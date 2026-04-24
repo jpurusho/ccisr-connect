@@ -1,0 +1,232 @@
+"use client"
+
+import { useEffect, useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import type { Member, Family, Address, WeddingAnniversary } from "@/types/database"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { MapPin, Phone, Mail, Heart } from "lucide-react"
+
+type FamilyWithDetails = Family & {
+  members: Member[]
+  addresses: Address[]
+  wedding_anniversaries: WeddingAnniversary[]
+}
+
+interface FamilyViewProps {
+  searchQuery: string
+  filter: "all" | "active" | "inactive" | "newcomers"
+}
+
+const MONTH_NAMES = [
+  "", "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+export function FamilyView({ searchQuery, filter }: FamilyViewProps) {
+  const router = useRouter()
+  const [families, setFamilies] = useState<FamilyWithDetails[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchFamilies() {
+      setLoading(true)
+      const supabase = createClient()
+
+      const { data, error } = await supabase
+        .from("families")
+        .select(
+          "*, members(*), addresses(*), wedding_anniversaries(*)"
+        )
+        .order("family_name", { ascending: true })
+
+      if (!error && data) {
+        setFamilies(data as FamilyWithDetails[])
+      }
+      setLoading(false)
+    }
+    fetchFamilies()
+  }, [])
+
+  const filtered = useMemo(() => {
+    let result = families
+
+    // Filter based on member status within families
+    if (filter === "active") {
+      result = result.filter((f) => f.is_active)
+    } else if (filter === "inactive") {
+      result = result.filter((f) => !f.is_active)
+    } else if (filter === "newcomers") {
+      result = result.filter((f) =>
+        f.members.some((m) => m.is_newcomer)
+      )
+    }
+
+    // Search by family name or member names/contact
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(
+        (f) =>
+          f.family_name.toLowerCase().includes(q) ||
+          f.members.some(
+            (m) =>
+              m.full_name.toLowerCase().includes(q) ||
+              (m.cell_phone && m.cell_phone.toLowerCase().includes(q)) ||
+              (m.email && m.email.toLowerCase().includes(q))
+          )
+      )
+    }
+
+    return result
+  }, [families, filter, searchQuery])
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-56 w-full rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  if (filtered.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <p className="text-muted-foreground">No families found.</p>
+        {searchQuery && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Try adjusting your search or filter.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {filtered.map((family) => {
+        const currentAddress = family.addresses.find((a) => a.is_current)
+        const anniversary = family.wedding_anniversaries[0]
+
+        // Sort members: husband first, then wife, then children
+        const roleOrder: Record<string, number> = {
+          husband: 0,
+          wife: 1,
+          child: 2,
+        }
+        const sortedMembers = [...family.members].sort(
+          (a, b) =>
+            (roleOrder[a.role_in_family] ?? 3) -
+            (roleOrder[b.role_in_family] ?? 3)
+        )
+
+        return (
+          <Card key={family.id}>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-lg">
+                    {family.family_name}
+                  </CardTitle>
+                  {currentAddress?.full_address && (
+                    <CardDescription className="mt-1 flex items-start gap-1.5">
+                      <MapPin className="mt-0.5 size-3.5 shrink-0" />
+                      <span>{currentAddress.full_address}</span>
+                    </CardDescription>
+                  )}
+                </div>
+                <Badge variant={family.is_active ? "default" : "outline"}>
+                  {family.is_active ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {family.home_phone && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Phone className="size-3.5 shrink-0" />
+                    <span>{family.home_phone}</span>
+                  </div>
+                )}
+
+                {/* Family members */}
+                <div className="space-y-2">
+                  {sortedMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-start justify-between gap-2 rounded-md p-2 transition-colors hover:bg-muted/50 cursor-pointer"
+                      onClick={() => router.push(`/members/${member.id}`)}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`inline-block size-2 rounded-full ${
+                              member.is_active
+                                ? "bg-green-500"
+                                : "bg-gray-400"
+                            }`}
+                          />
+                          <span className="truncate text-sm font-medium">
+                            {member.full_name}
+                          </span>
+                          <Badge
+                            variant="secondary"
+                            className="shrink-0 capitalize"
+                          >
+                            {member.role_in_family}
+                          </Badge>
+                          {member.is_newcomer && (
+                            <Badge variant="secondary" className="shrink-0">
+                              New
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 pl-3.5 text-xs text-muted-foreground">
+                          {member.cell_phone && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="size-3" />
+                              {member.cell_phone}
+                            </span>
+                          )}
+                          {member.email && (
+                            <span className="flex items-center gap-1">
+                              <Mail className="size-3" />
+                              {member.email}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Anniversary */}
+                {anniversary && (
+                  <div className="flex items-center gap-2 border-t pt-2 text-sm text-muted-foreground">
+                    <Heart className="size-3.5 shrink-0 text-pink-500" />
+                    <span>
+                      Anniversary: {MONTH_NAMES[anniversary.anniversary_month]}{" "}
+                      {anniversary.anniversary_day}
+                      {anniversary.anniversary_year
+                        ? `, ${anniversary.anniversary_year}`
+                        : ""}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
+  )
+}

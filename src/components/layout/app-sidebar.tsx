@@ -1,0 +1,135 @@
+"use client"
+
+import * as React from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import {
+  LayoutDashboard,
+  Users,
+  CalendarDays,
+  Send,
+  Clock,
+  History,
+  FileText,
+  Mail,
+  BarChart3,
+  UserCog,
+  Server,
+  Church,
+} from "lucide-react"
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "@/components/ui/sidebar"
+import { UserNav } from "@/components/layout/user-nav"
+
+const mainNavItems = [
+  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Members", href: "/members", icon: Users },
+  { title: "Calendar", href: "/calendar", icon: CalendarDays },
+  { title: "Compose", href: "/compose", icon: Send },
+  { title: "Dispatch Queue", href: "/dispatch", icon: Clock },
+  { title: "History", href: "/history", icon: History },
+  { title: "Templates", href: "/templates", icon: FileText },
+  { title: "Mailing Lists", href: "/mailing-lists", icon: Mail },
+  { title: "Reports", href: "/reports", icon: BarChart3 },
+]
+
+const settingsNavItems = [
+  { title: "User Management", href: "/settings/users", icon: UserCog },
+  { title: "SMTP Config", href: "/settings/smtp", icon: Server },
+]
+
+export function AppSidebar() {
+  const pathname = usePathname()
+
+  return (
+    <Sidebar>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Church className="size-4" />
+              </div>
+              <div className="flex flex-col gap-0.5 leading-none">
+                <span className="font-semibold">CCISR Connect</span>
+                <span className="text-xs text-muted-foreground">
+                  Church Management
+                </span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {mainNavItems.map((item) => {
+                const isActive =
+                  item.href === "/dashboard"
+                    ? pathname === "/dashboard"
+                    : pathname.startsWith(item.href)
+
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      tooltip={item.title}
+                      render={<Link href={item.href} />}
+                    >
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Settings</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {settingsNavItems.map((item) => {
+                const isActive = pathname.startsWith(item.href)
+
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      tooltip={item.title}
+                      render={<Link href={item.href} />}
+                    >
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <UserNav />
+      </SidebarFooter>
+    </Sidebar>
+  )
+}
