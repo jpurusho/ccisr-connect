@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import {
   Sun,
@@ -9,6 +10,7 @@ import {
   Star,
   Waves,
   TreePine,
+  Palette,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,19 +24,25 @@ import {
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
 
-  const icon =
-    theme === "dark" || theme === "github-dark" || theme === "midnight" ? (
-      <Moon className="size-4" />
-    ) : theme === "warm" ? (
-      <Flame className="size-4" />
-    ) : theme === "ocean" ? (
-      <Waves className="size-4" />
-    ) : theme === "forest" ? (
-      <TreePine className="size-4" />
-    ) : (
-      <Sun className="size-4" />
-    )
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const icon = !mounted ? (
+    <Palette className="size-4" />
+  ) : theme === "dark" || theme === "github-dark" || theme === "midnight" ? (
+    <Moon className="size-4" />
+  ) : theme === "warm" ? (
+    <Flame className="size-4" />
+  ) : theme === "ocean" ? (
+    <Waves className="size-4" />
+  ) : theme === "forest" ? (
+    <TreePine className="size-4" />
+  ) : (
+    <Sun className="size-4" />
+  )
 
   return (
     <DropdownMenu>
