@@ -7,13 +7,22 @@ import { Church } from "lucide-react";
 
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
-      },
-    });
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback`,
+        },
+      });
+      if (error) {
+        console.error("OAuth error:", error.message);
+        alert(`Sign-in error: ${error.message}`);
+      }
+    } catch (err) {
+      console.error("Sign-in failed:", err);
+      alert(`Sign-in failed: ${err}`);
+    }
   };
 
   return (

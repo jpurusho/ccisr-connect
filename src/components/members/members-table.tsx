@@ -15,6 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
+import { toast } from "sonner"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 type MemberWithFamily = Member & { families: Pick<Family, "family_name"> | null }
@@ -22,11 +24,12 @@ type MemberWithFamily = Member & { families: Pick<Family, "family_name"> | null 
 interface MembersTableProps {
   searchQuery: string
   filter: "all" | "active" | "inactive" | "newcomers"
+  onRefresh?: () => void
 }
 
 const PAGE_SIZE = 25
 
-export function MembersTable({ searchQuery, filter }: MembersTableProps) {
+export function MembersTable({ searchQuery, filter, onRefresh }: MembersTableProps) {
   const router = useRouter()
   const [members, setMembers] = useState<MemberWithFamily[]>([])
   const [loading, setLoading] = useState(true)
@@ -182,12 +185,29 @@ export function MembersTable({ searchQuery, filter }: MembersTableProps) {
                 </Badge>
               </TableCell>
               <TableCell>
-                <div className="flex items-center gap-1.5">
-                  {member.is_active ? (
-                    <Badge variant="default">Active</Badge>
-                  ) : (
-                    <Badge variant="outline">Inactive</Badge>
-                  )}
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <Switch
+                    size="sm"
+                    checked={member.is_active}
+                    onCheckedChange={async (checked) => {
+                      const supabase = createClient()
+                      const { error } = await supabase
+                        .from("members")
+                        .update({ is_active: checked } as never)
+                        .eq("id", member.id)
+                      if (error) {
+                        toast.error(`Failed: ${error.message}`)
+                      } else {
+                        setMembers((prev) =>
+                          prev.map((m) =>
+                            m.id === member.id ? { ...m, is_active: checked } : m
+                          )
+                        )
+                        onRefresh?.()
+                        toast.success(`${member.full_name} ${checked ? "activated" : "deactivated"}`)
+                      }
+                    }}
+                  />
                   {member.is_newcomer && (
                     <Badge variant="secondary">New</Badge>
                   )}

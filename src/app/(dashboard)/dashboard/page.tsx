@@ -203,6 +203,7 @@ export default function DashboardPage() {
   >(null)
   const [events, setEvents] = useState<UpcomingEvent[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [weekLabel, setWeekLabel] = useState("")
 
   useEffect(() => {
     const supabase = createClient()
@@ -211,6 +212,9 @@ export default function DashboardPage() {
 
     // Week bounds (Mon-Sun)
     const { monday, sunday } = getCurrentWeekBounds(today)
+    setWeekLabel(
+      `${MONTH_NAMES[monday.getMonth() + 1]} ${monday.getDate()} – ${MONTH_NAMES[sunday.getMonth() + 1]} ${sunday.getDate()}`
+    )
     const weekPairs = getMonthDayPairsInRange(monday, sunday)
 
     // Next 7 days for stat card
@@ -503,12 +507,12 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <div className="rounded-md p-1.5" style={{ backgroundColor: "#F5F3FF" }}>
-                <Cake className="size-4" style={{ color: "#7C3AED" }} />
+              <div className="rounded-md bg-purple-100 p-1.5 dark:bg-purple-900/40">
+                <Cake className="size-4 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <CardTitle>Birthdays This Week</CardTitle>
-                <CardDescription>Monday through Sunday</CardDescription>
+                <CardTitle>Birthdays — Week of {weekLabel}</CardTitle>
+                <CardDescription>For upcoming bulletin</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -524,14 +528,10 @@ export default function DashboardPage() {
                 {birthdays.map((b) => (
                   <div
                     key={b.id}
-                    className="flex items-center justify-between rounded-lg px-3 py-2"
-                    style={{ backgroundColor: "#F5F3FF" }}
+                    className="flex items-center justify-between rounded-lg bg-purple-50 px-3 py-2 dark:bg-purple-900/20"
                   >
                     <span className="text-sm font-medium">{b.full_name}</span>
-                    <span
-                      className="text-sm font-medium"
-                      style={{ color: "#7C3AED" }}
-                    >
+                    <span className="text-sm font-medium text-purple-600 dark:text-purple-400">
                       {formatMonthDay(b.birth_month, b.birth_day)}
                     </span>
                   </div>
@@ -545,12 +545,12 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <div className="rounded-md p-1.5" style={{ backgroundColor: "#FFFBEB" }}>
-                <Heart className="size-4" style={{ color: "#D97706" }} />
+              <div className="rounded-md bg-amber-100 p-1.5 dark:bg-amber-900/40">
+                <Heart className="size-4 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <CardTitle>Anniversaries This Week</CardTitle>
-                <CardDescription>Monday through Sunday</CardDescription>
+                <CardTitle>Anniversaries — Week of {weekLabel}</CardTitle>
+                <CardDescription>For upcoming bulletin</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -566,16 +566,12 @@ export default function DashboardPage() {
                 {anniversaries.map((a) => (
                   <div
                     key={a.id}
-                    className="flex items-center justify-between rounded-lg px-3 py-2"
-                    style={{ backgroundColor: "#FFFBEB" }}
+                    className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-900/20"
                   >
                     <span className="text-sm font-medium">
                       {a.husband_name} & {a.wife_name}
                     </span>
-                    <span
-                      className="text-sm font-medium"
-                      style={{ color: "#D97706" }}
-                    >
+                    <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
                       {formatMonthDay(
                         a.anniversary_month,
                         a.anniversary_day
