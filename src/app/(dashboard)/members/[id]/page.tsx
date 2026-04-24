@@ -43,21 +43,7 @@ type MemberDetail = Member & {
   families: Family | null
 }
 
-const MONTH_NAMES = [
-  "",
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-]
+import { MONTH_NAMES_FULL as MONTH_NAMES } from "@/lib/date-utils"
 
 export default function MemberDetailPage() {
   const params = useParams()

@@ -1,6 +1,7 @@
 "use client"
 
 import { format } from "date-fns"
+import { statusLabel } from "@/lib/date-utils"
 import {
   Dialog,
   DialogContent,
@@ -78,7 +79,7 @@ export function EventDetailDialog({
                 <span
                   className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[event.status] ?? ""}`}
                 >
-                  {event.status === "confirmed" ? "Scheduled" : event.status === "draft" ? "Tentative" : event.status.charAt(0).toUpperCase() + event.status.slice(1)}
+                  {statusLabel(event.status)}
                 </span>
               )}
             </div>

@@ -26,10 +26,7 @@ interface FamilyViewProps {
   filter: "all" | "active" | "inactive" | "newcomers"
 }
 
-const MONTH_NAMES = [
-  "", "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-]
+import { MONTH_NAMES_FULL as MONTH_NAMES } from "@/lib/date-utils"
 
 export function FamilyView({ searchQuery, filter }: FamilyViewProps) {
   const router = useRouter()

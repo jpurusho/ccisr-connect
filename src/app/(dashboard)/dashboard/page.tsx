@@ -1,30 +1,76 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import Link from "next/link"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Users,
   Home,
   Cake,
   Clock,
-  CalendarDays,
-  Send,
-  Mail,
-  ArrowRight,
+  BookOpen,
   Heart,
+  Newspaper,
+  CalendarDays,
+  Mail,
+  History,
+  ArrowRight,
+  Loader2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import type { EventInstanceStatus } from "@/types/database"
+import {
+  buildBirthdayCard,
+  buildAnniversaryCard,
+  buildBibleStudyCard,
+  buildWomensStudyCard,
+  buildBulletinCard,
+  type BirthdayEntry,
+  type AnniversaryEntry,
+} from "@/lib/email/card-builder"
+import { toast } from "sonner"
+import {
+  startOfWeek,
+  endOfWeek,
+  format,
+  addDays,
+  nextFriday,
+  isFriday,
+} from "date-fns"
+
+import {
+  WeeklyCommunicationCard,
+  type CommunicationStatus,
+} from "@/components/dashboard/weekly-communication-card"
+import {
+  BirthdayEditForm,
+  AnniversaryEditForm,
+  BibleStudyEditForm,
+  WomensStudyEditForm,
+  BulletinEditForm,
+  type BirthdayFormData,
+  type AnniversaryFormData,
+  type BibleStudyFormData,
+  type WomensStudyFormData,
+  type BulletinFormData,
+} from "@/components/dashboard/communication-edit-forms"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,434 +81,881 @@ interface Stats {
   pendingDispatches: number
 }
 
-interface BirthdayPerson {
+interface DispatchRecord {
   id: string
-  full_name: string
-  birth_month: number
-  birth_day: number
+  subject: string
+  status: string
+  scheduled_at: string | null
+  created_at: string
 }
 
-interface AnniversaryCouple {
+interface MailingListOption {
   id: string
-  husband_name: string
-  wife_name: string
-  anniversary_month: number
-  anniversary_day: number
-}
-
-interface UpcomingEvent {
-  id: string
-  instance_date: string
-  instance_time: string | null
-  status: EventInstanceStatus
-  event_title: string
+  name: string
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const MONTH_NAMES = [
-  "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-]
-
-function formatMonthDay(month: number, day: number): string {
-  return `${MONTH_NAMES[month]} ${day}`
-}
-
-function formatDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number)
-  return `${MONTH_NAMES[month]} ${day}, ${year}`
-}
-
-function formatTime(timeStr: string | null): string {
-  if (!timeStr) return ""
-  const [h, m] = timeStr.split(":").map(Number)
+function formatTime(time: string): string {
+  const [h, m] = time.split(":").map(Number)
   const ampm = h >= 12 ? "PM" : "AM"
-  const hour12 = h % 12 || 12
-  return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`
 }
 
-/**
- * Get (month, day) pairs for every date in a range [start, end] inclusive.
- * Handles month boundaries correctly by iterating day-by-day.
- */
-function getMonthDayPairsInRange(
-  start: Date,
-  end: Date
-): Array<{ month: number; day: number }> {
-  const pairs: Array<{ month: number; day: number }> = []
-  const current = new Date(start)
-  current.setHours(0, 0, 0, 0)
-  const endTime = new Date(end)
-  endTime.setHours(23, 59, 59, 999)
-
-  while (current <= endTime) {
-    pairs.push({ month: current.getMonth() + 1, day: current.getDate() })
-    current.setDate(current.getDate() + 1)
+function getWeekDays(monday: Date, sunday: Date) {
+  const days: { month: number; day: number }[] = []
+  for (let d = new Date(monday); d <= sunday; d = addDays(d, 1)) {
+    days.push({ month: d.getMonth() + 1, day: d.getDate() })
   }
-  return pairs
+  return days
 }
 
-/**
- * Get Monday and Sunday of the current week (Mon-Sun) for a given date.
- */
-function getCurrentWeekBounds(today: Date): { monday: Date; sunday: Date } {
-  const d = new Date(today)
-  d.setHours(0, 0, 0, 0)
-  const dayOfWeek = d.getDay() // 0=Sun, 1=Mon, ...
-  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  const monday = new Date(d)
-  monday.setDate(d.getDate() + diffToMonday)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  return { monday, sunday }
-}
-
-/**
- * Get the date range [today, today+6] for the "next 7 days" birthday count.
- */
-function getNext7DaysBounds(today: Date): { start: Date; end: Date } {
-  const start = new Date(today)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setDate(start.getDate() + 6)
-  return { start, end }
-}
-
-// ── Status badge variant mapping ───────────────────────────────────────────
-
-function statusLabel(status: EventInstanceStatus): string {
-  switch (status) {
-    case "confirmed": return "Scheduled"
-    case "draft": return "Tentative"
-    case "cancelled": return "Cancelled"
-    default: return status
-  }
-}
-
-function statusBadgeVariant(status: EventInstanceStatus) {
-  switch (status) {
-    case "confirmed":
-      return "default" as const
-    case "draft":
-      return "secondary" as const
+/** Map a dispatch_queue status to our card status */
+function mapDispatchStatus(dbStatus: string): CommunicationStatus {
+  switch (dbStatus) {
+    case "sent":
+      return "sent"
+    case "failed":
+      return "failed"
+    case "sending":
+    case "pending":
+    case "previewed":
+    case "approved":
+      return "scheduled"
     case "cancelled":
-      return "destructive" as const
+      return "draft"
     default:
-      return "outline" as const
+      return "draft"
   }
 }
 
-// ── Skeleton components ────────────────────────────────────────────────────
+// Communication type keys we track dispatches for
+type CommType =
+  | "birthday"
+  | "anniversary"
+  | "bible_study"
+  | "womens_study"
+  | "bulletin"
 
-function StatCardSkeleton() {
+// Subject-based matching to find existing dispatches for each type
+const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
+  birthday: (s) => /birthday/i.test(s),
+  anniversary: (s) => /anniversary/i.test(s),
+  bible_study: (s) => /bible study this friday/i.test(s),
+  womens_study: (s) => /women.*bible study/i.test(s),
+  bulletin: (s) => /weekly bulletin/i.test(s),
+}
+
+// ── Stat card config type ─────────────────────────────────────────────────
+
+interface StatCardConfig {
+  title: string
+  value: number
+  icon: typeof Home
+  color: string
+  bg: string
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────
+
+function CardSkeleton() {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="size-4" />
+    <Card className="relative overflow-hidden">
+      <div className="absolute inset-y-0 left-0 w-1 bg-muted" />
+      <div className="space-y-3 p-4 pl-5">
+        <div className="flex items-center gap-2">
+          <Skeleton className="size-8 rounded-lg" />
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="ml-auto h-5 w-16 rounded-full" />
         </div>
-        <Skeleton className="mt-1 h-8 w-16" />
-      </CardHeader>
-      <CardContent>
-        <Skeleton className="h-3 w-20" />
-      </CardContent>
+        <div className="space-y-1.5">
+          <Skeleton className="h-3.5 w-64" />
+          <Skeleton className="h-3.5 w-48" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-7 w-16 rounded-md" />
+          <Skeleton className="h-7 w-20 rounded-md" />
+          <Skeleton className="h-7 w-20 rounded-md" />
+          <Skeleton className="h-7 w-20 rounded-md" />
+        </div>
+      </div>
     </Card>
   )
 }
 
-function ListSkeleton({ rows = 3 }: { rows?: number }) {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center justify-between">
-          <Skeleton className="h-4 w-36" />
-          <Skeleton className="h-4 w-16" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function EventsSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4">
-          <Skeleton className="h-10 w-14 rounded-md" />
-          <div className="flex-1 space-y-1.5">
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-3 w-24" />
-          </div>
-          <Skeleton className="h-5 w-16 rounded-full" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── Main component ─────────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [birthdays, setBirthdays] = useState<BirthdayPerson[] | null>(null)
-  const [anniversaries, setAnniversaries] = useState<
-    AnniversaryCouple[] | null
-  >(null)
-  const [events, setEvents] = useState<UpcomingEvent[] | null>(null)
+  // ---- Global state ----
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
   const [weekLabel, setWeekLabel] = useState("")
+  const [dispatches, setDispatches] = useState<
+    Record<CommType, DispatchRecord | null>
+  >({
+    birthday: null,
+    anniversary: null,
+    bible_study: null,
+    womens_study: null,
+    bulletin: null,
+  })
 
+  // ---- Form state for each communication ----
+  const [birthdayForm, setBirthdayForm] = useState<BirthdayFormData>({
+    weekLabel: "",
+    birthdays: [],
+    message: "",
+  })
+  const [anniversaryForm, setAnniversaryForm] = useState<AnniversaryFormData>({
+    weekLabel: "",
+    anniversaries: [],
+    message: "",
+  })
+  const [bibleStudyForm, setBibleStudyForm] = useState<BibleStudyFormData>({
+    hostNames: "TBD",
+    address: "TBD",
+    city: "",
+    phone: "",
+    date: "",
+    time: "7:30 PM",
+    topic: "Studying the Book of Acts",
+    message: "",
+  })
+  const [womensStudyForm, setWomensStudyForm] = useState<WomensStudyFormData>({
+    topic: "Building a Relationship with God",
+    date: "",
+    time: "7:00 PM",
+    zoomLink: "",
+    message: "",
+  })
+  const [bulletinForm, setBulletinForm] = useState<BulletinFormData>({
+    weekLabel: "",
+    birthdays: [],
+    anniversaries: [],
+    helpers: [],
+    events: [],
+  })
+
+  // ---- Mailing list state ----
+  const [mailingLists, setMailingLists] = useState<MailingListOption[]>([])
+  const [selectedMailingList, setSelectedMailingList] = useState("")
+
+  // ---- Schedule dialog state ----
+  const [scheduleDialog, setScheduleDialog] = useState<{
+    open: boolean
+    commType: CommType | null
+    dateTime: string
+  }>({ open: false, commType: null, dateTime: "" })
+  const [sendingType, setSendingType] = useState<CommType | null>(null)
+
+  // ---- Data fetch ----
   useEffect(() => {
-    const supabase = createClient()
-    const today = new Date()
-    const todayISO = today.toISOString().split("T")[0]
+    fetchAll()
+  }, [])
 
-    // Week bounds (Mon-Sun)
-    const { monday, sunday } = getCurrentWeekBounds(today)
-    setWeekLabel(
-      `${MONTH_NAMES[monday.getMonth() + 1]} ${monday.getDate()} – ${MONTH_NAMES[sunday.getMonth() + 1]} ${sunday.getDate()}`
-    )
-    const weekPairs = getMonthDayPairsInRange(monday, sunday)
+  async function fetchAll() {
+    setLoading(true)
+    setError(null)
 
-    // Next 7 days for stat card
-    const { start: next7Start, end: next7End } = getNext7DaysBounds(today)
-    const next7Pairs = getMonthDayPairsInRange(next7Start, next7End)
+    try {
+      const supabase = createClient()
+      const today = new Date()
+      const monday = startOfWeek(today, { weekStartsOn: 1 })
+      const sunday = endOfWeek(today, { weekStartsOn: 1 })
+      const wl = `${format(monday, "MMM d")} – ${format(sunday, "MMM d")}`
+      setWeekLabel(wl)
 
-    async function fetchAll() {
-      try {
-        // ── Stats: Total Families ────────────────────────────────────
-        const familiesPromise = supabase
+      const weekDays = getWeekDays(monday, sunday)
+      const weekMonths = [...new Set(weekDays.map((d) => d.month))]
+      const weekSet = new Set(weekDays.map((d) => `${d.month}-${d.day}`))
+
+      // Next 7 days for stat card
+      const next7End = addDays(today, 6)
+      const next7Days = getWeekDays(today, next7End)
+      const next7Months = [...new Set(next7Days.map((d) => d.month))]
+      const next7Set = new Set(next7Days.map((d) => `${d.month}-${d.day}`))
+
+      // Friday for bible study
+      const fri = isFriday(today) ? today : nextFriday(today)
+      const friISO = format(fri, "yyyy-MM-dd")
+
+      // Monday/Sunday ISO for dispatch query
+      const mondayISO = format(monday, "yyyy-MM-dd")
+      const sundayISO = format(sunday, "yyyy-MM-dd")
+
+      // Run all queries in parallel
+      const [
+        familiesRes,
+        membersRes,
+        dispatchCountRes,
+        birthdayCountRes,
+        weekBirthdaysRes,
+        weekAnniversariesRes,
+        bibleStudyRes,
+        weekDispatchesRes,
+        mailingListsRes,
+      ] = await Promise.all([
+        // Stats
+        supabase
           .from("families")
           .select("id", { count: "exact", head: true })
-          .eq("is_active", true)
-
-        // ── Stats: Active Members ────────────────────────────────────
-        const membersPromise = supabase
+          .eq("is_active", true),
+        supabase
           .from("members")
           .select("id", { count: "exact", head: true })
-          .eq("is_active", true)
-
-        // ── Stats: Pending Dispatches ────────────────────────────────
-        const dispatchPromise = supabase
+          .eq("is_active", true),
+        supabase
           .from("dispatch_queue")
           .select("id", { count: "exact", head: true })
-          .in("status", ["pending", "previewed", "approved"])
+          .in("status", ["pending", "previewed", "approved"]),
 
-        // ── Upcoming Birthdays (next 7 days) - fetch members then filter
-        const birthdayMonths = [...new Set(next7Pairs.map((p) => p.month))]
-        const birthdayCountPromise = supabase
+        // Birthday count (next 7 days)
+        supabase
           .from("members")
           .select("birth_month, birth_day")
           .eq("is_active", true)
           .not("birth_month", "is", null)
           .not("birth_day", "is", null)
-          .in("birth_month", birthdayMonths)
-          .returns<Array<{ birth_month: number; birth_day: number }>>()
+          .in("birth_month", next7Months)
+          .returns<{ birth_month: number; birth_day: number }[]>(),
 
-        // ── This Week Birthdays ──────────────────────────────────────
-        const weekBirthdayMonths = [...new Set(weekPairs.map((p) => p.month))]
-        const weekBirthdaysPromise = supabase
+        // This week birthdays
+        supabase
           .from("members")
           .select("id, full_name, birth_month, birth_day")
           .eq("is_active", true)
           .not("birth_month", "is", null)
           .not("birth_day", "is", null)
-          .in("birth_month", weekBirthdayMonths)
-          .returns<BirthdayPerson[]>()
+          .in("birth_month", weekMonths)
+          .returns<
+            {
+              id: string
+              full_name: string
+              birth_month: number
+              birth_day: number
+            }[]
+          >(),
 
-        // ── This Week Anniversaries ──────────────────────────────────
-        const weekAnniMonths = [...new Set(weekPairs.map((p) => p.month))]
-        const weekAnniversariesPromise = supabase
+        // This week anniversaries
+        supabase
           .from("wedding_anniversaries")
           .select(
-            "id, anniversary_month, anniversary_day, husband:members!husband_member_id(full_name), wife:members!wife_member_id(full_name)"
+            "id, anniversary_month, anniversary_day, anniversary_year, husband:members!husband_member_id(full_name), wife:members!wife_member_id(full_name)"
           )
-          .in("anniversary_month", weekAnniMonths)
-          .returns<Array<{
-            id: string
-            anniversary_month: number
-            anniversary_day: number
-            husband: { full_name: string } | null
-            wife: { full_name: string } | null
-          }>>()
+          .in("anniversary_month", weekMonths)
+          .returns<
+            {
+              id: string
+              anniversary_month: number
+              anniversary_day: number
+              anniversary_year: number | null
+              husband: { full_name: string } | null
+              wife: { full_name: string } | null
+            }[]
+          >(),
 
-        // ── Upcoming Events ──────────────────────────────────────────
-        const eventsPromise = supabase
+        // Bible study instance
+        supabase
           .from("event_instances")
-          .select("id, instance_date, instance_time, status, event:events(title)")
-          .gte("instance_date", todayISO)
-          .order("instance_date", { ascending: true })
-          .limit(5)
-          .returns<Array<{
-            id: string
-            instance_date: string
-            instance_time: string | null
-            status: EventInstanceStatus
-            event: { title: string } | null
-          }>>()
+          .select(
+            "instance_date, instance_time, location_override, notes, host_family_id"
+          )
+          .eq("instance_date", friISO)
+          .eq("status", "confirmed")
+          .limit(1)
+          .returns<
+            {
+              instance_date: string
+              instance_time: string | null
+              location_override: string | null
+              notes: string | null
+              host_family_id: string | null
+            }[]
+          >(),
 
-        // Run all queries in parallel
-        const [
-          familiesRes,
-          membersRes,
-          dispatchRes,
-          birthdayCountRes,
-          weekBirthdaysRes,
-          weekAnniversariesRes,
-          eventsRes,
-        ] = await Promise.all([
-          familiesPromise,
-          membersPromise,
-          dispatchPromise,
-          birthdayCountPromise,
-          weekBirthdaysPromise,
-          weekAnniversariesPromise,
-          eventsPromise,
+        // This week dispatches
+        supabase
+          .from("dispatch_queue")
+          .select("id, subject, status, scheduled_at, created_at")
+          .gte("created_at", mondayISO)
+          .lte("created_at", sundayISO + "T23:59:59")
+          .not("status", "eq", "cancelled")
+          .order("created_at", { ascending: false })
+          .returns<DispatchRecord[]>(),
+
+        // Mailing lists
+        supabase
+          .from("mailing_lists")
+          .select("id, name")
+          .order("name")
+          .returns<MailingListOption[]>(),
+      ])
+
+      // Check errors
+      if (familiesRes.error) throw familiesRes.error
+      if (membersRes.error) throw membersRes.error
+      if (dispatchCountRes.error) throw dispatchCountRes.error
+      if (birthdayCountRes.error) throw birthdayCountRes.error
+      if (weekBirthdaysRes.error) throw weekBirthdaysRes.error
+      if (weekAnniversariesRes.error) throw weekAnniversariesRes.error
+      if (bibleStudyRes.error) throw bibleStudyRes.error
+      if (weekDispatchesRes.error) throw weekDispatchesRes.error
+      if (mailingListsRes.error) throw mailingListsRes.error
+
+      // ---- Stats ----
+      const upcomingBirthdayCount = (birthdayCountRes.data ?? []).filter((m) =>
+        next7Set.has(`${m.birth_month}-${m.birth_day}`)
+      ).length
+
+      setStats({
+        totalFamilies: familiesRes.count ?? 0,
+        activeMembers: membersRes.count ?? 0,
+        upcomingBirthdays: upcomingBirthdayCount,
+        pendingDispatches: dispatchCountRes.count ?? 0,
+      })
+
+      // ---- Process birthdays ----
+      const bdays = (weekBirthdaysRes.data ?? [])
+        .filter((m) => weekSet.has(`${m.birth_month}-${m.birth_day}`))
+        .sort((a, b) =>
+          a.birth_month !== b.birth_month
+            ? a.birth_month - b.birth_month
+            : a.birth_day - b.birth_day
+        )
+
+      const bdayEntries: BirthdayEntry[] = bdays.map((m) => ({
+        name: m.full_name,
+        date: `${m.birth_month}/${m.birth_day}`,
+      }))
+
+      setBirthdayForm({
+        weekLabel: wl,
+        birthdays: bdayEntries,
+        message: "",
+      })
+
+      // ---- Process anniversaries ----
+      const currentYear = today.getFullYear()
+      const annis = (weekAnniversariesRes.data ?? [])
+        .filter((a) =>
+          weekSet.has(`${a.anniversary_month}-${a.anniversary_day}`)
+        )
+        .sort((a, b) =>
+          a.anniversary_month !== b.anniversary_month
+            ? a.anniversary_month - b.anniversary_month
+            : a.anniversary_day - b.anniversary_day
+        )
+
+      const anniEntries: AnniversaryEntry[] = annis.map((a) => ({
+        husbandName: a.husband?.full_name?.split(" ")[0] ?? "?",
+        wifeName: a.wife?.full_name?.split(" ")[0] ?? "?",
+        date: `${a.anniversary_month}/${a.anniversary_day}`,
+        years: a.anniversary_year
+          ? currentYear - a.anniversary_year
+          : undefined,
+      }))
+
+      setAnniversaryForm({
+        weekLabel: wl,
+        anniversaries: anniEntries,
+        message: "",
+      })
+
+      // ---- Process Bible Study ----
+      const bsInstance =
+        bibleStudyRes.data && bibleStudyRes.data.length > 0
+          ? bibleStudyRes.data[0]
+          : null
+
+      let bsHostName = "TBD"
+      let bsAddress = "TBD"
+      let bsPhone = ""
+      const bsCity = ""
+
+      if (bsInstance?.host_family_id) {
+        const [familyRes, addrRes] = await Promise.all([
+          supabase
+            .from("families")
+            .select("family_name, home_phone")
+            .eq("id", bsInstance.host_family_id)
+            .returns<{ family_name: string; home_phone: string | null }[]>()
+            .single(),
+          supabase
+            .from("addresses")
+            .select("full_address")
+            .eq("family_id", bsInstance.host_family_id)
+            .eq("is_current", true)
+            .returns<{ full_address: string }[]>()
+            .limit(1)
+            .single(),
         ])
 
-        // Check for errors
-        if (familiesRes.error) throw familiesRes.error
-        if (membersRes.error) throw membersRes.error
-        if (dispatchRes.error) throw dispatchRes.error
-        if (birthdayCountRes.error) throw birthdayCountRes.error
-        if (weekBirthdaysRes.error) throw weekBirthdaysRes.error
-        if (weekAnniversariesRes.error) throw weekAnniversariesRes.error
-        if (eventsRes.error) throw eventsRes.error
-
-        // ── Process upcoming birthday count (next 7 days) ────────────
-        const next7Set = new Set(
-          next7Pairs.map((p) => `${p.month}-${p.day}`)
-        )
-        const upcomingBirthdayCount = (birthdayCountRes.data ?? []).filter(
-          (m) => next7Set.has(`${m.birth_month}-${m.birth_day}`)
-        ).length
-
-        // ── Process this week's birthdays ────────────────────────────
-        const weekSet = new Set(weekPairs.map((p) => `${p.month}-${p.day}`))
-        const filteredBirthdays = (weekBirthdaysRes.data ?? [])
-          .filter((m) => weekSet.has(`${m.birth_month}-${m.birth_day}`))
-          .sort((a, b) => {
-            if (a.birth_month !== b.birth_month)
-              return a.birth_month - b.birth_month
-            return a.birth_day - b.birth_day
-          })
-
-        // ── Process this week's anniversaries ────────────────────────
-        const filteredAnniversaries: AnniversaryCouple[] = (weekAnniversariesRes.data ?? [])
-          .filter((a) =>
-            weekSet.has(`${a.anniversary_month}-${a.anniversary_day}`)
-          )
-          .sort((a, b) => {
-            if (a.anniversary_month !== b.anniversary_month)
-              return a.anniversary_month - b.anniversary_month
-            return a.anniversary_day - b.anniversary_day
-          })
-          .map((a) => ({
-            id: a.id,
-            husband_name: a.husband?.full_name ?? "Unknown",
-            wife_name: a.wife?.full_name ?? "Unknown",
-            anniversary_month: a.anniversary_month,
-            anniversary_day: a.anniversary_day,
-          }))
-
-        // ── Process upcoming events ──────────────────────────────────
-        const processedEvents: UpcomingEvent[] = (eventsRes.data ?? []).map((e) => ({
-          id: e.id,
-          instance_date: e.instance_date,
-          instance_time: e.instance_time,
-          status: e.status,
-          event_title: e.event?.title ?? "Untitled Event",
-        }))
-
-        // ── Set state ────────────────────────────────────────────────
-        setStats({
-          totalFamilies: familiesRes.count ?? 0,
-          activeMembers: membersRes.count ?? 0,
-          upcomingBirthdays: upcomingBirthdayCount,
-          pendingDispatches: dispatchRes.count ?? 0,
-        })
-        setBirthdays(filteredBirthdays)
-        setAnniversaries(filteredAnniversaries)
-        setEvents(processedEvents)
-      } catch (err) {
-        console.error("Dashboard fetch error:", err)
-        setError(
-          err instanceof Error ? err.message : "Failed to load dashboard data"
-        )
+        if (familyRes.data) {
+          bsHostName = familyRes.data.family_name
+          bsPhone = familyRes.data.home_phone ?? ""
+        }
+        if (addrRes.data) bsAddress = addrRes.data.full_address
       }
+
+      if (bsInstance?.location_override) bsAddress = bsInstance.location_override
+      if (bsInstance?.notes) {
+        const contactMatch = bsInstance.notes.match(/Contact:\s*(.+)/i)
+        if (contactMatch) bsPhone = contactMatch[1].trim()
+      }
+
+      setBibleStudyForm({
+        hostNames: bsHostName,
+        address: bsAddress,
+        city: bsCity,
+        phone: bsPhone,
+        date: format(fri, "EEEE, MMMM do"),
+        time: bsInstance?.instance_time
+          ? formatTime(bsInstance.instance_time)
+          : "7:30 PM",
+        topic: "Studying the Book of Acts",
+        message: "",
+      })
+
+      // ---- Women's Study ----
+      const wed = addDays(monday, 2) // Wednesday
+      setWomensStudyForm({
+        topic: "Building a Relationship with God",
+        date: format(wed, "EEEE, MMMM do"),
+        time: "7:00 PM",
+        zoomLink: "",
+        message: "",
+      })
+
+      // ---- Bulletin ----
+      setBulletinForm({
+        weekLabel: `Week of ${wl}`,
+        birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
+        anniversaries: anniEntries.map((a) => ({
+          names: `${a.husbandName} & ${a.wifeName}`,
+          date: a.date,
+        })),
+        helpers: [],
+        events: [
+          {
+            title: "Women's Bible Study",
+            details: `Building a Relationship with God — ${format(wed, "EEEE")} @ 7:00 PM via Zoom`,
+          },
+          {
+            title: "San Ramon Bible Study",
+            details: `Studying the Book of Acts — ${format(fri, "EEEE")} at ${bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : "7:30 PM"}`,
+          },
+        ],
+      })
+
+      // ---- Mailing lists ----
+      setMailingLists(mailingListsRes.data ?? [])
+
+      // ---- Match dispatches to communication types ----
+      const weekDispatches = weekDispatchesRes.data ?? []
+      const matchedDispatches: Record<CommType, DispatchRecord | null> = {
+        birthday: null,
+        anniversary: null,
+        bible_study: null,
+        womens_study: null,
+        bulletin: null,
+      }
+
+      for (const d of weekDispatches) {
+        for (const [type, matcher] of Object.entries(DISPATCH_MATCHERS)) {
+          if (
+            matcher(d.subject) &&
+            !matchedDispatches[type as CommType]
+          ) {
+            matchedDispatches[type as CommType] = d
+          }
+        }
+      }
+
+      setDispatches(matchedDispatches)
+    } catch (err) {
+      console.error("Dashboard fetch error:", err)
+      setError(
+        err instanceof Error ? err.message : "Failed to load dashboard data"
+      )
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchAll()
-  }, [])
+  // ---- Computed status for each communication ----
+  function getStatus(type: CommType): CommunicationStatus {
+    const d = dispatches[type]
+    if (!d) return "draft"
+    return mapDispatchStatus(d.status)
+  }
 
-  // ── Stat card config ───────────────────────────────────────────────────
+  function getScheduledAt(type: CommType): Date | null {
+    const d = dispatches[type]
+    if (!d?.scheduled_at) return null
+    return new Date(d.scheduled_at)
+  }
 
-  const statCards = stats
+  // ---- Preview HTML builders (memoized) ----
+  const birthdayPreview = useMemo(() => {
+    if (birthdayForm.birthdays.length === 0) return null
+    return buildBirthdayCard({
+      weekLabel: birthdayForm.weekLabel,
+      birthdays: birthdayForm.birthdays,
+      message: birthdayForm.message || undefined,
+    })
+  }, [birthdayForm])
+
+  const anniversaryPreview = useMemo(() => {
+    if (anniversaryForm.anniversaries.length === 0) return null
+    return buildAnniversaryCard({
+      weekLabel: anniversaryForm.weekLabel,
+      anniversaries: anniversaryForm.anniversaries,
+      message: anniversaryForm.message || undefined,
+    })
+  }, [anniversaryForm])
+
+  const bibleStudyPreview = useMemo(
+    () =>
+      buildBibleStudyCard({
+        hostNames: bibleStudyForm.hostNames,
+        address: bibleStudyForm.address,
+        city: bibleStudyForm.city || undefined,
+        phone: bibleStudyForm.phone || undefined,
+        date: bibleStudyForm.date,
+        time: bibleStudyForm.time,
+        topic: bibleStudyForm.topic || undefined,
+        message: bibleStudyForm.message || undefined,
+      }),
+    [bibleStudyForm]
+  )
+
+  const womensStudyPreview = useMemo(
+    () =>
+      buildWomensStudyCard({
+        topic: womensStudyForm.topic,
+        date: womensStudyForm.date,
+        time: womensStudyForm.time,
+        zoomLink: womensStudyForm.zoomLink || undefined,
+        message: womensStudyForm.message || undefined,
+      }),
+    [womensStudyForm]
+  )
+
+  const bulletinPreview = useMemo(
+    () =>
+      buildBulletinCard({
+        weekLabel: bulletinForm.weekLabel,
+        birthdays: bulletinForm.birthdays,
+        anniversaries: bulletinForm.anniversaries,
+        helpers: bulletinForm.helpers,
+        events: bulletinForm.events,
+      }),
+    [bulletinForm]
+  )
+
+  // ---- Subject lines ----
+  function getSubject(type: CommType): string {
+    switch (type) {
+      case "birthday":
+        return `Happy Birthday! — Week of ${weekLabel}`
+      case "anniversary":
+        return `Happy Anniversary! — Week of ${weekLabel}`
+      case "bible_study":
+        return `Bible Study This Friday — ${bibleStudyForm.date}`
+      case "womens_study":
+        return `Women's Bible Study This Wednesday`
+      case "bulletin":
+        return `Weekly Bulletin — ${bulletinForm.weekLabel}`
+    }
+  }
+
+  // ---- Get preview for type ----
+  function getPreview(type: CommType): string | null {
+    switch (type) {
+      case "birthday":
+        return birthdayPreview
+      case "anniversary":
+        return anniversaryPreview
+      case "bible_study":
+        return bibleStudyPreview
+      case "womens_study":
+        return womensStudyPreview
+      case "bulletin":
+        return bulletinPreview
+    }
+  }
+
+  // ---- Queue / Send ----
+  const handleSendNow = useCallback(
+    async (type: CommType) => {
+      const html = getPreview(type)
+      const subject = getSubject(type)
+      if (!html) {
+        toast.error("No content to send. Please add data first.")
+        return
+      }
+
+      setSendingType(type)
+      try {
+        const supabase = createClient()
+        const { error } = await supabase.from("dispatch_queue").insert({
+          subject,
+          body_html: html,
+          scheduled_at: new Date().toISOString(),
+          status: "pending",
+          mailing_list_id: selectedMailingList || null,
+        } as never)
+
+        if (error) {
+          toast.error(`Failed: ${error.message}`)
+        } else {
+          toast.success(
+            `"${subject}" queued for dispatch. Go to Dispatch Queue to approve and send.`
+          )
+          // Update local state to show as scheduled
+          setDispatches((prev) => ({
+            ...prev,
+            [type]: {
+              id: "local",
+              subject,
+              status: "pending",
+              scheduled_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+            },
+          }))
+        }
+      } catch {
+        toast.error("An unexpected error occurred")
+      } finally {
+        setSendingType(null)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      selectedMailingList,
+      weekLabel,
+      birthdayPreview,
+      anniversaryPreview,
+      bibleStudyPreview,
+      womensStudyPreview,
+      bulletinPreview,
+      birthdayForm,
+      anniversaryForm,
+      bibleStudyForm,
+      womensStudyForm,
+      bulletinForm,
+    ]
+  )
+
+  const handleSchedule = useCallback(
+    async (type: CommType) => {
+      const html = getPreview(type)
+      if (!html) {
+        toast.error("No content to schedule. Please add data first.")
+        return
+      }
+      // Open schedule dialog
+      setScheduleDialog({
+        open: true,
+        commType: type,
+        dateTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+      })
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      birthdayPreview,
+      anniversaryPreview,
+      bibleStudyPreview,
+      womensStudyPreview,
+      bulletinPreview,
+      birthdayForm,
+      anniversaryForm,
+      bibleStudyForm,
+      womensStudyForm,
+      bulletinForm,
+      weekLabel,
+    ]
+  )
+
+  const confirmSchedule = useCallback(async () => {
+    const type = scheduleDialog.commType
+    if (!type) return
+
+    const html = getPreview(type)
+    const subject = getSubject(type)
+    if (!html) return
+
+    setSendingType(type)
+    setScheduleDialog((prev) => ({ ...prev, open: false }))
+
+    try {
+      const supabase = createClient()
+      const scheduledAt = new Date(scheduleDialog.dateTime).toISOString()
+
+      const { error } = await supabase.from("dispatch_queue").insert({
+        subject,
+        body_html: html,
+        scheduled_at: scheduledAt,
+        status: "pending",
+        mailing_list_id: selectedMailingList || null,
+      } as never)
+
+      if (error) {
+        toast.error(`Failed: ${error.message}`)
+      } else {
+        toast.success(
+          `"${subject}" scheduled for ${format(new Date(scheduledAt), "EEE, MMM d 'at' h:mm a")}`
+        )
+        setDispatches((prev) => ({
+          ...prev,
+          [type]: {
+            id: "local",
+            subject,
+            status: "pending",
+            scheduled_at: scheduledAt,
+            created_at: new Date().toISOString(),
+          },
+        }))
+      }
+    } catch {
+      toast.error("An unexpected error occurred")
+    } finally {
+      setSendingType(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    scheduleDialog,
+    selectedMailingList,
+    birthdayPreview,
+    anniversaryPreview,
+    bibleStudyPreview,
+    womensStudyPreview,
+    bulletinPreview,
+    birthdayForm,
+    anniversaryForm,
+    bibleStudyForm,
+    womensStudyForm,
+    bulletinForm,
+    weekLabel,
+  ])
+
+  // ---- Stat card config ----
+  const statCards: StatCardConfig[] | null = stats
     ? [
         {
-          title: "Total Families",
+          title: "Families",
           value: stats.totalFamilies,
-          description: "Registered families",
           icon: Home,
           color: "text-blue-600 dark:text-blue-400",
           bg: "bg-blue-100 dark:bg-blue-950/40",
-          hex: "#3b82f6",
         },
         {
-          title: "Active Members",
+          title: "Members",
           value: stats.activeMembers,
-          description: "Currently active",
           icon: Users,
           color: "text-emerald-600 dark:text-emerald-400",
           bg: "bg-emerald-100 dark:bg-emerald-950/40",
-          hex: "#10b981",
         },
         {
-          title: "Upcoming Birthdays",
+          title: "Birthdays (7d)",
           value: stats.upcomingBirthdays,
-          description: "In the next 7 days",
           icon: Cake,
           color: "text-purple-600 dark:text-purple-400",
           bg: "bg-purple-100 dark:bg-purple-950/40",
-          hex: "#7c3aed",
         },
         {
-          title: "Pending Dispatches",
+          title: "Pending",
           value: stats.pendingDispatches,
-          description: "Awaiting send",
           icon: Clock,
           color: "text-amber-600 dark:text-amber-400",
           bg: "bg-amber-100 dark:bg-amber-950/40",
-          hex: "#d97706",
         },
       ]
     : null
 
-  // ── Error state ────────────────────────────────────────────────────────
+  // ---- Summary lines ----
+  const birthdaySummary = useMemo(() => {
+    const names = birthdayForm.birthdays.map((b) => b.name).filter(Boolean)
+    if (names.length === 0) return ["No birthdays this week"]
+    const list =
+      names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")} +${names.length - 3} more`
+    return [`${names.length} birthday${names.length > 1 ? "s" : ""}: ${list}`]
+  }, [birthdayForm.birthdays])
 
+  const anniversarySummary = useMemo(() => {
+    const couples = anniversaryForm.anniversaries
+    if (couples.length === 0) return ["No anniversaries this week"]
+    const names = couples.map((a) => `${a.husbandName} & ${a.wifeName}`)
+    const list =
+      names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} +${names.length - 2} more`
+    return [
+      `${couples.length} anniversary${couples.length > 1 ? "ies" : "y"}: ${list}`,
+    ]
+  }, [anniversaryForm.anniversaries])
+
+  const bibleStudySummary = useMemo(() => {
+    const lines: string[] = []
+    lines.push(
+      `Host: ${bibleStudyForm.hostNames} — ${bibleStudyForm.date} at ${bibleStudyForm.time}`
+    )
+    if (bibleStudyForm.address !== "TBD") {
+      lines.push(`Location: ${bibleStudyForm.address}`)
+    }
+    if (bibleStudyForm.topic) {
+      lines.push(`Topic: ${bibleStudyForm.topic}`)
+    }
+    return lines
+  }, [bibleStudyForm])
+
+  const womensStudySummary = useMemo(() => {
+    const lines: string[] = []
+    lines.push(`${womensStudyForm.date} at ${womensStudyForm.time} via Zoom`)
+    if (womensStudyForm.topic) {
+      lines.push(`Topic: ${womensStudyForm.topic}`)
+    }
+    return lines
+  }, [womensStudyForm])
+
+  const bulletinSummary = useMemo(() => {
+    const parts: string[] = []
+    const bc = bulletinForm.birthdays.length
+    const ac = bulletinForm.anniversaries.length
+    const ec = bulletinForm.events.length
+    const hc = bulletinForm.helpers.length
+    if (bc > 0) parts.push(`${bc} birthday${bc > 1 ? "s" : ""}`)
+    if (ac > 0) parts.push(`${ac} anniversary${ac > 1 ? "ies" : "y"}`)
+    if (hc > 0) parts.push(`${hc} helper${hc > 1 ? "s" : ""}`)
+    if (ec > 0) parts.push(`${ec} event${ec > 1 ? "s" : ""}`)
+    return [
+      parts.length > 0
+        ? `Contains: ${parts.join(", ")}`
+        : "Empty bulletin — add content",
+    ]
+  }, [bulletinForm])
+
+  // ---- Error state ----
   if (error) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Welcome to CCISR Connect
+          <h1 className="text-2xl font-bold tracking-tight">
+            Weekly Command Center
           </h1>
-          <p className="text-muted-foreground">
-            Church membership management and communication platform.
+          <p className="text-sm text-muted-foreground">
+            Week of {weekLabel || "..."}
           </p>
         </div>
         <Card>
           <CardContent className="py-8 text-center">
             <p className="text-sm text-destructive">
-              Failed to load dashboard data: {error}
+              Failed to load data: {error}
             </p>
             <Button
               variant="outline"
               size="sm"
               className="mt-4"
-              onClick={() => window.location.reload()}
+              onClick={() => fetchAll()}
             >
               Retry
             </Button>
@@ -472,222 +965,262 @@ export default function DashboardPage() {
     )
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────
-
+  // ---- Main render ----
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Welcome to CCISR Connect
-        </h1>
-        <p className="text-muted-foreground">
-          Church membership management and communication platform.
-        </p>
+      {/* ── Header ────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Weekly Command Center
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Review, edit, preview, and send all communications for the week of{" "}
+            <span className="font-medium text-foreground">
+              {weekLabel || "..."}
+            </span>
+          </p>
+        </div>
+        {mailingLists.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">
+              Send to:
+            </Label>
+            <Select
+              value={selectedMailingList}
+              onValueChange={(val) => setSelectedMailingList(val ?? "")}
+            >
+              <SelectTrigger className="w-48" size="sm">
+                <SelectValue placeholder="Select list..." />
+              </SelectTrigger>
+              <SelectContent>
+                {mailingLists.map((ml) => (
+                  <SelectItem key={ml.id} value={ml.id}>
+                    {ml.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ── Stats Row (compact) ───────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {statCards
           ? statCards.map((stat) => (
-              <Card key={stat.title} className="relative overflow-hidden">
-                <div
-                  className="absolute inset-x-0 top-0 h-1"
-                  style={{ backgroundColor: stat.hex }}
-                />
-                <CardHeader className="pt-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                      <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight">
-                        {stat.value.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className={`rounded-xl p-2.5 ${stat.bg}`}>
-                      <stat.icon className={`size-5 ${stat.color}`} />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <p className="text-xs text-muted-foreground">
-                    {stat.description}
+              <div
+                key={stat.title}
+                className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 ring-1 ring-foreground/5"
+              >
+                <div className={`rounded-md p-1.5 ${stat.bg}`}>
+                  <stat.icon className={`size-4 ${stat.color}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-lg font-bold tabular-nums leading-tight">
+                    {stat.value.toLocaleString()}
                   </p>
-                </CardContent>
-              </Card>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {stat.title}
+                  </p>
+                </div>
+              </div>
             ))
           : Array.from({ length: 4 }).map((_, i) => (
-              <StatCardSkeleton key={i} />
+              <div
+                key={i}
+                className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5"
+              >
+                <Skeleton className="size-7 rounded-md" />
+                <div className="space-y-1">
+                  <Skeleton className="h-5 w-10" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
             ))}
       </div>
 
-      {/* This Week Section */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Birthdays This Week */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <div className="rounded-md bg-purple-100 p-1.5 dark:bg-purple-900/40">
-                <Cake className="size-4 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <CardTitle>Birthdays — Week of {weekLabel}</CardTitle>
-                <CardDescription>For upcoming bulletin</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {birthdays === null ? (
-              <ListSkeleton rows={3} />
-            ) : birthdays.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No birthdays this week.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {birthdays.map((b) => (
-                  <div
-                    key={b.id}
-                    className="flex items-center justify-between rounded-lg bg-purple-50 px-3 py-2 dark:bg-purple-900/20"
-                  >
-                    <span className="text-sm font-medium">{b.full_name}</span>
-                    <span className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                      {formatMonthDay(b.birth_month, b.birth_day)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* ── Communication Cards ───────────────────────────────── */}
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Birthday Card */}
+          <WeeklyCommunicationCard
+            title="Birthdays This Week"
+            accentColor="#7C3AED"
+            icon={Cake}
+            status={getStatus("birthday")}
+            summaryLines={birthdaySummary}
+            scheduledAt={getScheduledAt("birthday")}
+            previewHtml={birthdayPreview}
+            onSchedule={() => handleSchedule("birthday")}
+            onSendNow={() => handleSendNow("birthday")}
+          >
+            <BirthdayEditForm
+              data={birthdayForm}
+              onChange={setBirthdayForm}
+            />
+          </WeeklyCommunicationCard>
 
-        {/* Anniversaries This Week */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <div className="rounded-md bg-amber-100 p-1.5 dark:bg-amber-900/40">
-                <Heart className="size-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <CardTitle>Anniversaries — Week of {weekLabel}</CardTitle>
-                <CardDescription>For upcoming bulletin</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {anniversaries === null ? (
-              <ListSkeleton rows={3} />
-            ) : anniversaries.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No anniversaries this week.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {anniversaries.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-900/20"
-                  >
-                    <span className="text-sm font-medium">
-                      {a.husband_name} & {a.wife_name}
-                    </span>
-                    <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                      {formatMonthDay(
-                        a.anniversary_month,
-                        a.anniversary_day
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {/* Anniversary Card */}
+          <WeeklyCommunicationCard
+            title="Anniversaries This Week"
+            accentColor="#D97706"
+            icon={Heart}
+            status={getStatus("anniversary")}
+            summaryLines={anniversarySummary}
+            scheduledAt={getScheduledAt("anniversary")}
+            previewHtml={anniversaryPreview}
+            onSchedule={() => handleSchedule("anniversary")}
+            onSendNow={() => handleSendNow("anniversary")}
+          >
+            <AnniversaryEditForm
+              data={anniversaryForm}
+              onChange={setAnniversaryForm}
+            />
+          </WeeklyCommunicationCard>
+
+          {/* Bible Study Card */}
+          <WeeklyCommunicationCard
+            title="Friday Bible Study Invite"
+            accentColor="#0D9488"
+            icon={BookOpen}
+            status={getStatus("bible_study")}
+            summaryLines={bibleStudySummary}
+            scheduledAt={getScheduledAt("bible_study")}
+            previewHtml={bibleStudyPreview}
+            onSchedule={() => handleSchedule("bible_study")}
+            onSendNow={() => handleSendNow("bible_study")}
+          >
+            <BibleStudyEditForm
+              data={bibleStudyForm}
+              onChange={setBibleStudyForm}
+            />
+          </WeeklyCommunicationCard>
+
+          {/* Women's Study Card */}
+          <WeeklyCommunicationCard
+            title="Wednesday Women's Bible Study"
+            accentColor="#DB2777"
+            icon={Users}
+            status={getStatus("womens_study")}
+            summaryLines={womensStudySummary}
+            scheduledAt={getScheduledAt("womens_study")}
+            previewHtml={womensStudyPreview}
+            onSchedule={() => handleSchedule("womens_study")}
+            onSendNow={() => handleSendNow("womens_study")}
+          >
+            <WomensStudyEditForm
+              data={womensStudyForm}
+              onChange={setWomensStudyForm}
+            />
+          </WeeklyCommunicationCard>
+
+          {/* Bulletin Card */}
+          <WeeklyCommunicationCard
+            title="Weekly Bulletin"
+            accentColor="#4F46E5"
+            icon={Newspaper}
+            status={getStatus("bulletin")}
+            summaryLines={bulletinSummary}
+            scheduledAt={getScheduledAt("bulletin")}
+            previewHtml={bulletinPreview}
+            onSchedule={() => handleSchedule("bulletin")}
+            onSendNow={() => handleSendNow("bulletin")}
+          >
+            <BulletinEditForm
+              data={bulletinForm}
+              onChange={setBulletinForm}
+            />
+          </WeeklyCommunicationCard>
+        </div>
+      )}
+
+      {/* ── Quick Links ───────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" render={<Link href="/members" />}>
+          <Users className="size-3.5" data-icon="inline-start" />
+          Members
+          <ArrowRight className="size-3 opacity-50" data-icon="inline-end" />
+        </Button>
+        <Button variant="outline" size="sm" render={<Link href="/calendar" />}>
+          <CalendarDays className="size-3.5" data-icon="inline-start" />
+          Calendar
+          <ArrowRight className="size-3 opacity-50" data-icon="inline-end" />
+        </Button>
+        <Button variant="outline" size="sm" render={<Link href="/templates" />}>
+          <Mail className="size-3.5" data-icon="inline-start" />
+          Templates
+          <ArrowRight className="size-3 opacity-50" data-icon="inline-end" />
+        </Button>
+        <Button variant="outline" size="sm" render={<Link href="/dispatch" />}>
+          <History className="size-3.5" data-icon="inline-start" />
+          Dispatch History
+          <ArrowRight className="size-3 opacity-50" data-icon="inline-end" />
+        </Button>
       </div>
 
-      {/* Upcoming Events */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="rounded-md bg-muted p-1.5">
-              <CalendarDays className="size-4 text-muted-foreground" />
+      {/* ── Schedule Dialog ───────────────────────────────────── */}
+      <Dialog
+        open={scheduleDialog.open}
+        onOpenChange={(open) =>
+          setScheduleDialog((prev) => ({ ...prev, open }))
+        }
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Schedule Dispatch</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="schedule-dt">Send Date & Time</Label>
+              <Input
+                id="schedule-dt"
+                type="datetime-local"
+                value={scheduleDialog.dateTime}
+                onChange={(e) =>
+                  setScheduleDialog((prev) => ({
+                    ...prev,
+                    dateTime: e.target.value,
+                  }))
+                }
+              />
             </div>
-            <div>
-              <CardTitle>Upcoming Events</CardTitle>
-              <CardDescription>Next 5 scheduled events</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {events === null ? (
-            <EventsSkeleton />
-          ) : events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No upcoming events.
+            <p className="text-xs text-muted-foreground">
+              The email will be queued for dispatch at the selected time.
+              You can approve it in the Dispatch Queue.
             </p>
-          ) : (
-            <div className="space-y-3">
-              {events.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex items-center gap-4 rounded-lg border p-3"
-                >
-                  <div className="flex min-w-14 flex-col items-center rounded-md bg-muted px-2 py-1.5 text-center">
-                    <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      {MONTH_NAMES[
-                        parseInt(event.instance_date.split("-")[1], 10)
-                      ]}
-                    </span>
-                    <span className="text-lg font-bold leading-tight">
-                      {parseInt(event.instance_date.split("-")[2], 10)}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {event.event_title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(event.instance_date)}
-                      {event.instance_time
-                        ? ` at ${formatTime(event.instance_time)}`
-                        : ""}
-                    </p>
-                  </div>
-                  <Badge variant={statusBadgeVariant(event.status)}>
-                    {statusLabel(event.status)}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks and navigation</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Button render={<Link href="/compose" />}>
-              <Send className="size-4" data-icon="inline-start" />
-              Send Bulletin
-              <ArrowRight className="size-3.5 opacity-50" data-icon="inline-end" />
-            </Button>
-            <Button variant="outline" render={<Link href="/members" />}>
-              <Users className="size-4" data-icon="inline-start" />
-              View Members
-              <ArrowRight className="size-3.5 opacity-50" data-icon="inline-end" />
-            </Button>
-            <Button variant="outline" render={<Link href="/templates" />}>
-              <Mail className="size-4" data-icon="inline-start" />
-              Email Templates
-              <ArrowRight className="size-3.5 opacity-50" data-icon="inline-end" />
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button
+              onClick={confirmSchedule}
+              disabled={!scheduleDialog.dateTime || sendingType !== null}
+            >
+              {sendingType ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Clock className="size-4" data-icon="inline-start" />
+              )}
+              Confirm Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Sending overlay (subtle) ──────────────────────────── */}
+      {sendingType && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background shadow-lg">
+            <Loader2 className="size-4 animate-spin" />
+            Queuing dispatch...
+          </div>
+        </div>
+      )}
     </div>
   )
 }
