@@ -13,6 +13,7 @@ import {
   FileText,
   Mail,
   BarChart3,
+  Palette,
   UserCog,
   Server,
   Church,
@@ -46,6 +47,7 @@ const mainNavItems = [
 ]
 
 const settingsNavItems = [
+  { title: "Appearance", href: "/settings", icon: Palette },
   { title: "User Management", href: "/settings/users", icon: UserCog },
   { title: "SMTP Config", href: "/settings/smtp", icon: Server },
 ]
@@ -107,7 +109,10 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {settingsNavItems.map((item) => {
-                const isActive = pathname.startsWith(item.href)
+                const isActive =
+                  item.href === "/settings"
+                    ? pathname === "/settings"
+                    : pathname.startsWith(item.href)
 
                 return (
                   <SidebarMenuItem key={item.href}>

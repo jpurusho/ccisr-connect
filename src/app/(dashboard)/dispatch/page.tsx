@@ -208,20 +208,20 @@ export default function DispatchQueuePage() {
   }, [])
 
   useEffect(() => {
-    fetchDispatches()
+    void fetchDispatches()
   }, [fetchDispatches])
 
   useEffect(() => {
-    fetchFormData()
+    void fetchFormData()
   }, [fetchFormData])
 
-  // Reset page & selection when changing tabs
-  useEffect(() => {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  function handleTabChange(tab: StatusTab) {
+    setActiveTab(tab)
     setPage(0)
     setSelectedIds(new Set())
-  }, [activeTab])
-
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  }
 
   // -------------------------------------------------------------------------
   // Actions
@@ -606,7 +606,7 @@ export default function DispatchQueuePage() {
       {/* Tabs + Table */}
       <Tabs
         value={activeTab}
-        onValueChange={(val) => setActiveTab(val as StatusTab)}
+        onValueChange={(val) => handleTabChange(val as StatusTab)}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TabsList variant="line">

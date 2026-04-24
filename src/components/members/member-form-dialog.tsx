@@ -90,16 +90,16 @@ export function MemberFormDialog({
     setLoadingFamilies(false)
   }, [])
 
-  // Load families when dialog opens
+  // Load families when dialog opens, before pre-filling form
   useEffect(() => {
     if (open) {
       fetchFamilies()
     }
   }, [open, fetchFamilies])
 
-  // Pre-fill form when editing
+  // Pre-fill form when editing — only after families are loaded
   useEffect(() => {
-    if (open && member) {
+    if (open && member && !loadingFamilies) {
       setFirstName(member.first_name)
       setLastName(member.last_name)
       setFamilyId(member.family_id)
@@ -297,13 +297,15 @@ export function MemberFormDialog({
                 onChange={(e) => setNewFamilyName(e.target.value)}
                 placeholder="New family name"
               />
+            ) : loadingFamilies ? (
+              <Input value="Loading families..." disabled />
             ) : (
               <Select
                 value={familyId ?? undefined}
                 onValueChange={(val) => setFamilyId(val as string)}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={loadingFamilies ? "Loading..." : "Select a family"} />
+                  <SelectValue placeholder="Select a family" />
                 </SelectTrigger>
                 <SelectContent>
                   {families.map((f) => (

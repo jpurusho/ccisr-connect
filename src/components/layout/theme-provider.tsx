@@ -8,7 +8,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     <NextThemesProvider
       attribute="class"
       defaultTheme="light"
-      themes={["light", "dark", "warm"]}
+      themes={["light", "dark", "warm", "github-dark", "midnight", "ocean", "forest"]}
       enableSystem={false}
     >
       {children}

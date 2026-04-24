@@ -131,6 +131,15 @@ function getNext7DaysBounds(today: Date): { start: Date; end: Date } {
 
 // ── Status badge variant mapping ───────────────────────────────────────────
 
+function statusLabel(status: EventInstanceStatus): string {
+  switch (status) {
+    case "confirmed": return "Scheduled"
+    case "draft": return "Tentative"
+    case "cancelled": return "Cancelled"
+    default: return status
+  }
+}
+
 function statusBadgeVariant(status: EventInstanceStatus) {
   switch (status) {
     case "confirmed":
@@ -397,32 +406,36 @@ export default function DashboardPage() {
           value: stats.totalFamilies,
           description: "Registered families",
           icon: Home,
-          color: "text-blue-600",
-          bg: "bg-blue-50 dark:bg-blue-950/30",
+          color: "text-blue-600 dark:text-blue-400",
+          bg: "bg-blue-100 dark:bg-blue-950/40",
+          hex: "#3b82f6",
         },
         {
           title: "Active Members",
           value: stats.activeMembers,
           description: "Currently active",
           icon: Users,
-          color: "text-emerald-600",
-          bg: "bg-emerald-50 dark:bg-emerald-950/30",
+          color: "text-emerald-600 dark:text-emerald-400",
+          bg: "bg-emerald-100 dark:bg-emerald-950/40",
+          hex: "#10b981",
         },
         {
           title: "Upcoming Birthdays",
           value: stats.upcomingBirthdays,
           description: "In the next 7 days",
           icon: Cake,
-          color: "text-purple-600",
-          bg: "bg-purple-50 dark:bg-purple-950/30",
+          color: "text-purple-600 dark:text-purple-400",
+          bg: "bg-purple-100 dark:bg-purple-950/40",
+          hex: "#7c3aed",
         },
         {
           title: "Pending Dispatches",
           value: stats.pendingDispatches,
           description: "Awaiting send",
           icon: Clock,
-          color: "text-amber-600",
-          bg: "bg-amber-50 dark:bg-amber-950/30",
+          color: "text-amber-600 dark:text-amber-400",
+          bg: "bg-amber-100 dark:bg-amber-950/40",
+          hex: "#d97706",
         },
       ]
     : null
@@ -477,19 +490,25 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards
           ? statCards.map((stat) => (
-              <Card key={stat.title}>
-                <CardHeader>
+              <Card key={stat.title} className="relative overflow-hidden">
+                <div
+                  className="absolute inset-x-0 top-0 h-1"
+                  style={{ backgroundColor: stat.hex }}
+                />
+                <CardHeader className="pt-5">
                   <div className="flex items-center justify-between">
-                    <CardDescription>{stat.title}</CardDescription>
-                    <div className={`rounded-md p-1.5 ${stat.bg}`}>
-                      <stat.icon className={`size-4 ${stat.color}`} />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
+                      <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight">
+                        {stat.value.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className={`rounded-xl p-2.5 ${stat.bg}`}>
+                      <stat.icon className={`size-5 ${stat.color}`} />
                     </div>
                   </div>
-                  <CardTitle className="text-2xl tabular-nums">
-                    {stat.value.toLocaleString()}
-                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <p className="text-xs text-muted-foreground">
                     {stat.description}
                   </p>
@@ -634,7 +653,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <Badge variant={statusBadgeVariant(event.status)}>
-                    {event.status}
+                    {statusLabel(event.status)}
                   </Badge>
                 </div>
               ))}
