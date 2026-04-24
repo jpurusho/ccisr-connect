@@ -237,6 +237,9 @@ export default function DashboardPage() {
     events: [],
   })
 
+  // ---- Custom subject overrides ----
+  const [customSubjects, setCustomSubjects] = useState<Partial<Record<CommType, string>>>({})
+
   // ---- Mailing list state ----
   const [mailingLists, setMailingLists] = useState<MailingListOption[]>([])
   const [selectedMailingList, setSelectedMailingList] = useState("")
@@ -320,11 +323,10 @@ export default function DashboardPage() {
           .in("birth_month", next7Months)
           .returns<{ birth_month: number; birth_day: number }[]>(),
 
-        // This week birthdays
+        // This week birthdays (include inactive for dimmed display)
         supabase
           .from("members")
-          .select("id, full_name, birth_month, birth_day")
-          .eq("is_active", true)
+          .select("id, full_name, birth_month, birth_day, is_active")
           .not("birth_month", "is", null)
           .not("birth_day", "is", null)
           .in("birth_month", weekMonths)
@@ -334,14 +336,15 @@ export default function DashboardPage() {
               full_name: string
               birth_month: number
               birth_day: number
+              is_active: boolean
             }[]
           >(),
 
-        // This week anniversaries
+        // This week anniversaries (include family active status)
         supabase
           .from("wedding_anniversaries")
           .select(
-            "id, anniversary_month, anniversary_day, anniversary_year, husband:members!husband_member_id(full_name), wife:members!wife_member_id(full_name)"
+            "id, anniversary_month, anniversary_day, anniversary_year, family:families!family_id(is_active), husband:members!husband_member_id(full_name, is_active), wife:members!wife_member_id(full_name, is_active)"
           )
           .in("anniversary_month", weekMonths)
           .returns<
@@ -350,8 +353,9 @@ export default function DashboardPage() {
               anniversary_month: number
               anniversary_day: number
               anniversary_year: number | null
-              husband: { full_name: string } | null
-              wife: { full_name: string } | null
+              family: { is_active: boolean } | null
+              husband: { full_name: string; is_active: boolean } | null
+              wife: { full_name: string; is_active: boolean } | null
             }[]
           >(),
 
@@ -415,27 +419,36 @@ export default function DashboardPage() {
         pendingDispatches: dispatchCountRes.count ?? 0,
       })
 
-      // ---- Process birthdays ----
+      // ---- Process birthdays (active first, inactive dimmed) ----
       const bdays = (weekBirthdaysRes.data ?? [])
         .filter((m) => weekSet.has(`${m.birth_month}-${m.birth_day}`))
-        .sort((a, b) =>
-          a.birth_month !== b.birth_month
+        .sort((a, b) => {
+          if (a.is_active !== b.is_active) return a.is_active ? -1 : 1
+          return a.birth_month !== b.birth_month
             ? a.birth_month - b.birth_month
             : a.birth_day - b.birth_day
-        )
+        })
 
-      const bdayEntries: BirthdayEntry[] = bdays.map((m) => ({
-        name: m.full_name,
-        date: `${m.birth_month}/${m.birth_day}`,
-      }))
+      const bdayEntries: BirthdayEntry[] = bdays
+        .filter((m) => m.is_active)
+        .map((m) => ({
+          name: m.full_name,
+          date: `${m.birth_month}/${m.birth_day}`,
+        }))
+
+      const inactiveBdays = bdays
+        .filter((m) => !m.is_active)
+        .map((m) => `${m.full_name} (${m.birth_month}/${m.birth_day})`)
 
       setBirthdayForm({
         weekLabel: wl,
         birthdays: bdayEntries,
-        message: "",
+        message: inactiveBdays.length > 0
+          ? `Note: Inactive members with birthdays this week: ${inactiveBdays.join(", ")}`
+          : "",
       })
 
-      // ---- Process anniversaries ----
+      // ---- Process anniversaries (skip inactive families) ----
       const currentYear = today.getFullYear()
       const annis = (weekAnniversariesRes.data ?? [])
         .filter((a) =>
@@ -447,7 +460,14 @@ export default function DashboardPage() {
             : a.anniversary_day - b.anniversary_day
         )
 
-      const anniEntries: AnniversaryEntry[] = annis.map((a) => ({
+      const activeAnnis = annis.filter(
+        (a) => a.family?.is_active !== false && a.husband?.is_active !== false
+      )
+      const inactiveAnnis = annis.filter(
+        (a) => a.family?.is_active === false || a.husband?.is_active === false
+      )
+
+      const anniEntries: AnniversaryEntry[] = activeAnnis.map((a) => ({
         husbandName: a.husband?.full_name?.split(" ")[0] ?? "?",
         wifeName: a.wife?.full_name?.split(" ")[0] ?? "?",
         date: `${a.anniversary_month}/${a.anniversary_day}`,
@@ -459,7 +479,9 @@ export default function DashboardPage() {
       setAnniversaryForm({
         weekLabel: wl,
         anniversaries: anniEntries,
-        message: "",
+        message: inactiveAnnis.length > 0
+          ? `Note: ${inactiveAnnis.length} inactive family anniversar${inactiveAnnis.length > 1 ? "ies" : "y"} not shown`
+          : "",
       })
 
       // ---- Process Bible Study ----
@@ -654,8 +676,9 @@ export default function DashboardPage() {
     [bulletinForm]
   )
 
-  // ---- Subject lines ----
+  // ---- Subject lines (custom override or auto-generated) ----
   function getSubject(type: CommType): string {
+    if (customSubjects[type]) return customSubjects[type]!
     switch (type) {
       case "birthday":
         return `Happy Birthday! — Week of ${weekLabel}`
@@ -668,6 +691,10 @@ export default function DashboardPage() {
       case "bulletin":
         return `Weekly Bulletin — ${bulletinForm.weekLabel}`
     }
+  }
+
+  function setSubjectOverride(type: CommType, value: string) {
+    setCustomSubjects((prev) => ({ ...prev, [type]: value }))
   }
 
   // ---- Get preview for type ----
@@ -1056,6 +1083,8 @@ export default function DashboardPage() {
             icon={Cake}
             status={getStatus("birthday")}
             summaryLines={birthdaySummary}
+            subject={getSubject("birthday")}
+            onSubjectChange={(v) => setSubjectOverride("birthday", v)}
             scheduledAt={getScheduledAt("birthday")}
             previewHtml={birthdayPreview}
             onSchedule={() => handleSchedule("birthday")}
@@ -1074,6 +1103,8 @@ export default function DashboardPage() {
             icon={Heart}
             status={getStatus("anniversary")}
             summaryLines={anniversarySummary}
+            subject={getSubject("anniversary")}
+            onSubjectChange={(v) => setSubjectOverride("anniversary", v)}
             scheduledAt={getScheduledAt("anniversary")}
             previewHtml={anniversaryPreview}
             onSchedule={() => handleSchedule("anniversary")}
@@ -1092,6 +1123,8 @@ export default function DashboardPage() {
             icon={BookOpen}
             status={getStatus("bible_study")}
             summaryLines={bibleStudySummary}
+            subject={getSubject("bible_study")}
+            onSubjectChange={(v) => setSubjectOverride("bible_study", v)}
             scheduledAt={getScheduledAt("bible_study")}
             previewHtml={bibleStudyPreview}
             onSchedule={() => handleSchedule("bible_study")}
@@ -1110,6 +1143,8 @@ export default function DashboardPage() {
             icon={Users}
             status={getStatus("womens_study")}
             summaryLines={womensStudySummary}
+            subject={getSubject("womens_study")}
+            onSubjectChange={(v) => setSubjectOverride("womens_study", v)}
             scheduledAt={getScheduledAt("womens_study")}
             previewHtml={womensStudyPreview}
             onSchedule={() => handleSchedule("womens_study")}
@@ -1128,6 +1163,8 @@ export default function DashboardPage() {
             icon={Newspaper}
             status={getStatus("bulletin")}
             summaryLines={bulletinSummary}
+            subject={getSubject("bulletin")}
+            onSubjectChange={(v) => setSubjectOverride("bulletin", v)}
             scheduledAt={getScheduledAt("bulletin")}
             previewHtml={bulletinPreview}
             onSchedule={() => handleSchedule("bulletin")}

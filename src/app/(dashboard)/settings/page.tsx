@@ -1,277 +1,118 @@
 "use client"
 
-import { useTheme } from "next-themes"
-import { useEffect, useState } from "react"
-import { Check, Sun, Moon, Flame, Code2, Star, Waves, TreePine, Palette } from "lucide-react"
+import { Settings, Palette, Server, UserCog, Info, Church } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ThemeSelector } from "@/components/settings/theme-selector"
+import { SmtpConfigPanel } from "@/components/settings/smtp-config"
+import { UserManagementPanel } from "@/components/settings/user-management"
 
-const lightThemes = [
-  {
-    id: "light",
-    name: "Light",
-    icon: Sun,
-    description: "Clean and minimal",
-    colors: {
-      bg: "oklch(1 0 0)",
-      card: "oklch(0.97 0 0)",
-      primary: "oklch(0.205 0 0)",
-      accent: "oklch(0.97 0 0)",
-      sidebar: "oklch(0.985 0 0)",
-    },
-  },
-  {
-    id: "warm",
-    name: "Warm",
-    icon: Flame,
-    description: "Amber and honey tones",
-    colors: {
-      bg: "oklch(0.97 0.012 85)",
-      card: "oklch(0.93 0.02 80)",
-      primary: "oklch(0.55 0.15 55)",
-      accent: "oklch(0.88 0.06 75)",
-      sidebar: "oklch(0.94 0.02 78)",
-    },
-  },
-  {
-    id: "ocean",
-    name: "Ocean",
-    icon: Waves,
-    description: "Calm blues and teals",
-    colors: {
-      bg: "oklch(0.97 0.01 230)",
-      card: "oklch(0.93 0.02 225)",
-      primary: "oklch(0.55 0.13 230)",
-      accent: "oklch(0.95 0.03 225)",
-      sidebar: "oklch(0.95 0.03 225)",
-    },
-  },
-  {
-    id: "forest",
-    name: "Forest",
-    icon: TreePine,
-    description: "Natural greens",
-    colors: {
-      bg: "oklch(0.98 0.02 150)",
-      card: "oklch(0.94 0.03 150)",
-      primary: "oklch(0.60 0.15 150)",
-      accent: "oklch(0.96 0.04 150)",
-      sidebar: "oklch(0.96 0.04 150)",
-    },
-  },
-]
-
-const darkThemes = [
-  {
-    id: "dark",
-    name: "Dark",
-    icon: Moon,
-    description: "Classic dark mode",
-    colors: {
-      bg: "oklch(0.145 0 0)",
-      card: "oklch(0.205 0 0)",
-      primary: "oklch(0.922 0 0)",
-      accent: "oklch(0.269 0 0)",
-      sidebar: "oklch(0.205 0 0)",
-    },
-  },
-  {
-    id: "github-dark",
-    name: "GitHub Dark Pro",
-    icon: Code2,
-    description: "Inspired by GitHub",
-    colors: {
-      bg: "oklch(0.16 0.01 260)",
-      card: "oklch(0.20 0.01 260)",
-      primary: "oklch(0.70 0.14 250)",
-      accent: "oklch(0.52 0.18 260)",
-      sidebar: "oklch(0.08 0.01 260)",
-    },
-  },
-  {
-    id: "midnight",
-    name: "Midnight",
-    icon: Star,
-    description: "Deep navy blues",
-    colors: {
-      bg: "oklch(0.18 0.04 270)",
-      card: "oklch(0.25 0.03 265)",
-      primary: "oklch(0.62 0.19 260)",
-      accent: "oklch(0.40 0.18 265)",
-      sidebar: "oklch(0.10 0.04 270)",
-    },
-  },
-]
-
-function ThemeCard({
-  themeConfig,
-  isActive,
-  onSelect,
-}: {
-  themeConfig: (typeof lightThemes)[number]
-  isActive: boolean
-  onSelect: () => void
-}) {
-  const Icon = themeConfig.icon
-
+function AboutPanel() {
   return (
-    <button
-      onClick={onSelect}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all duration-200 hover:shadow-lg ${
-        isActive
-          ? "border-primary shadow-md ring-2 ring-primary/20"
-          : "border-border hover:border-primary/40"
-      }`}
-    >
-      {/* Color swatch preview */}
-      <div
-        className="relative h-28 w-full"
-        style={{ backgroundColor: themeConfig.colors.bg }}
-      >
-        {/* Sidebar preview strip */}
-        <div
-          className="absolute inset-y-0 left-0 w-12"
-          style={{ backgroundColor: themeConfig.colors.sidebar }}
-        />
-        {/* Card preview */}
-        <div
-          className="absolute right-3 top-3 h-14 w-24 rounded-md border shadow-sm"
-          style={{
-            backgroundColor: themeConfig.colors.card,
-            borderColor: themeConfig.colors.accent,
-          }}
-        >
-          {/* Primary color bar inside card */}
-          <div
-            className="mx-2 mt-2 h-2 w-12 rounded-full"
-            style={{ backgroundColor: themeConfig.colors.primary }}
-          />
-          <div
-            className="mx-2 mt-1.5 h-1.5 w-16 rounded-full opacity-30"
-            style={{ backgroundColor: themeConfig.colors.primary }}
-          />
-          <div
-            className="mx-2 mt-1 h-1.5 w-10 rounded-full opacity-15"
-            style={{ backgroundColor: themeConfig.colors.primary }}
-          />
-        </div>
-        {/* Accent dot */}
-        <div
-          className="absolute bottom-3 right-3 h-5 w-5 rounded-full"
-          style={{ backgroundColor: themeConfig.colors.primary }}
-        />
-        {/* Selected check */}
-        {isActive && (
-          <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Check className="size-3" />
-          </div>
-        )}
-      </div>
+    <div className="space-y-6">
+      <p className="text-muted-foreground">
+        Application information and credits.
+      </p>
 
-      {/* Theme info */}
-      <div className="flex items-center gap-2.5 border-t px-3 py-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-          <Icon className="size-4 text-muted-foreground" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{themeConfig.name}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {themeConfig.description}
-          </p>
-        </div>
-      </div>
-    </button>
+      <Card>
+        <CardHeader className="text-center pb-2">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+            <Church className="size-8 text-primary" />
+          </div>
+          <CardTitle className="mt-4 text-2xl">CCISR Connect</CardTitle>
+          <CardDescription>
+            Church Membership Management & Communication Platform
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="text-center">
+            <Badge variant="secondary" className="text-sm">
+              Version 1.0.0
+            </Badge>
+          </div>
+
+          <div className="rounded-lg border bg-muted/50 p-4 text-center text-sm text-muted-foreground">
+            Church Membership Management & Communication Platform for Christ
+            Church of India, San Ramon
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Built with</h3>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">Next.js</Badge>
+              <Badge variant="outline">Supabase</Badge>
+              <Badge variant="outline">Tailwind CSS</Badge>
+              <Badge variant="outline">shadcn/ui</Badge>
+              <Badge variant="outline">Vercel</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
-export default function SettingsAppearancePage() {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return (
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Appearance</h1>
-          <p className="text-muted-foreground">
-            Customize how CCISR Connect looks for you.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-44 animate-pulse rounded-xl border bg-muted"
-            />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
+export default function SettingsPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <Palette className="size-5 text-primary" />
+          <Settings className="size-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Appearance</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">
-            Customize how CCISR Connect looks for you. Choose a theme that suits
-            your style.
+            Manage your application preferences, email configuration, and users.
           </p>
         </div>
       </div>
 
-      {/* Light Themes */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Sun className="size-4 text-muted-foreground" />
-          <h2 className="text-lg font-semibold">Light Themes</h2>
-        </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {lightThemes.map((t) => (
-            <ThemeCard
-              key={t.id}
-              themeConfig={t}
-              isActive={theme === t.id}
-              onSelect={() => setTheme(t.id)}
-            />
-          ))}
-        </div>
-      </section>
+      <Tabs defaultValue="themes">
+        <TabsList
+          variant="line"
+          className="w-full justify-start overflow-x-auto"
+        >
+          <TabsTrigger value="themes">
+            <Palette className="size-4" />
+            <span className="hidden sm:inline">Themes</span>
+          </TabsTrigger>
+          <TabsTrigger value="email">
+            <Server className="size-4" />
+            <span className="hidden sm:inline">Email Configuration</span>
+          </TabsTrigger>
+          <TabsTrigger value="users">
+            <UserCog className="size-4" />
+            <span className="hidden sm:inline">User Management</span>
+          </TabsTrigger>
+          <TabsTrigger value="about">
+            <Info className="size-4" />
+            <span className="hidden sm:inline">About</span>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Dark Themes */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Moon className="size-4 text-muted-foreground" />
-          <h2 className="text-lg font-semibold">Dark Themes</h2>
-        </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {darkThemes.map((t) => (
-            <ThemeCard
-              key={t.id}
-              themeConfig={t}
-              isActive={theme === t.id}
-              onSelect={() => setTheme(t.id)}
-            />
-          ))}
-        </div>
-      </section>
+        <TabsContent value="themes" className="mt-6">
+          <ThemeSelector />
+        </TabsContent>
 
-      {/* Current theme info */}
-      <div className="rounded-lg border bg-card p-4">
-        <p className="text-sm text-muted-foreground">
-          Active theme:{" "}
-          <span className="font-semibold text-foreground">
-            {[...lightThemes, ...darkThemes].find((t) => t.id === theme)
-              ?.name ?? theme}
-          </span>
-        </p>
-      </div>
+        <TabsContent value="email" className="mt-6">
+          <SmtpConfigPanel />
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-6">
+          <UserManagementPanel />
+        </TabsContent>
+
+        <TabsContent value="about" className="mt-6">
+          <AboutPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

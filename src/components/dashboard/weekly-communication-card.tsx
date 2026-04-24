@@ -35,6 +35,8 @@ export interface WeeklyCommunicationCardProps {
   icon: LucideIcon
   status: CommunicationStatus
   summaryLines: string[]
+  subject?: string
+  onSubjectChange?: (value: string) => void
   scheduledAt?: Date | null
   previewHtml?: string | null
   onSchedule: () => void
@@ -85,6 +87,8 @@ export function WeeklyCommunicationCard({
   icon: Icon,
   status,
   summaryLines,
+  subject,
+  onSubjectChange,
   scheduledAt,
   previewHtml,
   onSchedule,
@@ -125,6 +129,23 @@ export function WeeklyCommunicationCard({
             {sc.label}
           </Badge>
         </div>
+
+        {/* Subject line */}
+        {subject !== undefined && (
+          <div className="px-4 pl-5 pt-2">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
+            {editing && onSubjectChange ? (
+              <input
+                type="text"
+                className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                value={subject}
+                onChange={(e) => onSubjectChange(e.target.value)}
+              />
+            ) : (
+              <p className="text-sm font-medium truncate">{subject}</p>
+            )}
+          </div>
+        )}
 
         {/* Content summary */}
         <CardContent className="pl-5 pt-2 pb-0">

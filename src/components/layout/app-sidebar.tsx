@@ -13,9 +13,7 @@ import {
   FileText,
   Mail,
   BarChart3,
-  Palette,
-  UserCog,
-  Server,
+  Settings,
   Church,
 } from "lucide-react"
 
@@ -25,7 +23,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -47,9 +44,7 @@ const mainNavItems = [
 ]
 
 const settingsNavItems = [
-  { title: "Appearance", href: "/settings", icon: Palette },
-  { title: "User Management", href: "/settings/users", icon: UserCog },
-  { title: "SMTP Config", href: "/settings/smtp", icon: Server },
+  { title: "Settings", href: "/settings", icon: Settings },
 ]
 
 export function AppSidebar() {
@@ -105,14 +100,10 @@ export function AppSidebar() {
         <SidebarSeparator />
 
         <SidebarGroup>
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {settingsNavItems.map((item) => {
-                const isActive =
-                  item.href === "/settings"
-                    ? pathname === "/settings"
-                    : pathname.startsWith(item.href)
+                const isActive = pathname.startsWith(item.href)
 
                 return (
                   <SidebarMenuItem key={item.href}>
