@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -27,6 +28,8 @@ import {
   Plus,
   Trash2,
   Loader2,
+  Pencil,
+  Send,
 } from "lucide-react"
 import {
   buildBirthdayCard,
@@ -183,6 +186,10 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
 
+  // Custom templates
+  const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string }[]>([])
+  const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown> } | null>(null)
+
   // Per-type form state
   const [subjects, setSubjects] = useState<Record<string, string>>({})
   const [birthdayData, setBirthdayData] = useState<BirthdayDefaults>({})
@@ -202,14 +209,22 @@ export default function TemplatesPage() {
     const supabase = createClient()
 
     // Fetch event types and templates separately to avoid FK ambiguity
-    const [etRes, tmplRes] = await Promise.all([
+    const [etRes, tmplRes, customRes] = await Promise.all([
       supabase.from("event_types").select("id, name").order("name").returns<{ id: string; name: string }[]>(),
       supabase
         .from("email_templates")
         .select("id, event_type_id, subject_template, body_template")
         .eq("is_default", true)
         .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string }[]>(),
+      supabase
+        .from("email_templates")
+        .select("id, name, subject_template, body_template")
+        .eq("is_default", false)
+        .order("name")
+        .returns<{ id: string; name: string; subject_template: string; body_template: string }[]>(),
     ])
+
+    if (customRes.data) setCustomTemplates(customRes.data)
 
     // Build event type maps
     const idToName: Record<string, string> = {}
@@ -454,6 +469,17 @@ export default function TemplatesPage() {
               </TabsTrigger>
             )
           })}
+          <TabsTrigger
+            value="custom"
+            className="gap-1.5 data-[state=active]:text-white"
+            style={activeTab === "custom" ? { backgroundColor: "#6B7280" } : undefined}
+          >
+            <Send className="size-3.5" />
+            Custom
+            {customTemplates.length > 0 && (
+              <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{customTemplates.length}</Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {EVENT_TYPE_TABS.map((tab) => (
@@ -863,6 +889,159 @@ export default function TemplatesPage() {
             </div>
           </TabsContent>
         ))}
+
+        {/* Custom Templates Tab */}
+        <TabsContent value="custom">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Custom Templates</CardTitle>
+              <CardDescription>
+                Templates created from the Compose page. Edit or delete them here.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {customTemplates.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No custom templates yet. Create one from the Compose page using "Custom Announcement".
+                </p>
+              ) : editingCustom ? (
+                <div className="space-y-4">
+                  <Field label="Template Name" htmlFor="ct-name">
+                    <Input
+                      id="ct-name"
+                      value={editingCustom.name}
+                      onChange={(e) => setEditingCustom({ ...editingCustom, name: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Subject Line" htmlFor="ct-subj">
+                    <Input
+                      id="ct-subj"
+                      value={editingCustom.subject}
+                      onChange={(e) => setEditingCustom({ ...editingCustom, subject: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Title" htmlFor="ct-title">
+                    <Input
+                      id="ct-title"
+                      value={(editingCustom.data.title as string) || ""}
+                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, title: e.target.value } })}
+                    />
+                  </Field>
+                  <Field label="Subtitle" htmlFor="ct-sub">
+                    <Input
+                      id="ct-sub"
+                      value={(editingCustom.data.subtitle as string) || ""}
+                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, subtitle: e.target.value } })}
+                    />
+                  </Field>
+                  <Field label="Message Body" htmlFor="ct-body">
+                    <Textarea
+                      id="ct-body"
+                      value={(editingCustom.data.body as string) || ""}
+                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, body: e.target.value } })}
+                      className="min-h-24"
+                    />
+                  </Field>
+                  <Field label="Footer Text" htmlFor="ct-foot">
+                    <Input
+                      id="ct-foot"
+                      value={(editingCustom.data.footerText as string) || ""}
+                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerText: e.target.value } })}
+                    />
+                  </Field>
+                  <ResourceLinksEditor
+                    links={(editingCustom.data.resourceLinks as { label: string; url: string }[]) ?? []}
+                    onChange={(links) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, resourceLinks: links } })}
+                  />
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={async () => {
+                        setSaving(true)
+                        const supabase = createClient()
+                        const { error } = await supabase
+                          .from("email_templates")
+                          .update({
+                            name: editingCustom.name,
+                            subject_template: editingCustom.subject,
+                            body_template: JSON.stringify(editingCustom.data),
+                          } as never)
+                          .eq("id", editingCustom.id)
+                        if (error) {
+                          toast.error(`Failed: ${error.message}`)
+                        } else {
+                          toast.success(`"${editingCustom.name}" updated`)
+                          logAudit("custom_template_updated", "email_templates", editingCustom.id, { name: editingCustom.name })
+                          setEditingCustom(null)
+                          fetchTemplates()
+                        }
+                        setSaving(false)
+                      }}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                      Save Changes
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditingCustom(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {customTemplates.map((ct) => {
+                    let parsed: Record<string, unknown> = {}
+                    try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+                    return (
+                      <div key={ct.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{ct.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{ct.subject_template}</p>
+                          {typeof parsed.title === "string" && parsed.title && (
+                            <p className="text-xs text-muted-foreground/70 truncate mt-0.5">Card: {parsed.title}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => {
+                              setEditingCustom({
+                                id: ct.id,
+                                name: ct.name,
+                                subject: ct.subject_template,
+                                data: parsed,
+                              })
+                            }}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={async () => {
+                              if (!confirm(`Delete template "${ct.name}"?`)) return
+                              const supabase = createClient()
+                              const { error } = await supabase.from("email_templates").delete().eq("id", ct.id)
+                              if (error) {
+                                toast.error(`Failed: ${error.message}`)
+                              } else {
+                                toast.success(`"${ct.name}" deleted`)
+                                logAudit("custom_template_deleted", "email_templates", ct.id, { name: ct.name })
+                                fetchTemplates()
+                              }
+                            }}
+                          >
+                            <Trash2 className="size-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Mobile preview dialog */}
