@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Plus, Trash2 } from "lucide-react"
 import { formatPhone } from "@/lib/utils"
 import type { BirthdayEntry, AnniversaryEntry } from "@/lib/email/card-builder"
@@ -342,6 +343,8 @@ export interface BibleStudyLocationData {
   address: string
   city: string
   phone: string
+  onVacation: boolean
+  vacationMessage: string
 }
 
 export interface BibleStudyFormData {
@@ -384,7 +387,7 @@ export function BibleStudyEditForm({
   function addLocation() {
     onChange({
       ...data,
-      locations: [...data.locations, { label: "", hostNames: "TBD", address: "TBD", city: "", phone: "" }],
+      locations: [...data.locations, { label: "", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" }],
     })
   }
 
@@ -479,6 +482,29 @@ export function BibleStudyEditForm({
               value={loc.city}
               onChange={(e) => updateLocation(i, "city", e.target.value)}
             />
+            <div className="flex items-center gap-2 pt-1">
+              <Switch
+                size="sm"
+                checked={loc.onVacation}
+                onCheckedChange={(checked) => {
+                  const locs = [...data.locations]
+                  locs[i] = { ...locs[i], onVacation: checked }
+                  onChange({ ...data, locations: locs })
+                }}
+              />
+              <Label className="text-xs text-muted-foreground">On vacation / break</Label>
+            </div>
+            {loc.onVacation && (
+              <Input
+                placeholder="e.g., Bible Study will resume on September 12th"
+                value={loc.vacationMessage}
+                onChange={(e) => {
+                  const locs = [...data.locations]
+                  locs[i] = { ...locs[i], vacationMessage: e.target.value }
+                  onChange({ ...data, locations: locs })
+                }}
+              />
+            )}
           </div>
         ))}
         <Button variant="outline" size="sm" onClick={addLocation}>

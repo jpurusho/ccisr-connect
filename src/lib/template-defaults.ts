@@ -4,6 +4,8 @@ export interface BibleStudyLocationDefault {
   address: string
   city: string
   phone: string
+  onVacation?: boolean
+  vacationMessage?: string
 }
 
 export interface ResourceLinkDefault {
@@ -96,8 +98,8 @@ export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
       topic: "Studying the Book of Acts",
       time: "7:30 PM",
       locations: [
-        { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "" },
-        { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "Mountain House, CA", phone: "" },
+        { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
+        { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "Mountain House, CA", phone: "", onVacation: false, vacationMessage: "" },
       ],
     },
   },

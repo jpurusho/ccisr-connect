@@ -27,6 +27,8 @@ import {
   History,
   ArrowRight,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -233,8 +235,8 @@ export default function DashboardPage() {
     resourceLinkLabel: "",
     resourceLinkUrl: "",
     locations: [
-      { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "" },
-      { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "", phone: "" },
+      { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
+      { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
     ],
   })
   const [womensStudyForm, setWomensStudyForm] = useState<WomensStudyFormData>({
@@ -291,10 +293,13 @@ export default function DashboardPage() {
   }>({ open: false, commType: null, dateTime: "" })
   const [sendingType, setSendingType] = useState<CommType | null>(null)
 
+  // ---- Week offset for future scheduling (0 = this week, 1 = next week, etc.) ----
+  const [weekOffset, setWeekOffset] = useState(0)
+
   // ---- Data fetch ----
   useEffect(() => {
     fetchAll()
-  }, [])
+  }, [weekOffset])
 
   async function fetchAll() {
     setLoading(true)
@@ -303,15 +308,17 @@ export default function DashboardPage() {
     try {
       const supabase = createClient()
       const today = new Date()
+      // Apply week offset for future scheduling
+      const baseDate = addDays(today, weekOffset * 7)
       // All weekly communications target the bulletin week: coming Sunday through following Saturday
-      const bulSun = getUpcomingSunday(today)
+      const bulSun = getUpcomingSunday(baseDate)
       const { saturday: bulSat } = getBulletinWeekBounds(bulSun)
       const wl = `${format(bulSun, "MMM d")} – ${format(bulSat, "MMM d")}`
       setWeekLabel(wl)
 
       // Also keep Mon-Sun for dispatch query range
-      const monday = startOfWeek(today, { weekStartsOn: 1 })
-      const sunday = endOfWeek(today, { weekStartsOn: 1 })
+      const monday = startOfWeek(baseDate, { weekStartsOn: 1 })
+      const sunday = endOfWeek(baseDate, { weekStartsOn: 1 })
 
       const weekDays = getWeekDays(bulSun, bulSat)
       const weekMonths = [...new Set(weekDays.map((d) => d.month))]
@@ -324,7 +331,7 @@ export default function DashboardPage() {
       const next7Set = new Set(next7Days.map((d) => `${d.month}-${d.day}`))
 
       // Friday for bible study
-      const fri = isFriday(today) ? today : nextFriday(today)
+      const fri = isFriday(baseDate) ? baseDate : nextFriday(baseDate)
       const friISO = format(fri, "yyyy-MM-dd")
 
       // Monday/Sunday ISO for dispatch query
@@ -629,10 +636,11 @@ export default function DashboardPage() {
       // Merge saved locations with DB host data for first location
       const savedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
       const mergedLocs = savedLocs.map((loc, i) => {
-        if (i === 0 && bsHostName !== "TBD") {
-          return { ...loc, hostNames: bsHostName, address: bsAddress, city: bsCity, phone: bsPhone }
+        const base = { onVacation: false, vacationMessage: "", ...loc }
+        if (i === 0 && bsHostName !== "TBD" && !base.onVacation) {
+          return { ...base, hostNames: bsHostName, address: bsAddress, city: bsCity, phone: bsPhone }
         }
-        return { ...loc }
+        return base
       })
 
       setBibleStudyForm({
@@ -1200,19 +1208,43 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* ── Header ────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end justify-between gap-2">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
             Communication Hub
           </h1>
           <p className="text-sm text-muted-foreground">
-            Review, edit, preview, and send all communications for the week of{" "}
+            {weekOffset === 0 ? "This week" : weekOffset === 1 ? "Next week" : `${weekOffset} weeks ahead`}
+            {" — "}
             <span className="font-medium text-foreground">
               {weekLabel || "..."}
             </span>
           </p>
         </div>
-        {/* Global selector removed — mailing list + SMTP are per-card */}
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
+            disabled={weekOffset === 0}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button
+            variant={weekOffset === 0 ? "default" : "outline"}
+            size="sm"
+            onClick={() => setWeekOffset(0)}
+          >
+            This Week
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWeekOffset((w) => w + 1)}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
       </div>
 
       {/* ── Stats Row (compact) ───────────────────────────────── */}

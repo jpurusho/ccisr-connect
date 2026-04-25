@@ -437,10 +437,11 @@ export default function ComposePage() {
         const fallbackBs = FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults
         const savedLocs = bsDef.locations ?? fallbackBs.locations ?? []
         const mergedLocs = savedLocs.map((loc, i) => {
-          if (i === 0 && hostName !== "TBD") {
-            return { ...loc, hostNames: hostName, address, city, phone: phone || "" }
+          const base = { onVacation: false, vacationMessage: "", ...loc }
+          if (i === 0 && hostName !== "TBD" && !base.onVacation) {
+            return { ...base, hostNames: hostName, address, city, phone: phone || "" }
           }
-          return { ...loc }
+          return base
         })
 
         setFormState({
@@ -1164,7 +1165,7 @@ function BibleStudyForm({
   function addLocation() {
     onChange({
       ...data,
-      locations: [...data.locations, { label: "", hostNames: "TBD", address: "TBD", city: "", phone: "" }],
+      locations: [...data.locations, { label: "", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" }],
     })
   }
 

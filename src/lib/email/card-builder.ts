@@ -260,6 +260,8 @@ export interface BibleStudyLocation {
   address?: string;
   city?: string;
   phone?: string;
+  onVacation?: boolean;
+  vacationMessage?: string;
 }
 
 export interface ResourceLink {
@@ -291,6 +293,17 @@ export function buildBibleStudyCard(data: BibleStudyCardData): string {
 
   const locationBlocks = data.locations
     .map((loc) => {
+      const locationHeader = data.locations.length > 1
+        ? `<p style="margin:0 0 8px;font-size:14px;font-weight:700;color:${colors.primary}">${loc.label}</p>`
+        : "";
+
+      if (loc.onVacation) {
+        const msg = loc.vacationMessage || `${loc.label} Bible Study is on break`;
+        return `${locationHeader}<div style="background:${colors.bgLight};border-radius:8px;padding:12px 16px;text-align:center">
+<p style="margin:0;font-size:13px;color:${colors.textLight};font-style:italic">${msg}</p>
+</div>`;
+      }
+
       let details = "";
       if (loc.hostNames) details += detailRow("Host", loc.hostNames);
       const addrParts = [loc.address, loc.city].filter(Boolean).join("<br/>");
@@ -298,10 +311,6 @@ export function buildBibleStudyCard(data: BibleStudyCardData): string {
       if (loc.phone) details += detailRow("Contact", loc.phone);
 
       if (!details) return "";
-
-      const locationHeader = data.locations.length > 1
-        ? `<p style="margin:0 0 8px;font-size:14px;font-weight:700;color:${colors.primary}">${loc.label}</p>`
-        : "";
 
       return `${locationHeader}<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
 ${details}
