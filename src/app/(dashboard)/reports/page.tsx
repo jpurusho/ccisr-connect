@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import {
   Card,
@@ -11,14 +13,23 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { BarChart3, Users, Cake, Heart, MapPin, UserPlus } from "lucide-react"
+import { Users, Cake, Heart, MapPin, UserPlus } from "lucide-react"
+import { canonicalCityName } from "@/lib/city-utils"
 
 interface CityCount {
   city: string
   count: number
 }
 
+interface StatConfig {
+  label: string
+  value: number | null
+  icon: typeof Users
+  href: string
+}
+
 export default function ReportsPage() {
+  const router = useRouter()
   const [familyCount, setFamilyCount] = useState<number | null>(null)
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [childCount, setChildCount] = useState<number | null>(null)
@@ -33,12 +44,19 @@ export default function ReportsPage() {
     const currentMonth = today.getMonth() + 1
 
     async function fetchReports() {
+      // Get newcomer tag ID first
+      const { data: newcomerTagRows } = await supabase
+        .from("tags").select("id").eq("name", "Newcomer").limit(1).returns<{ id: string }[]>()
+      const newcomerTagId = newcomerTagRows?.[0]?.id
+
       const [famRes, memRes, childRes, newcomerRes, addrRes, bdayRes, annRes] =
         await Promise.all([
           supabase.from("families").select("id", { count: "exact", head: true }).eq("is_active", true),
           supabase.from("members").select("id", { count: "exact", head: true }).eq("is_active", true),
           supabase.from("members").select("id", { count: "exact", head: true }).eq("is_active", true).eq("role_in_family", "child"),
-          supabase.from("members").select("id", { count: "exact", head: true }).eq("is_newcomer", true).eq("newcomer_acknowledged", false),
+          newcomerTagId
+            ? supabase.from("member_tags").select("id", { count: "exact", head: true }).eq("tag_id", newcomerTagId)
+            : Promise.resolve({ count: 0, error: null } as { count: number; error: null }),
           supabase.from("addresses").select("city").eq("is_current", true).returns<{ city: string }[]>(),
           supabase.from("members").select("full_name, birth_month, birth_day").eq("is_active", true).eq("birth_month", currentMonth).order("birth_day").returns<{ full_name: string; birth_month: number; birth_day: number }[]>(),
           supabase.from("wedding_anniversaries").select("anniversary_month, anniversary_day, husband:members!husband_member_id(full_name), wife:members!wife_member_id(full_name)").eq("anniversary_month", currentMonth).order("anniversary_day").returns<Record<string, unknown>[]>(),
@@ -52,8 +70,8 @@ export default function ReportsPage() {
       if (addrRes.data) {
         const counts: Record<string, number> = {}
         addrRes.data.forEach((a) => {
-          const city = (a.city || "Unknown").trim()
-          if (city) counts[city] = (counts[city] || 0) + 1
+          const city = canonicalCityName(a.city)
+          counts[city] = (counts[city] || 0) + 1
         })
         setCityCounts(
           Object.entries(counts)
@@ -92,6 +110,13 @@ export default function ReportsPage() {
 
   const monthName = new Date().toLocaleString("en-US", { month: "long" })
 
+  const statCards: StatConfig[] = [
+    { label: "Active Families", value: familyCount, icon: Users, href: "/members?view=family&filter=active" },
+    { label: "Active Members", value: memberCount, icon: Users, href: "/members?filter=active" },
+    { label: "Children", value: childCount, icon: Users, href: "/members?filter=active&role=child" },
+    { label: "Pending Newcomers", value: newcomerCount, icon: UserPlus, href: "/members?filter=newcomers" },
+  ]
+
   return (
     <div className="space-y-6">
       <div>
@@ -102,25 +127,22 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Active Families", value: familyCount, icon: Users },
-          { label: "Active Members", value: memberCount, icon: Users },
-          { label: "Children", value: childCount, icon: Users },
-          { label: "Pending Newcomers", value: newcomerCount, icon: UserPlus },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardDescription>{stat.label}</CardDescription>
-                <stat.icon className="size-4 text-muted-foreground" />
-              </div>
-              {stat.value !== null ? (
-                <CardTitle className="text-2xl">{stat.value}</CardTitle>
-              ) : (
-                <Skeleton className="h-8 w-16" />
-              )}
-            </CardHeader>
-          </Card>
+        {statCards.map((stat) => (
+          <Link key={stat.label} href={stat.href}>
+            <Card className="transition-colors hover:bg-accent cursor-pointer">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardDescription>{stat.label}</CardDescription>
+                  <stat.icon className="size-4 text-muted-foreground" />
+                </div>
+                {stat.value !== null ? (
+                  <CardTitle className="text-2xl">{stat.value}</CardTitle>
+                ) : (
+                  <Skeleton className="h-8 w-16" />
+                )}
+              </CardHeader>
+            </Card>
+          </Link>
         ))}
       </div>
 
@@ -189,7 +211,7 @@ export default function ReportsPage() {
             Families by City
           </CardTitle>
           <CardDescription>
-            Distribution of families across cities
+            Distribution of families across cities — click a city to view members
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -203,7 +225,15 @@ export default function ReportsPage() {
                 const maxCount = cityCounts[0]?.count || 1
                 const width = Math.max(8, (c.count / maxCount) * 100)
                 return (
-                  <div key={c.city} className="space-y-1">
+                  <div
+                    key={c.city}
+                    className="space-y-1 cursor-pointer rounded-md p-1.5 -mx-1.5 transition-colors hover:bg-accent"
+                    onClick={() =>
+                      router.push(
+                        `/members?filter=active&city=${encodeURIComponent(c.city)}`
+                      )
+                    }
+                  >
                     <div className="flex items-center justify-between text-sm">
                       <span>{c.city || "Unknown"}</span>
                       <span className="font-medium">{c.count}</span>

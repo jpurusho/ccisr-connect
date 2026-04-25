@@ -58,6 +58,34 @@ export function getWeekLabel(monday: Date, sunday: Date): string {
   return `${MONTH_NAMES_SHORT[monday.getMonth() + 1]} ${monday.getDate()} – ${MONTH_NAMES_SHORT[sunday.getMonth() + 1]} ${sunday.getDate()}`
 }
 
+export function getUpcomingSunday(today: Date): Date {
+  const d = new Date(today)
+  d.setHours(0, 0, 0, 0)
+  const dayOfWeek = d.getDay()
+  if (dayOfWeek === 0) return d
+  d.setDate(d.getDate() + (7 - dayOfWeek))
+  return d
+}
+
+export function getBulletinWeekBounds(targetSunday: Date): { sunday: Date; saturday: Date } {
+  const sunday = new Date(targetSunday)
+  sunday.setHours(0, 0, 0, 0)
+  const saturday = new Date(sunday)
+  saturday.setDate(sunday.getDate() + 6)
+  return { sunday, saturday }
+}
+
+export function getBulletinMultiWeekBounds(
+  targetSunday: Date,
+  weekCount: number
+): { sunday: Date; saturday: Date } {
+  const sunday = new Date(targetSunday)
+  sunday.setHours(0, 0, 0, 0)
+  const saturday = new Date(sunday)
+  saturday.setDate(sunday.getDate() + weekCount * 7 - 1)
+  return { sunday, saturday }
+}
+
 export function statusLabel(status: string): string {
   switch (status) {
     case "confirmed": return "Scheduled"

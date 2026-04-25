@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { logAudit } from "@/lib/audit"
 import type {
   DispatchQueue,
   DispatchStatus,
@@ -57,6 +58,8 @@ import {
   ChevronRight,
   Plus,
   Mail,
+  Clock,
+  Trash2,
 } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
@@ -246,6 +249,7 @@ export default function DispatchQueuePage() {
       toast.error("Update failed", { description: error.message })
       return false
     }
+    logAudit("dispatch_updated", "dispatch_queue", id, updatePayload)
     return true
   }
 
@@ -253,6 +257,7 @@ export default function DispatchQueuePage() {
     const ok = await updateStatus(item.id, "approved")
     if (ok) {
       toast.success("Dispatch approved")
+      logAudit("dispatch_approved", "dispatch_queue", item.id)
       fetchDispatches()
     }
   }
@@ -261,6 +266,7 @@ export default function DispatchQueuePage() {
     const ok = await updateStatus(item.id, "cancelled")
     if (ok) {
       toast.success("Dispatch cancelled")
+      logAudit("dispatch_cancelled", "dispatch_queue", item.id)
       setCancelTarget(null)
       fetchDispatches()
     }
@@ -270,6 +276,74 @@ export default function DispatchQueuePage() {
     const ok = await updateStatus(item.id, "pending", { error_message: null })
     if (ok) {
       toast.success("Dispatch reset to pending")
+      fetchDispatches()
+    }
+  }
+
+  async function handleDeleteDispatch(item: DispatchQueue) {
+    if (!confirm(`Permanently delete "${item.subject}"? This cannot be undone.`)) return
+    const supabase = createClient()
+    const { error } = await supabase.from("dispatch_queue").delete().eq("id", item.id)
+    if (error) {
+      toast.error(`Delete failed: ${error.message}`)
+    } else {
+      toast.success("Dispatch deleted")
+      logAudit("dispatch_deleted", "dispatch_queue", item.id, { subject: item.subject })
+      fetchDispatches()
+    }
+  }
+
+  async function handleSendNow(item: DispatchQueue) {
+    toast.info(`Sending "${item.subject}"...`)
+    try {
+      const res = await fetch("/api/dispatch/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatchId: item.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(`Sent to ${data.recipientCount} recipient(s)`)
+      } else {
+        toast.error(`Send failed: ${data.error}`)
+      }
+      fetchDispatches()
+    } catch {
+      toast.error("Network error while sending")
+    }
+  }
+
+  // Reschedule dialog state
+  const [rescheduleTarget, setRescheduleTarget] = useState<DispatchQueue | null>(null)
+  const [rescheduleDate, setRescheduleDate] = useState("")
+  const [rescheduleTime, setRescheduleTime] = useState("")
+
+  function openReschedule(item: DispatchQueue) {
+    const d = item.scheduled_at ? new Date(item.scheduled_at) : new Date()
+    const { dateStr, timeStr } = toLocalDateTimeInputs(d)
+    setRescheduleDate(dateStr)
+    setRescheduleTime(timeStr)
+    setRescheduleTarget(item)
+  }
+
+  async function handleReschedule() {
+    if (!rescheduleTarget || !rescheduleDate) return
+    const scheduledAt = rescheduleTime
+      ? new Date(`${rescheduleDate}T${rescheduleTime}`).toISOString()
+      : new Date(`${rescheduleDate}T00:00`).toISOString()
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("dispatch_queue")
+      .update({ scheduled_at: scheduledAt } as never)
+      .eq("id", rescheduleTarget.id)
+
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+    } else {
+      toast.success(`Rescheduled to ${format(new Date(scheduledAt), "MMM d, yyyy h:mm a")}`)
+      logAudit("dispatch_rescheduled", "dispatch_queue", rescheduleTarget.id, { scheduledAt })
+      setRescheduleTarget(null)
       fetchDispatches()
     }
   }
@@ -463,6 +537,14 @@ export default function DispatchQueuePage() {
     return status === "failed"
   }
 
+  function canSend(status: DispatchStatus) {
+    return status === "pending" || status === "previewed" || status === "approved"
+  }
+
+  function canReschedule(status: DispatchStatus) {
+    return status === "pending" || status === "previewed" || status === "approved"
+  }
+
   // Default schedule date: tomorrow at 9 AM
   const defaultSchedule = (() => {
     const d = new Date()
@@ -536,7 +618,9 @@ export default function DispatchQueuePage() {
                   onValueChange={(val) => setFormMailingList(val ?? "")}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a mailing list" />
+                    <SelectValue placeholder="Select a mailing list">
+                      {mailingLists.find((ml) => ml.id === formMailingList)?.name || "Select a mailing list"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {mailingLists.map((ml) => (
@@ -556,7 +640,9 @@ export default function DispatchQueuePage() {
                   onValueChange={(val) => setFormSmtpConfig(val ?? "")}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select SMTP configuration" />
+                    <SelectValue placeholder="Select SMTP configuration">
+                      {smtpConfigs.find((sc) => sc.id === formSmtpConfig)?.name || "Select SMTP configuration"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {smtpConfigs.map((sc) => (
@@ -773,6 +859,32 @@ export default function DispatchQueuePage() {
                                   </Button>
                                 )}
 
+                                {/* Send Now */}
+                                {canSend(d.status) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => handleSendNow(d)}
+                                    aria-label="Send now"
+                                    title="Send Now"
+                                  >
+                                    <Send className="size-3.5 text-green-600" />
+                                  </Button>
+                                )}
+
+                                {/* Reschedule */}
+                                {canReschedule(d.status) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => openReschedule(d)}
+                                    aria-label="Reschedule"
+                                    title="Reschedule"
+                                  >
+                                    <Clock className="size-3.5 text-amber-600" />
+                                  </Button>
+                                )}
+
                                 {/* Retry */}
                                 {canRetry(d.status) && (
                                   <Button
@@ -784,6 +896,17 @@ export default function DispatchQueuePage() {
                                     <RotateCcw className="size-3.5 text-orange-500" />
                                   </Button>
                                 )}
+
+                                {/* Delete */}
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => handleDeleteDispatch(d)}
+                                  aria-label="Delete dispatch"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -861,13 +984,98 @@ export default function DispatchQueuePage() {
                   </>
                 )}
               </div>
+
+              {/* Editable mailing list + SMTP for pending/approved dispatches */}
+              {canSend(previewItem.status) && (
+                <div className="grid gap-3 sm:grid-cols-2 rounded-lg border bg-muted/30 p-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Mailing List</Label>
+                    <Select
+                      value={previewItem.mailing_list_id || ""}
+                      onValueChange={async (val) => {
+                        const supabase = createClient()
+                        await supabase
+                          .from("dispatch_queue")
+                          .update({ mailing_list_id: val || null } as never)
+                          .eq("id", previewItem.id)
+                        setPreviewItem({ ...previewItem, mailing_list_id: val } as typeof previewItem)
+                        setDispatches((prev) =>
+                          prev.map((d) => d.id === previewItem.id ? { ...d, mailing_list_id: val } as typeof d : d)
+                        )
+                        toast.success("Mailing list updated")
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select list...">
+                          {mailingLists.find((ml) => ml.id === previewItem.mailing_list_id)?.name || "Select list..."}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mailingLists.map((ml) => (
+                          <SelectItem key={ml.id} value={ml.id}>{ml.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Send From</Label>
+                    <Select
+                      value={previewItem.smtp_config_id || ""}
+                      onValueChange={async (val) => {
+                        const supabase = createClient()
+                        await supabase
+                          .from("dispatch_queue")
+                          .update({ smtp_config_id: val || null } as never)
+                          .eq("id", previewItem.id)
+                        setPreviewItem({ ...previewItem, smtp_config_id: val } as typeof previewItem)
+                        setDispatches((prev) =>
+                          prev.map((d) => d.id === previewItem.id ? { ...d, smtp_config_id: val } as typeof d : d)
+                        )
+                        toast.success("SMTP account updated")
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select account...">
+                          {smtpConfigs.find((sc) => sc.id === previewItem.smtp_config_id)?.name || "Select account..."}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {smtpConfigs.map((sc) => (
+                          <SelectItem key={sc.id} value={sc.id}>{sc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
               <div
                 className="rounded border bg-white p-4 text-black"
                 dangerouslySetInnerHTML={{ __html: previewItem.body_html }}
               />
             </>
           )}
-          <DialogFooter showCloseButton />
+          <DialogFooter showCloseButton>
+            {previewItem && canSend(previewItem.status) && (
+              <Button
+                onClick={() => {
+                  if (!previewItem.mailing_list_id) {
+                    toast.error("Please select a mailing list first")
+                    return
+                  }
+                  if (!previewItem.smtp_config_id) {
+                    toast.error("Please select a Send From account first")
+                    return
+                  }
+                  handleSendNow(previewItem)
+                  setPreviewItem(null)
+                }}
+              >
+                <Send className="size-3.5" data-icon="inline-start" />
+                Send Now
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -895,6 +1103,58 @@ export default function DispatchQueuePage() {
               onClick={() => cancelTarget && handleCancel(cancelTarget)}
             >
               Cancel Dispatch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule dialog */}
+      <Dialog
+        open={!!rescheduleTarget}
+        onOpenChange={(open) => {
+          if (!open) setRescheduleTarget(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reschedule Dispatch</DialogTitle>
+            <DialogDescription>
+              Set a new send date and time for &quot;{rescheduleTarget?.subject}&quot;.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="resched-date">Date</Label>
+              <Input
+                id="resched-date"
+                type="date"
+                value={rescheduleDate}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="resched-time">Time</Label>
+              <Input
+                id="resched-time"
+                type="time"
+                value={rescheduleTime}
+                onChange={(e) => setRescheduleTime(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRescheduleTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReschedule}
+              disabled={!rescheduleDate}
+            >
+              <Clock className="size-3.5" data-icon="inline-start" />
+              Save Schedule
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -216,6 +216,20 @@ export type AuditLog = {
   created_at: string
 }
 
+export type Tag = {
+  id: string
+  name: string
+  color: string
+  created_at: string
+}
+
+export type MemberTag = {
+  id: string
+  member_id: string
+  tag_id: string
+  created_at: string
+}
+
 // ── Insert types (omit server-generated fields) ─────────────────────────────
 
 export type FamilyInsert = Omit<Family, 'id' | 'created_at' | 'updated_at'>

@@ -3,7 +3,10 @@
 import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import type { Member, Family } from "@/types/database"
+import { logAudit } from "@/lib/audit"
+import type { Member, Family, Address, Tag } from "@/types/database"
+import { canonicalCityName } from "@/lib/city-utils"
+import { formatPhone } from "@/lib/utils"
 import {
   Table,
   TableBody,
@@ -17,25 +20,55 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 
-type MemberWithFamily = Member & { families: Pick<Family, "family_name"> | null }
+type MemberWithFamily = Member & {
+  families:
+    | (Pick<Family, "family_name"> & {
+        addresses: Pick<Address, "city" | "zip" | "is_current">[]
+      })
+    | null
+  member_tags?: { tags: Pick<Tag, "id" | "name" | "color"> | null }[]
+}
 
 interface MembersTableProps {
   searchQuery: string
   filter: "all" | "active" | "inactive" | "newcomers"
+  cityFilter?: string
+  roleFilter?: string
+  tagFilter?: string
   onRefresh?: () => void
 }
 
 const PAGE_SIZE = 25
 
-export function MembersTable({ searchQuery, filter, onRefresh }: MembersTableProps) {
+function getMemberCity(member: MemberWithFamily): string {
+  const addr = member.families?.addresses?.find((a) => a.is_current)
+  return canonicalCityName(addr?.city ?? null)
+}
+
+function getMemberTags(member: MemberWithFamily): { id: string; name: string; color: string }[] {
+  return (member.member_tags ?? [])
+    .map((mt) => mt.tags)
+    .filter((t): t is Pick<Tag, "id" | "name" | "color"> => t !== null)
+}
+
+export function MembersTable({
+  searchQuery,
+  filter,
+  cityFilter,
+  roleFilter,
+  tagFilter,
+  onRefresh,
+}: MembersTableProps) {
   const router = useRouter()
   const [members, setMembers] = useState<MemberWithFamily[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
-  const [sortField, setSortField] = useState<"name" | "family">("name")
+  const [sortField, setSortField] = useState<"name" | "family" | "city">("name")
   const [sortAsc, setSortAsc] = useState(true)
+  const [availableTags, setAvailableTags] = useState<{ id: string; name: string; color: string }[]>([])
+  const [tagPopoverMemberId, setTagPopoverMemberId] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchMembers() {
@@ -43,36 +76,49 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
       const supabase = createClient()
       const { data, error } = await supabase
         .from("members")
-        .select("*, families(family_name)")
+        .select("*, families(family_name, addresses(city, zip, is_current)), member_tags(tags(id, name, color))")
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true })
 
       if (!error && data) {
         setMembers(data as MemberWithFamily[])
       }
+      const { data: tags } = await supabase.from("tags").select("id, name, color").order("name")
+      if (tags) setAvailableTags(tags)
       setLoading(false)
     }
     fetchMembers()
   }, [])
 
-  // Reset page when filter or search changes
   useEffect(() => {
     setPage(0)
-  }, [searchQuery, filter])
+  }, [searchQuery, filter, cityFilter, roleFilter, tagFilter])
 
   const filtered = useMemo(() => {
     let result = members
 
-    // Apply filter
     if (filter === "active") {
       result = result.filter((m) => m.is_active)
     } else if (filter === "inactive") {
       result = result.filter((m) => !m.is_active)
     } else if (filter === "newcomers") {
-      result = result.filter((m) => m.is_newcomer)
+      result = result.filter((m) =>
+        getMemberTags(m).some((t) => t.name.toLowerCase() === "newcomer")
+      )
     }
 
-    // Apply search
+    if (cityFilter && cityFilter !== "all") {
+      result = result.filter((m) => getMemberCity(m) === cityFilter)
+    }
+
+    if (roleFilter && roleFilter !== "all") {
+      result = result.filter((m) => m.role_in_family === roleFilter)
+    }
+
+    if (tagFilter && tagFilter !== "all") {
+      result = result.filter((m) => getMemberTags(m).some((t) => t.id === tagFilter))
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       result = result.filter(
@@ -83,7 +129,6 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
       )
     }
 
-    // Apply sort
     result = [...result].sort((a, b) => {
       let cmp = 0
       if (sortField === "name") {
@@ -92,17 +137,19 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
         const af = a.families?.family_name ?? ""
         const bf = b.families?.family_name ?? ""
         cmp = af.localeCompare(bf)
+      } else if (sortField === "city") {
+        cmp = getMemberCity(a).localeCompare(getMemberCity(b))
       }
       return sortAsc ? cmp : -cmp
     })
 
     return result
-  }, [members, filter, searchQuery, sortField, sortAsc])
+  }, [members, filter, searchQuery, sortField, sortAsc, cityFilter, roleFilter, tagFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
-  function handleSort(field: "name" | "family") {
+  function handleSort(field: "name" | "family" | "city") {
     if (sortField === field) {
       setSortAsc((prev) => !prev)
     } else {
@@ -111,7 +158,7 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
     }
   }
 
-  function sortIndicator(field: "name" | "family") {
+  function sortIndicator(field: "name" | "family" | "city") {
     if (sortField !== field) return null
     return sortAsc ? " ↑" : " ↓"
   }
@@ -158,8 +205,15 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
             </TableHead>
             <TableHead>Phone</TableHead>
             <TableHead className="hidden md:table-cell">Email</TableHead>
+            <TableHead
+              className="hidden lg:table-cell cursor-pointer select-none"
+              onClick={() => handleSort("city")}
+            >
+              City{sortIndicator("city")}
+            </TableHead>
             <TableHead className="hidden md:table-cell">Role</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead className="hidden xl:table-cell">Tags</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -174,10 +228,15 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
                 {member.families?.family_name ?? "-"}
               </TableCell>
               <TableCell className="text-muted-foreground">
-                {member.cell_phone ?? "-"}
+                {formatPhone(member.cell_phone) || "-"}
               </TableCell>
               <TableCell className="hidden text-muted-foreground md:table-cell">
                 {member.email ?? "-"}
+              </TableCell>
+              <TableCell className="hidden text-muted-foreground lg:table-cell">
+                {getMemberCity(member) !== "Unknown"
+                  ? getMemberCity(member)
+                  : "-"}
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <Badge variant="secondary" className="capitalize">
@@ -185,7 +244,10 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
                 </Badge>
               </TableCell>
               <TableCell>
-                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="flex items-center gap-1.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Switch
                     size="sm"
                     checked={member.is_active}
@@ -200,25 +262,88 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
                       } else {
                         setMembers((prev) =>
                           prev.map((m) =>
-                            m.id === member.id ? { ...m, is_active: checked } : m
+                            m.id === member.id
+                              ? { ...m, is_active: checked }
+                              : m
                           )
                         )
                         onRefresh?.()
-                        toast.success(`${member.full_name} ${checked ? "activated" : "deactivated"}`)
+                        logAudit("member_toggled_active", "members", member.id, { is_active: checked, name: member.full_name })
+                        toast.success(
+                          `${member.full_name} ${checked ? "activated" : "deactivated"}`
+                        )
                       }
                     }}
                   />
-                  {member.is_newcomer && (
-                    <Badge variant="secondary">New</Badge>
+                  {/* Newcomer shown as tag badge in Tags column */}
+                </div>
+              </TableCell>
+              <TableCell
+                className="hidden xl:table-cell relative"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setTagPopoverMemberId(tagPopoverMemberId === member.id ? null : member.id)
+                }}
+              >
+                <div className="flex flex-wrap gap-1 cursor-pointer min-h-[24px] rounded-md p-0.5 hover:bg-muted/50">
+                  {getMemberTags(member).map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
+                      style={{ backgroundColor: tag.color }}
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                  {getMemberTags(member).length === 0 && (
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                      <Plus className="size-3" /> Tags
+                    </span>
                   )}
                 </div>
+                {tagPopoverMemberId === member.id && (
+                  <div className="absolute right-0 z-50 mt-1 rounded-lg border bg-popover p-2 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-wrap gap-1.5 max-w-xs">
+                      {availableTags.map((tag) => {
+                        const hasTag = getMemberTags(member).some((t) => t.id === tag.id)
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${hasTag ? "text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                            style={hasTag ? { backgroundColor: tag.color } : undefined}
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              const supabase = createClient()
+                              if (hasTag) {
+                                await supabase.from("member_tags").delete().eq("member_id", member.id).eq("tag_id", tag.id)
+                              } else {
+                                await supabase.from("member_tags").insert({ member_id: member.id, tag_id: tag.id } as never)
+                              }
+                              logAudit(hasTag ? "tag_removed" : "tag_added", "member_tags", member.id, { tag: tag.name })
+                              const { data: updated } = await supabase
+                                .from("members")
+                                .select("*, families(family_name, addresses(city, zip, is_current)), member_tags(tags(id, name, color))")
+                                .eq("id", member.id)
+                                .single()
+                              if (updated) {
+                                setMembers((prev) => prev.map((m) => m.id === member.id ? updated as MemberWithFamily : m))
+                              }
+                            }}
+                          >
+                            {tag.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
@@ -236,7 +361,6 @@ export function MembersTable({ searchQuery, filter, onRefresh }: MembersTablePro
               <ChevronLeft />
             </Button>
             {Array.from({ length: totalPages }).map((_, i) => {
-              // Show first, last, current, and neighbors
               if (
                 i === 0 ||
                 i === totalPages - 1 ||

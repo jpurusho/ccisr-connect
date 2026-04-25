@@ -1,6 +1,9 @@
 "use client"
 
-import { Settings, Palette, Server, UserCog, Info, Church } from "lucide-react"
+import { Settings, Palette, Server, UserCog, Info, Church, Tag, FileText } from "lucide-react"
+import dynamic from "next/dynamic"
+
+const TemplatesPanel = dynamic(() => import("@/app/(dashboard)/templates/page"), { ssr: false })
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Card,
@@ -13,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { ThemeSelector } from "@/components/settings/theme-selector"
 import { SmtpConfigPanel } from "@/components/settings/smtp-config"
 import { UserManagementPanel } from "@/components/settings/user-management"
+import { TagManagementPanel } from "@/components/settings/tag-management"
 
 function AboutPanel() {
   return (
@@ -91,6 +95,14 @@ export default function SettingsPage() {
             <UserCog className="size-4" />
             <span className="hidden sm:inline">User Management</span>
           </TabsTrigger>
+          <TabsTrigger value="templates">
+            <FileText className="size-4" />
+            <span className="hidden sm:inline">Templates</span>
+          </TabsTrigger>
+          <TabsTrigger value="tags">
+            <Tag className="size-4" />
+            <span className="hidden sm:inline">Tags</span>
+          </TabsTrigger>
           <TabsTrigger value="about">
             <Info className="size-4" />
             <span className="hidden sm:inline">About</span>
@@ -107,6 +119,14 @@ export default function SettingsPage() {
 
         <TabsContent value="users" className="mt-6">
           <UserManagementPanel />
+        </TabsContent>
+
+        <TabsContent value="templates" className="mt-6">
+          <TemplatesPanel />
+        </TabsContent>
+
+        <TabsContent value="tags" className="mt-6">
+          <TagManagementPanel />
         </TabsContent>
 
         <TabsContent value="about" className="mt-6">

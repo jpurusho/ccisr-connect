@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { Member, Family, FamilyRole, FamilyInsert, MemberInsert } from "@/types/database"
+import { logAudit } from "@/lib/audit"
+import type { Member, Family, FamilyRole, FamilyInsert, MemberInsert, Tag } from "@/types/database"
+import { formatPhone } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -73,6 +75,10 @@ export function MemberFormDialog({
   const [isNewcomer, setIsNewcomer] = useState(false)
   const [notes, setNotes] = useState("")
 
+  // Tags
+  const [availableTags, setAvailableTags] = useState<Tag[]>([])
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set())
+
   // Families for dropdown
   const [families, setFamilies] = useState<Family[]>([])
   const [loadingFamilies, setLoadingFamilies] = useState(false)
@@ -81,12 +87,12 @@ export function MemberFormDialog({
   const fetchFamilies = useCallback(async () => {
     setLoadingFamilies(true)
     const supabase = createClient()
-    const { data } = await supabase
-      .from("families")
-      .select("*")
-      .eq("is_active", true)
-      .order("family_name", { ascending: true })
-    if (data) setFamilies(data)
+    const [famRes, tagRes] = await Promise.all([
+      supabase.from("families").select("*").eq("is_active", true).order("family_name", { ascending: true }),
+      supabase.from("tags").select("*").order("name").returns<Tag[]>(),
+    ])
+    if (famRes.data) setFamilies(famRes.data)
+    if (tagRes.data) setAvailableTags(tagRes.data)
     setLoadingFamilies(false)
   }, [])
 
@@ -114,8 +120,17 @@ export function MemberFormDialog({
       setIsActive(member.is_active)
       setIsNewcomer(member.is_newcomer)
       setNotes(member.notes ?? "")
+      // Fetch current tags for this member
+      const supabase = createClient()
+      supabase
+        .from("member_tags")
+        .select("tag_id")
+        .eq("member_id", member.id)
+        .returns<{ tag_id: string }[]>()
+        .then(({ data }) => {
+          setSelectedTagIds(new Set((data ?? []).map((t) => t.tag_id)))
+        })
     } else if (open && !member) {
-      // Reset form for new member
       setFirstName("")
       setLastName("")
       setFamilyId(null)
@@ -130,8 +145,9 @@ export function MemberFormDialog({
       setIsActive(true)
       setIsNewcomer(false)
       setNotes("")
+      setSelectedTagIds(new Set())
     }
-  }, [open, member])
+  }, [open, member, loadingFamilies])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -172,6 +188,7 @@ export function MemberFormDialog({
           return
         }
         resolvedFamilyId = (newFamily as Family).id
+        logAudit("family_created", "families", null, { family_name: newFamilyName.trim() })
       }
 
       if (!resolvedFamilyId) {
@@ -213,6 +230,7 @@ export function MemberFormDialog({
           return
         }
         toast.success("Member updated successfully.")
+        logAudit("member_updated", "members", member.id, { name: fullName })
       } else {
         const { error } = await supabase
           .from("members")
@@ -224,6 +242,31 @@ export function MemberFormDialog({
           return
         }
         toast.success("Member created successfully.")
+        logAudit("member_created", "members", null, { name: fullName })
+      }
+
+      // Sync tags
+      if (isEditing && member) {
+        await supabase.from("member_tags").delete().eq("member_id", member.id)
+        if (selectedTagIds.size > 0) {
+          await supabase.from("member_tags").insert(
+            [...selectedTagIds].map((tagId) => ({ member_id: member.id, tag_id: tagId })) as never
+          )
+        }
+      } else if (!isEditing && selectedTagIds.size > 0) {
+        const { data: newMember } = await supabase
+          .from("members")
+          .select("id")
+          .eq("full_name", fullName)
+          .eq("family_id", resolvedFamilyId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single()
+        if (newMember) {
+          await supabase.from("member_tags").insert(
+            [...selectedTagIds].map((tagId) => ({ member_id: (newMember as { id: string }).id, tag_id: tagId })) as never
+          )
+        }
       }
 
       onOpenChange(false)
@@ -247,7 +290,7 @@ export function MemberFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" data-1p-ignore autoComplete="off">
           {/* Name fields */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -305,7 +348,9 @@ export function MemberFormDialog({
                 onValueChange={(val) => setFamilyId(val as string)}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a family" />
+                  <SelectValue placeholder="Select a family">
+                    {families.find((f) => f.id === familyId)?.family_name || "Select a family"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {families.map((f) => (
@@ -348,6 +393,8 @@ export function MemberFormDialog({
                 value={cellPhone}
                 onChange={(e) => setCellPhone(e.target.value)}
                 placeholder="(555) 123-4567"
+                autoComplete="off"
+                data-1p-ignore
               />
             </div>
             <div className="space-y-1.5">
@@ -358,6 +405,8 @@ export function MemberFormDialog({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="email@example.com"
+                autoComplete="off"
+                data-1p-ignore
               />
             </div>
           </div>
@@ -419,15 +468,42 @@ export function MemberFormDialog({
                 onCheckedChange={(checked) => setIsActive(checked)}
               />
             </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="isNewcomer">Newcomer</Label>
-              <Switch
-                id="isNewcomer"
-                checked={isNewcomer}
-                onCheckedChange={(checked) => setIsNewcomer(checked)}
-              />
-            </div>
+            {/* Newcomer is now managed via Tags */}
           </div>
+
+          {/* Tags */}
+          {availableTags.length > 0 && (
+            <div className="space-y-2">
+              <Label>Tags</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {availableTags.map((tag) => {
+                  const isSelected = selectedTagIds.has(tag.id)
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTagIds((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(tag.id)) next.delete(tag.id)
+                          else next.add(tag.id)
+                          return next
+                        })
+                      }}
+                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                        isSelected
+                          ? "text-white"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                      style={isSelected ? { backgroundColor: tag.color } : undefined}
+                    >
+                      {tag.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-1.5">

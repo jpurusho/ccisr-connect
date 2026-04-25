@@ -12,7 +12,11 @@ import {
   CardDescription,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
+import { logAudit } from "@/lib/audit"
+import { formatPhone } from "@/lib/utils"
 import { MapPin, Phone, Mail, Heart } from "lucide-react"
 
 type FamilyWithDetails = Family & {
@@ -24,11 +28,13 @@ type FamilyWithDetails = Family & {
 interface FamilyViewProps {
   searchQuery: string
   filter: "all" | "active" | "inactive" | "newcomers"
+  cityFilter?: string
 }
 
 import { MONTH_NAMES_FULL as MONTH_NAMES } from "@/lib/date-utils"
+import { canonicalCityName } from "@/lib/city-utils"
 
-export function FamilyView({ searchQuery, filter }: FamilyViewProps) {
+export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps) {
   const router = useRouter()
   const [families, setFamilies] = useState<FamilyWithDetails[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,11 +69,17 @@ export function FamilyView({ searchQuery, filter }: FamilyViewProps) {
       result = result.filter((f) => !f.is_active)
     } else if (filter === "newcomers") {
       result = result.filter((f) =>
-        f.members.some((m) => m.is_newcomer)
+        f.members.some((m) => m.is_newcomer)  // fallback to DB field for families without tag data
       )
     }
 
-    // Search by family name or member names/contact
+    if (cityFilter && cityFilter !== "all") {
+      result = result.filter((f) => {
+        const addr = f.addresses?.find((a) => a.is_current)
+        return canonicalCityName(addr?.city ?? null) === cityFilter
+      })
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       result = result.filter(
@@ -83,7 +95,7 @@ export function FamilyView({ searchQuery, filter }: FamilyViewProps) {
     }
 
     return result
-  }, [families, filter, searchQuery])
+  }, [families, filter, searchQuery, cityFilter])
 
   if (loading) {
     return (
@@ -141,9 +153,49 @@ export function FamilyView({ searchQuery, filter }: FamilyViewProps) {
                     </CardDescription>
                   )}
                 </div>
-                <Badge variant={family.is_active ? "default" : "outline"}>
-                  {family.is_active ? "Active" : "Inactive"}
-                </Badge>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-xs text-muted-foreground">
+                    {family.is_active ? "Active" : "Inactive"}
+                  </span>
+                  <Switch
+                    size="sm"
+                    checked={family.is_active}
+                    onCheckedChange={async (checked) => {
+                      const supabase = createClient()
+                      const { error: famErr } = await supabase
+                        .from("families")
+                        .update({ is_active: checked } as never)
+                        .eq("id", family.id)
+                      if (famErr) {
+                        toast.error(`Failed: ${famErr.message}`)
+                        return
+                      }
+                      await supabase
+                        .from("members")
+                        .update({ is_active: checked } as never)
+                        .eq("family_id", family.id)
+                      setFamilies((prev) =>
+                        prev.map((f) =>
+                          f.id === family.id
+                            ? {
+                                ...f,
+                                is_active: checked,
+                                members: f.members.map((m) => ({ ...m, is_active: checked })),
+                              }
+                            : f
+                        )
+                      )
+                      logAudit("family_toggled_active", "families", family.id, {
+                        is_active: checked,
+                        name: family.family_name,
+                        memberCount: family.members.length,
+                      })
+                      toast.success(
+                        `${family.family_name} family ${checked ? "activated" : "deactivated"} (${family.members.length} members)`
+                      )
+                    }}
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -151,7 +203,7 @@ export function FamilyView({ searchQuery, filter }: FamilyViewProps) {
                 {family.home_phone && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Phone className="size-3.5 shrink-0" />
-                    <span>{family.home_phone}</span>
+                    <span>{formatPhone(family.home_phone)}</span>
                   </div>
                 )}
 
@@ -181,11 +233,7 @@ export function FamilyView({ searchQuery, filter }: FamilyViewProps) {
                           >
                             {member.role_in_family}
                           </Badge>
-                          {member.is_newcomer && (
-                            <Badge variant="secondary" className="shrink-0">
-                              New
-                            </Badge>
-                          )}
+                          {/* Newcomer shown via tags */}
                         </div>
                         <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 pl-3.5 text-xs text-muted-foreground">
                           {member.cell_phone && (

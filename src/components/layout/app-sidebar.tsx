@@ -10,7 +10,6 @@ import {
   Send,
   Clock,
   History,
-  FileText,
   Mail,
   BarChart3,
   Settings,
@@ -23,29 +22,70 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { UserNav } from "@/components/layout/user-nav"
 
-const mainNavItems = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+const membershipNav = [
+  { title: "Communication Hub", href: "/dashboard", icon: LayoutDashboard },
   { title: "Members", href: "/members", icon: Users },
   { title: "Calendar", href: "/calendar", icon: CalendarDays },
-  { title: "Compose", href: "/compose", icon: Send },
-  { title: "Dispatch Queue", href: "/dispatch", icon: Clock },
-  { title: "History", href: "/history", icon: History },
-  { title: "Templates", href: "/templates", icon: FileText },
-  { title: "Mailing Lists", href: "/mailing-lists", icon: Mail },
   { title: "Reports", href: "/reports", icon: BarChart3 },
 ]
 
-const settingsNavItems = [
+const communicationsNav = [
+  { title: "Compose", href: "/compose", icon: Send },
+  { title: "Dispatch Queue", href: "/dispatch", icon: Clock },
+  { title: "Mailing Lists", href: "/mailing-lists", icon: Mail },
+  { title: "History", href: "/history", icon: History },
+]
+
+const configNav = [
   { title: "Settings", href: "/settings", icon: Settings },
 ]
+
+function NavGroup({
+  label,
+  items,
+  pathname,
+}: {
+  label: string
+  items: typeof membershipNav
+  pathname: string
+}) {
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>{label}</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => {
+            const isActive =
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(item.href)
+
+            return (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  isActive={isActive}
+                  tooltip={item.title}
+                  render={<Link href={item.href} />}
+                >
+                  <item.icon className="size-4" />
+                  <span>{item.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  )
+}
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -71,56 +111,9 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNavItems.map((item) => {
-                const isActive =
-                  item.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname.startsWith(item.href)
-
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      tooltip={item.title}
-                      render={<Link href={item.href} />}
-                    >
-                      <item.icon className="size-4" />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator />
-
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {settingsNavItems.map((item) => {
-                const isActive = pathname.startsWith(item.href)
-
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      tooltip={item.title}
-                      render={<Link href={item.href} />}
-                    >
-                      <item.icon className="size-4" />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <NavGroup label="Membership" items={membershipNav} pathname={pathname} />
+        <NavGroup label="Communications" items={communicationsNav} pathname={pathname} />
+        <NavGroup label="Configuration" items={configNav} pathname={pathname} />
       </SidebarContent>
 
       <SidebarFooter>

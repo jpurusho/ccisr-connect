@@ -1,35 +1,50 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronsUpDown, LogOut, User, Palette } from "lucide-react"
-import { useTheme } from "next-themes"
-
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { LogOut } from "lucide-react"
+/* eslint-disable @next/next/no-img-element */
+import { Button } from "@/components/ui/button"
 import {
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-// Placeholder user data - will be replaced with real auth data
-const placeholderUser = {
-  name: "Church Admin",
-  email: "admin@ccisr.org",
-  initials: "CA",
+interface UserInfo {
+  name: string
+  email: string
+  avatar: string | null
+  initials: string
 }
 
 export function UserNav() {
   const router = useRouter()
-  const { theme, setTheme } = useTheme()
+  const [user, setUser] = useState<UserInfo | null>(null)
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const { createClient } = await import("@/lib/supabase/client")
+        const supabase = createClient()
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser) {
+          const meta = authUser.user_metadata ?? {}
+          const idMeta = authUser.identities?.[0]?.identity_data ?? {}
+          const name = meta.full_name || meta.name || idMeta.full_name || idMeta.name || authUser.email?.split("@")[0] || "User"
+          const email = authUser.email || ""
+          const avatar = meta.avatar_url || meta.picture || idMeta.avatar_url || idMeta.picture || null
+          const parts = String(name).trim().split(/\s+/)
+          const initials = parts.length >= 2
+            ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+            : name.slice(0, 2).toUpperCase()
+          setUser({ name, email, avatar, initials })
+        }
+      } catch {
+        // Auth not configured
+      }
+    }
+    loadUser()
+  }, [])
 
   const handleSignOut = async () => {
     try {
@@ -37,78 +52,47 @@ export function UserNav() {
       const supabase = createClient()
       await supabase.auth.signOut()
     } catch {
-      // Supabase client may not be configured yet
+      // ignore
     }
     router.push("/login")
   }
 
-  const cycleTheme = () => {
-    const themes = ["light", "dark", "warm"]
-    const currentIndex = themes.indexOf(theme ?? "light")
-    const nextIndex = (currentIndex + 1) % themes.length
-    setTheme(themes[nextIndex])
-  }
+  if (!user) return null
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <SidebarMenuButton
-                size="lg"
-                className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
-              />
-            }
-          >
-            <Avatar size="sm">
-              <AvatarFallback className="text-xs">
-                {placeholderUser.initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">
-                {placeholderUser.name}
-              </span>
-              <span className="truncate text-xs text-muted-foreground">
-                {placeholderUser.email}
-              </span>
+        <div className="flex items-center gap-2.5 px-2 py-2 overflow-hidden">
+          {user.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user.name}
+              className="size-7 shrink-0 rounded-full"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium">
+              {user.initials}
             </div>
-            <ChevronsUpDown className="ml-auto size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            align="end"
-            sideOffset={4}
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium leading-tight">
+              {user.name}
+            </p>
+            <p className="truncate text-[10px] leading-tight text-muted-foreground">
+              {user.email}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            onClick={handleSignOut}
+            title="Sign out"
           >
-            <DropdownMenuLabel>
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">
-                  {placeholderUser.name}
-                </p>
-                <p className="text-xs leading-none text-muted-foreground">
-                  {placeholderUser.email}
-                </p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push("/settings/profile")}>
-                <User className="size-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={cycleTheme}>
-                <Palette className="size-4" />
-                <span>Theme ({theme ?? "light"})</span>
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="size-4" />
-              <span>Sign out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <LogOut className="size-3.5" />
+          </Button>
+        </div>
       </SidebarMenuItem>
     </SidebarMenu>
   )

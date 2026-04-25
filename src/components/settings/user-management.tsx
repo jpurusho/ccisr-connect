@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { logAudit } from "@/lib/audit"
 import type { AppUser, UserRole } from "@/types/database"
 import {
   Card,
@@ -121,6 +122,7 @@ export function UserManagementPanel() {
         toast.error(`Failed to create app user: ${error.message}`)
       } else {
         toast.success(`User ${inviteEmail.trim()} invited as ${inviteRole}`)
+        logAudit("user_invited", "app_users", null, { email: inviteEmail.trim(), role: inviteRole })
         setDialogOpen(false)
         setInviteEmail("")
         setInviteDisplayName("")
@@ -145,6 +147,7 @@ export function UserManagementPanel() {
       toast.error(`Failed to update: ${error.message}`)
     } else {
       toast.success(`${user.email} ${user.is_active ? "deactivated" : "activated"}`)
+      logAudit("user_toggled_active", "app_users", user.id, { is_active: !user.is_active })
       fetchUsers()
     }
   }
@@ -160,6 +163,7 @@ export function UserManagementPanel() {
       toast.error(`Failed to update role: ${error.message}`)
     } else {
       toast.success(`${user.email} role updated to ${newRole}`)
+      logAudit("user_role_changed", "app_users", user.id, { role: newRole })
       fetchUsers()
     }
   }

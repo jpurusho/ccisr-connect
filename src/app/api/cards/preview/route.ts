@@ -38,15 +38,24 @@ export async function GET(request: NextRequest) {
 
     case "bible_study":
       html = buildBibleStudyCard({
-        hostNames: searchParams.get("host") || "Jerome & Sunitha",
-        address:
-          searchParams.get("address") ||
-          "2652 Piccadilly Circle",
-        city: "San Ramon, CA 94582",
-        phone: searchParams.get("phone") || "510-676-2224",
         date: searchParams.get("date") || "Friday, May 2nd",
         time: searchParams.get("time") || "7:30 PM",
         topic: searchParams.get("topic") || "Studying the Book of Acts",
+        locations: [
+          {
+            label: "San Ramon",
+            hostNames: searchParams.get("host") || "Jerome & Sunitha",
+            address: searchParams.get("address") || "2652 Piccadilly Circle",
+            city: "San Ramon, CA 94582",
+            phone: searchParams.get("phone") || "510-676-2224",
+          },
+          {
+            label: "Mountain House",
+            hostNames: "TBD",
+            address: "TBD",
+            city: "Mountain House, CA",
+          },
+        ],
       });
       break;
 

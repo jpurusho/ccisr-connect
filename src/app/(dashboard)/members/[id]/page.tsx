@@ -3,7 +3,9 @@
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import type { Member, Family, Address, WeddingAnniversary } from "@/types/database"
+import { logAudit } from "@/lib/audit"
+import { formatPhone } from "@/lib/utils"
+import type { Member, Family, Address, WeddingAnniversary, Tag } from "@/types/database"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -23,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { MemberFormDialog } from "@/components/members/member-form-dialog"
 import { toast } from "sonner"
 import {
@@ -36,6 +39,7 @@ import {
   Heart,
   Users,
   Loader2,
+  Tag as TagIcon,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -57,7 +61,13 @@ export default function MemberDetailPage() {
   const [loading, setLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [permanentDeleteDialogOpen, setPermanentDeleteDialogOpen] = useState(false)
+  const [permanentDeleteConfirmName, setPermanentDeleteConfirmName] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [permanentlyDeleting, setPermanentlyDeleting] = useState(false)
+  const [availableTags, setAvailableTags] = useState<Tag[]>([])
+  const [memberTagIds, setMemberTagIds] = useState<Set<string>>(new Set())
+  const [togglingTagId, setTogglingTagId] = useState<string | null>(null)
 
   const fetchMember = useCallback(async () => {
     setLoading(true)
@@ -79,7 +89,7 @@ export default function MemberDetailPage() {
     setMember(detail)
 
     // Fetch related data in parallel
-    const [familyMembersResult, addressResult, anniversaryResult] =
+    const [familyMembersResult, addressResult, anniversaryResult, tagsResult, memberTagsResult] =
       await Promise.all([
         supabase
           .from("members")
@@ -100,6 +110,14 @@ export default function MemberDetailPage() {
           .eq("family_id", detail.family_id)
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from("tags")
+          .select("*")
+          .order("name"),
+        supabase
+          .from("member_tags")
+          .select("tag_id")
+          .eq("member_id", memberId),
       ])
 
     if (familyMembersResult.data) {
@@ -110,6 +128,12 @@ export default function MemberDetailPage() {
     }
     if (anniversaryResult.data) {
       setAnniversary(anniversaryResult.data)
+    }
+    if (tagsResult.data) {
+      setAvailableTags(tagsResult.data as Tag[])
+    }
+    if (memberTagsResult.data) {
+      setMemberTagIds(new Set(memberTagsResult.data.map((mt: { tag_id: string }) => mt.tag_id)))
     }
 
     setLoading(false)
@@ -136,9 +160,79 @@ export default function MemberDetailPage() {
     }
 
     toast.success(`${member.full_name} has been marked as inactive.`)
+    logAudit("member_deleted", "members", member.id, { name: member.full_name })
     setDeleteDialogOpen(false)
     setDeleting(false)
     router.push("/members")
+  }
+
+  async function handlePermanentDelete() {
+    if (!member) return
+    setPermanentlyDeleting(true)
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("members")
+      .delete()
+      .eq("id", member.id)
+
+    if (error) {
+      toast.error("Failed to permanently delete member: " + error.message)
+      setPermanentlyDeleting(false)
+      return
+    }
+
+    toast.success(`${member.full_name} has been permanently deleted.`)
+    logAudit("member_permanently_deleted", "members", member.id, { name: member.full_name })
+    setPermanentDeleteDialogOpen(false)
+    setPermanentlyDeleting(false)
+    router.push("/members")
+  }
+
+  async function handleTagToggle(tagId: string) {
+    if (!member) return
+    setTogglingTagId(tagId)
+
+    const supabase = createClient()
+    const hasTag = memberTagIds.has(tagId)
+
+    if (hasTag) {
+      const { error } = await supabase
+        .from("member_tags")
+        .delete()
+        .eq("member_id", member.id)
+        .eq("tag_id", tagId)
+
+      if (error) {
+        toast.error("Failed to remove tag: " + error.message)
+        setTogglingTagId(null)
+        return
+      }
+
+      setMemberTagIds((prev) => {
+        const next = new Set(prev)
+        next.delete(tagId)
+        return next
+      })
+      const tag = availableTags.find((t) => t.id === tagId)
+      logAudit("tag_removed", "member_tags", member.id, { tag_name: tag?.name })
+    } else {
+      const { error } = await supabase
+        .from("member_tags")
+        .insert({ member_id: member.id, tag_id: tagId } as never)
+
+      if (error) {
+        toast.error("Failed to add tag: " + error.message)
+        setTogglingTagId(null)
+        return
+      }
+
+      setMemberTagIds((prev) => new Set(prev).add(tagId))
+      const tag = availableTags.find((t) => t.id === tagId)
+      logAudit("tag_added", "member_tags", member.id, { tag_name: tag?.name })
+    }
+
+    setTogglingTagId(null)
   }
 
   function handleEditSuccess() {
@@ -165,10 +259,10 @@ export default function MemberDetailPage() {
         <Button
           variant="outline"
           className="mt-4"
-          render={<Link href="/members" />}
+          onClick={() => router.back()}
         >
           <ArrowLeft className="size-4" />
-          Back to Members
+          Go Back
         </Button>
       </div>
     )
@@ -187,7 +281,7 @@ export default function MemberDetailPage() {
           <Button
             variant="ghost"
             size="icon"
-            render={<Link href="/members" />}
+            onClick={() => router.back()}
           >
             <ArrowLeft />
           </Button>
@@ -204,9 +298,7 @@ export default function MemberDetailPage() {
               ) : (
                 <Badge variant="outline">Inactive</Badge>
               )}
-              {member.is_newcomer && (
-                <Badge variant="secondary">Newcomer</Badge>
-              )}
+              {/* Newcomer shown via tags */}
             </div>
           </div>
         </div>
@@ -221,6 +313,17 @@ export default function MemberDetailPage() {
           >
             <Trash2 className="size-4" />
             Deactivate
+          </Button>
+          <Button
+            variant="outline"
+            className="border-destructive text-destructive hover:bg-destructive/10"
+            onClick={() => {
+              setPermanentDeleteConfirmName("")
+              setPermanentDeleteDialogOpen(true)
+            }}
+          >
+            <Trash2 className="size-4" />
+            Delete Permanently
           </Button>
         </div>
       </div>
@@ -239,7 +342,7 @@ export default function MemberDetailPage() {
                   <div>
                     <p className="text-sm font-medium">Cell Phone</p>
                     <p className="text-sm text-muted-foreground">
-                      {member.cell_phone}
+                      {formatPhone(member.cell_phone)}
                     </p>
                   </div>
                 </div>
@@ -290,6 +393,60 @@ export default function MemberDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Tags */}
+        {availableTags.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TagIcon className="size-4" />
+                Tags
+              </CardTitle>
+              <CardDescription>
+                Click a tag to toggle it on or off for this member.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map((tag) => {
+                  const isActive = memberTagIds.has(tag.id)
+                  const isToggling = togglingTagId === tag.id
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      disabled={isToggling}
+                      onClick={() => handleTagToggle(tag.id)}
+                      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: tag.color + "20",
+                              borderColor: tag.color,
+                              color: tag.color,
+                            }
+                          : {
+                              borderColor: "var(--border)",
+                              color: "var(--muted-foreground)",
+                            }
+                      }
+                    >
+                      {isToggling ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <span
+                          className="inline-block size-2 rounded-full"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                      )}
+                      {tag.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Family Information */}
         <Card>
           <CardHeader>
@@ -300,7 +457,7 @@ export default function MemberDetailPage() {
             {member.families?.home_phone && (
               <CardDescription className="flex items-center gap-1.5">
                 <Phone className="size-3.5" />
-                Home: {member.families.home_phone}
+                Home: {formatPhone(member.families.home_phone)}
               </CardDescription>
             )}
           </CardHeader>
@@ -329,7 +486,7 @@ export default function MemberDetailPage() {
                     </div>
                     {fm.cell_phone && (
                       <span className="text-xs text-muted-foreground">
-                        {fm.cell_phone}
+                        {formatPhone(fm.cell_phone)}
                       </span>
                     )}
                   </div>
@@ -375,36 +532,6 @@ export default function MemberDetailPage() {
         )}
 
         {/* Newcomer info */}
-        {member.is_newcomer && (
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Newcomer Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Date:</span>
-                  <span className="text-muted-foreground">
-                    {member.newcomer_date ?? "Not recorded"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Acknowledged:</span>
-                  <Badge
-                    variant={
-                      member.newcomer_acknowledged ? "default" : "outline"
-                    }
-                  >
-                    {member.newcomer_acknowledged ? "Yes" : "No"}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Metadata */}
         <Card className="lg:col-span-2">
           <CardContent className="pt-4">
@@ -438,7 +565,7 @@ export default function MemberDetailPage() {
         onSuccess={handleEditSuccess}
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Deactivate Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -467,6 +594,49 @@ export default function MemberDetailPage() {
             >
               {deleting && <Loader2 className="animate-spin" />}
               Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permanent Delete Confirmation Dialog */}
+      <Dialog open={permanentDeleteDialogOpen} onOpenChange={setPermanentDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Permanently</DialogTitle>
+            <DialogDescription>
+              This will permanently delete{" "}
+              <span className="font-medium text-foreground">
+                {member.full_name}
+              </span>{" "}
+              and all their data. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">
+              Type <span className="font-semibold text-foreground">{member.full_name}</span> to confirm:
+            </p>
+            <Input
+              value={permanentDeleteConfirmName}
+              onChange={(e) => setPermanentDeleteConfirmName(e.target.value)}
+              placeholder={member.full_name}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPermanentDeleteDialogOpen(false)}
+              disabled={permanentlyDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handlePermanentDelete}
+              disabled={permanentlyDeleting || permanentDeleteConfirmName !== member.full_name}
+            >
+              {permanentlyDeleting && <Loader2 className="animate-spin" />}
+              Delete Permanently
             </Button>
           </DialogFooter>
         </DialogContent>

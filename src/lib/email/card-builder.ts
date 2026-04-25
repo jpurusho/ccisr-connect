@@ -23,6 +23,25 @@ export interface CardColors {
   bgLight: string;
 }
 
+export function deriveColorsFromPrimary(hex: string): CardColors {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  const mix = (c: number, w: number, t: number) => Math.round(c * (1 - t) + w * t)
+  const toHex = (r2: number, g2: number, b2: number) =>
+    `#${[r2, g2, b2].map((c) => c.toString(16).padStart(2, "0")).join("")}`
+
+  return {
+    primary: hex,
+    primaryLight: toHex(mix(r, 255, 0.85), mix(g, 255, 0.85), mix(b, 255, 0.85)),
+    accent: toHex(mix(r, 255, 0.4), mix(g, 255, 0.4), mix(b, 255, 0.4)),
+    textDark: "#1E293B",
+    textLight: "#64748B",
+    border: toHex(mix(r, 255, 0.7), mix(g, 255, 0.7), mix(b, 255, 0.7)),
+    bgLight: toHex(mix(r, 255, 0.92), mix(g, 255, 0.92), mix(b, 255, 0.92)),
+  }
+}
+
 export const EVENT_COLORS: Record<string, CardColors> = {
   birthday: {
     primary: "#7C3AED",
@@ -85,7 +104,6 @@ function wrapCard(content: string, colors: CardColors): string {
 <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${colors.border};border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
 ${content}
 </table>
-<p style="margin:12px 0 0;font-size:10px;color:${colors.textLight};text-align:center">Christ Church of India, San Ramon &bull; CCISR Connect</p>
 </div>`;
 }
 
@@ -108,6 +126,14 @@ ${html}
 </td></tr>`;
 }
 
+function resourceLinksHtml(links: ResourceLink[] | undefined, colors: CardColors): string {
+  const valid = (links ?? []).filter(l => l.url);
+  if (valid.length === 0) return "";
+  return `<div style="text-align:center;margin-top:16px">${valid.map(l =>
+    `<a href="${l.url}" style="display:inline-block;padding:8px 20px;background:${colors.primary};color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;margin:4px">${l.label || "View Link"}</a>`
+  ).join("")}</div>`;
+}
+
 function footerRow(text: string, colors: CardColors): string {
   return `<tr><td style="background:${colors.bgLight};padding:14px 28px;text-align:center;border-top:1px solid ${colors.border}">
 <p style="margin:0;font-size:11px;color:${colors.textLight}">${text}</p>
@@ -122,16 +148,16 @@ export interface BirthdayEntry {
 }
 
 export interface BirthdayCardData {
-  weekLabel: string; // e.g., "April 27 – May 3"
+  weekLabel: string;
   birthdays: BirthdayEntry[];
   message?: string;
+  footerVerse?: string;
+  primaryColor?: string;
+  resourceLinks?: ResourceLink[];
 }
 
 export function buildBirthdayCard(data: BirthdayCardData): string {
-  const colors = EVENT_COLORS.birthday;
-  const message =
-    data.message ||
-    "Wishing you a blessed birthday filled with God's love, joy, and peace. May this new year bring wonderful blessings!";
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.birthday;
 
   const personRows = data.birthdays
     .map(
@@ -143,9 +169,14 @@ export function buildBirthdayCard(data: BirthdayCardData): string {
     )
     .join("");
 
+  const messageHtml = data.message
+    ? `<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
+<p style="margin:0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${data.message}</p>`
+    : "";
+
   const content =
     headerRow(
-      data.birthdays.length === 1 ? "Happy Birthday!" : "Happy Birthday!",
+      "Happy Birthday!",
       `Christ Church of India, San Ramon`,
       "🎂",
       colors
@@ -155,14 +186,11 @@ export function buildBirthdayCard(data: BirthdayCardData): string {
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;overflow:hidden;margin-top:8px">
 ${personRows}
 </table>
-<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
-<p style="margin:0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${message}</p>`,
+${messageHtml}
+${resourceLinksHtml(data.resourceLinks, colors)}`,
       colors
     ) +
-    footerRow(
-      '"The LORD bless you and keep you; the LORD make His face shine on you and be gracious to you." — Numbers 6:24-25',
-      colors
-    );
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
 
   return wrapCard(content, colors);
 }
@@ -177,16 +205,16 @@ export interface AnniversaryEntry {
 }
 
 export interface AnniversaryCardData {
-  weekLabel: string; // e.g., "April 27 – May 3"
+  weekLabel: string;
   anniversaries: AnniversaryEntry[];
   message?: string;
+  footerVerse?: string;
+  primaryColor?: string;
+  resourceLinks?: ResourceLink[];
 }
 
 export function buildAnniversaryCard(data: AnniversaryCardData): string {
-  const colors = EVENT_COLORS.anniversary;
-  const message =
-    data.message ||
-    "Congratulations on your wedding anniversary! May the Lord continue to bless your marriage with love, joy, and togetherness.";
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.anniversary;
 
   const coupleRows = data.anniversaries
     .map((a) => {
@@ -197,6 +225,11 @@ export function buildAnniversaryCard(data: AnniversaryCardData): string {
 </tr>`;
     })
     .join("");
+
+  const messageHtml = data.message
+    ? `<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
+<p style="margin:0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${data.message}</p>`
+    : "";
 
   const content =
     headerRow(
@@ -210,35 +243,45 @@ export function buildAnniversaryCard(data: AnniversaryCardData): string {
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;overflow:hidden;margin-top:8px">
 ${coupleRows}
 </table>
-<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
-<p style="margin:0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${message}</p>`,
+${messageHtml}
+${resourceLinksHtml(data.resourceLinks, colors)}`,
       colors
     ) +
-    footerRow(
-      '"And over all these virtues put on love, which binds them all together in perfect unity." — Colossians 3:14',
-      colors
-    );
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
 
   return wrapCard(content, colors);
 }
 
-// ---------- Bible Study Invite ----------
+// ---------- Bible Study Invite (multi-location) ----------
 
-export interface BibleStudyCardData {
-  hostNames: string; // e.g., "Jerome & Sunitha"
-  address: string;
+export interface BibleStudyLocation {
+  label: string;
+  hostNames?: string;
+  address?: string;
   city?: string;
   phone?: string;
-  date: string; // e.g., "Friday, May 2nd"
-  time: string; // e.g., "7:30 PM"
+}
+
+export interface ResourceLink {
+  label: string;
+  url: string;
+}
+
+export interface BibleStudyCardData {
+  title?: string;
+  date: string;
+  time: string;
   topic?: string;
   message?: string;
+  footerVerse?: string;
+  primaryColor?: string;
+  resourceLink?: ResourceLink;
+  resourceLinks?: ResourceLink[];
+  locations: BibleStudyLocation[];
 }
 
 export function buildBibleStudyCard(data: BibleStudyCardData): string {
-  const colors = EVENT_COLORS.friday_bible_study;
-  const message =
-    data.message || "We invite you to join our weekly Bible Study.";
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.friday_bible_study;
 
   const detailRow = (label: string, value: string) =>
     `<tr>
@@ -246,30 +289,47 @@ export function buildBibleStudyCard(data: BibleStudyCardData): string {
 <td style="padding:6px 0 6px 12px;font-size:14px;color:${colors.textDark};font-weight:500">${value}</td>
 </tr>`;
 
-  let details = detailRow("When", `${data.date} at ${data.time}`);
-  details += detailRow("Host", data.hostNames);
-  details += detailRow("Where", data.address + (data.city ? `<br/>${data.city}` : ""));
-  if (data.phone) details += detailRow("Contact", data.phone);
-  if (data.topic) details += detailRow("Topic", data.topic);
+  const locationBlocks = data.locations
+    .map((loc) => {
+      let details = "";
+      if (loc.hostNames) details += detailRow("Host", loc.hostNames);
+      const addrParts = [loc.address, loc.city].filter(Boolean).join("<br/>");
+      if (addrParts) details += detailRow("Where", addrParts);
+      if (loc.phone) details += detailRow("Contact", loc.phone);
+
+      if (!details) return "";
+
+      const locationHeader = data.locations.length > 1
+        ? `<p style="margin:0 0 8px;font-size:14px;font-weight:700;color:${colors.primary}">${loc.label}</p>`
+        : "";
+
+      return `${locationHeader}<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
+${details}
+</table>`;
+    })
+    .filter(Boolean)
+    .join(`<div style="height:16px"></div>`);
+
+  let sharedDetails = detailRow("When", `${data.date} at ${data.time}`);
+  if (data.topic) sharedDetails += detailRow("Topic", data.topic);
 
   const content =
     headerRow(
-      "Bible Study This Friday",
+      data.title || "Bible Study This Friday",
       "Christ Church of India, San Ramon",
       "📖",
       colors
     ) +
     contentRow(
-      `<p style="margin:0 0 16px;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${message}</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
-${details}
-</table>`,
+      `${data.message ? `<p style="margin:0 0 16px;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${data.message}</p>` : ""}
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
+${sharedDetails}
+</table>
+${locationBlocks}
+${resourceLinksHtml([...(data.resourceLinks ?? []), ...(data.resourceLink ? [data.resourceLink] : [])], colors)}`,
       colors
     ) +
-    footerRow(
-      '"Your word is a lamp for my feet, a light on my path." — Psalm 119:105',
-      colors
-    );
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
 
   return wrapCard(content, colors);
 }
@@ -277,17 +337,22 @@ ${details}
 // ---------- Women's Bible Study ----------
 
 export interface WomensStudyCardData {
-  topic: string;
-  date: string; // e.g., "Wednesday, May 7th"
+  title?: string;
+  topic?: string;
+  date: string;
   time: string;
   zoomLink?: string;
+  zoomMeetingId?: string;
+  zoomPasscode?: string;
+  location?: string;
   message?: string;
+  footerVerse?: string;
+  primaryColor?: string;
+  resourceLinks?: ResourceLink[];
 }
 
 export function buildWomensStudyCard(data: WomensStudyCardData): string {
-  const colors = EVENT_COLORS.wednesday_womens_study;
-  const message =
-    data.message || "Join us for our Women's Bible Study — all women welcome!";
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.wednesday_womens_study;
 
   const detailRow = (label: string, value: string) =>
     `<tr>
@@ -296,33 +361,35 @@ export function buildWomensStudyCard(data: WomensStudyCardData): string {
 </tr>`;
 
   let details = detailRow("When", `${data.date} at ${data.time}`);
-  details += detailRow("Topic", data.topic);
-  details += detailRow("Where", "Via Zoom");
+  if (data.topic) details += detailRow("Topic", data.topic);
   if (data.zoomLink) {
+    details += detailRow("Where", "Via Zoom");
     details += detailRow(
       "Link",
       `<a href="${data.zoomLink}" style="color:${colors.primary};text-decoration:underline">Join Zoom Meeting</a>`
     );
+    if (data.zoomMeetingId) details += detailRow("Meeting ID", data.zoomMeetingId);
+    if (data.zoomPasscode) details += detailRow("Passcode", data.zoomPasscode);
+  } else if (data.location) {
+    details += detailRow("Where", data.location);
   }
 
   const content =
     headerRow(
-      "Women's Bible Study",
+      data.title || "Women's Bible Study",
       "Christ Church of India, San Ramon",
       "🕊️",
       colors
     ) +
     contentRow(
-      `<p style="margin:0 0 16px;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${message}</p>
+      `${data.message ? `<p style="margin:0 0 16px;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${data.message}</p>` : ""}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
 ${details}
-</table>`,
+</table>
+${resourceLinksHtml(data.resourceLinks, colors)}`,
       colors
     ) +
-    footerRow(
-      '"She is clothed with strength and dignity; she can laugh at the days to come." — Proverbs 31:25',
-      colors
-    );
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
 
   return wrapCard(content, colors);
 }
@@ -339,10 +406,12 @@ export interface PrayerMeetingCardData {
   dinnerNote?: string;
   signupLink?: string;
   message?: string;
+  primaryColor?: string;
+  resourceLink?: ResourceLink;
 }
 
 export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
-  const colors = EVENT_COLORS.monthly_prayer;
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.monthly_prayer;
   const message =
     data.message ||
     "Please join us for a time of prayer and worship, followed by a fellowship dinner.";
@@ -378,7 +447,8 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
 ${details}
 </table>
-${signupHtml}`,
+${signupHtml}
+${data.resourceLink?.url ? `<div style="text-align:center;margin-top:12px"><a href="${data.resourceLink.url}" style="display:inline-block;padding:8px 20px;border:2px solid ${colors.primary};color:${colors.primary};text-decoration:none;border-radius:8px;font-size:13px;font-weight:600">${data.resourceLink.label || "View Resources"}</a></div>` : ""}`,
       colors
     ) +
     footerRow(
@@ -398,16 +468,18 @@ export interface BulletinItem {
 }
 
 export interface BulletinCardData {
-  weekLabel: string; // e.g., "Week of April 27 – May 3, 2026"
+  weekLabel: string;
   birthdays: { name: string; date: string }[];
   anniversaries: { names: string; date: string }[];
   helpers: { role: string; name: string }[];
   events: { title: string; details: string }[];
   message?: string;
+  primaryColor?: string;
+  resourceLinks?: ResourceLink[];
 }
 
 export function buildBulletinCard(data: BulletinCardData): string {
-  const colors = EVENT_COLORS.bulletin;
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.bulletin;
 
   const sectionTitle = (icon: string, title: string, sectionColor: string) =>
     `<tr><td style="padding:16px 0 8px;font-size:13px;font-weight:700;color:${sectionColor};text-transform:uppercase;letter-spacing:0.5px">${icon} ${title}</td></tr>`;
@@ -463,21 +535,24 @@ ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font
 
 export interface CustomCardData {
   title: string;
-  subtitle: string;
-  emoji: string;
+  subtitle?: string;
+  emoji?: string;
   bodyHtml: string;
   footerText?: string;
-  colorScheme: keyof typeof EVENT_COLORS;
+  primaryColor?: string;
+  colorScheme?: string;
 }
 
 export function buildCustomCard(data: CustomCardData): string {
-  const colors = EVENT_COLORS[data.colorScheme] || EVENT_COLORS.bulletin;
+  const colors = data.primaryColor
+    ? deriveColorsFromPrimary(data.primaryColor)
+    : EVENT_COLORS[data.colorScheme ?? "bulletin"] || EVENT_COLORS.bulletin;
 
   const content =
-    headerRow(data.title, data.subtitle, data.emoji, colors) +
+    headerRow(data.title, data.subtitle || "Christ Church of India, San Ramon", data.emoji || "📋", colors) +
     contentRow(data.bodyHtml, colors) +
     footerRow(
-      data.footerText || "Christ Church of India, San Ramon",
+      data.footerText || "Christ Church of India, San Ramon — CCISR Connect",
       colors
     );
 

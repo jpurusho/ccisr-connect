@@ -111,17 +111,17 @@ export function MonthView({
                       }
                     }}
                     className={cn(
-                      "hidden truncate rounded px-1 py-px text-[10px] font-medium leading-tight sm:block",
+                      "hidden truncate rounded-full px-2 py-0.5 text-[10px] font-medium leading-tight sm:block",
                       event.kind === "birthday" &&
-                        "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+                        "bg-purple-500 text-white dark:bg-purple-600",
                       event.kind === "anniversary" &&
-                        "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                        "bg-amber-500 text-white dark:bg-amber-600"
                     )}
                     style={
                       event.kind === "event"
                         ? {
-                            backgroundColor: `${event.color}18`,
-                            color: event.color,
+                            backgroundColor: event.color,
+                            color: "#fff",
                           }
                         : undefined
                     }

@@ -27,6 +27,7 @@ import {
   buildWomensStudyCard,
   buildPrayerMeetingCard,
   buildBulletinCard,
+  buildCustomCard,
   EVENT_COLORS,
   type BirthdayEntry,
   type AnniversaryEntry,
@@ -46,6 +47,15 @@ import {
   Trash2,
 } from "lucide-react"
 import { startOfWeek, endOfWeek, format, addDays, nextFriday, isFriday } from "date-fns"
+import { logAudit } from "@/lib/audit"
+import { getUpcomingSunday, getBulletinWeekBounds } from "@/lib/date-utils"
+import {
+  parseBodyTemplate,
+  FALLBACK_DEFAULTS,
+  type BibleStudyDefaults,
+  type WomensStudyDefaults,
+  type BulletinDefaults,
+} from "@/lib/template-defaults"
 
 // ---------------------------------------------------------------------------
 // Template metadata
@@ -60,42 +70,28 @@ const TEMPLATES = [
   { id: "bulletin", title: "Weekly Bulletin", description: "Full weekly bulletin with all info", icon: Newspaper, color: EVENT_COLORS.bulletin.primary },
 ] as const
 
-type TemplateId = (typeof TEMPLATES)[number]["id"]
+type BuiltinTemplateId = (typeof TEMPLATES)[number]["id"]
+type TemplateId = BuiltinTemplateId | string
 
-// ---------------------------------------------------------------------------
-// Form-state types (one per template)
-// ---------------------------------------------------------------------------
-
-interface BirthdayFormState {
-  weekLabel: string
-  birthdays: BirthdayEntry[]
-  message: string
+const TEMPLATE_TO_EVENT_TYPE: Record<string, string> = {
+  birthday: "birthday",
+  anniversary: "anniversary",
+  bible_study: "friday_bible_study",
+  womens_study: "wednesday_womens_study",
+  prayer_meeting: "monthly_prayer",
+  bulletin: "bulletin",
 }
 
-interface AnniversaryFormState {
-  weekLabel: string
-  anniversaries: AnniversaryEntry[]
-  message: string
-}
-
-interface BibleStudyFormState {
-  hostNames: string
-  address: string
-  city: string
-  phone: string
-  date: string
-  time: string
-  topic: string
-  message: string
-}
-
-interface WomensStudyFormState {
-  topic: string
-  date: string
-  time: string
-  zoomLink: string
-  message: string
-}
+// Form types — imported from edit-forms (single source of truth)
+import {
+  HostFamilyInput,
+  type BirthdayFormData as BirthdayFormState,
+  type AnniversaryFormData as AnniversaryFormState,
+  type BibleStudyFormData as BibleStudyFormState,
+  type BibleStudyLocationData as BibleStudyLocationState,
+  type WomensStudyFormData as WomensStudyFormState,
+} from "@/components/dashboard/communication-edit-forms"
+import { formatPhone } from "@/lib/utils"
 
 interface PrayerMeetingFormState {
   hostNames: string
@@ -117,6 +113,16 @@ interface BulletinFormState {
   events: { title: string; details: string }[]
 }
 
+interface CustomFormState {
+  title: string
+  subtitle: string
+  emoji: string
+  body: string
+  primaryColor: string
+  footerText: string
+  resourceLinks: { label: string; url: string }[]
+}
+
 type FormState =
   | { type: "birthday"; data: BirthdayFormState }
   | { type: "anniversary"; data: AnniversaryFormState }
@@ -124,6 +130,7 @@ type FormState =
   | { type: "womens_study"; data: WomensStudyFormState }
   | { type: "prayer_meeting"; data: PrayerMeetingFormState }
   | { type: "bulletin"; data: BulletinFormState }
+  | { type: "custom"; data: CustomFormState }
 
 // ---------------------------------------------------------------------------
 // Mailing list type
@@ -174,24 +181,39 @@ function buildPreview(form: FormState): string {
     case "bible_study": {
       const d = form.data
       return buildBibleStudyCard({
-        hostNames: d.hostNames,
-        address: d.address,
-        city: d.city || undefined,
-        phone: d.phone || undefined,
+        title: d.title || undefined,
         date: d.date,
         time: d.time,
         topic: d.topic || undefined,
         message: d.message || undefined,
+        primaryColor: d.primaryColor || undefined,
+        footerVerse: d.footerVerse || undefined,
+        resourceLink: d.resourceLinkUrl
+          ? { label: d.resourceLinkLabel || "View Resources", url: d.resourceLinkUrl }
+          : undefined,
+        locations: d.locations.map((loc) => ({
+          label: loc.label,
+          hostNames: loc.hostNames || undefined,
+          address: loc.address || undefined,
+          city: loc.city || undefined,
+          phone: loc.phone || undefined,
+        })),
       })
     }
     case "womens_study": {
       const d = form.data
       return buildWomensStudyCard({
-        topic: d.topic,
+        title: d.title || undefined,
+        topic: d.topic || undefined,
         date: d.date,
         time: d.time,
         zoomLink: d.zoomLink || undefined,
+        zoomMeetingId: d.zoomMeetingId || undefined,
+        zoomPasscode: d.zoomPasscode || undefined,
+        location: d.location || undefined,
         message: d.message || undefined,
+        primaryColor: d.primaryColor || undefined,
+        footerVerse: d.footerVerse || undefined,
       })
     }
     case "prayer_meeting": {
@@ -218,6 +240,21 @@ function buildPreview(form: FormState): string {
         events: d.events,
       })
     }
+    case "custom": {
+      const d = form.data
+      const linksHtml = (d.resourceLinks ?? []).filter(l => l.url).map(l =>
+        `<a href="${l.url}" style="display:inline-block;padding:8px 20px;background:${d.primaryColor || "#6B7280"};color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;margin:4px">${l.label || "View Link"}</a>`
+      ).join("")
+      const bodyWithLinks = `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${d.body}</p>${linksHtml ? `<div style="text-align:center;margin-top:16px">${linksHtml}</div>` : ""}`
+      return buildCustomCard({
+        title: d.title || "Announcement",
+        subtitle: d.subtitle || undefined,
+        emoji: d.emoji || undefined,
+        bodyHtml: bodyWithLinks,
+        primaryColor: d.primaryColor || undefined,
+        footerText: d.footerText || undefined,
+      })
+    }
   }
 }
 
@@ -225,25 +262,38 @@ function buildPreview(form: FormState): string {
 // Component
 // ---------------------------------------------------------------------------
 
+interface CustomTemplate {
+  id: string
+  name: string
+  subject_template: string
+  body_template: string
+}
+
 export default function ComposePage() {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId | null>(null)
   const [formState, setFormState] = useState<FormState | null>(null)
   const [loading, setLoading] = useState(false)
   const [mailingLists, setMailingLists] = useState<MailingListOption[]>([])
   const [selectedMailingList, setSelectedMailingList] = useState<string>("")
+  const [smtpConfigs, setSmtpConfigs] = useState<{ id: string; name: string; from_email: string }[]>([])
+  const [selectedSmtpConfig, setSelectedSmtpConfig] = useState<string>("")
   const [scheduling, setScheduling] = useState(false)
   const [subject, setSubject] = useState("")
+  const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([])
 
-  // Fetch mailing lists on mount
+  // Fetch mailing lists + SMTP configs + custom templates on mount
   useEffect(() => {
     const supabase = createClient()
-    supabase
-      .from("mailing_lists")
-      .select("id, name")
-      .order("name")
-      .then(({ data }) => {
-        if (data) setMailingLists(data)
-      })
+    Promise.all([
+      supabase.from("mailing_lists").select("id, name").order("name"),
+      supabase.from("smtp_configs").select("id, name, from_email").eq("is_active", true).order("name"),
+      supabase.from("email_templates").select("id, name, subject_template, body_template").eq("is_default", false).order("name")
+        .returns<CustomTemplate[]>(),
+    ]).then(([mlRes, smtpRes, ctRes]) => {
+      if (mlRes.data) setMailingLists(mlRes.data)
+      if (smtpRes.data) setSmtpConfigs(smtpRes.data)
+      if (ctRes.data) setCustomTemplates(ctRes.data)
+    })
   }, [])
 
   // Build preview from form state (live update)
@@ -262,6 +312,25 @@ export default function ComposePage() {
 
     const supabase = createClient()
     const today = new Date()
+
+    // Fetch saved template defaults for this type (no FK join)
+    const etName = TEMPLATE_TO_EVENT_TYPE[templateId]
+    let savedData: Record<string, unknown> = {}
+    if (etName) {
+      const [etRes, tmplRes] = await Promise.all([
+        supabase.from("event_types").select("id, name").returns<{ id: string; name: string }[]>(),
+        supabase.from("email_templates").select("event_type_id, body_template").eq("is_default", true)
+          .returns<{ event_type_id: string; body_template: string }[]>(),
+      ])
+      const etMap: Record<string, string> = {}
+      if (etRes.data) for (const et of etRes.data) etMap[et.name] = et.id
+      const targetEtId = etMap[etName]
+      const match = tmplRes.data?.find((t) => t.event_type_id === targetEtId)
+      if (match) {
+        const parsed = parseBodyTemplate(etName, match.body_template)
+        if (parsed) savedData = parsed.data as Record<string, unknown>
+      }
+    }
     const monday = startOfWeek(today, { weekStartsOn: 1 })
     const sunday = endOfWeek(today, { weekStartsOn: 1 })
     const weekLabel = `${format(monday, "MMM d")} – ${format(sunday, "MMM d")}`
@@ -364,17 +433,29 @@ export default function ComposePage() {
           if (contactMatch) phone = contactMatch[1].trim()
         }
 
+        const bsDef = savedData as BibleStudyDefaults
+        const fallbackBs = FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults
+        const savedLocs = bsDef.locations ?? fallbackBs.locations ?? []
+        const mergedLocs = savedLocs.map((loc, i) => {
+          if (i === 0 && hostName !== "TBD") {
+            return { ...loc, hostNames: hostName, address, city, phone: phone || "" }
+          }
+          return { ...loc }
+        })
+
         setFormState({
           type: "bible_study",
           data: {
-            hostNames: hostName,
-            address,
-            city,
-            phone: phone || "",
+            title: bsDef.title ?? fallbackBs.title ?? "Bible Study This Friday",
             date: format(fri, "EEEE, MMMM do"),
-            time: instance?.instance_time ? formatTime(instance.instance_time) : "7:30 PM",
-            topic: "Studying the Book of Acts",
-            message: "",
+            time: instance?.instance_time ? formatTime(instance.instance_time) : bsDef.time ?? "7:30 PM",
+            topic: bsDef.topic ?? fallbackBs.topic ?? "Studying the Book of Acts",
+            message: bsDef.message ?? "",
+            primaryColor: bsDef.primaryColor ?? "",
+            footerVerse: bsDef.footerVerse ?? "",
+            resourceLinkLabel: (bsDef as Record<string, unknown>).resourceLinkLabel as string ?? "",
+            resourceLinkUrl: (bsDef as Record<string, unknown>).resourceLinkUrl as string ?? "",
+            locations: mergedLocs,
           },
         })
         setSubject(`Bible Study This Friday — ${format(fri, "MMM d")}`)
@@ -385,11 +466,17 @@ export default function ComposePage() {
         setFormState({
           type: "womens_study",
           data: {
-            topic: "Building a Relationship with God",
+            title: (savedData as WomensStudyDefaults).title ?? "Women's Bible Study",
+            topic: (savedData as WomensStudyDefaults).topic ?? "Building a Relationship with God",
             date: format(addDays(monday, 2), "EEEE, MMMM do"),
-            time: "7:00 PM",
-            zoomLink: "",
-            message: "",
+            time: (savedData as WomensStudyDefaults).time ?? "7:00 PM",
+            zoomLink: (savedData as WomensStudyDefaults).zoomLink ?? "",
+            zoomMeetingId: (savedData as WomensStudyDefaults).zoomMeetingId ?? "",
+            zoomPasscode: (savedData as WomensStudyDefaults).zoomPasscode ?? "",
+            location: (savedData as WomensStudyDefaults).location ?? "",
+            message: (savedData as WomensStudyDefaults).message ?? "",
+            primaryColor: (savedData as WomensStudyDefaults).primaryColor ?? "",
+            footerVerse: (savedData as WomensStudyDefaults).footerVerse ?? "",
           },
         })
         setSubject("Women's Bible Study This Wednesday")
@@ -416,27 +503,39 @@ export default function ComposePage() {
       }
 
       case "bulletin": {
+        // Bulletin uses Sun-Sat week starting from the coming Sunday
+        const bulSunday = getUpcomingSunday(today)
+        const { saturday: bulSaturday } = getBulletinWeekBounds(bulSunday)
+        const bulLabel = `${format(bulSunday, "MMM d")} – ${format(bulSaturday, "MMM d")}`
+
+        const bulDays: { month: number; day: number }[] = []
+        for (let d = new Date(bulSunday); d <= bulSaturday; d = addDays(d, 1)) {
+          bulDays.push({ month: d.getMonth() + 1, day: d.getDate() })
+        }
+        const bulMonths = [...new Set(bulDays.map((d) => d.month))]
+        const bulSet = new Set(bulDays.map((d) => `${d.month}-${d.day}`))
+
         const [bdayRes, annRes] = await Promise.all([
           supabase
             .from("members")
             .select("full_name, birth_month, birth_day")
             .eq("is_active", true)
             .not("birth_month", "is", null)
-            .in("birth_month", weekMonths)
+            .in("birth_month", bulMonths)
             .returns<{ full_name: string; birth_month: number; birth_day: number }[]>(),
           supabase
             .from("wedding_anniversaries")
             .select("anniversary_month, anniversary_day, husband:members!husband_member_id(full_name), wife:members!wife_member_id(full_name)")
-            .in("anniversary_month", weekMonths)
+            .in("anniversary_month", bulMonths)
             .returns<{ anniversary_month: number; anniversary_day: number; husband: { full_name: string } | null; wife: { full_name: string } | null }[]>(),
         ])
 
         const bdays = (bdayRes.data ?? [])
-          .filter((m) => weekSet.has(`${m.birth_month}-${m.birth_day}`))
+          .filter((m) => bulSet.has(`${m.birth_month}-${m.birth_day}`))
           .map((m) => ({ name: m.full_name, date: `${m.birth_month}/${m.birth_day}` }))
 
         const anns = (annRes.data ?? [])
-          .filter((a) => weekSet.has(`${a.anniversary_month}-${a.anniversary_day}`))
+          .filter((a) => bulSet.has(`${a.anniversary_month}-${a.anniversary_day}`))
           .map((a) => ({
             names: `${a.husband?.full_name?.split(" ")[0] ?? "?"} & ${a.wife?.full_name?.split(" ")[0] ?? "?"}`,
             date: `${a.anniversary_month}/${a.anniversary_day}`,
@@ -445,7 +544,7 @@ export default function ComposePage() {
         setFormState({
           type: "bulletin",
           data: {
-            weekLabel: `Week of ${weekLabel}`,
+            weekLabel: `Sunday ${format(bulSunday, "MMMM d, yyyy")} — Week of ${bulLabel}`,
             birthdays: bdays,
             anniversaries: anns,
             helpers: [],
@@ -455,7 +554,7 @@ export default function ComposePage() {
             ],
           },
         })
-        setSubject(`Weekly Bulletin — Week of ${weekLabel}`)
+        setSubject(`Weekly Bulletin for Sunday ${format(bulSunday, "MMMM d, yyyy")}`)
         break
       }
     }
@@ -490,18 +589,32 @@ export default function ComposePage() {
     setScheduling(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from("dispatch_queue").insert({
-        subject,
-        body_html: previewHtml,
-        scheduled_at: new Date().toISOString(),
-        status: "pending",
-        mailing_list_id: selectedMailingList || null,
-      } as never)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      const { data: inserted, error } = await supabase
+        .from("dispatch_queue")
+        .insert({
+          subject,
+          body_html: previewHtml,
+          scheduled_at: new Date().toISOString(),
+          status: "pending",
+          mailing_list_id: selectedMailingList || null,
+          smtp_config_id: selectedSmtpConfig || null,
+          created_by: user?.id ?? null,
+        } as never)
+        .select("id")
+        .single() as { data: { id: string } | null; error: { message: string } | null }
 
       if (error) {
         toast.error(`Failed: ${error.message}`)
       } else {
         toast.success("Dispatch queued successfully! Go to Dispatch Queue to approve and send.")
+        await logAudit("dispatch_created", "dispatch_queue", inserted?.id, {
+          subject,
+          template: selectedTemplate,
+        })
         setFormState(null)
         setSelectedTemplate(null)
         setSubject("")
@@ -556,6 +669,82 @@ export default function ComposePage() {
             </Card>
           )
         })}
+
+        {/* Custom templates */}
+        {customTemplates.map((ct) => {
+          const isSelected = selectedTemplate === `custom:${ct.id}`
+          const color = "#6B7280"
+          return (
+            <Card
+              key={ct.id}
+              className={`cursor-pointer transition-all hover:shadow-md ${isSelected ? "ring-2" : ""}`}
+              style={isSelected ? { borderColor: color, boxShadow: `0 0 0 1px ${color}` } : {}}
+              onClick={() => {
+                setSelectedTemplate(`custom:${ct.id}`)
+                try {
+                  const body = JSON.parse(ct.body_template)
+                  setFormState({
+                    type: "custom",
+                    data: {
+                      title: body.title || ct.name,
+                      subtitle: body.subtitle || "",
+                      emoji: body.emoji || "📋",
+                      body: body.body || "",
+                      primaryColor: body.primaryColor || "",
+                      footerText: body.footerText || "",
+                      resourceLinks: body.resourceLinks || [],
+                    },
+                  })
+                  setSubject(ct.subject_template || ct.name)
+                } catch {
+                  setFormState({
+                    type: "custom",
+                    data: { title: ct.name, subtitle: "", emoji: "📋", body: ct.body_template, primaryColor: "", footerText: "", resourceLinks: [] },
+                  })
+                  setSubject(ct.name)
+                }
+              }}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <Send className="size-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">{ct.name}</CardTitle>
+                    <CardDescription className="text-xs">Custom template</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+          )
+        })}
+
+        {/* Create new custom template */}
+        <Card
+          className={`cursor-pointer transition-all hover:shadow-md border-dashed ${selectedTemplate === "custom:new" ? "ring-2" : ""}`}
+          onClick={() => {
+            setSelectedTemplate("custom:new")
+            setFormState({
+              type: "custom",
+              data: { title: "", subtitle: "Christ Church of India, San Ramon", emoji: "📋", body: "", primaryColor: "#6B7280", footerText: "", resourceLinks: [] },
+            })
+            setSubject("")
+            setLoading(false)
+          }}
+        >
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg border border-dashed text-muted-foreground">
+                <Plus className="size-5" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Custom Announcement</CardTitle>
+                <CardDescription className="text-xs">Create a one-off or save as template</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
       </div>
 
       {/* Loading */}
@@ -633,6 +822,31 @@ export default function ComposePage() {
                       onChange={(data) => updateForm("bulletin", () => data)}
                     />
                   )}
+                  {formState.type === "custom" && (
+                    <CustomForm
+                      data={formState.data}
+                      onChange={(data) => setFormState({ type: "custom", data })}
+                      onSaveAsTemplate={async (name) => {
+                        const supabase = createClient()
+                        const { error } = await supabase.from("email_templates").insert({
+                          name,
+                          subject_template: subject,
+                          body_template: JSON.stringify(formState.data),
+                          is_default: false,
+                        } as never)
+                        if (error) {
+                          toast.error(`Failed: ${error.message}`)
+                        } else {
+                          toast.success(`Template "${name}" saved`)
+                          logAudit("custom_template_created", "email_templates", null, { name })
+                          const { data: ctRes } = await supabase
+                            .from("email_templates").select("id, name, subject_template, body_template")
+                            .eq("is_default", false).order("name").returns<CustomTemplate[]>()
+                          if (ctRes) setCustomTemplates(ctRes)
+                        }
+                      }}
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -678,30 +892,53 @@ export default function ComposePage() {
               <CardTitle className="text-base">Send Options</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-                <div className="flex-1 space-y-1.5">
-                  <Label>Mailing List</Label>
-                  <Select value={selectedMailingList} onValueChange={(val) => setSelectedMailingList(val ?? "")}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a mailing list..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mailingLists.map((ml) => (
-                        <SelectItem key={ml.id} value={ml.id}>
-                          {ml.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="flex flex-col gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Mailing List</Label>
+                    <Select value={selectedMailingList} onValueChange={(val) => setSelectedMailingList(val ?? "")}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a mailing list...">
+                          {mailingLists.find((ml) => ml.id === selectedMailingList)?.name || "Select a mailing list..."}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mailingLists.map((ml) => (
+                          <SelectItem key={ml.id} value={ml.id}>
+                            {ml.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Send From (SMTP Account)</Label>
+                    <Select value={selectedSmtpConfig} onValueChange={(val) => setSelectedSmtpConfig(val ?? "")}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select an SMTP account...">
+                          {smtpConfigs.find((sc) => sc.id === selectedSmtpConfig)?.name || "Select an SMTP account..."}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {smtpConfigs.map((sc) => (
+                          <SelectItem key={sc.id} value={sc.id}>
+                            {sc.name} ({sc.from_email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Button
-                  onClick={handleScheduleDispatch}
-                  disabled={scheduling}
-                  style={{ backgroundColor: TEMPLATES.find((t) => t.id === selectedTemplate)?.color }}
-                >
-                  {scheduling ? <Loader2 className="animate-spin" /> : <Send className="size-4" />}
-                  Queue for Dispatch
-                </Button>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleScheduleDispatch}
+                    disabled={scheduling}
+                    style={{ backgroundColor: TEMPLATES.find((t) => t.id === selectedTemplate)?.color }}
+                  >
+                    {scheduling ? <Loader2 className="animate-spin" /> : <Send className="size-4" />}
+                    Queue for Dispatch
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -910,25 +1147,31 @@ function BibleStudyForm({
   data: BibleStudyFormState
   onChange: (data: BibleStudyFormState) => void
 }) {
-  function set<K extends keyof BibleStudyFormState>(field: K, value: BibleStudyFormState[K]) {
+  function set<K extends keyof Omit<BibleStudyFormState, "locations">>(field: K, value: BibleStudyFormState[K]) {
     onChange({ ...data, [field]: value })
+  }
+
+  function updateLocation(index: number, field: keyof BibleStudyLocationState, value: string) {
+    const updated = [...data.locations]
+    updated[index] = { ...updated[index], [field]: value }
+    onChange({ ...data, locations: updated })
+  }
+
+  function removeLocation(index: number) {
+    onChange({ ...data, locations: data.locations.filter((_, i) => i !== index) })
+  }
+
+  function addLocation() {
+    onChange({
+      ...data,
+      locations: [...data.locations, { label: "", hostNames: "TBD", address: "TBD", city: "", phone: "" }],
+    })
   }
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Host Names" htmlFor="bs-host">
-          <Input id="bs-host" value={data.hostNames} onChange={(e) => set("hostNames", e.target.value)} />
-        </Field>
-        <Field label="Phone" htmlFor="bs-phone">
-          <Input id="bs-phone" value={data.phone} onChange={(e) => set("phone", e.target.value)} />
-        </Field>
-      </div>
-      <Field label="Address" htmlFor="bs-addr">
-        <Input id="bs-addr" value={data.address} onChange={(e) => set("address", e.target.value)} />
-      </Field>
-      <Field label="City" htmlFor="bs-city">
-        <Input id="bs-city" value={data.city} onChange={(e) => set("city", e.target.value)} placeholder="e.g., San Ramon, CA" />
+      <Field label="Card Title" htmlFor="bs-title">
+        <Input id="bs-title" value={data.title} onChange={(e) => set("title", e.target.value)} placeholder="Bible Study This Friday" />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Date" htmlFor="bs-date">
@@ -938,9 +1181,52 @@ function BibleStudyForm({
           <Input id="bs-time" value={data.time} onChange={(e) => set("time", e.target.value)} placeholder="7:30 PM" />
         </Field>
       </div>
-      <Field label="Topic" htmlFor="bs-topic">
+      <Field label="Topic (leave empty to exclude)" htmlFor="bs-topic">
         <Input id="bs-topic" value={data.topic} onChange={(e) => set("topic", e.target.value)} />
       </Field>
+
+      {data.locations.map((loc, i) => (
+        <div key={i} className="space-y-2 rounded-md border p-3">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Location name"
+              value={loc.label}
+              onChange={(e) => updateLocation(i, "label", e.target.value)}
+              className="flex-1 font-medium"
+            />
+            {data.locations.length > 1 && (
+              <Button variant="ghost" size="icon-sm" onClick={() => removeLocation(i)}>
+                <Trash2 className="size-3.5 text-muted-foreground" />
+              </Button>
+            )}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <HostFamilyInput
+              value={loc.hostNames}
+              onChange={(v) => updateLocation(i, "hostNames", v)}
+              onSelect={(f) => {
+                const locs = [...data.locations]
+                locs[i] = {
+                  ...locs[i],
+                  hostNames: `${f.family_name}'s Residence`,
+                  address: f.full_address ?? locs[i].address,
+                  city: [f.city, f.state, f.zip].filter(Boolean).join(", ") || locs[i].city,
+                  phone: formatPhone(f.home_phone) || locs[i].phone,
+                }
+                onChange({ ...data, locations: locs })
+              }}
+            />
+            <Input placeholder="Phone" value={loc.phone} onChange={(e) => updateLocation(i, "phone", e.target.value)} />
+          </div>
+          <Input placeholder="Address" value={loc.address} onChange={(e) => updateLocation(i, "address", e.target.value)} />
+          <Input placeholder="City, State ZIP" value={loc.city} onChange={(e) => updateLocation(i, "city", e.target.value)} />
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={addLocation}>
+        <Plus className="size-3.5" />
+        Add Location
+      </Button>
+
       <Field label="Custom Message (optional)" htmlFor="bs-msg">
         <Textarea
           id="bs-msg"
@@ -970,7 +1256,10 @@ function WomensStudyForm({
 
   return (
     <div className="space-y-4">
-      <Field label="Topic" htmlFor="ws-topic">
+      <Field label="Card Title" htmlFor="ws-title">
+        <Input id="ws-title" value={data.title} onChange={(e) => set("title", e.target.value)} placeholder="Women's Bible Study" />
+      </Field>
+      <Field label="Topic (leave empty to exclude)" htmlFor="ws-topic">
         <Input id="ws-topic" value={data.topic} onChange={(e) => set("topic", e.target.value)} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -981,8 +1270,21 @@ function WomensStudyForm({
           <Input id="ws-time" value={data.time} onChange={(e) => set("time", e.target.value)} placeholder="7:00 PM" />
         </Field>
       </div>
-      <Field label="Zoom Link" htmlFor="ws-zoom">
+      <Field label="Zoom Link (leave empty to exclude)" htmlFor="ws-zoom">
         <Input id="ws-zoom" value={data.zoomLink} onChange={(e) => set("zoomLink", e.target.value)} placeholder="https://zoom.us/j/..." />
+      </Field>
+      {data.zoomLink && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Meeting ID" htmlFor="ws-zmid">
+            <Input id="ws-zmid" value={data.zoomMeetingId} onChange={(e) => set("zoomMeetingId", e.target.value)} placeholder="779 2123 2378" />
+          </Field>
+          <Field label="Passcode" htmlFor="ws-zmpw">
+            <Input id="ws-zmpw" value={data.zoomPasscode} onChange={(e) => set("zoomPasscode", e.target.value)} placeholder="6gLy8u" />
+          </Field>
+        </div>
+      )}
+      <Field label="Location (used when no Zoom link)" htmlFor="ws-loc">
+        <Input id="ws-loc" value={data.location} onChange={(e) => set("location", e.target.value)} placeholder="e.g., Fellowship Hall" />
       </Field>
       <Field label="Custom Message (optional)" htmlFor="ws-msg">
         <Textarea
@@ -1015,7 +1317,19 @@ function PrayerMeetingForm({
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Host Names" htmlFor="pm-host">
-          <Input id="pm-host" value={data.hostNames} onChange={(e) => set("hostNames", e.target.value)} />
+          <HostFamilyInput
+            value={data.hostNames}
+            onChange={(v) => set("hostNames", v)}
+            onSelect={(f) => {
+              onChange({
+                ...data,
+                hostNames: `${f.family_name}'s Residence`,
+                address: f.full_address ?? data.address,
+                city: [f.city, f.state, f.zip].filter(Boolean).join(", ") || data.city,
+                phone: formatPhone(f.home_phone) || data.phone,
+              })
+            }}
+          />
         </Field>
         <Field label="Phone" htmlFor="pm-phone">
           <Input id="pm-phone" value={data.phone} onChange={(e) => set("phone", e.target.value)} />
@@ -1254,6 +1568,158 @@ function ListSection<T extends Record<string, string>>({
         <Plus className="size-3.5" />
         {addLabel}
       </Button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Custom Announcement Form
+// ---------------------------------------------------------------------------
+
+const EMOJI_PRESETS = ["📋", "📢", "🙏", "⛪", "❌", "✅", "📅", "🎉", "💡", "⚠️", "📖", "🕊️"]
+const COLOR_PRESETS = ["#6B7280", "#3B82F6", "#EF4444", "#F59E0B", "#059669", "#8B5CF6", "#EC4899", "#0D9488"]
+
+function CustomForm({
+  data,
+  onChange,
+  onSaveAsTemplate,
+}: {
+  data: CustomFormState
+  onChange: (data: CustomFormState) => void
+  onSaveAsTemplate: (name: string) => void
+}) {
+  const [saveTemplateName, setSaveTemplateName] = useState("")
+
+  function set<K extends keyof CustomFormState>(field: K, value: CustomFormState[K]) {
+    onChange({ ...data, [field]: value })
+  }
+
+  return (
+    <div className="space-y-4">
+      <Field label="Card Title" htmlFor="ct-title">
+        <Input id="ct-title" value={data.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g., No Bible Study This Week" />
+      </Field>
+      <Field label="Subtitle" htmlFor="ct-sub">
+        <Input id="ct-sub" value={data.subtitle} onChange={(e) => set("subtitle", e.target.value)} placeholder="Christ Church of India, San Ramon" />
+      </Field>
+      <div className="space-y-1.5">
+        <Label>Emoji</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {EMOJI_PRESETS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              className={`size-8 rounded-md text-lg transition-colors ${data.emoji === e ? "bg-primary/10 ring-2 ring-primary" : "hover:bg-muted"}`}
+              onClick={() => set("emoji", e)}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Color</Label>
+        <div className="flex items-center gap-1.5">
+          {COLOR_PRESETS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`size-6 rounded-full border-2 transition-transform hover:scale-110 ${data.primaryColor === c ? "border-foreground scale-110" : "border-transparent"}`}
+              style={{ backgroundColor: c }}
+              onClick={() => set("primaryColor", c)}
+            />
+          ))}
+          <Input
+            type="color"
+            value={data.primaryColor || "#6B7280"}
+            onChange={(e) => set("primaryColor", e.target.value)}
+            className="h-6 w-8 cursor-pointer rounded border p-0"
+          />
+        </div>
+      </div>
+      <Field label="Message Body" htmlFor="ct-body">
+        <Textarea
+          id="ct-body"
+          value={data.body}
+          onChange={(e) => set("body", e.target.value)}
+          placeholder="Write your announcement message here..."
+          className="min-h-24"
+        />
+      </Field>
+      <Field label="Footer Text (optional)" htmlFor="ct-footer">
+        <Input id="ct-footer" value={data.footerText} onChange={(e) => set("footerText", e.target.value)} placeholder="Leave blank for default" />
+      </Field>
+
+      {/* Resource Links */}
+      <div className="space-y-2">
+        <Label>Resource Links (optional)</Label>
+        {data.resourceLinks.map((link, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Input
+              placeholder="Label"
+              value={link.label}
+              onChange={(e) => {
+                const links = [...data.resourceLinks]
+                links[i] = { ...links[i], label: e.target.value }
+                onChange({ ...data, resourceLinks: links })
+              }}
+              className="flex-1"
+            />
+            <Input
+              placeholder="https://..."
+              value={link.url}
+              onChange={(e) => {
+                const links = [...data.resourceLinks]
+                links[i] = { ...links[i], url: e.target.value }
+                onChange({ ...data, resourceLinks: links })
+              }}
+              className="flex-1"
+            />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => {
+                const links = data.resourceLinks.filter((_, j) => j !== i)
+                onChange({ ...data, resourceLinks: links })
+              }}
+            >
+              <Trash2 className="size-3.5 text-muted-foreground" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onChange({ ...data, resourceLinks: [...data.resourceLinks, { label: "", url: "" }] })}
+        >
+          <Plus className="size-3.5" />
+          Add Link
+        </Button>
+      </div>
+
+      {/* Save as template */}
+      <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+        <Label className="text-xs text-muted-foreground">Save as reusable template (optional)</Label>
+        <div className="flex gap-2">
+          <Input
+            value={saveTemplateName}
+            onChange={(e) => setSaveTemplateName(e.target.value)}
+            placeholder="Template name..."
+            className="flex-1"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!saveTemplateName.trim()}
+            onClick={() => {
+              onSaveAsTemplate(saveTemplateName.trim())
+              setSaveTemplateName("")
+            }}
+          >
+            Save Template
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

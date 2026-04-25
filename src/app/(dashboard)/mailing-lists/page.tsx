@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { MailingList } from "@/types/database"
+import { logAudit } from "@/lib/audit"
+import type { MailingList, RecipientType } from "@/types/database"
 import {
   Card,
   CardContent,
@@ -25,11 +26,46 @@ import {
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { Plus, Mail, Users, Trash2, Pencil, Loader2 } from "lucide-react"
+import {
+  Plus,
+  Mail,
+  Users,
+  Trash2,
+  Pencil,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  X,
+} from "lucide-react"
+
+// ── Types ─────────────────────────────────────────────────────────────────
 
 interface MailingListWithCount extends MailingList {
   member_count: number
 }
+
+interface ListRecipient {
+  id: string
+  member_id: string | null
+  external_email: string | null
+  recipient_type: RecipientType
+  member_name?: string
+  member_email?: string
+}
+
+interface MemberOption {
+  id: string
+  full_name: string
+  email: string | null
+}
+
+const RECIPIENT_SECTIONS: { value: RecipientType; label: string; description: string }[] = [
+  { value: "to", label: "To", description: "Primary recipients" },
+  { value: "cc", label: "CC", description: "Carbon copy" },
+  { value: "bcc", label: "BCC", description: "Blind carbon copy" },
+]
+
+// ── Component ─────────────────────────────────────────────────────────────
 
 export default function MailingListsPage() {
   const [lists, setLists] = useState<MailingListWithCount[]>([])
@@ -41,6 +77,16 @@ export default function MailingListsPage() {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [googleGroupEmail, setGoogleGroupEmail] = useState("")
+
+  const [expandedListId, setExpandedListId] = useState<string | null>(null)
+  const [recipients, setRecipients] = useState<ListRecipient[]>([])
+  const [recipientsLoading, setRecipientsLoading] = useState(false)
+
+  const [addSearches, setAddSearches] = useState<Record<string, string>>({})
+  const [addEmails, setAddEmails] = useState<Record<string, string>>({})
+  const [addModes, setAddModes] = useState<Record<string, "member" | "external">>({})
+  const [searchResults, setSearchResults] = useState<Record<string, MemberOption[]>>({})
+  const [addingRecipient, setAddingRecipient] = useState(false)
 
   const fetchLists = useCallback(async () => {
     setLoading(true)
@@ -66,6 +112,126 @@ export default function MailingListsPage() {
   useEffect(() => {
     fetchLists()
   }, [fetchLists])
+
+  // ── Recipient management ────────────────────────────────────────────────
+
+  async function fetchRecipients(listId: string) {
+    setRecipientsLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("mailing_list_members")
+      .select("id, member_id, external_email, recipient_type, members(full_name, email)")
+      .eq("mailing_list_id", listId)
+      .order("created_at", { ascending: true })
+
+    if (data) {
+      setRecipients(
+        (data as unknown as Array<{
+          id: string
+          member_id: string | null
+          external_email: string | null
+          recipient_type: RecipientType
+          members: { full_name: string; email: string | null } | null
+        }>).map((r) => ({
+          id: r.id,
+          member_id: r.member_id,
+          external_email: r.external_email,
+          recipient_type: r.recipient_type,
+          member_name: r.members?.full_name,
+          member_email: r.members?.email ?? undefined,
+        }))
+      )
+    }
+    setRecipientsLoading(false)
+  }
+
+  function toggleExpand(listId: string) {
+    if (expandedListId === listId) {
+      setExpandedListId(null)
+      setRecipients([])
+    } else {
+      setExpandedListId(listId)
+      fetchRecipients(listId)
+    }
+  }
+
+  async function searchMembers(query: string, sectionKey: string) {
+    setAddSearches((prev) => ({ ...prev, [sectionKey]: query }))
+    if (query.trim().length < 2) {
+      setSearchResults((prev) => ({ ...prev, [sectionKey]: [] }))
+      return
+    }
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("members")
+      .select("id, full_name, email")
+      .eq("is_active", true)
+      .ilike("full_name", `%${query.trim()}%`)
+      .limit(10)
+      .returns<MemberOption[]>()
+
+    setSearchResults((prev) => ({ ...prev, [sectionKey]: data ?? [] }))
+  }
+
+  async function addRecipient(type: RecipientType, memberId?: string, email?: string) {
+    if (!expandedListId) return
+    setAddingRecipient(true)
+    const supabase = createClient()
+
+    const payload: Record<string, unknown> = {
+      mailing_list_id: expandedListId,
+      recipient_type: type,
+    }
+    if (memberId) {
+      payload.member_id = memberId
+    } else if (email) {
+      payload.external_email = email.trim()
+    } else {
+      setAddingRecipient(false)
+      return
+    }
+
+    const { error } = await supabase
+      .from("mailing_list_members")
+      .insert(payload as never)
+
+    if (error) {
+      toast.error(error.message.includes("duplicate")
+        ? "This recipient is already in the list"
+        : `Failed: ${error.message}`)
+    } else {
+      toast.success("Recipient added")
+      logAudit("mailing_list_member_added", "mailing_list_members", expandedListId, {
+        memberId, email, type,
+      })
+      setAddSearches((prev) => ({ ...prev, [type]: "" }))
+      setAddEmails((prev) => ({ ...prev, [type]: "" }))
+      setSearchResults((prev) => ({ ...prev, [type]: [] }))
+      fetchRecipients(expandedListId)
+      fetchLists()
+    }
+    setAddingRecipient(false)
+  }
+
+  async function removeRecipient(recipientId: string) {
+    if (!expandedListId) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("mailing_list_members")
+      .delete()
+      .eq("id", recipientId)
+
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+    } else {
+      toast.success("Recipient removed")
+      logAudit("mailing_list_member_removed", "mailing_list_members", expandedListId, { recipientId })
+      fetchRecipients(expandedListId)
+      fetchLists()
+    }
+  }
+
+  // ── List CRUD ───────────────────────────────────────────────────────────
 
   function openDialog(list?: MailingList) {
     if (list) {
@@ -108,6 +274,7 @@ export default function MailingListsPage() {
           return
         }
         toast.success("Mailing list updated")
+        logAudit("mailing_list_updated", "mailing_lists", editingList.id, { name })
       } else {
         const { error } = await supabase
           .from("mailing_lists")
@@ -117,6 +284,7 @@ export default function MailingListsPage() {
           return
         }
         toast.success("Mailing list created")
+        logAudit("mailing_list_created", "mailing_lists", null, { name })
       }
 
       setDialogOpen(false)
@@ -129,7 +297,8 @@ export default function MailingListsPage() {
   }
 
   async function deleteList(list: MailingList) {
-    if (!confirm(`Delete mailing list "${list.name}"? This will also remove all member assignments.`)) return
+    if (!confirm(`Delete mailing list "${list.name}"? This will also remove all recipients.`))
+      return
 
     const supabase = createClient()
     const { error } = await supabase
@@ -141,9 +310,13 @@ export default function MailingListsPage() {
       toast.error(`Delete failed: ${error.message}`)
     } else {
       toast.success(`"${list.name}" deleted`)
+      logAudit("mailing_list_deleted", "mailing_lists", list.id, { name: list.name })
+      if (expandedListId === list.id) setExpandedListId(null)
       fetchLists()
     }
   }
+
+  // ── Render ──────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -161,9 +334,9 @@ export default function MailingListsPage() {
       </div>
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full" />
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
           ))}
         </div>
       ) : lists.length === 0 ? (
@@ -177,58 +350,208 @@ export default function MailingListsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {lists.map((list) => (
-            <Card key={list.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg">{list.name}</CardTitle>
-                    {list.description && (
-                      <CardDescription>{list.description}</CardDescription>
+        <div className="space-y-4">
+          {lists.map((list) => {
+            const isExpanded = expandedListId === list.id
+
+            return (
+              <Card key={list.id} className={isExpanded ? "overflow-visible" : ""}>
+                <CardHeader
+                  className="cursor-pointer"
+                  onClick={() => toggleExpand(list.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">{list.name}</CardTitle>
+                      {list.description && (
+                        <CardDescription className="mt-0.5">
+                          {list.description}
+                        </CardDescription>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="secondary" className="gap-1">
+                        <Users className="size-3" />
+                        {list.member_count}
+                      </Badge>
+                      {list.google_group_email && (
+                        <Badge variant="outline" className="text-xs hidden sm:inline-flex">
+                          Google Group
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(e) => { e.stopPropagation(); openDialog(list) }}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(e) => { e.stopPropagation(); deleteList(list) }}
+                      >
+                        <Trash2 className="size-3.5 text-destructive" />
+                      </Button>
+                      {isExpanded ? (
+                        <ChevronUp className="size-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="size-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+
+                {isExpanded && (
+                  <CardContent className="border-t pt-4">
+                    {recipientsLoading ? (
+                      <div className="space-y-2">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {RECIPIENT_SECTIONS.map((section) => {
+                          const type = section.value
+                          const typeRecipients = recipients.filter((r) => r.recipient_type === type)
+                          const mode = addModes[type] ?? "member"
+                          const search = addSearches[type] ?? ""
+                          const email = addEmails[type] ?? ""
+                          const results = searchResults[type] ?? []
+
+                          return (
+                            <div key={type} className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="text-sm font-semibold">{section.label}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">{section.description}</span>
+                                  {typeRecipients.length > 0 && (
+                                    <Badge variant="secondary" className="ml-2 text-xs">
+                                      {typeRecipients.length}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant={mode === "member" ? "default" : "ghost"}
+                                    size="sm"
+                                    className="h-6 text-xs px-2"
+                                    onClick={() => setAddModes((prev) => ({ ...prev, [type]: "member" }))}
+                                  >
+                                    Member
+                                  </Button>
+                                  <Button
+                                    variant={mode === "external" ? "default" : "ghost"}
+                                    size="sm"
+                                    className="h-6 text-xs px-2"
+                                    onClick={() => setAddModes((prev) => ({ ...prev, [type]: "external" }))}
+                                  >
+                                    Email
+                                  </Button>
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2">
+                                {mode === "member" ? (
+                                  <div className="relative flex-1">
+                                    <Input
+                                      value={search}
+                                      onChange={(e) => searchMembers(e.target.value, type)}
+                                      placeholder="Search member..."
+                                      className="h-8 text-sm"
+                                    />
+                                    {results.length > 0 && (
+                                      <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-48 overflow-y-auto">
+                                        {results.map((m) => (
+                                          <button
+                                            key={m.id}
+                                            type="button"
+                                            className="flex w-full items-center justify-between px-3 py-1.5 text-sm hover:bg-accent text-left"
+                                            onClick={() => addRecipient(type, m.id)}
+                                            disabled={addingRecipient}
+                                          >
+                                            <span className="font-medium">{m.full_name}</span>
+                                            <span className="text-xs text-muted-foreground">{m.email || "no email"}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <Input
+                                      type="email"
+                                      value={email}
+                                      onChange={(e) => setAddEmails((prev) => ({ ...prev, [type]: e.target.value }))}
+                                      placeholder="email@example.com"
+                                      className="h-8 text-sm flex-1"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" && email.trim()) {
+                                          e.preventDefault()
+                                          addRecipient(type, undefined, email)
+                                        }
+                                      }}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      className="h-8"
+                                      disabled={!email.trim() || addingRecipient}
+                                      onClick={() => addRecipient(type, undefined, email)}
+                                    >
+                                      <Plus className="size-3.5" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+
+                              {typeRecipients.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                  {typeRecipients.map((r) => (
+                                    <Badge
+                                      key={r.id}
+                                      variant="secondary"
+                                      className="gap-1 pr-1 font-normal"
+                                    >
+                                      <span className="max-w-40 truncate">
+                                        {r.member_name || r.external_email}
+                                      </span>
+                                      {r.member_name && r.member_email && (
+                                        <span className="text-[10px] opacity-60 hidden sm:inline">
+                                          {r.member_email}
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => removeRecipient(r.id)}
+                                        className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                                      >
+                                        <X className="size-3" />
+                                      </button>
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+
+                        {recipients.length === 0 && (
+                          <p className="text-center text-sm text-muted-foreground py-2">
+                            No recipients yet. Add members or emails to any field above.
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => openDialog(list)}
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => deleteList(list)}
-                    >
-                      <Trash2 className="size-3.5 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="size-4" />
-                    <span>{list.member_count} recipient{list.member_count !== 1 ? "s" : ""}</span>
-                  </div>
-                  {list.google_group_email && (
-                    <Badge variant="outline" className="text-xs">
-                      Google Group
-                    </Badge>
-                  )}
-                </div>
-                {list.google_group_email && (
-                  <p className="mt-2 text-xs text-muted-foreground truncate">
-                    {list.google_group_email}
-                  </p>
+                  </CardContent>
                 )}
-              </CardContent>
-            </Card>
-          ))}
+              </Card>
+            )
+          })}
         </div>
       )}
 
+      {/* Create/Edit List Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -266,7 +589,7 @@ export default function MailingListsPage() {
               <Label htmlFor="googleGroup">Google Group Email</Label>
               <Input
                 id="googleGroup"
-                type="email"
+                type="text"
                 value={googleGroupEmail}
                 onChange={(e) => setGoogleGroupEmail(e.target.value)}
                 placeholder="group@googlegroups.com"

@@ -26,31 +26,22 @@ function EventPill({
       type="button"
       onClick={onClick}
       className={cn(
-        "group/pill flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs transition-all hover:opacity-80",
-        isBirthday &&
-          "bg-purple-50 text-purple-800 ring-1 ring-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:ring-purple-800",
-        isAnniversary &&
-          "bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-800"
+        "group/pill flex w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-xs transition-all hover:opacity-80",
+        isBirthday && "bg-purple-500 text-white",
+        isAnniversary && "bg-amber-500 text-white"
       )}
       style={
         !isBirthday && !isAnniversary
           ? {
-              backgroundColor: `${event.color}12`,
-              color: event.color,
-              boxShadow: `inset 0 0 0 1px ${event.color}30`,
+              backgroundColor: event.color,
+              color: "#fff",
             }
           : undefined
       }
     >
-      {isBirthday && (
-        <Cake className="size-3 shrink-0 text-purple-500 dark:text-purple-400" />
-      )}
-      {isAnniversary && (
-        <Heart className="size-3 shrink-0 text-amber-500 dark:text-amber-400" />
-      )}
-      {event.kind === "event" && (
-        <CalendarDays className="size-3 shrink-0" style={{ color: event.color }} />
-      )}
+      {isBirthday && <Cake className="size-3 shrink-0" />}
+      {isAnniversary && <Heart className="size-3 shrink-0" />}
+      {event.kind === "event" && <CalendarDays className="size-3 shrink-0" />}
       <span className="truncate font-medium">{event.title}</span>
       {event.time && (
         <span className="ml-auto shrink-0 text-[10px] opacity-70">

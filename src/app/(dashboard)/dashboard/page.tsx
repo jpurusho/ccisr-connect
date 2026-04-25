@@ -15,13 +15,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Users,
   Home,
   Cake,
@@ -58,7 +51,23 @@ import {
 import {
   WeeklyCommunicationCard,
   type CommunicationStatus,
+  type SmtpConfigOption,
 } from "@/components/dashboard/weekly-communication-card"
+import { logAudit } from "@/lib/audit"
+import {
+  getUpcomingSunday,
+  getBulletinWeekBounds,
+  getBulletinMultiWeekBounds,
+} from "@/lib/date-utils"
+import {
+  parseBodyTemplate,
+  FALLBACK_DEFAULTS,
+  type BibleStudyDefaults,
+  type WomensStudyDefaults,
+  type BirthdayDefaults,
+  type AnniversaryDefaults,
+  type BulletinDefaults,
+} from "@/lib/template-defaults"
 import {
   BirthdayEditForm,
   AnniversaryEditForm,
@@ -141,9 +150,9 @@ type CommType =
 const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
   birthday: (s) => /birthday/i.test(s),
   anniversary: (s) => /anniversary/i.test(s),
-  bible_study: (s) => /bible study this friday/i.test(s),
-  womens_study: (s) => /women.*bible study/i.test(s),
-  bulletin: (s) => /weekly bulletin/i.test(s),
+  bible_study: (s) => /bible.?study/i.test(s) && !/women/i.test(s),
+  womens_study: (s) => /women.*(?:bible|study)/i.test(s),
+  bulletin: (s) => /bulletin/i.test(s),
 }
 
 // ── Stat card config type ─────────────────────────────────────────────────
@@ -154,6 +163,7 @@ interface StatCardConfig {
   icon: typeof Home
   color: string
   bg: string
+  href: string
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────
@@ -213,21 +223,32 @@ export default function DashboardPage() {
     message: "",
   })
   const [bibleStudyForm, setBibleStudyForm] = useState<BibleStudyFormData>({
-    hostNames: "TBD",
-    address: "TBD",
-    city: "",
-    phone: "",
+    title: "Bible Study This Friday",
     date: "",
     time: "7:30 PM",
     topic: "Studying the Book of Acts",
     message: "",
+    primaryColor: "",
+    footerVerse: "",
+    resourceLinkLabel: "",
+    resourceLinkUrl: "",
+    locations: [
+      { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "" },
+      { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "", phone: "" },
+    ],
   })
   const [womensStudyForm, setWomensStudyForm] = useState<WomensStudyFormData>({
+    title: "Women's Bible Study",
     topic: "Building a Relationship with God",
     date: "",
     time: "7:00 PM",
     zoomLink: "",
+    zoomMeetingId: "",
+    zoomPasscode: "",
+    location: "",
     message: "",
+    primaryColor: "",
+    footerVerse: "",
   })
   const [bulletinForm, setBulletinForm] = useState<BulletinFormData>({
     weekLabel: "",
@@ -240,9 +261,27 @@ export default function DashboardPage() {
   // ---- Custom subject overrides ----
   const [customSubjects, setCustomSubjects] = useState<Partial<Record<CommType, string>>>({})
 
-  // ---- Mailing list state ----
+  // ---- Mailing list + SMTP state (per-card) ----
   const [mailingLists, setMailingLists] = useState<MailingListOption[]>([])
-  const [selectedMailingList, setSelectedMailingList] = useState("")
+  const [smtpConfigs, setSmtpConfigs] = useState<SmtpConfigOption[]>([])
+  const [commOptions, setCommOptions] = useState<
+    Record<CommType, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }>
+  >({
+    birthday: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+    anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+    bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+    womens_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+    bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+  })
+
+  // ---- Dispatch counts per type ----
+  const [dispatchCounts, setDispatchCounts] = useState<Record<CommType, number>>({
+    birthday: 0,
+    anniversary: 0,
+    bible_study: 0,
+    womens_study: 0,
+    bulletin: 0,
+  })
 
   // ---- Schedule dialog state ----
   const [scheduleDialog, setScheduleDialog] = useState<{
@@ -264,12 +303,17 @@ export default function DashboardPage() {
     try {
       const supabase = createClient()
       const today = new Date()
-      const monday = startOfWeek(today, { weekStartsOn: 1 })
-      const sunday = endOfWeek(today, { weekStartsOn: 1 })
-      const wl = `${format(monday, "MMM d")} – ${format(sunday, "MMM d")}`
+      // All weekly communications target the bulletin week: coming Sunday through following Saturday
+      const bulSun = getUpcomingSunday(today)
+      const { saturday: bulSat } = getBulletinWeekBounds(bulSun)
+      const wl = `${format(bulSun, "MMM d")} – ${format(bulSat, "MMM d")}`
       setWeekLabel(wl)
 
-      const weekDays = getWeekDays(monday, sunday)
+      // Also keep Mon-Sun for dispatch query range
+      const monday = startOfWeek(today, { weekStartsOn: 1 })
+      const sunday = endOfWeek(today, { weekStartsOn: 1 })
+
+      const weekDays = getWeekDays(bulSun, bulSat)
       const weekMonths = [...new Set(weekDays.map((d) => d.month))]
       const weekSet = new Set(weekDays.map((d) => `${d.month}-${d.day}`))
 
@@ -298,6 +342,9 @@ export default function DashboardPage() {
         bibleStudyRes,
         weekDispatchesRes,
         mailingListsRes,
+        smtpConfigsRes,
+        templateDefaultsRes,
+        eventTypesRes,
       ] = await Promise.all([
         // Stats
         supabase
@@ -394,6 +441,27 @@ export default function DashboardPage() {
           .select("id, name")
           .order("name")
           .returns<MailingListOption[]>(),
+
+        // SMTP configs
+        supabase
+          .from("smtp_configs")
+          .select("id, name, from_email")
+          .eq("is_active", true)
+          .order("name")
+          .returns<SmtpConfigOption[]>(),
+
+        // Saved template defaults (no FK join — resolve event type name in JS)
+        supabase
+          .from("email_templates")
+          .select("id, event_type_id, subject_template, body_template")
+          .eq("is_default", true)
+          .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string }[]>(),
+
+        // Event type id-to-name map
+        supabase
+          .from("event_types")
+          .select("id, name")
+          .returns<{ id: string; name: string }[]>(),
       ])
 
       // Check errors
@@ -406,6 +474,35 @@ export default function DashboardPage() {
       if (bibleStudyRes.error) throw bibleStudyRes.error
       if (weekDispatchesRes.error) throw weekDispatchesRes.error
       if (mailingListsRes.error) throw mailingListsRes.error
+      if (smtpConfigsRes.error) throw smtpConfigsRes.error
+
+      // ---- Parse saved template defaults (no FK join, resolve in JS) ----
+      const etIdToName: Record<string, string> = {}
+      if (eventTypesRes.data) {
+        for (const et of eventTypesRes.data) etIdToName[et.id] = et.name
+      }
+
+      // Use the last template per event type (in case of duplicates)
+      const savedDefaults: Record<string, { subject: string; data: Record<string, unknown> }> = {}
+      if (templateDefaultsRes.data) {
+        for (const t of templateDefaultsRes.data) {
+          const etName = etIdToName[t.event_type_id]
+          if (!etName) continue
+          const parsed = parseBodyTemplate(etName, t.body_template)
+          if (parsed) {
+            savedDefaults[etName] = {
+              subject: t.subject_template,
+              data: parsed.data as Record<string, unknown>,
+            }
+          }
+        }
+      }
+
+      const bsDef = (savedDefaults.friday_bible_study?.data ?? FALLBACK_DEFAULTS.friday_bible_study.data) as BibleStudyDefaults
+      const wsDef = (savedDefaults.wednesday_womens_study?.data ?? FALLBACK_DEFAULTS.wednesday_womens_study.data) as WomensStudyDefaults
+      const bdDef = (savedDefaults.birthday?.data ?? {}) as BirthdayDefaults
+      const anDef = (savedDefaults.anniversary?.data ?? {}) as AnniversaryDefaults
+      const bulDef = (savedDefaults.bulletin?.data ?? FALLBACK_DEFAULTS.bulletin.data) as BulletinDefaults
 
       // ---- Stats ----
       const upcomingBirthdayCount = (birthdayCountRes.data ?? []).filter((m) =>
@@ -445,7 +542,7 @@ export default function DashboardPage() {
         birthdays: bdayEntries,
         message: inactiveBdays.length > 0
           ? `Note: Inactive members with birthdays this week: ${inactiveBdays.join(", ")}`
-          : "",
+          : bdDef.message ?? "",
       })
 
       // ---- Process anniversaries (skip inactive families) ----
@@ -481,10 +578,10 @@ export default function DashboardPage() {
         anniversaries: anniEntries,
         message: inactiveAnnis.length > 0
           ? `Note: ${inactiveAnnis.length} inactive family anniversar${inactiveAnnis.length > 1 ? "ies" : "y"} not shown`
-          : "",
+          : anDef.message ?? "",
       })
 
-      // ---- Process Bible Study ----
+      // ---- Process Bible Study (multi-location) ----
       const bsInstance =
         bibleStudyRes.data && bibleStudyRes.data.length > 0
           ? bibleStudyRes.data[0]
@@ -493,7 +590,7 @@ export default function DashboardPage() {
       let bsHostName = "TBD"
       let bsAddress = "TBD"
       let bsPhone = ""
-      const bsCity = ""
+      let bsCity = ""
 
       if (bsInstance?.host_family_id) {
         const [familyRes, addrRes] = await Promise.all([
@@ -505,10 +602,10 @@ export default function DashboardPage() {
             .single(),
           supabase
             .from("addresses")
-            .select("full_address")
+            .select("full_address, city, state, zip")
             .eq("family_id", bsInstance.host_family_id)
             .eq("is_current", true)
-            .returns<{ full_address: string }[]>()
+            .returns<{ full_address: string; city: string | null; state: string | null; zip: string | null }[]>()
             .limit(1)
             .single(),
         ])
@@ -517,7 +614,10 @@ export default function DashboardPage() {
           bsHostName = familyRes.data.family_name
           bsPhone = familyRes.data.home_phone ?? ""
         }
-        if (addrRes.data) bsAddress = addrRes.data.full_address
+        if (addrRes.data) {
+          bsAddress = addrRes.data.full_address
+          bsCity = [addrRes.data.city, addrRes.data.state, addrRes.data.zip].filter(Boolean).join(", ")
+        }
       }
 
       if (bsInstance?.location_override) bsAddress = bsInstance.location_override
@@ -526,54 +626,66 @@ export default function DashboardPage() {
         if (contactMatch) bsPhone = contactMatch[1].trim()
       }
 
+      // Merge saved locations with DB host data for first location
+      const savedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
+      const mergedLocs = savedLocs.map((loc, i) => {
+        if (i === 0 && bsHostName !== "TBD") {
+          return { ...loc, hostNames: bsHostName, address: bsAddress, city: bsCity, phone: bsPhone }
+        }
+        return { ...loc }
+      })
+
       setBibleStudyForm({
-        hostNames: bsHostName,
-        address: bsAddress,
-        city: bsCity,
-        phone: bsPhone,
+        title: bsDef.title ?? "Bible Study This Friday",
         date: format(fri, "EEEE, MMMM do"),
         time: bsInstance?.instance_time
           ? formatTime(bsInstance.instance_time)
-          : "7:30 PM",
-        topic: "Studying the Book of Acts",
-        message: "",
+          : bsDef.time ?? "7:30 PM",
+        topic: bsDef.topic ?? "Studying the Book of Acts",
+        message: bsDef.message ?? "",
+        primaryColor: bsDef.primaryColor ?? "",
+        footerVerse: bsDef.footerVerse ?? "",
+        resourceLinkLabel: (bsDef as Record<string, unknown>).resourceLinkLabel as string ?? "",
+        resourceLinkUrl: (bsDef as Record<string, unknown>).resourceLinkUrl as string ?? "",
+        locations: mergedLocs,
       })
 
       // ---- Women's Study ----
-      const wed = addDays(monday, 2) // Wednesday
+      const wed = addDays(bulSun, 3) // Wednesday of bulletin week
       setWomensStudyForm({
-        topic: "Building a Relationship with God",
+        title: wsDef.title ?? "Women's Bible Study",
+        topic: wsDef.topic ?? "Building a Relationship with God",
         date: format(wed, "EEEE, MMMM do"),
-        time: "7:00 PM",
-        zoomLink: "",
-        message: "",
+        time: wsDef.time ?? "7:00 PM",
+        zoomLink: wsDef.zoomLink ?? "",
+        zoomMeetingId: wsDef.zoomMeetingId ?? "",
+        zoomPasscode: wsDef.zoomPasscode ?? "",
+        location: wsDef.location ?? "",
+        message: wsDef.message ?? "",
+        primaryColor: wsDef.primaryColor ?? "",
+        footerVerse: wsDef.footerVerse ?? "",
       })
 
       // ---- Bulletin ----
+      // Bulletin reuses the same Sun-Sat range already computed at top
+      const bulEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
+
       setBulletinForm({
-        weekLabel: `Week of ${wl}`,
+        weekLabel: `Sunday ${format(bulSun, "MMMM d, yyyy")} — Week of ${wl}`,
         birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
         anniversaries: anniEntries.map((a) => ({
           names: `${a.husbandName} & ${a.wifeName}`,
           date: a.date,
         })),
         helpers: [],
-        events: [
-          {
-            title: "Women's Bible Study",
-            details: `Building a Relationship with God — ${format(wed, "EEEE")} @ 7:00 PM via Zoom`,
-          },
-          {
-            title: "San Ramon Bible Study",
-            details: `Studying the Book of Acts — ${format(fri, "EEEE")} at ${bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : "7:30 PM"}`,
-          },
-        ],
+        events: bulEvents,
       })
 
-      // ---- Mailing lists ----
+      // ---- Mailing lists + SMTP configs ----
       setMailingLists(mailingListsRes.data ?? [])
+      setSmtpConfigs(smtpConfigsRes.data ?? [])
 
-      // ---- Match dispatches to communication types ----
+      // ---- Match dispatches to communication types (count all, keep latest) ----
       const weekDispatches = weekDispatchesRes.data ?? []
       const matchedDispatches: Record<CommType, DispatchRecord | null> = {
         birthday: null,
@@ -582,19 +694,27 @@ export default function DashboardPage() {
         womens_study: null,
         bulletin: null,
       }
+      const counts: Record<CommType, number> = {
+        birthday: 0,
+        anniversary: 0,
+        bible_study: 0,
+        womens_study: 0,
+        bulletin: 0,
+      }
 
       for (const d of weekDispatches) {
         for (const [type, matcher] of Object.entries(DISPATCH_MATCHERS)) {
-          if (
-            matcher(d.subject) &&
-            !matchedDispatches[type as CommType]
-          ) {
-            matchedDispatches[type as CommType] = d
+          if (matcher(d.subject)) {
+            counts[type as CommType]++
+            if (!matchedDispatches[type as CommType]) {
+              matchedDispatches[type as CommType] = d
+            }
           }
         }
       }
 
       setDispatches(matchedDispatches)
+      setDispatchCounts(counts)
     } catch (err) {
       console.error("Dashboard fetch error:", err)
       setError(
@@ -640,14 +760,23 @@ export default function DashboardPage() {
   const bibleStudyPreview = useMemo(
     () =>
       buildBibleStudyCard({
-        hostNames: bibleStudyForm.hostNames,
-        address: bibleStudyForm.address,
-        city: bibleStudyForm.city || undefined,
-        phone: bibleStudyForm.phone || undefined,
+        title: bibleStudyForm.title || undefined,
         date: bibleStudyForm.date,
         time: bibleStudyForm.time,
         topic: bibleStudyForm.topic || undefined,
         message: bibleStudyForm.message || undefined,
+        primaryColor: bibleStudyForm.primaryColor || undefined,
+        footerVerse: bibleStudyForm.footerVerse || undefined,
+        resourceLink: bibleStudyForm.resourceLinkUrl
+          ? { label: bibleStudyForm.resourceLinkLabel || "View Resources", url: bibleStudyForm.resourceLinkUrl }
+          : undefined,
+        locations: bibleStudyForm.locations.map((loc) => ({
+          label: loc.label,
+          hostNames: loc.hostNames || undefined,
+          address: loc.address || undefined,
+          city: loc.city || undefined,
+          phone: loc.phone || undefined,
+        })),
       }),
     [bibleStudyForm]
   )
@@ -655,11 +784,17 @@ export default function DashboardPage() {
   const womensStudyPreview = useMemo(
     () =>
       buildWomensStudyCard({
-        topic: womensStudyForm.topic,
+        title: womensStudyForm.title || undefined,
+        topic: womensStudyForm.topic || undefined,
         date: womensStudyForm.date,
         time: womensStudyForm.time,
         zoomLink: womensStudyForm.zoomLink || undefined,
+        zoomMeetingId: womensStudyForm.zoomMeetingId || undefined,
+        zoomPasscode: womensStudyForm.zoomPasscode || undefined,
+        location: womensStudyForm.location || undefined,
         message: womensStudyForm.message || undefined,
+        primaryColor: womensStudyForm.primaryColor || undefined,
+        footerVerse: womensStudyForm.footerVerse || undefined,
       }),
     [womensStudyForm]
   )
@@ -689,7 +824,7 @@ export default function DashboardPage() {
       case "womens_study":
         return `Women's Bible Study This Wednesday`
       case "bulletin":
-        return `Weekly Bulletin — ${bulletinForm.weekLabel}`
+        return `Weekly Bulletin for ${bulletinForm.weekLabel}`
     }
   }
 
@@ -717,40 +852,78 @@ export default function DashboardPage() {
   const handleSendNow = useCallback(
     async (type: CommType) => {
       const html = getPreview(type)
-      const subject = getSubject(type)
+      let subject = getSubject(type)
       if (!html) {
         toast.error("No content to send. Please add data first.")
+        return
+      }
+
+      const currentStatus = getStatus(type)
+      const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
+      if (isReminder && !subject.startsWith("Reminder: ")) {
+        subject = `Reminder: ${subject}`
+      }
+
+      const opts = commOptions[type]
+      if (!opts.mailingListId) {
+        toast.error("Please select a mailing list before sending.")
+        return
+      }
+      if (!opts.smtpConfigId) {
+        toast.error("Please select a Send From account before sending.")
         return
       }
 
       setSendingType(type)
       try {
         const supabase = createClient()
-        const { error } = await supabase.from("dispatch_queue").insert({
-          subject,
-          body_html: html,
-          scheduled_at: new Date().toISOString(),
-          status: "pending",
-          mailing_list_id: selectedMailingList || null,
-        } as never)
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        const { data: inserted, error } = await supabase
+          .from("dispatch_queue")
+          .insert({
+            subject,
+            body_html: html,
+            scheduled_at: new Date().toISOString(),
+            status: "pending",
+            mailing_list_id: opts.mailingListId || null,
+            smtp_config_id: opts.smtpConfigId || null,
+            created_by: user?.id ?? null,
+          } as never)
+          .select("id")
+          .single() as { data: { id: string } | null; error: { message: string } | null }
 
         if (error) {
           toast.error(`Failed: ${error.message}`)
         } else {
           toast.success(
-            `"${subject}" queued for dispatch. Go to Dispatch Queue to approve and send.`
+            isReminder
+              ? `Reminder queued for "${getSubject(type)}".`
+              : `"${subject}" queued for dispatch. Go to Dispatch Queue to approve and send.`
           )
-          // Update local state to show as scheduled
           setDispatches((prev) => ({
             ...prev,
             [type]: {
-              id: "local",
+              id: inserted?.id ?? "local",
               subject,
               status: "pending",
               scheduled_at: new Date().toISOString(),
               created_at: new Date().toISOString(),
             },
           }))
+          setDispatchCounts((prev) => ({
+            ...prev,
+            [type]: prev[type] + 1,
+          }))
+
+          await logAudit(
+            isReminder ? "dispatch_reminder_sent" : "dispatch_created",
+            "dispatch_queue",
+            inserted?.id,
+            { subject, commType: type, isReminder }
+          )
         }
       } catch {
         toast.error("An unexpected error occurred")
@@ -760,7 +933,7 @@ export default function DashboardPage() {
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      selectedMailingList,
+      commOptions,
       weekLabel,
       birthdayPreview,
       anniversaryPreview,
@@ -782,7 +955,15 @@ export default function DashboardPage() {
         toast.error("No content to schedule. Please add data first.")
         return
       }
-      // Open schedule dialog
+      const opts = commOptions[type]
+      if (!opts.mailingListId) {
+        toast.error("Please select a mailing list before scheduling.")
+        return
+      }
+      if (!opts.smtpConfigId) {
+        toast.error("Please select a Send From account before scheduling.")
+        return
+      }
       setScheduleDialog({
         open: true,
         commType: type,
@@ -813,20 +994,31 @@ export default function DashboardPage() {
     const subject = getSubject(type)
     if (!html) return
 
+    const opts = commOptions[type]
+
     setSendingType(type)
     setScheduleDialog((prev) => ({ ...prev, open: false }))
 
     try {
       const supabase = createClient()
       const scheduledAt = new Date(scheduleDialog.dateTime).toISOString()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-      const { error } = await supabase.from("dispatch_queue").insert({
-        subject,
-        body_html: html,
-        scheduled_at: scheduledAt,
-        status: "pending",
-        mailing_list_id: selectedMailingList || null,
-      } as never)
+      const { data: inserted, error } = await supabase
+        .from("dispatch_queue")
+        .insert({
+          subject,
+          body_html: html,
+          scheduled_at: scheduledAt,
+          status: "pending",
+          mailing_list_id: opts.mailingListId || null,
+          smtp_config_id: opts.smtpConfigId || null,
+          created_by: user?.id ?? null,
+        } as never)
+        .select("id")
+        .single() as { data: { id: string } | null; error: { message: string } | null }
 
       if (error) {
         toast.error(`Failed: ${error.message}`)
@@ -837,13 +1029,23 @@ export default function DashboardPage() {
         setDispatches((prev) => ({
           ...prev,
           [type]: {
-            id: "local",
+            id: inserted?.id ?? "local",
             subject,
             status: "pending",
             scheduled_at: scheduledAt,
             created_at: new Date().toISOString(),
           },
         }))
+        setDispatchCounts((prev) => ({
+          ...prev,
+          [type]: prev[type] + 1,
+        }))
+
+        await logAudit("dispatch_scheduled", "dispatch_queue", inserted?.id, {
+          subject,
+          commType: type,
+          scheduledAt,
+        })
       }
     } catch {
       toast.error("An unexpected error occurred")
@@ -853,7 +1055,7 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scheduleDialog,
-    selectedMailingList,
+    commOptions,
     birthdayPreview,
     anniversaryPreview,
     bibleStudyPreview,
@@ -876,6 +1078,7 @@ export default function DashboardPage() {
           icon: Home,
           color: "text-blue-600 dark:text-blue-400",
           bg: "bg-blue-100 dark:bg-blue-950/40",
+          href: "/members?view=family&filter=active",
         },
         {
           title: "Members",
@@ -883,6 +1086,7 @@ export default function DashboardPage() {
           icon: Users,
           color: "text-emerald-600 dark:text-emerald-400",
           bg: "bg-emerald-100 dark:bg-emerald-950/40",
+          href: "/members?filter=active",
         },
         {
           title: "Birthdays (7d)",
@@ -890,6 +1094,7 @@ export default function DashboardPage() {
           icon: Cake,
           color: "text-purple-600 dark:text-purple-400",
           bg: "bg-purple-100 dark:bg-purple-950/40",
+          href: "/reports",
         },
         {
           title: "Pending",
@@ -897,6 +1102,7 @@ export default function DashboardPage() {
           icon: Clock,
           color: "text-amber-600 dark:text-amber-400",
           bg: "bg-amber-100 dark:bg-amber-950/40",
+          href: "/dispatch",
         },
       ]
     : null
@@ -923,11 +1129,9 @@ export default function DashboardPage() {
 
   const bibleStudySummary = useMemo(() => {
     const lines: string[] = []
-    lines.push(
-      `Host: ${bibleStudyForm.hostNames} — ${bibleStudyForm.date} at ${bibleStudyForm.time}`
-    )
-    if (bibleStudyForm.address !== "TBD") {
-      lines.push(`Location: ${bibleStudyForm.address}`)
+    lines.push(`${bibleStudyForm.date} at ${bibleStudyForm.time}`)
+    for (const loc of bibleStudyForm.locations) {
+      lines.push(`${loc.label}: ${loc.hostNames}${loc.address !== "TBD" ? ` — ${loc.address}` : ""}`)
     }
     if (bibleStudyForm.topic) {
       lines.push(`Topic: ${bibleStudyForm.topic}`)
@@ -967,7 +1171,7 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Weekly Command Center
+            Communication Hub
           </h1>
           <p className="text-sm text-muted-foreground">
             Week of {weekLabel || "..."}
@@ -999,7 +1203,7 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Weekly Command Center
+            Communication Hub
           </h1>
           <p className="text-sm text-muted-foreground">
             Review, edit, preview, and send all communications for the week of{" "}
@@ -1008,37 +1212,17 @@ export default function DashboardPage() {
             </span>
           </p>
         </div>
-        {mailingLists.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">
-              Send to:
-            </Label>
-            <Select
-              value={selectedMailingList}
-              onValueChange={(val) => setSelectedMailingList(val ?? "")}
-            >
-              <SelectTrigger className="w-48" size="sm">
-                <SelectValue placeholder="Select list..." />
-              </SelectTrigger>
-              <SelectContent>
-                {mailingLists.map((ml) => (
-                  <SelectItem key={ml.id} value={ml.id}>
-                    {ml.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        {/* Global selector removed — mailing list + SMTP are per-card */}
       </div>
 
       {/* ── Stats Row (compact) ───────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {statCards
           ? statCards.map((stat) => (
-              <div
+              <Link
                 key={stat.title}
-                className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 ring-1 ring-foreground/5"
+                href={stat.href}
+                className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 ring-1 ring-foreground/5 transition-colors hover:bg-accent"
               >
                 <div className={`rounded-md p-1.5 ${stat.bg}`}>
                   <stat.icon className={`size-4 ${stat.color}`} />
@@ -1051,7 +1235,7 @@ export default function DashboardPage() {
                     {stat.title}
                   </p>
                 </div>
-              </div>
+              </Link>
             ))
           : Array.from({ length: 4 }).map((_, i) => (
               <div
@@ -1069,13 +1253,13 @@ export default function DashboardPage() {
 
       {/* ── Communication Cards ───────────────────────────────── */}
       {loading ? (
-        <div className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <CardSkeleton key={i} />
           ))}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-2">
           {/* Birthday Card */}
           <WeeklyCommunicationCard
             title="Birthdays This Week"
@@ -1089,6 +1273,13 @@ export default function DashboardPage() {
             previewHtml={birthdayPreview}
             onSchedule={() => handleSchedule("birthday")}
             onSendNow={() => handleSendNow("birthday")}
+            mailingLists={mailingLists}
+            smtpConfigs={smtpConfigs}
+            selectedMailingList={commOptions.birthday.mailingListId}
+            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, mailingListId: id } }))}
+            selectedSmtpConfig={commOptions.birthday.smtpConfigId}
+            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, smtpConfigId: id } }))}
+            sendCount={dispatchCounts.birthday}
           >
             <BirthdayEditForm
               data={birthdayForm}
@@ -1109,6 +1300,13 @@ export default function DashboardPage() {
             previewHtml={anniversaryPreview}
             onSchedule={() => handleSchedule("anniversary")}
             onSendNow={() => handleSendNow("anniversary")}
+            mailingLists={mailingLists}
+            smtpConfigs={smtpConfigs}
+            selectedMailingList={commOptions.anniversary.mailingListId}
+            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, mailingListId: id } }))}
+            selectedSmtpConfig={commOptions.anniversary.smtpConfigId}
+            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, smtpConfigId: id } }))}
+            sendCount={dispatchCounts.anniversary}
           >
             <AnniversaryEditForm
               data={anniversaryForm}
@@ -1129,6 +1327,13 @@ export default function DashboardPage() {
             previewHtml={bibleStudyPreview}
             onSchedule={() => handleSchedule("bible_study")}
             onSendNow={() => handleSendNow("bible_study")}
+            mailingLists={mailingLists}
+            smtpConfigs={smtpConfigs}
+            selectedMailingList={commOptions.bible_study.mailingListId}
+            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, mailingListId: id } }))}
+            selectedSmtpConfig={commOptions.bible_study.smtpConfigId}
+            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, smtpConfigId: id } }))}
+            sendCount={dispatchCounts.bible_study}
           >
             <BibleStudyEditForm
               data={bibleStudyForm}
@@ -1149,6 +1354,13 @@ export default function DashboardPage() {
             previewHtml={womensStudyPreview}
             onSchedule={() => handleSchedule("womens_study")}
             onSendNow={() => handleSendNow("womens_study")}
+            mailingLists={mailingLists}
+            smtpConfigs={smtpConfigs}
+            selectedMailingList={commOptions.womens_study.mailingListId}
+            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, mailingListId: id } }))}
+            selectedSmtpConfig={commOptions.womens_study.smtpConfigId}
+            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, smtpConfigId: id } }))}
+            sendCount={dispatchCounts.womens_study}
           >
             <WomensStudyEditForm
               data={womensStudyForm}
@@ -1169,6 +1381,13 @@ export default function DashboardPage() {
             previewHtml={bulletinPreview}
             onSchedule={() => handleSchedule("bulletin")}
             onSendNow={() => handleSendNow("bulletin")}
+            mailingLists={mailingLists}
+            smtpConfigs={smtpConfigs}
+            selectedMailingList={commOptions.bulletin.mailingListId}
+            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, mailingListId: id } }))}
+            selectedSmtpConfig={commOptions.bulletin.smtpConfigId}
+            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, smtpConfigId: id } }))}
+            sendCount={dispatchCounts.bulletin}
           >
             <BulletinEditForm
               data={bulletinForm}

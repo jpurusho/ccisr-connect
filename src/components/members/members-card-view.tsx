@@ -3,20 +3,34 @@
 import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import type { Member, Family } from "@/types/database"
+import type { Member, Family, Address } from "@/types/database"
+import { canonicalCityName } from "@/lib/city-utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Phone, Mail } from "lucide-react"
+import { Phone, Mail, MapPin } from "lucide-react"
 
-type MemberWithFamily = Member & { families: Pick<Family, "family_name"> | null }
+type MemberWithFamily = Member & {
+  families:
+    | (Pick<Family, "family_name"> & {
+        addresses: Pick<Address, "city" | "is_current">[]
+      })
+    | null
+  member_tags?: { tags: { id: string; name: string; color: string } | null }[]
+}
+
+function getMemberCity(m: MemberWithFamily): string {
+  const addr = m.families?.addresses?.find((a) => a.is_current)
+  return canonicalCityName(addr?.city ?? null)
+}
 
 interface MembersCardViewProps {
   searchQuery: string
   filter: "all" | "active" | "inactive" | "newcomers"
+  cityFilter?: string
 }
 
-export function MembersCardView({ searchQuery, filter }: MembersCardViewProps) {
+export function MembersCardView({ searchQuery, filter, cityFilter }: MembersCardViewProps) {
   const router = useRouter()
   const [members, setMembers] = useState<MemberWithFamily[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,7 +41,7 @@ export function MembersCardView({ searchQuery, filter }: MembersCardViewProps) {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("members")
-        .select("*, families(family_name)")
+        .select("*, families(family_name, addresses(city, is_current)), member_tags(tags(id, name, color))")
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true })
 
@@ -47,7 +61,13 @@ export function MembersCardView({ searchQuery, filter }: MembersCardViewProps) {
     } else if (filter === "inactive") {
       result = result.filter((m) => !m.is_active)
     } else if (filter === "newcomers") {
-      result = result.filter((m) => m.is_newcomer)
+      result = result.filter((m) =>
+        (m.member_tags ?? []).some((mt) => mt.tags?.name?.toLowerCase() === "newcomer")
+      )
+    }
+
+    if (cityFilter && cityFilter !== "all") {
+      result = result.filter((m) => getMemberCity(m) === cityFilter)
     }
 
     if (searchQuery.trim()) {
@@ -61,7 +81,7 @@ export function MembersCardView({ searchQuery, filter }: MembersCardViewProps) {
     }
 
     return result
-  }, [members, filter, searchQuery])
+  }, [members, filter, searchQuery, cityFilter])
 
   if (loading) {
     return (
@@ -111,9 +131,7 @@ export function MembersCardView({ searchQuery, filter }: MembersCardViewProps) {
                   }`}
                   title={member.is_active ? "Active" : "Inactive"}
                 />
-                {member.is_newcomer && (
-                  <Badge variant="secondary">New</Badge>
-                )}
+                {/* Newcomer shown via tags */}
               </div>
             </div>
           </CardHeader>
@@ -129,6 +147,12 @@ export function MembersCardView({ searchQuery, filter }: MembersCardViewProps) {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Mail className="size-3.5 shrink-0" />
                   <span className="truncate">{member.email}</span>
+                </div>
+              )}
+              {getMemberCity(member) !== "Unknown" && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="size-3.5 shrink-0" />
+                  <span>{getMemberCity(member)}</span>
                 </div>
               )}
               <div className="pt-1">

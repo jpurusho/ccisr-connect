@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { logAudit } from "@/lib/audit"
 import type { SmtpConfig } from "@/types/database"
 import {
   Card,
@@ -134,6 +135,7 @@ export function SmtpConfigPanel() {
           return
         }
         toast.success("SMTP config updated")
+        logAudit("smtp_config_updated", "smtp_configs", editingConfig.id, { name })
       } else {
         payload.encrypted_password = password
         const { error } = await supabase
@@ -144,6 +146,7 @@ export function SmtpConfigPanel() {
           return
         }
         toast.success("SMTP config created")
+        logAudit("smtp_config_created", "smtp_configs", null, { name })
       }
 
       setDialogOpen(false)
@@ -166,6 +169,7 @@ export function SmtpConfigPanel() {
       toast.error(`Failed: ${error.message}`)
     } else {
       toast.success(`${config.name} ${config.is_active ? "disabled" : "enabled"}`)
+      logAudit("smtp_config_toggled", "smtp_configs", config.id, { is_active: !config.is_active })
       fetchConfigs()
     }
   }
@@ -183,6 +187,7 @@ export function SmtpConfigPanel() {
       toast.error(`Delete failed: ${error.message}`)
     } else {
       toast.success(`${config.name} deleted`)
+      logAudit("smtp_config_deleted", "smtp_configs", config.id, { name: config.name })
       fetchConfigs()
     }
   }
@@ -361,6 +366,8 @@ export function SmtpConfigPanel() {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="email@gmail.com"
                   required
+                  autoComplete="off"
+                  data-1p-ignore
                 />
               </div>
               <div className="space-y-1.5">
@@ -375,6 +382,8 @@ export function SmtpConfigPanel() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={editingConfig ? "••••••••" : "App password"}
                     required={!editingConfig}
+                    autoComplete="off"
+                    data-1p-ignore
                   />
                   <button
                     type="button"
