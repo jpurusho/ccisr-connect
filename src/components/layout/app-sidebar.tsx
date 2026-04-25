@@ -29,6 +29,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { UserNav } from "@/components/layout/user-nav"
+import { APP_VERSION } from "@/lib/version"
 
 const membershipNav = [
   { title: "Communication Hub", href: "/dashboard", icon: LayoutDashboard },
@@ -118,6 +119,7 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <UserNav />
+        <p className="px-3 pb-2 text-[10px] text-muted-foreground/50">v{APP_VERSION}</p>
       </SidebarFooter>
     </Sidebar>
   )

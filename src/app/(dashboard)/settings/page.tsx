@@ -18,6 +18,8 @@ import { SmtpConfigPanel } from "@/components/settings/smtp-config"
 import { UserManagementPanel } from "@/components/settings/user-management"
 import { TagManagementPanel } from "@/components/settings/tag-management"
 
+import { APP_VERSION } from "@/lib/version"
+
 function AboutPanel() {
   return (
     <div className="space-y-6">
@@ -38,7 +40,7 @@ function AboutPanel() {
         <CardContent className="space-y-6">
           <div className="text-center">
             <Badge variant="secondary" className="text-sm">
-              Version 1.0.0
+              v{APP_VERSION}
             </Badge>
           </div>
 
