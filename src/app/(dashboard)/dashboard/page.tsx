@@ -1249,11 +1249,9 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Communication Hub
+            {weekOffset === 0 ? "This Week" : weekOffset === 1 ? "Next Week" : `${weekOffset} Weeks Ahead`}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {weekOffset === 0 ? "This week" : weekOffset === 1 ? "Next week" : `${weekOffset} weeks ahead`}
-            {" — "}
             <span className="font-medium text-foreground">
               {weekLabel || "..."}
             </span>
@@ -1285,41 +1283,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Stats Row (compact) ───────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {statCards
-          ? statCards.map((stat) => (
-              <Link
-                key={stat.title}
-                href={stat.href}
-                className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 ring-1 ring-foreground/5 transition-colors hover:bg-accent"
-              >
-                <div className={`rounded-md p-1.5 ${stat.bg}`}>
-                  <stat.icon className={`size-4 ${stat.color}`} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-lg font-bold tabular-nums leading-tight">
-                    {stat.value.toLocaleString()}
-                  </p>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {stat.title}
-                  </p>
-                </div>
-              </Link>
-            ))
-          : Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5"
-              >
-                <Skeleton className="size-7 rounded-md" />
-                <div className="space-y-1">
-                  <Skeleton className="h-5 w-10" />
-                  <Skeleton className="h-3 w-16" />
-                </div>
-              </div>
-            ))}
-      </div>
+      {/* Stats row moved to Members page */}
 
       {/* ── Upcoming Events Strip ──────────────────────────────── */}
       {!loading && (
@@ -1517,29 +1481,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Quick Links ───────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" render={<Link href="/members" />}>
-          <Users className="size-3.5" data-icon="inline-start" />
-          Members
-          <ArrowRight className="size-3 opacity-50" data-icon="inline-end" />
-        </Button>
-        <Button variant="outline" size="sm" render={<Link href="/calendar" />}>
-          <CalendarDays className="size-3.5" data-icon="inline-start" />
-          Calendar
-          <ArrowRight className="size-3 opacity-50" data-icon="inline-end" />
-        </Button>
-        <Button variant="outline" size="sm" render={<Link href="/templates" />}>
-          <Mail className="size-3.5" data-icon="inline-start" />
-          Templates
-          <ArrowRight className="size-3 opacity-50" data-icon="inline-end" />
-        </Button>
-        <Button variant="outline" size="sm" render={<Link href="/dispatch" />}>
-          <History className="size-3.5" data-icon="inline-start" />
-          Dispatch History
-          <ArrowRight className="size-3 opacity-50" data-icon="inline-end" />
-        </Button>
-      </div>
+      {/* Quick links removed — use sidebar navigation */}
 
       {/* ── Schedule Dialog ───────────────────────────────────── */}
       <Dialog
