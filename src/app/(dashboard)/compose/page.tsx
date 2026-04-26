@@ -46,6 +46,8 @@ import {
   Plus,
   Trash2,
   Save,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { startOfWeek, endOfWeek, format, addDays, nextFriday, isFriday } from "date-fns"
 import { logAudit } from "@/lib/audit"
@@ -271,6 +273,7 @@ interface CustomTemplate {
 }
 
 export default function ComposePage() {
+  const [weekOffset, setWeekOffset] = useState(0)
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId | null>(null)
   const [formState, setFormState] = useState<FormState | null>(null)
   const [loading, setLoading] = useState(false)
@@ -318,7 +321,7 @@ export default function ComposePage() {
     setSelectedTemplate(templateId)
 
     const supabase = createClient()
-    const today = new Date()
+    const today = addDays(new Date(), weekOffset * 7)
 
     // Fetch saved template defaults for this type (no FK join)
     const etName = TEMPLATE_TO_EVENT_TYPE[templateId]
@@ -742,12 +745,34 @@ export default function ComposePage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Compose</h1>
-        <p className="text-muted-foreground">
-          Select a template, edit the content, then preview and send.
-        </p>
+      {/* Page header with week selector */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Compose</h1>
+          <p className="text-sm text-muted-foreground">
+            {weekOffset === 0 ? "This week" : weekOffset === 1 ? "Next week" : `${weekOffset} weeks ahead`}
+            {" — "}
+            <span className="font-medium text-foreground">
+              {(() => {
+                const base = addDays(new Date(), weekOffset * 7)
+                const sun = getUpcomingSunday(base)
+                const { saturday } = getBulletinWeekBounds(sun)
+                return `${format(sun, "MMM d")} – ${format(saturday, "MMM d")}`
+              })()}
+            </span>
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => { setWeekOffset((w) => Math.max(0, w - 1)); setSelectedTemplate(null); setFormState(null) }} disabled={weekOffset === 0}>
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button variant={weekOffset === 0 ? "default" : "outline"} size="sm" onClick={() => { setWeekOffset(0); setSelectedTemplate(null); setFormState(null) }}>
+            This Week
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { setWeekOffset((w) => w + 1); setSelectedTemplate(null); setFormState(null) }}>
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Saved Instances */}
