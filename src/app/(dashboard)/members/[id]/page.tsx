@@ -259,10 +259,9 @@ export default function MemberDetailPage() {
         <Button
           variant="outline"
           className="mt-4"
-          onClick={() => router.back()}
+          render={<Link href="/members" />}
         >
-          <ArrowLeft className="size-4" />
-          Go Back
+          Back to Members
         </Button>
       </div>
     )
@@ -278,13 +277,6 @@ export default function MemberDetailPage() {
       {/* Top bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-          >
-            <ArrowLeft />
-          </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
               {member.full_name}
