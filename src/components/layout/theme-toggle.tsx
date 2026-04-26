@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useTheme } from "next-themes"
 import {
   Sun,
@@ -13,22 +13,36 @@ import {
   Palette,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+
+const THEMES = [
+  { value: "light", label: "Light", icon: Sun, group: "light" },
+  { value: "warm", label: "Warm", icon: Flame, group: "light" },
+  { value: "ocean", label: "Ocean", icon: Waves, group: "light" },
+  { value: "forest", label: "Forest", icon: TreePine, group: "light" },
+  { value: "dark", label: "Dark", icon: Moon, group: "dark" },
+  { value: "github-dark", label: "GitHub Dark", icon: Code2, group: "dark" },
+  { value: "midnight", label: "Midnight", icon: Star, group: "dark" },
+]
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [open])
 
   const icon = !mounted ? (
     <Palette className="size-4" />
@@ -45,48 +59,49 @@ export function ThemeToggle() {
   )
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="ghost" size="icon-sm">
-            {icon}
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" sideOffset={8}>
-        <DropdownMenuLabel>Light Themes</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          <Sun className="size-4" />
-          <span>Light</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("warm")}>
-          <Flame className="size-4" />
-          <span>Warm</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("ocean")}>
-          <Waves className="size-4" />
-          <span>Ocean</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("forest")}>
-          <TreePine className="size-4" />
-          <span>Forest</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Dark Themes</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          <Moon className="size-4" />
-          <span>Dark</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("github-dark")}>
-          <Code2 className="size-4" />
-          <span>GitHub Dark Pro</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("midnight")}>
-          <Star className="size-4" />
-          <span>Midnight</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="relative" ref={ref}>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        {icon}
+        <span className="sr-only">Toggle theme</span>
+      </Button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-40 rounded-lg border bg-popover p-1 shadow-lg">
+          <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Light</p>
+          {THEMES.filter((t) => t.group === "light").map((t) => {
+            const Icon = t.icon
+            return (
+              <button
+                key={t.value}
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent ${theme === t.value ? "bg-accent font-medium" : ""}`}
+                onClick={() => { setTheme(t.value); setOpen(false) }}
+              >
+                <Icon className="size-3.5" />
+                {t.label}
+              </button>
+            )
+          })}
+          <div className="my-1 border-t" />
+          <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Dark</p>
+          {THEMES.filter((t) => t.group === "dark").map((t) => {
+            const Icon = t.icon
+            return (
+              <button
+                key={t.value}
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent ${theme === t.value ? "bg-accent font-medium" : ""}`}
+                onClick={() => { setTheme(t.value); setOpen(false) }}
+              >
+                <Icon className="size-3.5" />
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
