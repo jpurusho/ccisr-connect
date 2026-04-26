@@ -1,9 +1,10 @@
 "use client"
 
-import { Settings, Palette, Server, UserCog, Info, Church, Tag, FileText } from "lucide-react"
+import { Settings, Palette, Server, UserCog, Info, Church, Tag, FileText, Activity } from "lucide-react"
 import dynamic from "next/dynamic"
 
 const TemplatesPanel = dynamic(() => import("@/app/(dashboard)/templates/page"), { ssr: false })
+const ActivityLogPanel = dynamic(() => import("@/components/settings/activity-log-panel"), { ssr: false })
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Card,
@@ -105,6 +106,10 @@ export default function SettingsPage() {
             <Tag className="size-4" />
             <span className="hidden sm:inline">Tags</span>
           </TabsTrigger>
+          <TabsTrigger value="activity">
+            <Activity className="size-4" />
+            <span className="hidden sm:inline">Activity Log</span>
+          </TabsTrigger>
           <TabsTrigger value="about">
             <Info className="size-4" />
             <span className="hidden sm:inline">About</span>
@@ -129,6 +134,10 @@ export default function SettingsPage() {
 
         <TabsContent value="tags" className="mt-6">
           <TagManagementPanel />
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-6">
+          <ActivityLogPanel />
         </TabsContent>
 
         <TabsContent value="about" className="mt-6">

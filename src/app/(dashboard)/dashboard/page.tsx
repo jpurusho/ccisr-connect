@@ -1321,6 +1321,56 @@ export default function DashboardPage() {
             ))}
       </div>
 
+      {/* ── Upcoming Events Strip ──────────────────────────────── */}
+      {!loading && (
+        <Card>
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Upcoming This Week</p>
+              <Link href="/calendar" className="text-xs text-primary hover:underline">Full Calendar</Link>
+            </div>
+            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+              {(() => {
+                const days: { date: Date; label: string }[] = []
+                const start = getUpcomingSunday(addDays(new Date(), weekOffset * 7))
+                for (let i = 0; i < 7; i++) {
+                  const d = addDays(start, i)
+                  days.push({ date: d, label: format(d, "EEE d") })
+                }
+                return days.map((day) => {
+                  const dayBdays = birthdayForm.birthdays.filter((b) => {
+                    const [m, d] = b.date.split("/").map(Number)
+                    return m === day.date.getMonth() + 1 && d === day.date.getDate()
+                  })
+                  const dayAnnis = anniversaryForm.anniversaries.filter((a) => {
+                    const [m, d] = a.date.split("/").map(Number)
+                    return m === day.date.getMonth() + 1 && d === day.date.getDate()
+                  })
+                  const isToday = format(day.date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+                  return (
+                    <div
+                      key={day.label}
+                      className={`flex min-w-[80px] flex-col items-center gap-1 rounded-lg border px-2 py-1.5 text-center ${isToday ? "border-primary bg-primary/5" : ""}`}
+                    >
+                      <span className={`text-[10px] font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{day.label}</span>
+                      {dayBdays.map((b, i) => (
+                        <span key={`b${i}`} className="w-full truncate rounded-full bg-purple-500 px-1.5 py-0.5 text-[9px] text-white">{b.name.split(" ")[0]}</span>
+                      ))}
+                      {dayAnnis.map((a, i) => (
+                        <span key={`a${i}`} className="w-full truncate rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] text-white">{a.husbandName}</span>
+                      ))}
+                      {dayBdays.length === 0 && dayAnnis.length === 0 && (
+                        <span className="text-[9px] text-muted-foreground/30">—</span>
+                      )}
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Communication Cards ───────────────────────────────── */}
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-2">

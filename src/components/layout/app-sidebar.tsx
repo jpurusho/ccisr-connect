@@ -6,12 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   Users,
-  CalendarDays,
-  Send,
-  Clock,
-  History,
   Mail,
-  BarChart3,
   Settings,
   Church,
 } from "lucide-react"
@@ -22,7 +17,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -31,62 +25,12 @@ import {
 import { UserNav } from "@/components/layout/user-nav"
 import { APP_VERSION } from "@/lib/version"
 
-const membershipNav = [
-  { title: "Communication Hub", href: "/dashboard", icon: LayoutDashboard },
+const navItems = [
+  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Members", href: "/members", icon: Users },
-  { title: "Calendar", href: "/calendar", icon: CalendarDays },
-  { title: "Reports", href: "/reports", icon: BarChart3 },
-]
-
-const communicationsNav = [
-  { title: "Compose", href: "/compose", icon: Send },
-  { title: "Dispatch Queue", href: "/dispatch", icon: Clock },
-  { title: "Mailing Lists", href: "/mailing-lists", icon: Mail },
-  { title: "History", href: "/history", icon: History },
-]
-
-const configNav = [
+  { title: "Email", href: "/email", icon: Mail },
   { title: "Settings", href: "/settings", icon: Settings },
 ]
-
-function NavGroup({
-  label,
-  items,
-  pathname,
-}: {
-  label: string
-  items: typeof membershipNav
-  pathname: string
-}) {
-  return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{label}</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {items.map((item) => {
-            const isActive =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href)
-
-            return (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  isActive={isActive}
-                  tooltip={item.title}
-                  render={<Link href={item.href} />}
-                >
-                  <item.icon className="size-4" />
-                  <span>{item.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )
-          })}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-  )
-}
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -112,9 +56,31 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavGroup label="Membership" items={membershipNav} pathname={pathname} />
-        <NavGroup label="Communications" items={communicationsNav} pathname={pathname} />
-        <NavGroup label="Configuration" items={configNav} pathname={pathname} />
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map((item) => {
+                const isActive =
+                  item.href === "/dashboard"
+                    ? pathname === "/dashboard"
+                    : pathname.startsWith(item.href)
+
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      tooltip={item.title}
+                      render={<Link href={item.href} />}
+                    >
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>
