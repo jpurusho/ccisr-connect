@@ -484,6 +484,7 @@ export interface BulletinCardData {
   events: { title: string; details: string }[];
   message?: string;
   primaryColor?: string;
+  footerVerse?: string;
   resourceLinks?: ResourceLink[];
 }
 
@@ -533,7 +534,7 @@ ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font
     headerRow("Weekly Bulletin", data.weekLabel, "⛪", colors) +
     contentRow(sections, colors) +
     footerRow(
-      "Christ Church of India, San Ramon — CCISR Connect",
+      data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect",
       colors
     );
 

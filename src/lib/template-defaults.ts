@@ -55,6 +55,7 @@ export interface AnniversaryDefaults {
 export interface BulletinDefaults {
   events?: { title: string; details: string }[]
   primaryColor?: string
+  footerVerse?: string
   resourceLinks?: ResourceLinkDefault[]
 }
 

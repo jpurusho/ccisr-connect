@@ -845,6 +845,13 @@ export default function TemplatesPage() {
                         <Plus className="size-3.5" />
                         Add Event
                       </Button>
+                      <Field label="Footer Bible Verse" htmlFor="bul-verse" hint="Leave empty for default footer">
+                        <Input
+                          id="bul-verse"
+                          value={bulletinData.footerVerse || ""}
+                          onChange={(e) => setBulletinData((prev) => ({ ...prev, footerVerse: e.target.value }))}
+                        />
+                      </Field>
                       <ResourceLinksEditor
                         links={bulletinData.resourceLinks ?? []}
                         onChange={(links) => setBulletinData((prev) => ({ ...prev, resourceLinks: links }))}
