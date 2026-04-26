@@ -571,7 +571,8 @@ export default function ComposePage() {
     }
 
     setLoading(false)
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOffset])
 
   // ----------------------------------------------------------
   // Form update helpers (type-safe wrappers)
