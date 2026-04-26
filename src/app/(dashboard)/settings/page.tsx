@@ -83,7 +83,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="themes">
         <TabsList
           variant="line"
-          className="w-full justify-start overflow-x-auto"
+          className="w-full justify-start overflow-x-auto scrollbar-none"
         >
           <TabsTrigger value="themes">
             <Palette className="size-4" />
