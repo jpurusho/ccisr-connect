@@ -293,8 +293,14 @@ export default function HistoryPage() {
 
     if (purgeDialog.target === "dispatch") {
       let query = supabase.from("dispatch_queue").delete()
-      if (purgeDialog.mode === "filtered" && dSearch.trim()) {
-        query = query.ilike("subject", `%${dSearch.trim()}%`)
+      if (purgeDialog.mode === "filtered") {
+        if (dSearch.trim()) query = query.ilike("subject", `%${dSearch.trim()}%`)
+        if (dStatusFilter !== "all") query = query.eq("status", dStatusFilter)
+        if (dDateFrom) query = query.gte("created_at", dDateFrom)
+        if (dDateTo) query = query.lte("created_at", dDateTo + "T23:59:59")
+        if (!dSearch.trim() && dStatusFilter === "all" && !dDateFrom && !dDateTo) {
+          query = query.gte("created_at", "1970-01-01")
+        }
       } else {
         query = query.gte("created_at", "1970-01-01")
       }
@@ -445,7 +451,7 @@ export default function HistoryPage() {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    {dTotal > 0 && dSearch && (
+                    {dTotal > 0 && (dSearch || dStatusFilter !== "all" || dDateFrom || dDateTo) && (
                       <Button
                         variant="outline"
                         size="sm"
