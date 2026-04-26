@@ -2,13 +2,14 @@
 
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Send, Clock, Mail, History } from "lucide-react"
+import { Send, Clock, Mail, History, FileText } from "lucide-react"
 import dynamic from "next/dynamic"
 
 const ComposePanel = dynamic(() => import("@/app/(dashboard)/compose/page"), { ssr: false })
 const DispatchPanel = dynamic(() => import("@/app/(dashboard)/dispatch/page"), { ssr: false })
 const MailingListsPanel = dynamic(() => import("@/app/(dashboard)/mailing-lists/page"), { ssr: false })
 const HistoryPanel = dynamic(() => import("@/app/(dashboard)/history/page"), { ssr: false })
+const TemplatesPanel = dynamic(() => import("@/app/(dashboard)/templates/page"), { ssr: false })
 
 export default function EmailPage() {
   const [activeTab, setActiveTab] = useState("compose")
@@ -36,6 +37,10 @@ export default function EmailPage() {
             <Mail className="size-4" />
             <span className="hidden sm:inline">Mailing Lists</span>
           </TabsTrigger>
+          <TabsTrigger value="templates">
+            <FileText className="size-4" />
+            <span className="hidden sm:inline">Templates</span>
+          </TabsTrigger>
           <TabsTrigger value="history">
             <History className="size-4" />
             <span className="hidden sm:inline">History</span>
@@ -50,6 +55,9 @@ export default function EmailPage() {
         </TabsContent>
         <TabsContent value="mailing-lists" className="mt-6">
           <MailingListsPanel />
+        </TabsContent>
+        <TabsContent value="templates" className="mt-6">
+          <TemplatesPanel />
         </TabsContent>
         <TabsContent value="history" className="mt-6">
           <HistoryPanel />
