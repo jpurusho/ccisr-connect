@@ -216,6 +216,21 @@ export type AuditLog = {
   created_at: string
 }
 
+export type ComposedInstance = {
+  id: string
+  template_type: string
+  name: string
+  subject: string
+  form_data: Record<string, unknown>
+  mailing_list_id: string | null
+  smtp_config_id: string | null
+  additional_recipients: string | null
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type Tag = {
   id: string
   name: string

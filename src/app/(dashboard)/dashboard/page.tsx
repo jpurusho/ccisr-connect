@@ -352,6 +352,7 @@ export default function DashboardPage() {
         smtpConfigsRes,
         templateDefaultsRes,
         eventTypesRes,
+        composedInstancesRes,
       ] = await Promise.all([
         // Stats
         supabase
@@ -469,6 +470,13 @@ export default function DashboardPage() {
           .from("event_types")
           .select("id, name")
           .returns<{ id: string; name: string }[]>(),
+
+        // Composed instances (persisted from Compose page)
+        supabase
+          .from("composed_instances")
+          .select("template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients")
+          .eq("is_active", true)
+          .returns<{ template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null }[]>(),
       ])
 
       // Check errors
@@ -505,10 +513,19 @@ export default function DashboardPage() {
         }
       }
 
-      const bsDef = (savedDefaults.friday_bible_study?.data ?? FALLBACK_DEFAULTS.friday_bible_study.data) as BibleStudyDefaults
-      const wsDef = (savedDefaults.wednesday_womens_study?.data ?? FALLBACK_DEFAULTS.wednesday_womens_study.data) as WomensStudyDefaults
-      const bdDef = (savedDefaults.birthday?.data ?? {}) as BirthdayDefaults
-      const anDef = (savedDefaults.anniversary?.data ?? {}) as AnniversaryDefaults
+      // Build composed instances map (template_type → data)
+      const composedMap: Record<string, { form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null }> = {}
+      if (composedInstancesRes.data) {
+        for (const ci of composedInstancesRes.data) {
+          composedMap[ci.template_type] = ci
+        }
+      }
+
+      // Priority: composed instance > template defaults > hardcoded fallbacks
+      const bsDef = (composedMap.bible_study?.form_data ?? savedDefaults.friday_bible_study?.data ?? FALLBACK_DEFAULTS.friday_bible_study.data) as BibleStudyDefaults
+      const wsDef = (composedMap.womens_study?.form_data ?? savedDefaults.wednesday_womens_study?.data ?? FALLBACK_DEFAULTS.wednesday_womens_study.data) as WomensStudyDefaults
+      const bdDef = (composedMap.birthday?.form_data ?? savedDefaults.birthday?.data ?? {}) as BirthdayDefaults
+      const anDef = (composedMap.anniversary?.form_data ?? savedDefaults.anniversary?.data ?? {}) as AnniversaryDefaults
       const bulDef = (savedDefaults.bulletin?.data ?? FALLBACK_DEFAULTS.bulletin.data) as BulletinDefaults
 
       // ---- Stats ----
@@ -692,6 +709,27 @@ export default function DashboardPage() {
       // ---- Mailing lists + SMTP configs ----
       setMailingLists(mailingListsRes.data ?? [])
       setSmtpConfigs(smtpConfigsRes.data ?? [])
+
+      // ---- Pre-fill mailing list + SMTP from composed instances ----
+      const commTypes: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "bulletin"]
+      const prefilledOptions: Record<CommType, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }> = {
+        birthday: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+        anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+        bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+        womens_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+        bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+      }
+      for (const ct of commTypes) {
+        const ci = composedMap[ct]
+        if (ci) {
+          prefilledOptions[ct] = {
+            mailingListId: ci.mailing_list_id || "",
+            smtpConfigId: ci.smtp_config_id || "",
+            additionalRecipients: ci.additional_recipients || "",
+          }
+        }
+      }
+      setCommOptions(prefilledOptions)
 
       // ---- Match dispatches to communication types (count all, keep latest) ----
       const weekDispatches = weekDispatchesRes.data ?? []

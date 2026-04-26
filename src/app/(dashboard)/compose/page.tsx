@@ -45,6 +45,7 @@ import {
   Eye,
   Plus,
   Trash2,
+  Save,
 } from "lucide-react"
 import { startOfWeek, endOfWeek, format, addDays, nextFriday, isFriday } from "date-fns"
 import { logAudit } from "@/lib/audit"
@@ -280,8 +281,10 @@ export default function ComposePage() {
   const [scheduling, setScheduling] = useState(false)
   const [subject, setSubject] = useState("")
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([])
+  const [savedInstances, setSavedInstances] = useState<{ id: string; template_type: string; name: string; subject: string; updated_at: string; mailing_list_id: string | null; smtp_config_id: string | null }[]>([])
+  const [savingInstance, setSavingInstance] = useState(false)
 
-  // Fetch mailing lists + SMTP configs + custom templates on mount
+  // Fetch mailing lists + SMTP configs + custom templates + saved instances on mount
   useEffect(() => {
     const supabase = createClient()
     Promise.all([
@@ -289,10 +292,14 @@ export default function ComposePage() {
       supabase.from("smtp_configs").select("id, name, from_email").eq("is_active", true).order("name"),
       supabase.from("email_templates").select("id, name, subject_template, body_template").eq("is_default", false).order("name")
         .returns<CustomTemplate[]>(),
-    ]).then(([mlRes, smtpRes, ctRes]) => {
+      supabase.from("composed_instances").select("id, template_type, name, subject, updated_at, mailing_list_id, smtp_config_id")
+        .eq("is_active", true).order("updated_at", { ascending: false })
+        .returns<{ id: string; template_type: string; name: string; subject: string; updated_at: string; mailing_list_id: string | null; smtp_config_id: string | null }[]>(),
+    ]).then(([mlRes, smtpRes, ctRes, ciRes]) => {
       if (mlRes.data) setMailingLists(mlRes.data)
       if (smtpRes.data) setSmtpConfigs(smtpRes.data)
       if (ctRes.data) setCustomTemplates(ctRes.data)
+      if (ciRes.data) setSavedInstances(ciRes.data)
     })
   }, [])
 
@@ -578,6 +585,108 @@ export default function ComposePage() {
   }
 
   // ----------------------------------------------------------
+  // Save as composed instance (persists for Communication Hub)
+  // ----------------------------------------------------------
+
+  async function handleSaveInstance() {
+    if (!formState || !subject) {
+      toast.error("Select a template and fill in the subject first")
+      return
+    }
+
+    setSavingInstance(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const templateType = formState.type === "custom"
+        ? `custom:${selectedTemplate}`
+        : formState.type
+      const templateName = TEMPLATES.find((t) => t.id === formState.type)?.title || subject
+
+      // Check if an active instance already exists for this type
+      const { data: existing } = await supabase
+        .from("composed_instances")
+        .select("id")
+        .eq("template_type", templateType)
+        .eq("is_active", true)
+        .limit(1)
+        .returns<{ id: string }[]>()
+
+      const payload = {
+        template_type: templateType,
+        name: templateName,
+        subject,
+        form_data: formState.data,
+        mailing_list_id: selectedMailingList || null,
+        smtp_config_id: selectedSmtpConfig || null,
+        additional_recipients: null,
+        is_active: true,
+        created_by: user?.id ?? null,
+      }
+
+      if (existing && existing.length > 0) {
+        const { error } = await supabase
+          .from("composed_instances")
+          .update(payload as never)
+          .eq("id", existing[0].id)
+        if (error) {
+          toast.error(`Save failed: ${error.message}`)
+        } else {
+          toast.success(`"${templateName}" instance saved. Ready to send from Communication Hub.`)
+          logAudit("composed_instance_updated", "composed_instances", existing[0].id, { templateType })
+        }
+      } else {
+        const { error } = await supabase
+          .from("composed_instances")
+          .insert(payload as never)
+        if (error) {
+          toast.error(`Save failed: ${error.message}`)
+        } else {
+          toast.success(`"${templateName}" instance saved. Ready to send from Communication Hub.`)
+          logAudit("composed_instance_created", "composed_instances", null, { templateType })
+        }
+      }
+
+      // Refresh saved instances list
+      const { data: refreshed } = await supabase
+        .from("composed_instances")
+        .select("id, template_type, name, subject, updated_at, mailing_list_id, smtp_config_id")
+        .eq("is_active", true).order("updated_at", { ascending: false })
+        .returns<typeof savedInstances>()
+      if (refreshed) setSavedInstances(refreshed)
+    } catch {
+      toast.error("An unexpected error occurred")
+    } finally {
+      setSavingInstance(false)
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Load a saved instance
+  // ----------------------------------------------------------
+
+  async function loadSavedInstance(instanceId: string) {
+    setLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("composed_instances")
+      .select("*")
+      .eq("id", instanceId)
+      .single() as { data: { id: string; template_type: string; name: string; subject: string; form_data: Record<string, unknown>; mailing_list_id: string | null; smtp_config_id: string | null } | null }
+
+    if (data) {
+      const type = data.template_type.startsWith("custom:") ? "custom" : data.template_type
+      setSelectedTemplate(data.template_type as TemplateId)
+      setFormState({ type, data: data.form_data } as unknown as FormState)
+      setSubject(data.subject)
+      setSelectedMailingList(data.mailing_list_id || "")
+      setSelectedSmtpConfig(data.smtp_config_id || "")
+    }
+    setLoading(false)
+  }
+
+  // ----------------------------------------------------------
   // Queue for dispatch
   // ----------------------------------------------------------
 
@@ -640,6 +749,41 @@ export default function ComposePage() {
           Select a template, edit the content, then preview and send.
         </p>
       </div>
+
+      {/* Saved Instances */}
+      {savedInstances.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Saved Instances</CardTitle>
+            <CardDescription>Continue editing a previously saved communication</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {savedInstances.map((si) => (
+                <button
+                  key={si.id}
+                  type="button"
+                  className="flex items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+                  onClick={() => loadSavedInstance(si.id)}
+                >
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Send className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{si.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{si.subject}</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                      Updated {new Date(si.updated_at).toLocaleDateString()}
+                      {si.mailing_list_id && " · List set"}
+                      {si.smtp_config_id && " · SMTP set"}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Template selector cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -930,7 +1074,15 @@ export default function ComposePage() {
                     </Select>
                   </div>
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleSaveInstance}
+                    disabled={savingInstance}
+                  >
+                    {savingInstance ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                    Save Instance
+                  </Button>
                   <Button
                     onClick={handleScheduleDispatch}
                     disabled={scheduling}
