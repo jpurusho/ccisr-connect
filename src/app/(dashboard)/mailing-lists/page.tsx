@@ -88,8 +88,8 @@ export default function MailingListsPage() {
   const [searchResults, setSearchResults] = useState<Record<string, MemberOption[]>>({})
   const [addingRecipient, setAddingRecipient] = useState(false)
 
-  const fetchLists = useCallback(async () => {
-    setLoading(true)
+  const fetchLists = useCallback(async (showLoader = false) => {
+    if (showLoader) setLoading(true)
     const supabase = createClient()
     const { data } = await supabase
       .from("mailing_lists")
@@ -110,7 +110,7 @@ export default function MailingListsPage() {
   }, [])
 
   useEffect(() => {
-    fetchLists()
+    fetchLists(true)
   }, [fetchLists])
 
   // ── Recipient management ────────────────────────────────────────────────
