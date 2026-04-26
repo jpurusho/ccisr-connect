@@ -293,6 +293,9 @@ export default function DashboardPage() {
   }>({ open: false, commType: null, dateTime: "" })
   const [sendingType, setSendingType] = useState<CommType | null>(null)
 
+  // ---- Selected communication card ----
+  const [selectedCard, setSelectedCard] = useState<CommType>("bulletin")
+
   // ---- Week offset for future scheduling (0 = this week, 1 = next week, etc.) ----
   const [weekOffset, setWeekOffset] = useState(0)
 
@@ -1335,153 +1338,80 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* ── Communication Cards ───────────────────────────────── */}
+      {/* ── Communication Summary Tabs ────────────────────────── */}
       {loading ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-28 rounded-full" />)}
+          </div>
+          <CardSkeleton />
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Birthday Card */}
-          <WeeklyCommunicationCard
-            title="Birthdays This Week"
-            accentColor="#7C3AED"
-            icon={Cake}
-            status={getStatus("birthday")}
-            summaryLines={birthdaySummary}
-            subject={getSubject("birthday")}
-            onSubjectChange={(v) => setSubjectOverride("birthday", v)}
-            scheduledAt={getScheduledAt("birthday")}
-            previewHtml={birthdayPreview}
-            onSchedule={() => handleSchedule("birthday")}
-            onSendNow={() => handleSendNow("birthday")}
-            mailingLists={mailingLists}
-            smtpConfigs={smtpConfigs}
-            selectedMailingList={commOptions.birthday.mailingListId}
-            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, mailingListId: id } }))}
-            selectedSmtpConfig={commOptions.birthday.smtpConfigId}
-            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, smtpConfigId: id } }))}
-            sendCount={dispatchCounts.birthday}
-          >
-            <BirthdayEditForm
-              data={birthdayForm}
-              onChange={setBirthdayForm}
-            />
-          </WeeklyCommunicationCard>
+        <div className="space-y-4">
+          {/* Summary pills */}
+          <div className="flex flex-wrap gap-2">
+            {([
+              { type: "bulletin" as CommType, label: "Bulletin", color: "#4F46E5", icon: Newspaper },
+              { type: "birthday" as CommType, label: "Birthdays", color: "#7C3AED", icon: Cake },
+              { type: "anniversary" as CommType, label: "Anniversaries", color: "#D97706", icon: Heart },
+              { type: "bible_study" as CommType, label: "Bible Study", color: "#0D9488", icon: BookOpen },
+              { type: "womens_study" as CommType, label: "Women's Study", color: "#DB2777", icon: Users },
+            ]).map(({ type, label, color, icon: Icon }) => {
+              const status = getStatus(type)
+              const count = dispatchCounts[type]
+              const isActive = selectedCard === type
+              return (
+                <button
+                  key={type}
+                  onClick={() => setSelectedCard(type)}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                    isActive ? "text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                  style={isActive ? { backgroundColor: color } : undefined}
+                >
+                  <Icon className="size-3.5" />
+                  {label}
+                  {status === "sent" && count > 0 && (
+                    <span className={`rounded-full px-1.5 text-[10px] ${isActive ? "bg-white/20" : "bg-foreground/10"}`}>
+                      {count}x
+                    </span>
+                  )}
+                  {status === "scheduled" && (
+                    <span className={`size-1.5 rounded-full ${isActive ? "bg-white/60" : "bg-amber-400"}`} />
+                  )}
+                </button>
+              )
+            })}
+          </div>
 
-          {/* Anniversary Card */}
-          <WeeklyCommunicationCard
-            title="Anniversaries This Week"
-            accentColor="#D97706"
-            icon={Heart}
-            status={getStatus("anniversary")}
-            summaryLines={anniversarySummary}
-            subject={getSubject("anniversary")}
-            onSubjectChange={(v) => setSubjectOverride("anniversary", v)}
-            scheduledAt={getScheduledAt("anniversary")}
-            previewHtml={anniversaryPreview}
-            onSchedule={() => handleSchedule("anniversary")}
-            onSendNow={() => handleSendNow("anniversary")}
-            mailingLists={mailingLists}
-            smtpConfigs={smtpConfigs}
-            selectedMailingList={commOptions.anniversary.mailingListId}
-            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, mailingListId: id } }))}
-            selectedSmtpConfig={commOptions.anniversary.smtpConfigId}
-            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, smtpConfigId: id } }))}
-            sendCount={dispatchCounts.anniversary}
-          >
-            <AnniversaryEditForm
-              data={anniversaryForm}
-              onChange={setAnniversaryForm}
-            />
-          </WeeklyCommunicationCard>
-
-          {/* Bible Study Card */}
-          <WeeklyCommunicationCard
-            title="Friday Bible Study Invite"
-            accentColor="#0D9488"
-            icon={BookOpen}
-            status={getStatus("bible_study")}
-            summaryLines={bibleStudySummary}
-            subject={getSubject("bible_study")}
-            onSubjectChange={(v) => setSubjectOverride("bible_study", v)}
-            scheduledAt={getScheduledAt("bible_study")}
-            previewHtml={bibleStudyPreview}
-            onSchedule={() => handleSchedule("bible_study")}
-            onSendNow={() => handleSendNow("bible_study")}
-            mailingLists={mailingLists}
-            smtpConfigs={smtpConfigs}
-            selectedMailingList={commOptions.bible_study.mailingListId}
-            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, mailingListId: id } }))}
-            selectedSmtpConfig={commOptions.bible_study.smtpConfigId}
-            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, smtpConfigId: id } }))}
-            sendCount={dispatchCounts.bible_study}
-          >
-            <BibleStudyEditForm
-              data={bibleStudyForm}
-              onChange={setBibleStudyForm}
-            />
-          </WeeklyCommunicationCard>
-
-          {/* Women's Study Card */}
-          <WeeklyCommunicationCard
-            title="Wednesday Women's Bible Study"
-            accentColor="#DB2777"
-            icon={Users}
-            status={getStatus("womens_study")}
-            summaryLines={womensStudySummary}
-            subject={getSubject("womens_study")}
-            onSubjectChange={(v) => setSubjectOverride("womens_study", v)}
-            scheduledAt={getScheduledAt("womens_study")}
-            previewHtml={womensStudyPreview}
-            onSchedule={() => handleSchedule("womens_study")}
-            onSendNow={() => handleSendNow("womens_study")}
-            mailingLists={mailingLists}
-            smtpConfigs={smtpConfigs}
-            selectedMailingList={commOptions.womens_study.mailingListId}
-            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, mailingListId: id } }))}
-            selectedSmtpConfig={commOptions.womens_study.smtpConfigId}
-            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, smtpConfigId: id } }))}
-            sendCount={dispatchCounts.womens_study}
-          >
-            <WomensStudyEditForm
-              data={womensStudyForm}
-              onChange={setWomensStudyForm}
-            />
-          </WeeklyCommunicationCard>
-
-          {/* Bulletin Card */}
-          <WeeklyCommunicationCard
-            title="Weekly Bulletin"
-            accentColor="#4F46E5"
-            icon={Newspaper}
-            status={getStatus("bulletin")}
-            summaryLines={bulletinSummary}
-            subject={getSubject("bulletin")}
-            onSubjectChange={(v) => setSubjectOverride("bulletin", v)}
-            scheduledAt={getScheduledAt("bulletin")}
-            previewHtml={bulletinPreview}
-            onSchedule={() => handleSchedule("bulletin")}
-            onSendNow={() => handleSendNow("bulletin")}
-            mailingLists={mailingLists}
-            smtpConfigs={smtpConfigs}
-            selectedMailingList={commOptions.bulletin.mailingListId}
-            onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, mailingListId: id } }))}
-            selectedSmtpConfig={commOptions.bulletin.smtpConfigId}
-            onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, smtpConfigId: id } }))}
-            sendCount={dispatchCounts.bulletin}
-          >
-            <BulletinEditForm
-              data={bulletinForm}
-              onChange={setBulletinForm}
-            />
-          </WeeklyCommunicationCard>
+          {/* Selected card expanded */}
+          {selectedCard === "birthday" && (
+            <WeeklyCommunicationCard title="Birthdays This Week" accentColor="#7C3AED" icon={Cake} status={getStatus("birthday")} summaryLines={birthdaySummary} subject={getSubject("birthday")} onSubjectChange={(v) => setSubjectOverride("birthday", v)} scheduledAt={getScheduledAt("birthday")} previewHtml={birthdayPreview} onSchedule={() => handleSchedule("birthday")} onSendNow={() => handleSendNow("birthday")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.birthday.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, mailingListId: id } }))} selectedSmtpConfig={commOptions.birthday.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, smtpConfigId: id } }))} sendCount={dispatchCounts.birthday} additionalRecipients={commOptions.birthday.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, additionalRecipients: v } }))}>
+              <BirthdayEditForm data={birthdayForm} onChange={setBirthdayForm} />
+            </WeeklyCommunicationCard>
+          )}
+          {selectedCard === "anniversary" && (
+            <WeeklyCommunicationCard title="Anniversaries This Week" accentColor="#D97706" icon={Heart} status={getStatus("anniversary")} summaryLines={anniversarySummary} subject={getSubject("anniversary")} onSubjectChange={(v) => setSubjectOverride("anniversary", v)} scheduledAt={getScheduledAt("anniversary")} previewHtml={anniversaryPreview} onSchedule={() => handleSchedule("anniversary")} onSendNow={() => handleSendNow("anniversary")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.anniversary.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, mailingListId: id } }))} selectedSmtpConfig={commOptions.anniversary.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, smtpConfigId: id } }))} sendCount={dispatchCounts.anniversary} additionalRecipients={commOptions.anniversary.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, additionalRecipients: v } }))}>
+              <AnniversaryEditForm data={anniversaryForm} onChange={setAnniversaryForm} />
+            </WeeklyCommunicationCard>
+          )}
+          {selectedCard === "bible_study" && (
+            <WeeklyCommunicationCard title="Friday Bible Study Invite" accentColor="#0D9488" icon={BookOpen} status={getStatus("bible_study")} summaryLines={bibleStudySummary} subject={getSubject("bible_study")} onSubjectChange={(v) => setSubjectOverride("bible_study", v)} scheduledAt={getScheduledAt("bible_study")} previewHtml={bibleStudyPreview} onSchedule={() => handleSchedule("bible_study")} onSendNow={() => handleSendNow("bible_study")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.bible_study.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, mailingListId: id } }))} selectedSmtpConfig={commOptions.bible_study.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, smtpConfigId: id } }))} sendCount={dispatchCounts.bible_study} additionalRecipients={commOptions.bible_study.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, additionalRecipients: v } }))}>
+              <BibleStudyEditForm data={bibleStudyForm} onChange={setBibleStudyForm} />
+            </WeeklyCommunicationCard>
+          )}
+          {selectedCard === "womens_study" && (
+            <WeeklyCommunicationCard title="Wednesday Women's Bible Study" accentColor="#DB2777" icon={Users} status={getStatus("womens_study")} summaryLines={womensStudySummary} subject={getSubject("womens_study")} onSubjectChange={(v) => setSubjectOverride("womens_study", v)} scheduledAt={getScheduledAt("womens_study")} previewHtml={womensStudyPreview} onSchedule={() => handleSchedule("womens_study")} onSendNow={() => handleSendNow("womens_study")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.womens_study.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, mailingListId: id } }))} selectedSmtpConfig={commOptions.womens_study.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, smtpConfigId: id } }))} sendCount={dispatchCounts.womens_study} additionalRecipients={commOptions.womens_study.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, additionalRecipients: v } }))}>
+              <WomensStudyEditForm data={womensStudyForm} onChange={setWomensStudyForm} />
+            </WeeklyCommunicationCard>
+          )}
+          {selectedCard === "bulletin" && (
+            <WeeklyCommunicationCard title="Weekly Bulletin" accentColor="#4F46E5" icon={Newspaper} status={getStatus("bulletin")} summaryLines={bulletinSummary} subject={getSubject("bulletin")} onSubjectChange={(v) => setSubjectOverride("bulletin", v)} scheduledAt={getScheduledAt("bulletin")} previewHtml={bulletinPreview} onSchedule={() => handleSchedule("bulletin")} onSendNow={() => handleSendNow("bulletin")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.bulletin.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, mailingListId: id } }))} selectedSmtpConfig={commOptions.bulletin.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, smtpConfigId: id } }))} sendCount={dispatchCounts.bulletin} additionalRecipients={commOptions.bulletin.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, additionalRecipients: v } }))}>
+              <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} />
+            </WeeklyCommunicationCard>
+          )}
         </div>
       )}
-
-      {/* Quick links removed — use sidebar navigation */}
 
       {/* ── Schedule Dialog ───────────────────────────────────── */}
       <Dialog

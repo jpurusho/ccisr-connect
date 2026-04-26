@@ -339,10 +339,6 @@ export function WeeklyCommunicationCard({
           {/* Action buttons */}
           {status === "draft" && (
             <>
-              <Button variant="outline" size="sm" onClick={onSchedule}>
-                <Clock className="size-3.5" data-icon="inline-start" />
-                Schedule
-              </Button>
               <Button
                 size="sm"
                 onClick={onSendNow}
@@ -351,6 +347,10 @@ export function WeeklyCommunicationCard({
               >
                 <Send className="size-3.5" data-icon="inline-start" />
                 Send Now
+              </Button>
+              <Button variant="outline" size="sm" onClick={onSchedule}>
+                <Clock className="size-3.5" data-icon="inline-start" />
+                Queue
               </Button>
             </>
           )}
