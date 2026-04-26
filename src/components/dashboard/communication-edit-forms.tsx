@@ -50,7 +50,7 @@ export function HostFamilyInput({
     const supabase = createClient()
     const { data } = await supabase
       .from("families")
-      .select("id, family_name, home_phone, addresses(full_address, city, state, zip, is_current)")
+      .select("id, family_name, home_phone, addresses(full_address, street, city, state, zip, is_current), members(cell_phone, role_in_family)")
       .eq("is_active", true)
       .ilike("family_name", `%${query.trim()}%`)
       .limit(8)
@@ -60,14 +60,18 @@ export function HostFamilyInput({
         id: string
         family_name: string
         home_phone: string | null
-        addresses: Array<{ full_address: string; city: string | null; state: string | null; zip: string | null; is_current: boolean }>
+        addresses: Array<{ full_address: string; street: string | null; city: string | null; state: string | null; zip: string | null; is_current: boolean }>
+        members: Array<{ cell_phone: string | null; role_in_family: string }> | null
       }>).map((f) => {
         const addr = f.addresses?.find((a) => a.is_current)
+        const primaryMember = f.members?.find((m) => m.role_in_family === "husband") ?? f.members?.[0]
+        const phone = f.home_phone || primaryMember?.cell_phone || null
+        const address = addr?.full_address || [addr?.street, addr?.city, addr?.state, addr?.zip].filter(Boolean).join(", ") || null
         return {
           id: f.id,
           family_name: f.family_name,
-          home_phone: f.home_phone,
-          full_address: addr?.full_address ?? null,
+          home_phone: phone,
+          full_address: address,
           city: addr?.city ?? null,
           state: addr?.state ?? null,
           zip: addr?.zip ?? null,
@@ -103,6 +107,9 @@ export function HostFamilyInput({
               <span className="font-medium">{f.family_name}</span>
               {f.full_address && (
                 <span className="text-xs text-muted-foreground truncate">{f.full_address}</span>
+              )}
+              {f.home_phone && (
+                <span className="text-xs text-muted-foreground">{formatPhone(f.home_phone)}</span>
               )}
             </button>
           ))}

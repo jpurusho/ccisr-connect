@@ -49,6 +49,8 @@ import {
   FALLBACK_DEFAULTS,
   SUBJECT_FALLBACKS,
 } from "@/lib/template-defaults"
+import { HostFamilyInput } from "@/components/dashboard/communication-edit-forms"
+import { formatPhone } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -654,12 +656,22 @@ export default function TemplatesPage() {
                               )}
                             </div>
                             <div className="grid gap-2 sm:grid-cols-2">
-                              <Input
-                                placeholder="Host Names"
+                              <HostFamilyInput
                                 value={loc.hostNames}
-                                onChange={(e) => {
+                                onChange={(v) => {
                                   const locs = [...(bibleStudyData.locations || [])]
-                                  locs[i] = { ...locs[i], hostNames: e.target.value }
+                                  locs[i] = { ...locs[i], hostNames: v }
+                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
+                                }}
+                                onSelect={(f) => {
+                                  const locs = [...(bibleStudyData.locations || [])]
+                                  locs[i] = {
+                                    ...locs[i],
+                                    hostNames: `${f.family_name}'s Residence`,
+                                    address: f.full_address ?? locs[i].address,
+                                    city: [f.city, f.state, f.zip].filter(Boolean).join(", ") || locs[i].city,
+                                    phone: formatPhone(f.home_phone) || locs[i].phone,
+                                  }
                                   setBibleStudyData((prev) => ({ ...prev, locations: locs }))
                                 }}
                               />
@@ -697,7 +709,7 @@ export default function TemplatesPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            const locs = [...(bibleStudyData.locations || []), { label: "", hostNames: "", address: "", city: "", phone: "" }]
+                            const locs = [...(bibleStudyData.locations || []), { label: "", hostNames: "", address: "", city: "", phone: "", onVacation: false, vacationMessage: "" }]
                             setBibleStudyData((prev) => ({ ...prev, locations: locs }))
                           }}
                         >
