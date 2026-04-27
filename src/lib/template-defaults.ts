@@ -13,18 +13,22 @@ export interface ResourceLinkDefault {
   url: string
 }
 
-export interface BibleStudyDefaults {
-  title?: string
-  topic?: string
-  time?: string
+export interface CommonCardFields {
   message?: string
+  headerSubtitle?: string
   footerVerse?: string
   primaryColor?: string
   resourceLinks?: ResourceLinkDefault[]
+}
+
+export interface BibleStudyDefaults extends CommonCardFields {
+  title?: string
+  topic?: string
+  time?: string
   locations?: BibleStudyLocationDefault[]
 }
 
-export interface WomensStudyDefaults {
+export interface WomensStudyDefaults extends CommonCardFields {
   title?: string
   topic?: string
   time?: string
@@ -32,32 +36,45 @@ export interface WomensStudyDefaults {
   zoomMeetingId?: string
   zoomPasscode?: string
   location?: string
-  message?: string
-  footerVerse?: string
-  primaryColor?: string
-  resourceLinks?: ResourceLinkDefault[]
 }
 
-export interface BirthdayDefaults {
-  message?: string
-  footerVerse?: string
-  primaryColor?: string
-  resourceLinks?: ResourceLinkDefault[]
-}
+export interface BirthdayDefaults extends CommonCardFields {}
 
-export interface AnniversaryDefaults {
-  message?: string
-  footerVerse?: string
-  primaryColor?: string
-  resourceLinks?: ResourceLinkDefault[]
-}
+export interface AnniversaryDefaults extends CommonCardFields {}
 
-export interface BulletinDefaults {
+export interface BulletinDefaults extends CommonCardFields {
   events?: { title: string; details: string }[]
-  message?: string
-  primaryColor?: string
-  footerVerse?: string
-  resourceLinks?: ResourceLinkDefault[]
+}
+
+export interface PrayerMeetingDefaults extends CommonCardFields {
+  hostNames?: string
+  address?: string
+  city?: string
+  phone?: string
+  date?: string
+  time?: string
+  dinnerNote?: string
+  signupLink?: string
+}
+
+/**
+ * Extract common card fields from a defaults object with safe fallbacks.
+ * Eliminates the `(def as Record<string, unknown>).field as string ?? ""` pattern.
+ */
+export function extractCommonFields(def: CommonCardFields): {
+  message: string
+  headerSubtitle: string
+  primaryColor: string
+  footerVerse: string
+  resourceLinks: ResourceLinkDefault[]
+} {
+  return {
+    message: def.message ?? "",
+    headerSubtitle: def.headerSubtitle ?? "",
+    primaryColor: def.primaryColor ?? "",
+    footerVerse: def.footerVerse ?? "",
+    resourceLinks: (def.resourceLinks ?? []) as ResourceLinkDefault[],
+  }
 }
 
 export type TemplateDefaults =
@@ -66,6 +83,7 @@ export type TemplateDefaults =
   | { type: "friday_bible_study"; data: BibleStudyDefaults }
   | { type: "wednesday_womens_study"; data: WomensStudyDefaults }
   | { type: "bulletin"; data: BulletinDefaults }
+  | { type: "monthly_prayer"; data: PrayerMeetingDefaults }
 
 export function parseBodyTemplate(eventTypeName: string, bodyJson: string): TemplateDefaults | null {
   try {
@@ -81,6 +99,8 @@ export function parseBodyTemplate(eventTypeName: string, bodyJson: string): Temp
         return { type: "wednesday_womens_study", data: data as WomensStudyDefaults }
       case "bulletin":
         return { type: "bulletin", data: data as BulletinDefaults }
+      case "monthly_prayer":
+        return { type: "monthly_prayer", data: data as PrayerMeetingDefaults }
       default:
         return null
     }

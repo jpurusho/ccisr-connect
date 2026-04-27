@@ -30,8 +30,6 @@ import {
   buildBulletinCard,
   buildCustomCard,
   EVENT_COLORS,
-  type BirthdayEntry,
-  type AnniversaryEntry,
 } from "@/lib/email/card-builder"
 import { toast } from "sonner"
 import {
@@ -57,9 +55,11 @@ import { getUpcomingSunday, getBulletinWeekBounds } from "@/lib/date-utils"
 import {
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
+  extractCommonFields,
   type BibleStudyDefaults,
   type WomensStudyDefaults,
   type BulletinDefaults,
+  type CommonCardFields,
 } from "@/lib/template-defaults"
 
 // ---------------------------------------------------------------------------
@@ -92,13 +92,14 @@ import {
   HostFamilyInput,
   ResourceLinksEditor,
   CardStyleFields,
+  BirthdayEditForm,
+  AnniversaryEditForm,
   BibleStudyEditForm,
   WomensStudyEditForm,
   BulletinEditForm,
   type BirthdayFormData as BirthdayFormState,
   type AnniversaryFormData as AnniversaryFormState,
   type BibleStudyFormData as BibleStudyFormState,
-  type BibleStudyLocationData as BibleStudyLocationState,
   type WomensStudyFormData as WomensStudyFormState,
   type BulletinFormData as BulletinFormState,
 } from "@/components/dashboard/communication-edit-forms"
@@ -395,11 +396,7 @@ export default function ComposePage() {
           data: {
             weekLabel,
             birthdays: bdays,
-            message: (savedData.message as string) ?? "",
-            headerSubtitle: (savedData.headerSubtitle as string) ?? "",
-            primaryColor: (savedData.primaryColor as string) ?? "",
-            footerVerse: (savedData.footerVerse as string) ?? "",
-            resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
+            ...extractCommonFields(savedData as CommonCardFields),
           },
         })
         setSubject(`Happy Birthday! — Week of ${weekLabel}`)
@@ -426,11 +423,7 @@ export default function ComposePage() {
           data: {
             weekLabel,
             anniversaries: anns,
-            message: (savedData.message as string) ?? "",
-            headerSubtitle: (savedData.headerSubtitle as string) ?? "",
-            primaryColor: (savedData.primaryColor as string) ?? "",
-            footerVerse: (savedData.footerVerse as string) ?? "",
-            resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
+            ...extractCommonFields(savedData as CommonCardFields),
           },
         })
         setSubject(`Happy Anniversary! — Week of ${weekLabel}`)
@@ -493,6 +486,13 @@ export default function ComposePage() {
           return base
         })
 
+        const bsCommon = extractCommonFields(bsDef)
+        // Migrate legacy single-link format
+        if (bsCommon.resourceLinks.length === 0) {
+          const def = bsDef as Record<string, unknown>
+          const url = (def.resourceLinkUrl as string) ?? ""
+          if (url) bsCommon.resourceLinks = [{ label: (def.resourceLinkLabel as string) || "View Resources", url }]
+        }
         setFormState({
           type: "bible_study",
           data: {
@@ -500,18 +500,7 @@ export default function ComposePage() {
             date: format(fri, "EEEE, MMMM do"),
             time: instance?.instance_time ? formatTime(instance.instance_time) : bsDef.time ?? "7:30 PM",
             topic: bsDef.topic ?? fallbackBs.topic ?? "Studying the Book of Acts",
-            message: bsDef.message ?? "",
-            headerSubtitle: (bsDef as Record<string, unknown>).headerSubtitle as string ?? "",
-            primaryColor: bsDef.primaryColor ?? "",
-            footerVerse: bsDef.footerVerse ?? "",
-            resourceLinks: (() => {
-              const def = bsDef as Record<string, unknown>
-              const links = (def.resourceLinks ?? []) as { label: string; url: string }[]
-              if (links.length > 0) return links
-              const label = (def.resourceLinkLabel as string) ?? ""
-              const url = (def.resourceLinkUrl as string) ?? ""
-              return url ? [{ label: label || "View Resources", url }] : []
-            })(),
+            ...bsCommon,
             locations: mergedLocs,
           },
         })
@@ -520,22 +509,19 @@ export default function ComposePage() {
       }
 
       case "womens_study": {
+        const ws = savedData as WomensStudyDefaults
         setFormState({
           type: "womens_study",
           data: {
-            title: (savedData as WomensStudyDefaults).title ?? "Women's Bible Study",
-            topic: (savedData as WomensStudyDefaults).topic ?? "Building a Relationship with God",
+            title: ws.title ?? "Women's Bible Study",
+            topic: ws.topic ?? "Building a Relationship with God",
             date: format(addDays(monday, 2), "EEEE, MMMM do"),
-            time: (savedData as WomensStudyDefaults).time ?? "7:00 PM",
-            zoomLink: (savedData as WomensStudyDefaults).zoomLink ?? "",
-            zoomMeetingId: (savedData as WomensStudyDefaults).zoomMeetingId ?? "",
-            zoomPasscode: (savedData as WomensStudyDefaults).zoomPasscode ?? "",
-            location: (savedData as WomensStudyDefaults).location ?? "",
-            message: (savedData as WomensStudyDefaults).message ?? "",
-            headerSubtitle: (savedData as Record<string, unknown>).headerSubtitle as string ?? "",
-            primaryColor: (savedData as WomensStudyDefaults).primaryColor ?? "",
-            footerVerse: (savedData as WomensStudyDefaults).footerVerse ?? "",
-            resourceLinks: ((savedData as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
+            time: ws.time ?? "7:00 PM",
+            zoomLink: ws.zoomLink ?? "",
+            zoomMeetingId: ws.zoomMeetingId ?? "",
+            zoomPasscode: ws.zoomPasscode ?? "",
+            location: ws.location ?? "",
+            ...extractCommonFields(ws),
           },
         })
         setSubject("Women's Bible Study This Wednesday")
@@ -554,11 +540,7 @@ export default function ComposePage() {
             time: "6:30 PM",
             dinnerNote: "Dinner provided by the host family",
             signupLink: "",
-            message: (savedData.message as string) ?? "",
-            headerSubtitle: (savedData.headerSubtitle as string) ?? "",
-            primaryColor: (savedData.primaryColor as string) ?? "",
-            footerVerse: (savedData.footerVerse as string) ?? "",
-            resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
+            ...extractCommonFields(savedData as CommonCardFields),
           },
         })
         setSubject("Monthly Prayer Meeting")
@@ -617,11 +599,7 @@ export default function ComposePage() {
               { title: "Women's Bible Study", details: "Building a Relationship with God — Wednesdays @ 7:00 PM via Zoom" },
               { title: "San Ramon Bible Study", details: "Studying the Book of Acts — Friday at 7:30 PM" },
             ],
-            resourceLinks: (bulDef.resourceLinks ?? []) as { label: string; url: string }[],
-            message: bulDef.message ?? "",
-            headerSubtitle: (bulDef as Record<string, unknown>).headerSubtitle as string ?? "",
-            primaryColor: bulDef.primaryColor ?? "",
-            footerVerse: bulDef.footerVerse ?? "",
+            ...extractCommonFields(bulDef),
           },
         })
         setSubject(`Weekly Bulletin for Sunday ${format(bulSunday, "MMMM d, yyyy")}`)
@@ -1064,13 +1042,13 @@ export default function ComposePage() {
 
                   {/* Template-specific fields */}
                   {formState.type === "birthday" && (
-                    <BirthdayForm
+                    <BirthdayEditForm
                       data={formState.data}
                       onChange={(data) => updateForm("birthday", () => data)}
                     />
                   )}
                   {formState.type === "anniversary" && (
-                    <AnniversaryForm
+                    <AnniversaryEditForm
                       data={formState.data}
                       onChange={(data) => updateForm("anniversary", () => data)}
                     />
@@ -1257,10 +1235,9 @@ export default function ComposePage() {
 }
 
 // ===========================================================================
-// Sub-form components
+// Sub-form components (only template-specific forms that aren't shared)
 // ===========================================================================
 
-// Shared field wrapper for consistent spacing
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
@@ -1269,181 +1246,6 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; 
     </div>
   )
 }
-
-// ---------------------------------------------------------------------------
-// Birthday Form
-// ---------------------------------------------------------------------------
-
-function BirthdayForm({
-  data,
-  onChange,
-}: {
-  data: BirthdayFormState
-  onChange: (data: BirthdayFormState) => void
-}) {
-  function updateBirthday(index: number, field: keyof BirthdayEntry, value: string) {
-    const updated = [...data.birthdays]
-    updated[index] = { ...updated[index], [field]: value }
-    onChange({ ...data, birthdays: updated })
-  }
-
-  function removeBirthday(index: number) {
-    onChange({ ...data, birthdays: data.birthdays.filter((_, i) => i !== index) })
-  }
-
-  function addBirthday() {
-    onChange({ ...data, birthdays: [...data.birthdays, { name: "", date: "" }] })
-  }
-
-  return (
-    <div className="space-y-4">
-      <Field label="Week Label" htmlFor="bday-week">
-        <Input
-          id="bday-week"
-          value={data.weekLabel}
-          onChange={(e) => onChange({ ...data, weekLabel: e.target.value })}
-        />
-      </Field>
-
-      <div className="space-y-2">
-        <Label>Birthdays</Label>
-        {data.birthdays.map((b, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Input
-              placeholder="Name"
-              value={b.name}
-              onChange={(e) => updateBirthday(i, "name", e.target.value)}
-              className="flex-1"
-            />
-            <Input
-              placeholder="Date (e.g., 4/29)"
-              value={b.date}
-              onChange={(e) => updateBirthday(i, "date", e.target.value)}
-              className="w-28"
-            />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => removeBirthday(i)}
-            >
-              <Trash2 className="size-3.5 text-muted-foreground" />
-            </Button>
-          </div>
-        ))}
-        <Button variant="outline" size="sm" onClick={addBirthday}>
-          <Plus className="size-3.5" />
-          Add Birthday
-        </Button>
-      </div>
-
-      <Field label="Custom Message (optional)" htmlFor="bday-msg">
-        <Textarea
-          id="bday-msg"
-          placeholder="Leave blank for default message"
-          value={data.message}
-          onChange={(e) => onChange({ ...data, message: e.target.value })}
-        />
-      </Field>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Anniversary Form
-// ---------------------------------------------------------------------------
-
-function AnniversaryForm({
-  data,
-  onChange,
-}: {
-  data: AnniversaryFormState
-  onChange: (data: AnniversaryFormState) => void
-}) {
-  function updateAnniversary(index: number, field: keyof AnniversaryEntry, value: string | number | undefined) {
-    const updated = [...data.anniversaries]
-    updated[index] = { ...updated[index], [field]: value }
-    onChange({ ...data, anniversaries: updated })
-  }
-
-  function removeAnniversary(index: number) {
-    onChange({ ...data, anniversaries: data.anniversaries.filter((_, i) => i !== index) })
-  }
-
-  function addAnniversary() {
-    onChange({
-      ...data,
-      anniversaries: [...data.anniversaries, { husbandName: "", wifeName: "", date: "" }],
-    })
-  }
-
-  return (
-    <div className="space-y-4">
-      <Field label="Week Label" htmlFor="ann-week">
-        <Input
-          id="ann-week"
-          value={data.weekLabel}
-          onChange={(e) => onChange({ ...data, weekLabel: e.target.value })}
-        />
-      </Field>
-
-      <div className="space-y-2">
-        <Label>Anniversaries</Label>
-        {data.anniversaries.map((a, i) => (
-          <div key={i} className="flex flex-wrap items-center gap-2">
-            <Input
-              placeholder="Husband"
-              value={a.husbandName}
-              onChange={(e) => updateAnniversary(i, "husbandName", e.target.value)}
-              className="w-28 flex-1"
-            />
-            <Input
-              placeholder="Wife"
-              value={a.wifeName}
-              onChange={(e) => updateAnniversary(i, "wifeName", e.target.value)}
-              className="w-28 flex-1"
-            />
-            <Input
-              placeholder="Date"
-              value={a.date}
-              onChange={(e) => updateAnniversary(i, "date", e.target.value)}
-              className="w-20"
-            />
-            <Input
-              placeholder="Years"
-              type="number"
-              value={a.years ?? ""}
-              onChange={(e) =>
-                updateAnniversary(i, "years", e.target.value ? parseInt(e.target.value, 10) : undefined)
-              }
-              className="w-16"
-            />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => removeAnniversary(i)}
-            >
-              <Trash2 className="size-3.5 text-muted-foreground" />
-            </Button>
-          </div>
-        ))}
-        <Button variant="outline" size="sm" onClick={addAnniversary}>
-          <Plus className="size-3.5" />
-          Add Anniversary
-        </Button>
-      </div>
-
-      <Field label="Custom Message (optional)" htmlFor="ann-msg">
-        <Textarea
-          id="ann-msg"
-          placeholder="Leave blank for default message"
-          value={data.message}
-          onChange={(e) => onChange({ ...data, message: e.target.value })}
-        />
-      </Field>
-    </div>
-  )
-}
-
 
 // ---------------------------------------------------------------------------
 // Prayer Meeting Form

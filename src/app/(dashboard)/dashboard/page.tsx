@@ -64,11 +64,11 @@ import {
 import {
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
+  extractCommonFields,
   type BibleStudyDefaults,
   type WomensStudyDefaults,
-  type BirthdayDefaults,
-  type AnniversaryDefaults,
   type BulletinDefaults,
+  type CommonCardFields,
 } from "@/lib/template-defaults"
 import {
   BirthdayEditForm,
@@ -551,11 +551,14 @@ export default function DashboardPage() {
       }
 
       // Priority: composed instance > template defaults > hardcoded fallbacks
-      const bsDef = (composedMap.bible_study?.form_data ?? savedDefaults.friday_bible_study?.data ?? FALLBACK_DEFAULTS.friday_bible_study.data) as BibleStudyDefaults
-      const wsDef = (composedMap.womens_study?.form_data ?? savedDefaults.wednesday_womens_study?.data ?? FALLBACK_DEFAULTS.wednesday_womens_study.data) as WomensStudyDefaults
-      const bdDef = (composedMap.birthday?.form_data ?? savedDefaults.birthday?.data ?? {}) as BirthdayDefaults
-      const anDef = (composedMap.anniversary?.form_data ?? savedDefaults.anniversary?.data ?? {}) as AnniversaryDefaults
-      const bulDef = (composedMap.bulletin?.form_data ?? savedDefaults.bulletin?.data ?? FALLBACK_DEFAULTS.bulletin.data) as BulletinDefaults
+      const resolve = (ciKey: string, etKey: string, fallbackKey?: string): CommonCardFields & Record<string, unknown> =>
+        (composedMap[ciKey]?.form_data ?? savedDefaults[etKey]?.data ?? (fallbackKey ? FALLBACK_DEFAULTS[fallbackKey].data : {})) as CommonCardFields & Record<string, unknown>
+
+      const bsDef = resolve("bible_study", "friday_bible_study", "friday_bible_study") as BibleStudyDefaults
+      const wsDef = resolve("womens_study", "wednesday_womens_study", "wednesday_womens_study") as WomensStudyDefaults
+      const bdDef = resolve("birthday", "birthday") as CommonCardFields
+      const anDef = resolve("anniversary", "anniversary") as CommonCardFields
+      const bulDef = resolve("bulletin", "bulletin", "bulletin") as BulletinDefaults
 
       // ---- Stats ----
       const upcomingBirthdayCount = (birthdayCountRes.data ?? []).filter((m) =>
@@ -590,16 +593,14 @@ export default function DashboardPage() {
         .filter((m) => !m.is_active)
         .map((m) => `${m.full_name} (${m.birth_month}/${m.birth_day})`)
 
+      const bdCommon = extractCommonFields(bdDef)
       setBirthdayForm({
         weekLabel: wl,
         birthdays: bdayEntries,
+        ...bdCommon,
         message: inactiveBdays.length > 0
           ? `Note: Inactive members with birthdays this week: ${inactiveBdays.join(", ")}`
-          : bdDef.message ?? "",
-        headerSubtitle: (bdDef as Record<string, unknown>).headerSubtitle as string ?? "",
-        primaryColor: (bdDef as Record<string, unknown>).primaryColor as string ?? "",
-        footerVerse: (bdDef as Record<string, unknown>).footerVerse as string ?? "",
-        resourceLinks: ((bdDef as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
+          : bdCommon.message,
       })
 
       // ---- Process anniversaries (skip inactive families) ----
@@ -630,16 +631,14 @@ export default function DashboardPage() {
           : undefined,
       }))
 
+      const anCommon = extractCommonFields(anDef)
       setAnniversaryForm({
         weekLabel: wl,
         anniversaries: anniEntries,
+        ...anCommon,
         message: inactiveAnnis.length > 0
           ? `Note: ${inactiveAnnis.length} inactive family anniversar${inactiveAnnis.length > 1 ? "ies" : "y"} not shown`
-          : anDef.message ?? "",
-        headerSubtitle: (anDef as Record<string, unknown>).headerSubtitle as string ?? "",
-        primaryColor: (anDef as Record<string, unknown>).primaryColor as string ?? "",
-        footerVerse: (anDef as Record<string, unknown>).footerVerse as string ?? "",
-        resourceLinks: ((anDef as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
+          : anCommon.message,
       })
 
       // ---- Process Bible Study (multi-location) ----
@@ -697,6 +696,13 @@ export default function DashboardPage() {
         return base
       })
 
+      const bsCommon = extractCommonFields(bsDef)
+      // Migrate legacy single-link format
+      if (bsCommon.resourceLinks.length === 0) {
+        const def = bsDef as Record<string, unknown>
+        const url = (def.resourceLinkUrl as string) ?? ""
+        if (url) bsCommon.resourceLinks = [{ label: (def.resourceLinkLabel as string) || "View Resources", url }]
+      }
       setBibleStudyForm({
         title: bsDef.title ?? "Bible Study This Friday",
         date: format(fri, "EEEE, MMMM do"),
@@ -704,23 +710,13 @@ export default function DashboardPage() {
           ? formatTime(bsInstance.instance_time)
           : bsDef.time ?? "7:30 PM",
         topic: bsDef.topic ?? "Studying the Book of Acts",
-        message: bsDef.message ?? "",
-        headerSubtitle: (bsDef as Record<string, unknown>).headerSubtitle as string ?? "",
-        primaryColor: bsDef.primaryColor ?? "",
-        footerVerse: bsDef.footerVerse ?? "",
-        resourceLinks: (() => {
-          const def = bsDef as Record<string, unknown>
-          const links = (def.resourceLinks ?? []) as { label: string; url: string }[]
-          if (links.length > 0) return links
-          const label = (def.resourceLinkLabel as string) ?? ""
-          const url = (def.resourceLinkUrl as string) ?? ""
-          return url ? [{ label: label || "View Resources", url }] : []
-        })(),
+        ...bsCommon,
         locations: mergedLocs,
       })
 
       // ---- Women's Study ----
       const wed = addDays(bulSun, 3) // Wednesday of bulletin week
+      const wsCommon = extractCommonFields(wsDef)
       setWomensStudyForm({
         title: wsDef.title ?? "Women's Bible Study",
         topic: wsDef.topic ?? "Building a Relationship with God",
@@ -730,17 +726,14 @@ export default function DashboardPage() {
         zoomMeetingId: wsDef.zoomMeetingId ?? "",
         zoomPasscode: wsDef.zoomPasscode ?? "",
         location: wsDef.location ?? "",
-        message: wsDef.message ?? "",
-        headerSubtitle: (wsDef as Record<string, unknown>).headerSubtitle as string ?? "",
-        primaryColor: wsDef.primaryColor ?? "",
-        footerVerse: wsDef.footerVerse ?? "",
-        resourceLinks: ((wsDef as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
+        ...wsCommon,
       })
 
       // ---- Bulletin ----
       // Bulletin reuses the same Sun-Sat range already computed at top
       const bulEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
 
+      const bulCommon = extractCommonFields(bulDef)
       setBulletinForm({
         weekLabel: `Sunday ${format(bulSun, "MMMM d, yyyy")} — Week of ${wl}`,
         birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
@@ -750,11 +743,7 @@ export default function DashboardPage() {
         })),
         helpers: [],
         events: bulEvents,
-        resourceLinks: (bulDef.resourceLinks ?? []) as { label: string; url: string }[],
-        message: bulDef.message ?? "",
-        headerSubtitle: (bulDef as Record<string, unknown>).headerSubtitle as string ?? "",
-        primaryColor: bulDef.primaryColor ?? "",
-        footerVerse: bulDef.footerVerse ?? "",
+        ...bulCommon,
       })
 
       // ---- Mailing lists + SMTP configs ----
