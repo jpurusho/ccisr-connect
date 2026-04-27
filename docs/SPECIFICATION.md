@@ -388,14 +388,14 @@ users 1──* audit_log
 |----|------------|----------|
 | MEM-1 | Full CRUD on members. Add/edit/delete individual members. | P0 |
 | MEM-2 | Family grouping: members are organized into families. View family card showing all members (husband, wife, children), address, contact info. | P0 |
-| MEM-3 | Mark members/families as **active** or **inactive** (relocated). Inactive records are retained but hidden from default views. Toggle to show/hide inactive. | P0 |
+| MEM-3 | Mark members/families as **active** or **inactive** (relocated). Inactive records are retained but hidden from default views. Toggle to show/hide inactive. **Cascade rule:** deactivating a family excludes all its members from birthday cards, anniversary cards, and bulletin listings — even if individual member records are still marked active. A family's active status is the authoritative gate. | P0 |
 | MEM-4 | **Newcomer tracking**: flag new members, track acknowledgment status, date joined. Dedicated newcomer view/report. Auto-resolve newcomer flag after acknowledgment. | P1 |
 | MEM-5 | Search members by any field: name, phone, email, address, city. Full-text search. | P0 |
 | MEM-6 | Filter members by: active/inactive, city, family, has email, has birthday, newcomer status. | P0 |
 | MEM-7 | Sort members by: name, family, city, join date. | P0 |
 | MEM-8 | Multiple view styles: table/list view, card/grid view, family-grouped view. | P1 |
 | MEM-9 | Birthdays: store month/day (year optional). Display age only when year is known. | P0 |
-| MEM-10 | Anniversaries: stored per family (husband + wife). Month/day required, year optional. | P0 |
+| MEM-10 | Anniversaries: stored per family (husband + wife). Month/day required, year optional. Excluded from cards when the family is inactive. | P0 |
 | MEM-11 | Family count dashboard: total families, active families, total individuals, total children. | P0 |
 | MEM-12 | Export members to CSV/Excel. | P2 |
 | MEM-13 | Inline editing for quick updates (e.g., click phone number to edit). | P1 |
@@ -405,8 +405,8 @@ users 1──* audit_log
 
 | ID | Requirement | Priority |
 |----|------------|----------|
-| COM-1 | **Birthday cards**: auto-generate beautiful, color-coded cards for members with birthdays in the upcoming week. Preview before sending. | P0 |
-| COM-2 | **Anniversary cards**: same as birthday cards but different color scheme/template. | P0 |
+| COM-1 | **Birthday cards**: auto-generate beautiful, color-coded cards for members with birthdays in the upcoming week. Preview before sending. Members belonging to inactive families are excluded (family active status cascades). | P0 |
+| COM-2 | **Anniversary cards**: same as birthday cards but different color scheme/template. Excluded when the family is inactive or the husband member is inactive. | P0 |
 | COM-3 | **Friday Bible Study invitation**: weekly email with host family, address, phone, time. Content sourced from event_instances. | P0 |
 | COM-4 | **Wednesday Women's Bible Study notice**: weekly email with Zoom link, topic, time. | P0 |
 | COM-5 | **Monthly Prayer Meeting invitation**: email with host, address, phone, time, dinner details, signup link. | P0 |

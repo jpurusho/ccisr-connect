@@ -8,14 +8,14 @@ A full-featured church management application built with Next.js, Supabase, and 
 
 ### Membership Management
 - **Member Directory** — Add, edit, deactivate, or permanently delete members
-- **Family Grouping** — Organize members into families with family-level activate/deactivate
+- **Family Grouping** — Organize members into families with family-level activate/deactivate (cascades to exclude all members from birthday/anniversary cards and bulletin listings)
 - **Tags** — Custom color-coded tags (Newcomer, Bible Study, Youth, Volunteer, etc.)
 - **City Consolidation** — Smart normalization of city names for filtering
 - **Dedup Tool** — Find and resolve duplicate members by name, email, or phone
 - **Import/Export** — Import from vCard (.vcf), export filtered lists as styled PDF cards
 
 ### Communication Hub
-- **Weekly Cards** — Birthday, Anniversary, Bible Study, Women's Study, Bulletin
+- **Weekly Cards** — Birthday, Anniversary, Bible Study, Women's Study, Bulletin (inactive families automatically excluded)
 - **Multi-Location Bible Study** — San Ramon + Mountain House with vacation mode
 - **Template System** — Persistent defaults with theme colors, footer verses, resource links
 - **Custom Announcements** — Create one-off or reusable custom templates
