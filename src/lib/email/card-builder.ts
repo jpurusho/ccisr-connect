@@ -542,9 +542,8 @@ ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font
     ? `<div style="margin:16px 0 0;padding:12px 16px;background:${colors.bgLight};border-radius:8px;font-size:14px;color:${colors.textDark};line-height:1.6;white-space:pre-wrap">${data.message}</div>`
     : "";
 
-  const churchLine = data.headerSubtitle
-    ? `<p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.75);font-weight:500;text-transform:uppercase;letter-spacing:1px">${data.headerSubtitle}</p>`
-    : "";
+  const churchName = data.headerSubtitle || "Christ Church of India, San Ramon";
+  const churchLine = `<p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.75);font-weight:500;text-transform:uppercase;letter-spacing:1px">${churchName}</p>`;
 
   const bulletinHeader = `<tr><td style="background:${colors.primary};padding:24px 28px;text-align:center">
 <p style="margin:0;font-size:32px;line-height:1">⛪</p>

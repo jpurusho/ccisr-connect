@@ -406,12 +406,13 @@ export default function ComposePage() {
       case "anniversary": {
         const { data } = await supabase
           .from("wedding_anniversaries")
-          .select("anniversary_month, anniversary_day, husband:members!husband_member_id(full_name), wife:members!wife_member_id(full_name)")
+          .select("anniversary_month, anniversary_day, family:families!family_id(is_active), husband:members!husband_member_id(full_name, is_active), wife:members!wife_member_id(full_name, is_active)")
           .in("anniversary_month", weekMonths)
-          .returns<{ anniversary_month: number; anniversary_day: number; husband: { full_name: string } | null; wife: { full_name: string } | null }[]>()
+          .returns<{ anniversary_month: number; anniversary_day: number; family: { is_active: boolean } | null; husband: { full_name: string; is_active: boolean } | null; wife: { full_name: string; is_active: boolean } | null }[]>()
 
         const anns = (data ?? [])
           .filter((a) => weekSet.has(`${a.anniversary_month}-${a.anniversary_day}`))
+          .filter((a) => a.family?.is_active !== false && a.husband?.is_active !== false)
           .map((a) => ({
             husbandName: a.husband?.full_name?.split(" ")[0] ?? "?",
             wifeName: a.wife?.full_name?.split(" ")[0] ?? "?",
@@ -570,9 +571,9 @@ export default function ComposePage() {
             .returns<{ full_name: string; birth_month: number; birth_day: number }[]>(),
           supabase
             .from("wedding_anniversaries")
-            .select("anniversary_month, anniversary_day, husband:members!husband_member_id(full_name), wife:members!wife_member_id(full_name)")
+            .select("anniversary_month, anniversary_day, family:families!family_id(is_active), husband:members!husband_member_id(full_name, is_active), wife:members!wife_member_id(full_name, is_active)")
             .in("anniversary_month", bulMonths)
-            .returns<{ anniversary_month: number; anniversary_day: number; husband: { full_name: string } | null; wife: { full_name: string } | null }[]>(),
+            .returns<{ anniversary_month: number; anniversary_day: number; family: { is_active: boolean } | null; husband: { full_name: string; is_active: boolean } | null; wife: { full_name: string; is_active: boolean } | null }[]>(),
         ])
 
         const bdays = (bdayRes.data ?? [])
@@ -581,6 +582,7 @@ export default function ComposePage() {
 
         const anns = (annRes.data ?? [])
           .filter((a) => bulSet.has(`${a.anniversary_month}-${a.anniversary_day}`))
+          .filter((a) => a.family?.is_active !== false && a.husband?.is_active !== false)
           .map((a) => ({
             names: `${a.husband?.full_name?.split(" ")[0] ?? "?"} & ${a.wife?.full_name?.split(" ")[0] ?? "?"}`,
             date: `${a.anniversary_month}/${a.anniversary_day}`,
