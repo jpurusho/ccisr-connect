@@ -13,7 +13,7 @@ import { Phone, Mail, MapPin } from "lucide-react"
 type MemberWithFamily = Member & {
   families:
     | (Pick<Family, "family_name"> & {
-        addresses: Pick<Address, "city" | "is_current">[]
+        addresses: Pick<Address, "city" | "full_address" | "is_current">[]
       })
     | null
   member_tags?: { tags: { id: string; name: string; color: string } | null }[]
@@ -41,7 +41,7 @@ export function MembersCardView({ searchQuery, filter, cityFilter }: MembersCard
       const supabase = createClient()
       const { data, error } = await supabase
         .from("members")
-        .select("*, families(family_name, addresses(city, is_current)), member_tags(tags(id, name, color))")
+        .select("*, families(family_name, addresses(city, full_address, is_current)), member_tags(tags(id, name, color))")
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true })
 
@@ -149,12 +149,16 @@ export function MembersCardView({ searchQuery, filter, cityFilter }: MembersCard
                   <span className="truncate">{member.email}</span>
                 </div>
               )}
-              {getMemberCity(member) !== "Unknown" && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="size-3.5 shrink-0" />
-                  <span>{getMemberCity(member)}</span>
-                </div>
-              )}
+              {(() => {
+                const addr = member.families?.addresses?.find((a) => a.is_current)
+                const display = addr?.full_address || (getMemberCity(member) !== "Unknown" ? getMemberCity(member) : null)
+                return display ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="size-3.5 shrink-0" />
+                    <span className="truncate">{display}</span>
+                  </div>
+                ) : null
+              })()}
               <div className="pt-1">
                 <Badge variant="secondary" className="capitalize">
                   {member.role_in_family}

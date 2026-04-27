@@ -19,10 +19,11 @@ import { MembersCardView } from "@/components/members/members-card-view"
 import { FamilyView } from "@/components/members/family-view"
 import { MemberFormDialog } from "@/components/members/member-form-dialog"
 import type { Tag } from "@/types/database"
-import { Plus, Search, LayoutGrid, Table2, Users, Download, Upload, Merge } from "lucide-react"
+import { Plus, Search, LayoutGrid, Table2, Users, Download, Upload, Merge, GitMerge } from "lucide-react"
 import { MemberExportDialog } from "@/components/members/member-export"
 import { MemberImportDialog } from "@/components/members/member-import"
 import { MemberDedupDialog } from "@/components/members/member-dedup"
+import { FamilyMergeDialog } from "@/components/members/family-merge"
 
 type FilterValue = "all" | "active" | "inactive" | "newcomers"
 
@@ -56,6 +57,7 @@ function MembersPageContent() {
   const [exportOpen, setExportOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [dedupOpen, setDedupOpen] = useState(false)
+  const [familyMergeOpen, setFamilyMergeOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const defaultView = searchParams.get("view") || "table"
 
@@ -112,7 +114,10 @@ function MembersPageContent() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setDedupOpen(true)} title="Find duplicates">
+          <Button variant="outline" onClick={() => setFamilyMergeOpen(true)} title="Merge duplicate families">
+            <GitMerge className="size-4" />
+          </Button>
+          <Button variant="outline" onClick={() => setDedupOpen(true)} title="Find duplicate members">
             <Merge className="size-4" />
           </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
@@ -258,6 +263,13 @@ function MembersPageContent() {
       <MemberFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        onSuccess={handleSuccess}
+      />
+
+      {/* Family Merge Dialog */}
+      <FamilyMergeDialog
+        open={familyMergeOpen}
+        onOpenChange={setFamilyMergeOpen}
         onSuccess={handleSuccess}
       />
 

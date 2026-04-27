@@ -75,6 +75,13 @@ export function MemberFormDialog({
   const [isNewcomer, setIsNewcomer] = useState(false)
   const [notes, setNotes] = useState("")
 
+  // Address (family-level)
+  const [street, setStreet] = useState("")
+  const [city, setCity] = useState("")
+  const [addrState, setAddrState] = useState("")
+  const [zip, setZip] = useState("")
+  const [homePhone, setHomePhone] = useState("")
+
   // Tags
   const [availableTags, setAvailableTags] = useState<Tag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set())
@@ -103,6 +110,31 @@ export function MemberFormDialog({
     }
   }, [open, fetchFamilies])
 
+  async function loadFamilyAddress(fId: string) {
+    const supabase = createClient()
+    const [addrRes, famRes] = await Promise.all([
+      supabase
+        .from("addresses")
+        .select("street, city, state, zip")
+        .eq("family_id", fId)
+        .eq("is_current", true)
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("families")
+        .select("home_phone")
+        .eq("id", fId)
+        .single(),
+    ])
+    const addr = addrRes.data as { street: string | null; city: string | null; state: string | null; zip: string | null } | null
+    setStreet(addr?.street ?? "")
+    setCity(addr?.city ?? "")
+    setAddrState(addr?.state ?? "")
+    setZip(addr?.zip ?? "")
+    const fam = famRes.data as { home_phone: string | null } | null
+    setHomePhone(fam?.home_phone ?? "")
+  }
+
   // Pre-fill form when editing — only after families are loaded
   useEffect(() => {
     if (open && member && !loadingFamilies) {
@@ -120,6 +152,7 @@ export function MemberFormDialog({
       setIsActive(member.is_active)
       setIsNewcomer(member.is_newcomer)
       setNotes(member.notes ?? "")
+      loadFamilyAddress(member.family_id)
       // Fetch current tags for this member
       const supabase = createClient()
       supabase
@@ -145,6 +178,11 @@ export function MemberFormDialog({
       setIsActive(true)
       setIsNewcomer(false)
       setNotes("")
+      setStreet("")
+      setCity("")
+      setAddrState("")
+      setZip("")
+      setHomePhone("")
       setSelectedTagIds(new Set())
     }
   }, [open, member, loadingFamilies])
@@ -243,6 +281,53 @@ export function MemberFormDialog({
         }
         toast.success("Member created successfully.")
         logAudit("member_created", "members", null, { name: fullName })
+      }
+
+      // Save address and home phone for the family
+      if (resolvedFamilyId) {
+        const hasAddress = street.trim() || city.trim() || addrState.trim() || zip.trim()
+        if (hasAddress) {
+          const fullAddress = [street.trim(), city.trim(), addrState.trim(), zip.trim()].filter(Boolean).join(", ")
+          const { data: existingAddr } = await supabase
+            .from("addresses")
+            .select("id")
+            .eq("family_id", resolvedFamilyId)
+            .eq("is_current", true)
+            .limit(1)
+            .maybeSingle()
+
+          if (existingAddr) {
+            await supabase
+              .from("addresses")
+              .update({
+                street: street.trim() || null,
+                city: city.trim() || null,
+                state: addrState.trim() || null,
+                zip: zip.trim() || null,
+                full_address: fullAddress || null,
+              } as never)
+              .eq("id", (existingAddr as { id: string }).id)
+          } else {
+            await supabase
+              .from("addresses")
+              .insert({
+                family_id: resolvedFamilyId,
+                street: street.trim() || null,
+                city: city.trim() || null,
+                state: addrState.trim() || null,
+                zip: zip.trim() || null,
+                full_address: fullAddress || null,
+                is_current: true,
+              } as never)
+          }
+        }
+
+        if (homePhone.trim()) {
+          await supabase
+            .from("families")
+            .update({ home_phone: homePhone.trim() } as never)
+            .eq("id", resolvedFamilyId)
+        }
       }
 
       // Sync tags
@@ -345,7 +430,11 @@ export function MemberFormDialog({
             ) : (
               <Select
                 value={familyId ?? undefined}
-                onValueChange={(val) => setFamilyId(val as string)}
+                onValueChange={(val) => {
+                  const fId = val as string
+                  setFamilyId(fId)
+                  loadFamilyAddress(fId)
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a family">
@@ -409,6 +498,58 @@ export function MemberFormDialog({
                 data-1p-ignore
               />
             </div>
+          </div>
+
+          {/* Address (family-level) */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Family Address</Label>
+            <Input
+              value={street}
+              onChange={(e) => setStreet(e.target.value)}
+              placeholder="Street address"
+              autoComplete="off"
+              data-1p-ignore
+            />
+            <div className="grid grid-cols-6 gap-2">
+              <Input
+                className="col-span-3"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="City"
+                autoComplete="off"
+                data-1p-ignore
+              />
+              <Input
+                className="col-span-1"
+                value={addrState}
+                onChange={(e) => setAddrState(e.target.value)}
+                placeholder="State"
+                autoComplete="off"
+                data-1p-ignore
+              />
+              <Input
+                className="col-span-2"
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
+                placeholder="Zip"
+                autoComplete="off"
+                data-1p-ignore
+              />
+            </div>
+          </div>
+
+          {/* Home phone (family-level) */}
+          <div className="space-y-1.5">
+            <Label htmlFor="homePhone">Home phone</Label>
+            <Input
+              id="homePhone"
+              type="tel"
+              value={homePhone}
+              onChange={(e) => setHomePhone(e.target.value)}
+              placeholder="(555) 123-4567"
+              autoComplete="off"
+              data-1p-ignore
+            />
           </div>
 
           {/* Birthday */}
