@@ -380,15 +380,15 @@ export default function ComposePage() {
       case "birthday": {
         const { data } = await supabase
           .from("members")
-          .select("full_name, birth_month, birth_day")
+          .select("full_name, birth_month, birth_day, family:families!family_id(is_active)")
           .eq("is_active", true)
           .not("birth_month", "is", null)
           .not("birth_day", "is", null)
           .in("birth_month", weekMonths)
-          .returns<{ full_name: string; birth_month: number; birth_day: number }[]>()
+          .returns<{ full_name: string; birth_month: number; birth_day: number; family: { is_active: boolean } | null }[]>()
 
         const bdays = (data ?? [])
-          .filter((m) => weekSet.has(`${m.birth_month}-${m.birth_day}`))
+          .filter((m) => weekSet.has(`${m.birth_month}-${m.birth_day}`) && m.family?.is_active !== false)
           .map((m) => ({ name: m.full_name, date: `${m.birth_month}/${m.birth_day}` }))
 
         setFormState({
@@ -564,11 +564,11 @@ export default function ComposePage() {
         const [bdayRes, annRes] = await Promise.all([
           supabase
             .from("members")
-            .select("full_name, birth_month, birth_day")
+            .select("full_name, birth_month, birth_day, family:families!family_id(is_active)")
             .eq("is_active", true)
             .not("birth_month", "is", null)
             .in("birth_month", bulMonths)
-            .returns<{ full_name: string; birth_month: number; birth_day: number }[]>(),
+            .returns<{ full_name: string; birth_month: number; birth_day: number; family: { is_active: boolean } | null }[]>(),
           supabase
             .from("wedding_anniversaries")
             .select("anniversary_month, anniversary_day, family:families!family_id(is_active), husband:members!husband_member_id(full_name, is_active), wife:members!wife_member_id(full_name, is_active)")
@@ -577,7 +577,7 @@ export default function ComposePage() {
         ])
 
         const bdays = (bdayRes.data ?? [])
-          .filter((m) => bulSet.has(`${m.birth_month}-${m.birth_day}`))
+          .filter((m) => bulSet.has(`${m.birth_month}-${m.birth_day}`) && m.family?.is_active !== false)
           .map((m) => ({ name: m.full_name, date: `${m.birth_month}/${m.birth_day}` }))
 
         const anns = (annRes.data ?? [])

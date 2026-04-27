@@ -386,20 +386,20 @@ export default function DashboardPage() {
           .select("id", { count: "exact", head: true })
           .in("status", ["pending", "previewed", "approved"]),
 
-        // Birthday count (next 7 days)
+        // Birthday count (next 7 days) — exclude inactive families
         supabase
           .from("members")
-          .select("birth_month, birth_day")
+          .select("birth_month, birth_day, family:families!family_id(is_active)")
           .eq("is_active", true)
           .not("birth_month", "is", null)
           .not("birth_day", "is", null)
           .in("birth_month", next7Months)
-          .returns<{ birth_month: number; birth_day: number }[]>(),
+          .returns<{ birth_month: number; birth_day: number; family: { is_active: boolean } | null }[]>(),
 
         // This week birthdays (include inactive for dimmed display)
         supabase
           .from("members")
-          .select("id, full_name, birth_month, birth_day, is_active")
+          .select("id, full_name, birth_month, birth_day, is_active, family:families!family_id(is_active)")
           .not("birth_month", "is", null)
           .not("birth_day", "is", null)
           .in("birth_month", weekMonths)
@@ -410,6 +410,7 @@ export default function DashboardPage() {
               birth_month: number
               birth_day: number
               is_active: boolean
+              family: { is_active: boolean } | null
             }[]
           >(),
 
@@ -562,7 +563,7 @@ export default function DashboardPage() {
 
       // ---- Stats ----
       const upcomingBirthdayCount = (birthdayCountRes.data ?? []).filter((m) =>
-        next7Set.has(`${m.birth_month}-${m.birth_day}`)
+        next7Set.has(`${m.birth_month}-${m.birth_day}`) && m.family?.is_active !== false
       ).length
 
       setStats({
@@ -573,24 +574,30 @@ export default function DashboardPage() {
       })
 
       // ---- Process birthdays (active first, inactive dimmed) ----
+      // A member is considered inactive if they or their family is inactive
+      const isActiveMember = (m: { is_active: boolean; family: { is_active: boolean } | null }) =>
+        m.is_active && m.family?.is_active !== false
+
       const bdays = (weekBirthdaysRes.data ?? [])
         .filter((m) => weekSet.has(`${m.birth_month}-${m.birth_day}`))
         .sort((a, b) => {
-          if (a.is_active !== b.is_active) return a.is_active ? -1 : 1
+          const aActive = isActiveMember(a)
+          const bActive = isActiveMember(b)
+          if (aActive !== bActive) return aActive ? -1 : 1
           return a.birth_month !== b.birth_month
             ? a.birth_month - b.birth_month
             : a.birth_day - b.birth_day
         })
 
       const bdayEntries: BirthdayEntry[] = bdays
-        .filter((m) => m.is_active)
+        .filter(isActiveMember)
         .map((m) => ({
           name: m.full_name,
           date: `${m.birth_month}/${m.birth_day}`,
         }))
 
       const inactiveBdays = bdays
-        .filter((m) => !m.is_active)
+        .filter((m) => !isActiveMember(m))
         .map((m) => `${m.full_name} (${m.birth_month}/${m.birth_day})`)
 
       const bdCommon = extractCommonFields(bdDef)
