@@ -38,7 +38,9 @@ export default function MembersPage() {
 function MembersPageContent() {
   const searchParams = useSearchParams()
   const [stats, setStats] = useState<{
-    total: number; active: number; inactive: number; families: number; children: number
+    total: number; active: number; inactive: number
+    families: number; familiesActive: number; familiesInactive: number
+    children: number; childrenActive: number; childrenInactive: number
   } | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<FilterValue>(
@@ -65,19 +67,31 @@ function MembersPageContent() {
 
   const fetchStats = useCallback(async () => {
     const supabase = createClient()
-    const [totalRes, activeRes, inactiveRes, familiesRes, childrenRes] = await Promise.all([
+    const [
+      totalRes, activeRes, inactiveRes,
+      familiesRes, familiesActiveRes, familiesInactiveRes,
+      childrenRes, childrenActiveRes, childrenInactiveRes,
+    ] = await Promise.all([
       supabase.from("members").select("*", { count: "exact", head: true }),
       supabase.from("members").select("*", { count: "exact", head: true }).eq("is_active", true),
       supabase.from("members").select("*", { count: "exact", head: true }).eq("is_active", false),
+      supabase.from("families").select("*", { count: "exact", head: true }),
       supabase.from("families").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("families").select("*", { count: "exact", head: true }).eq("is_active", false),
       supabase.from("members").select("*", { count: "exact", head: true }).eq("role_in_family", "child"),
+      supabase.from("members").select("*", { count: "exact", head: true }).eq("role_in_family", "child").eq("is_active", true),
+      supabase.from("members").select("*", { count: "exact", head: true }).eq("role_in_family", "child").eq("is_active", false),
     ])
     setStats({
       total: totalRes.count ?? 0,
       active: activeRes.count ?? 0,
       inactive: inactiveRes.count ?? 0,
-      families: familiesRes.count ?? 0,
+      families: (familiesRes.count ?? 0),
+      familiesActive: familiesActiveRes.count ?? 0,
+      familiesInactive: familiesInactiveRes.count ?? 0,
       children: childrenRes.count ?? 0,
+      childrenActive: childrenActiveRes.count ?? 0,
+      childrenInactive: childrenInactiveRes.count ?? 0,
     })
   }, [])
 
@@ -149,12 +163,12 @@ function MembersPageContent() {
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {([
-            { label: "Families", value: stats.families, icon: Home, color: "text-blue-600 dark:text-blue-400", filterKey: "families" as const },
+            { label: "Families", value: stats.families, sub: `${stats.familiesActive} active / ${stats.familiesInactive} inactive`, icon: Home, color: "text-blue-600 dark:text-blue-400", filterKey: "families" as const },
             { label: "Active", value: stats.active, icon: UserCheck, color: "text-green-600 dark:text-green-400", filterKey: "active" as const },
             { label: "Inactive", value: stats.inactive, icon: UserX, color: "text-gray-500", filterKey: "inactive" as const },
-            { label: "Children", value: stats.children, icon: Baby, color: "text-purple-600 dark:text-purple-400", filterKey: "children" as const },
+            { label: "Children", value: stats.children, sub: `${stats.childrenActive} active / ${stats.childrenInactive} inactive`, icon: Baby, color: "text-purple-600 dark:text-purple-400", filterKey: "children" as const },
             { label: "Total", value: stats.total, icon: Users, color: "text-foreground", filterKey: "all" as const },
-          ] as const).map((s) => {
+          ]).map((s) => {
             const isActive = s.filterKey === "families"
               ? viewTab === "family" && filter === "all"
               : filter === s.filterKey && viewTab !== "family"
@@ -181,6 +195,7 @@ function MembersPageContent() {
                 <div className="min-w-0">
                   <p className="text-lg font-semibold leading-tight">{s.value}</p>
                   <p className="text-[11px] text-muted-foreground">{s.label}</p>
+                  {s.sub && <p className="text-[10px] text-muted-foreground/70">{s.sub}</p>}
                 </div>
               </button>
             )

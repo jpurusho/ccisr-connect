@@ -532,7 +532,8 @@ ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font
 
   const content =
     headerRow("Weekly Bulletin", data.weekLabel, "⛪", colors) +
-    contentRow(sections, colors) +
+    contentRow(`${sections}
+${resourceLinksHtml(data.resourceLinks, colors)}`, colors) +
     footerRow(
       data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect",
       colors
@@ -551,6 +552,7 @@ export interface CustomCardData {
   footerText?: string;
   primaryColor?: string;
   colorScheme?: string;
+  resourceLinks?: ResourceLink[];
 }
 
 export function buildCustomCard(data: CustomCardData): string {
@@ -560,7 +562,8 @@ export function buildCustomCard(data: CustomCardData): string {
 
   const content =
     headerRow(data.title, data.subtitle || "Christ Church of India, San Ramon", data.emoji || "📋", colors) +
-    contentRow(data.bodyHtml, colors) +
+    contentRow(`${data.bodyHtml}
+${resourceLinksHtml(data.resourceLinks, colors)}`, colors) +
     footerRow(
       data.footerText || "Christ Church of India, San Ramon — CCISR Connect",
       colors

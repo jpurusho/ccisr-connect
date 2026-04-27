@@ -141,6 +141,122 @@ function Field({
 }
 
 // ---------------------------------------------------------------------------
+// Shared: Resource Links Editor
+// ---------------------------------------------------------------------------
+
+export interface ResourceLinkItem {
+  label: string
+  url: string
+}
+
+function ResourceLinksEditor({
+  links,
+  onChange,
+}: {
+  links: ResourceLinkItem[]
+  onChange: (links: ResourceLinkItem[]) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>Links</Label>
+      {links.map((link, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <Input
+            placeholder="Label (e.g., Study Materials)"
+            value={link.label}
+            onChange={(e) => {
+              const updated = [...links]
+              updated[i] = { ...updated[i], label: e.target.value }
+              onChange(updated)
+            }}
+            className="w-40"
+          />
+          <Input
+            placeholder="https://..."
+            value={link.url}
+            onChange={(e) => {
+              const updated = [...links]
+              updated[i] = { ...updated[i], url: e.target.value }
+              onChange(updated)
+            }}
+            className="flex-1"
+          />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onChange(links.filter((_, j) => j !== i))}
+          >
+            <Trash2 className="size-3.5 text-muted-foreground" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={() => onChange([...links, { label: "", url: "" }])}>
+        <Plus className="size-3.5" />
+        Add Link
+      </Button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Shared: Card Style Fields (message, footer verse, primary color)
+// ---------------------------------------------------------------------------
+
+interface CardStyleFieldsData {
+  message: string
+  primaryColor: string
+  footerVerse: string
+}
+
+function CardStyleFields<T extends CardStyleFieldsData>({
+  data,
+  onChange,
+  idPrefix,
+}: {
+  data: T
+  onChange: (data: T) => void
+  idPrefix: string
+}) {
+  return (
+    <>
+      <Field label="Custom Message (optional)" htmlFor={`${idPrefix}-msg`}>
+        <Textarea
+          id={`${idPrefix}-msg`}
+          placeholder="Leave blank for default"
+          value={data.message}
+          onChange={(e) => onChange({ ...data, message: e.target.value })}
+          className="min-h-12"
+        />
+      </Field>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Field label="Footer Verse / Text" htmlFor={`${idPrefix}-fv`}>
+          <Input
+            id={`${idPrefix}-fv`}
+            value={data.footerVerse}
+            onChange={(e) => onChange({ ...data, footerVerse: e.target.value })}
+            placeholder="Christ Church of India, San Ramon"
+          />
+        </Field>
+        <Field label="Primary Color" htmlFor={`${idPrefix}-color`}>
+          <div className="flex items-center gap-2">
+            <Input
+              id={`${idPrefix}-color`}
+              value={data.primaryColor}
+              onChange={(e) => onChange({ ...data, primaryColor: e.target.value })}
+              placeholder="#4F46E5"
+              className="flex-1"
+            />
+            {data.primaryColor && (
+              <span className="size-6 rounded-md border" style={{ backgroundColor: data.primaryColor }} />
+            )}
+          </div>
+        </Field>
+      </div>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Birthday Edit Form (inline)
 // ---------------------------------------------------------------------------
 
@@ -362,8 +478,7 @@ export interface BibleStudyFormData {
   message: string
   primaryColor: string
   footerVerse: string
-  resourceLinkLabel: string
-  resourceLinkUrl: string
+  resourceLinks: { label: string; url: string }[]
   locations: BibleStudyLocationData[]
 }
 
@@ -520,34 +635,11 @@ export function BibleStudyEditForm({
         </Button>
       </div>
 
-      <Field label="Custom Message (optional)" htmlFor="bs-i-msg">
-        <Textarea
-          id="bs-i-msg"
-          placeholder="Leave blank for default"
-          value={data.message}
-          onChange={(e) => set("message", e.target.value)}
-          className="min-h-12"
-        />
-      </Field>
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Field label="Resource Link Label" htmlFor="bs-i-rll">
-          <Input
-            id="bs-i-rll"
-            value={data.resourceLinkLabel}
-            onChange={(e) => set("resourceLinkLabel", e.target.value)}
-            placeholder="e.g., Study Materials"
-          />
-        </Field>
-        <Field label="Resource Link URL" htmlFor="bs-i-rlu">
-          <Input
-            id="bs-i-rlu"
-            value={data.resourceLinkUrl}
-            onChange={(e) => set("resourceLinkUrl", e.target.value)}
-            placeholder="https://drive.google.com/..."
-          />
-        </Field>
-      </div>
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
+      <CardStyleFields data={data} onChange={onChange} idPrefix="bs-i" />
     </div>
   )
 }
@@ -568,6 +660,7 @@ export interface WomensStudyFormData {
   message: string
   primaryColor: string
   footerVerse: string
+  resourceLinks: { label: string; url: string }[]
 }
 
 export function WomensStudyEditForm({
@@ -655,15 +748,11 @@ export function WomensStudyEditForm({
           placeholder="e.g., Fellowship Hall"
         />
       </Field>
-      <Field label="Custom Message (optional)" htmlFor="ws-i-msg">
-        <Textarea
-          id="ws-i-msg"
-          placeholder="Leave blank for default"
-          value={data.message}
-          onChange={(e) => set("message", e.target.value)}
-          className="min-h-12"
-        />
-      </Field>
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
+      <CardStyleFields data={data} onChange={onChange} idPrefix="ws-i" />
     </div>
   )
 }
@@ -678,6 +767,10 @@ export interface BulletinFormData {
   anniversaries: { names: string; date: string }[]
   helpers: { role: string; name: string }[]
   events: { title: string; details: string }[]
+  resourceLinks: { label: string; url: string }[]
+  message: string
+  primaryColor: string
+  footerVerse: string
   weeksAhead?: number
 }
 
@@ -877,6 +970,12 @@ export function BulletinEditForm({
           Add Event
         </Button>
       </div>
+
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
+      <CardStyleFields data={data} onChange={onChange} idPrefix="bul-i" />
     </div>
   )
 }

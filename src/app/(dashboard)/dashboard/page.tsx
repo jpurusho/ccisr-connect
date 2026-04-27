@@ -232,8 +232,7 @@ export default function DashboardPage() {
     message: "",
     primaryColor: "",
     footerVerse: "",
-    resourceLinkLabel: "",
-    resourceLinkUrl: "",
+    resourceLinks: [],
     locations: [
       { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
       { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
@@ -251,6 +250,7 @@ export default function DashboardPage() {
     message: "",
     primaryColor: "",
     footerVerse: "",
+    resourceLinks: [],
   })
   const [bulletinForm, setBulletinForm] = useState<BulletinFormData>({
     weekLabel: "",
@@ -258,6 +258,10 @@ export default function DashboardPage() {
     anniversaries: [],
     helpers: [],
     events: [],
+    resourceLinks: [],
+    message: "",
+    primaryColor: "",
+    footerVerse: "",
   })
 
   // ---- Custom subject overrides ----
@@ -474,12 +478,13 @@ export default function DashboardPage() {
           .select("id, name")
           .returns<{ id: string; name: string }[]>(),
 
-        // Composed instances (persisted from Compose page)
+        // Composed instances for this week: exact match, recurring that covers this week, or legacy (no week_start)
         supabase
           .from("composed_instances")
-          .select("template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients")
+          .select("template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until")
           .eq("is_active", true)
-          .returns<{ template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null }[]>(),
+          .or(`week_start.eq.${format(bulSun, "yyyy-MM-dd")},week_start.is.null,and(is_recurring.eq.true,week_start.lte.${format(bulSun, "yyyy-MM-dd")})`)
+          .returns<{ template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null }[]>(),
       ])
 
       // Check errors
@@ -517,10 +522,20 @@ export default function DashboardPage() {
       }
 
       // Build composed instances map (template_type → data)
-      const composedMap: Record<string, { form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null }> = {}
+      // Priority: exact week match > recurring (filter expired) > legacy (null week_start)
+      const weekStr = format(bulSun, "yyyy-MM-dd")
+      type CIRow = (typeof composedInstancesRes.data extends (infer U)[] | null ? U : never)
+      const composedMap: Record<string, CIRow> = {}
       if (composedInstancesRes.data) {
         for (const ci of composedInstancesRes.data) {
-          composedMap[ci.template_type] = ci
+          if (ci.is_recurring && ci.recur_until && ci.recur_until < weekStr) continue
+          const existing = composedMap[ci.template_type]
+          if (!existing) {
+            composedMap[ci.template_type] = ci
+          } else {
+            const rank = (c: CIRow) => c.week_start === weekStr ? 2 : c.is_recurring ? 1 : 0
+            if (rank(ci) > rank(existing)) composedMap[ci.template_type] = ci
+          }
         }
       }
 
@@ -529,7 +544,7 @@ export default function DashboardPage() {
       const wsDef = (composedMap.womens_study?.form_data ?? savedDefaults.wednesday_womens_study?.data ?? FALLBACK_DEFAULTS.wednesday_womens_study.data) as WomensStudyDefaults
       const bdDef = (composedMap.birthday?.form_data ?? savedDefaults.birthday?.data ?? {}) as BirthdayDefaults
       const anDef = (composedMap.anniversary?.form_data ?? savedDefaults.anniversary?.data ?? {}) as AnniversaryDefaults
-      const bulDef = (savedDefaults.bulletin?.data ?? FALLBACK_DEFAULTS.bulletin.data) as BulletinDefaults
+      const bulDef = (composedMap.bulletin?.form_data ?? savedDefaults.bulletin?.data ?? FALLBACK_DEFAULTS.bulletin.data) as BulletinDefaults
 
       // ---- Stats ----
       const upcomingBirthdayCount = (birthdayCountRes.data ?? []).filter((m) =>
@@ -673,8 +688,14 @@ export default function DashboardPage() {
         message: bsDef.message ?? "",
         primaryColor: bsDef.primaryColor ?? "",
         footerVerse: bsDef.footerVerse ?? "",
-        resourceLinkLabel: (bsDef as Record<string, unknown>).resourceLinkLabel as string ?? "",
-        resourceLinkUrl: (bsDef as Record<string, unknown>).resourceLinkUrl as string ?? "",
+        resourceLinks: (() => {
+          const def = bsDef as Record<string, unknown>
+          const links = (def.resourceLinks ?? []) as { label: string; url: string }[]
+          if (links.length > 0) return links
+          const label = (def.resourceLinkLabel as string) ?? ""
+          const url = (def.resourceLinkUrl as string) ?? ""
+          return url ? [{ label: label || "View Resources", url }] : []
+        })(),
         locations: mergedLocs,
       })
 
@@ -692,6 +713,7 @@ export default function DashboardPage() {
         message: wsDef.message ?? "",
         primaryColor: wsDef.primaryColor ?? "",
         footerVerse: wsDef.footerVerse ?? "",
+        resourceLinks: ((wsDef as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
       })
 
       // ---- Bulletin ----
@@ -707,6 +729,10 @@ export default function DashboardPage() {
         })),
         helpers: [],
         events: bulEvents,
+        resourceLinks: (bulDef.resourceLinks ?? []) as { label: string; url: string }[],
+        message: bulDef.message ?? "",
+        primaryColor: bulDef.primaryColor ?? "",
+        footerVerse: bulDef.footerVerse ?? "",
       })
 
       // ---- Mailing lists + SMTP configs ----
@@ -816,9 +842,7 @@ export default function DashboardPage() {
         message: bibleStudyForm.message || undefined,
         primaryColor: bibleStudyForm.primaryColor || undefined,
         footerVerse: bibleStudyForm.footerVerse || undefined,
-        resourceLink: bibleStudyForm.resourceLinkUrl
-          ? { label: bibleStudyForm.resourceLinkLabel || "View Resources", url: bibleStudyForm.resourceLinkUrl }
-          : undefined,
+        resourceLinks: (bibleStudyForm.resourceLinks ?? []).filter((l) => l.url),
         locations: bibleStudyForm.locations.map((loc) => ({
           label: loc.label,
           hostNames: loc.hostNames || undefined,
@@ -844,6 +868,7 @@ export default function DashboardPage() {
         message: womensStudyForm.message || undefined,
         primaryColor: womensStudyForm.primaryColor || undefined,
         footerVerse: womensStudyForm.footerVerse || undefined,
+        resourceLinks: (womensStudyForm.resourceLinks ?? []).filter((l) => l.url),
       }),
     [womensStudyForm]
   )
@@ -856,6 +881,10 @@ export default function DashboardPage() {
         anniversaries: bulletinForm.anniversaries,
         helpers: bulletinForm.helpers,
         events: bulletinForm.events,
+        resourceLinks: bulletinForm.resourceLinks,
+        message: bulletinForm.message || undefined,
+        primaryColor: bulletinForm.primaryColor || undefined,
+        footerVerse: bulletinForm.footerVerse || undefined,
       }),
     [bulletinForm]
   )
@@ -1396,17 +1425,17 @@ export default function DashboardPage() {
             </WeeklyCommunicationCard>
           )}
           {selectedCard === "bible_study" && (
-            <WeeklyCommunicationCard title="Friday Bible Study Invite" accentColor="#0D9488" icon={BookOpen} status={getStatus("bible_study")} summaryLines={bibleStudySummary} subject={getSubject("bible_study")} onSubjectChange={(v) => setSubjectOverride("bible_study", v)} scheduledAt={getScheduledAt("bible_study")} previewHtml={bibleStudyPreview} onSchedule={() => handleSchedule("bible_study")} onSendNow={() => handleSendNow("bible_study")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.bible_study.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, mailingListId: id } }))} selectedSmtpConfig={commOptions.bible_study.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, smtpConfigId: id } }))} sendCount={dispatchCounts.bible_study} additionalRecipients={commOptions.bible_study.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, additionalRecipients: v } }))}>
+            <WeeklyCommunicationCard title="Friday Bible Study Invite" accentColor="#0D9488" icon={BookOpen} status={getStatus("bible_study")} summaryLines={bibleStudySummary} subject={getSubject("bible_study")} onSubjectChange={(v) => setSubjectOverride("bible_study", v)} scheduledAt={getScheduledAt("bible_study")} previewHtml={bibleStudyPreview} resourceLinks={(bibleStudyForm.resourceLinks ?? []).filter((l) => l.url)} onSchedule={() => handleSchedule("bible_study")} onSendNow={() => handleSendNow("bible_study")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.bible_study.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, mailingListId: id } }))} selectedSmtpConfig={commOptions.bible_study.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, smtpConfigId: id } }))} sendCount={dispatchCounts.bible_study} additionalRecipients={commOptions.bible_study.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, additionalRecipients: v } }))}>
               <BibleStudyEditForm data={bibleStudyForm} onChange={setBibleStudyForm} />
             </WeeklyCommunicationCard>
           )}
           {selectedCard === "womens_study" && (
-            <WeeklyCommunicationCard title="Wednesday Women's Bible Study" accentColor="#DB2777" icon={Users} status={getStatus("womens_study")} summaryLines={womensStudySummary} subject={getSubject("womens_study")} onSubjectChange={(v) => setSubjectOverride("womens_study", v)} scheduledAt={getScheduledAt("womens_study")} previewHtml={womensStudyPreview} onSchedule={() => handleSchedule("womens_study")} onSendNow={() => handleSendNow("womens_study")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.womens_study.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, mailingListId: id } }))} selectedSmtpConfig={commOptions.womens_study.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, smtpConfigId: id } }))} sendCount={dispatchCounts.womens_study} additionalRecipients={commOptions.womens_study.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, additionalRecipients: v } }))}>
+            <WeeklyCommunicationCard title="Wednesday Women's Bible Study" accentColor="#DB2777" icon={Users} status={getStatus("womens_study")} summaryLines={womensStudySummary} subject={getSubject("womens_study")} onSubjectChange={(v) => setSubjectOverride("womens_study", v)} scheduledAt={getScheduledAt("womens_study")} previewHtml={womensStudyPreview} resourceLinks={[...(womensStudyForm.zoomLink ? [{ label: "Join Zoom Meeting", url: womensStudyForm.zoomLink }] : []), ...(womensStudyForm.resourceLinks ?? []).filter((l) => l.url)]} onSchedule={() => handleSchedule("womens_study")} onSendNow={() => handleSendNow("womens_study")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.womens_study.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, mailingListId: id } }))} selectedSmtpConfig={commOptions.womens_study.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, smtpConfigId: id } }))} sendCount={dispatchCounts.womens_study} additionalRecipients={commOptions.womens_study.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, additionalRecipients: v } }))}>
               <WomensStudyEditForm data={womensStudyForm} onChange={setWomensStudyForm} />
             </WeeklyCommunicationCard>
           )}
           {selectedCard === "bulletin" && (
-            <WeeklyCommunicationCard title="Weekly Bulletin" accentColor="#4F46E5" icon={Newspaper} status={getStatus("bulletin")} summaryLines={bulletinSummary} subject={getSubject("bulletin")} onSubjectChange={(v) => setSubjectOverride("bulletin", v)} scheduledAt={getScheduledAt("bulletin")} previewHtml={bulletinPreview} onSchedule={() => handleSchedule("bulletin")} onSendNow={() => handleSendNow("bulletin")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.bulletin.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, mailingListId: id } }))} selectedSmtpConfig={commOptions.bulletin.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, smtpConfigId: id } }))} sendCount={dispatchCounts.bulletin} additionalRecipients={commOptions.bulletin.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, additionalRecipients: v } }))}>
+            <WeeklyCommunicationCard title="Weekly Bulletin" accentColor="#4F46E5" icon={Newspaper} status={getStatus("bulletin")} summaryLines={bulletinSummary} subject={getSubject("bulletin")} onSubjectChange={(v) => setSubjectOverride("bulletin", v)} scheduledAt={getScheduledAt("bulletin")} previewHtml={bulletinPreview} resourceLinks={bulletinForm.resourceLinks.filter((l) => l.url)} onSchedule={() => handleSchedule("bulletin")} onSendNow={() => handleSendNow("bulletin")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.bulletin.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, mailingListId: id } }))} selectedSmtpConfig={commOptions.bulletin.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, smtpConfigId: id } }))} sendCount={dispatchCounts.bulletin} additionalRecipients={commOptions.bulletin.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, additionalRecipients: v } }))}>
               <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} />
             </WeeklyCommunicationCard>
           )}

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   buildBirthdayCard,
   buildAnniversaryCard,
@@ -191,9 +192,7 @@ function buildPreview(form: FormState): string {
         message: d.message || undefined,
         primaryColor: d.primaryColor || undefined,
         footerVerse: d.footerVerse || undefined,
-        resourceLink: d.resourceLinkUrl
-          ? { label: d.resourceLinkLabel || "View Resources", url: d.resourceLinkUrl }
-          : undefined,
+        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
         locations: d.locations.map((loc) => ({
           label: loc.label,
           hostNames: loc.hostNames || undefined,
@@ -217,6 +216,7 @@ function buildPreview(form: FormState): string {
         message: d.message || undefined,
         primaryColor: d.primaryColor || undefined,
         footerVerse: d.footerVerse || undefined,
+        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
       })
     }
     case "prayer_meeting": {
@@ -245,17 +245,14 @@ function buildPreview(form: FormState): string {
     }
     case "custom": {
       const d = form.data
-      const linksHtml = (d.resourceLinks ?? []).filter(l => l.url).map(l =>
-        `<a href="${l.url}" style="display:inline-block;padding:8px 20px;background:${d.primaryColor || "#6B7280"};color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;margin:4px">${l.label || "View Link"}</a>`
-      ).join("")
-      const bodyWithLinks = `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${d.body}</p>${linksHtml ? `<div style="text-align:center;margin-top:16px">${linksHtml}</div>` : ""}`
       return buildCustomCard({
         title: d.title || "Announcement",
         subtitle: d.subtitle || undefined,
         emoji: d.emoji || undefined,
-        bodyHtml: bodyWithLinks,
+        bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${d.body}</p>`,
         primaryColor: d.primaryColor || undefined,
         footerText: d.footerText || undefined,
+        resourceLinks: (d.resourceLinks ?? []).filter((l: { url: string }) => l.url),
       })
     }
   }
@@ -284,8 +281,10 @@ export default function ComposePage() {
   const [scheduling, setScheduling] = useState(false)
   const [subject, setSubject] = useState("")
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([])
-  const [savedInstances, setSavedInstances] = useState<{ id: string; template_type: string; name: string; subject: string; updated_at: string; mailing_list_id: string | null; smtp_config_id: string | null }[]>([])
+  const [savedInstances, setSavedInstances] = useState<{ id: string; template_type: string; name: string; subject: string; updated_at: string; mailing_list_id: string | null; smtp_config_id: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null }[]>([])
   const [savingInstance, setSavingInstance] = useState(false)
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurUntil, setRecurUntil] = useState("")
 
   // Fetch mailing lists + SMTP configs + custom templates + saved instances on mount
   useEffect(() => {
@@ -295,9 +294,9 @@ export default function ComposePage() {
       supabase.from("smtp_configs").select("id, name, from_email").eq("is_active", true).order("name"),
       supabase.from("email_templates").select("id, name, subject_template, body_template").eq("is_default", false).order("name")
         .returns<CustomTemplate[]>(),
-      supabase.from("composed_instances").select("id, template_type, name, subject, updated_at, mailing_list_id, smtp_config_id")
+      supabase.from("composed_instances").select("id, template_type, name, subject, updated_at, mailing_list_id, smtp_config_id, week_start, is_recurring, recur_until")
         .eq("is_active", true).order("updated_at", { ascending: false })
-        .returns<{ id: string; template_type: string; name: string; subject: string; updated_at: string; mailing_list_id: string | null; smtp_config_id: string | null }[]>(),
+        .returns<{ id: string; template_type: string; name: string; subject: string; updated_at: string; mailing_list_id: string | null; smtp_config_id: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null }[]>(),
     ]).then(([mlRes, smtpRes, ctRes, ciRes]) => {
       if (mlRes.data) setMailingLists(mlRes.data)
       if (smtpRes.data) setSmtpConfigs(smtpRes.data)
@@ -464,8 +463,14 @@ export default function ComposePage() {
             message: bsDef.message ?? "",
             primaryColor: bsDef.primaryColor ?? "",
             footerVerse: bsDef.footerVerse ?? "",
-            resourceLinkLabel: (bsDef as Record<string, unknown>).resourceLinkLabel as string ?? "",
-            resourceLinkUrl: (bsDef as Record<string, unknown>).resourceLinkUrl as string ?? "",
+            resourceLinks: (() => {
+              const def = bsDef as Record<string, unknown>
+              const links = (def.resourceLinks ?? []) as { label: string; url: string }[]
+              if (links.length > 0) return links
+              const label = (def.resourceLinkLabel as string) ?? ""
+              const url = (def.resourceLinkUrl as string) ?? ""
+              return url ? [{ label: label || "View Resources", url }] : []
+            })(),
             locations: mergedLocs,
           },
         })
@@ -488,6 +493,7 @@ export default function ComposePage() {
             message: (savedData as WomensStudyDefaults).message ?? "",
             primaryColor: (savedData as WomensStudyDefaults).primaryColor ?? "",
             footerVerse: (savedData as WomensStudyDefaults).footerVerse ?? "",
+            resourceLinks: ((savedData as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
           },
         })
         setSubject("Women's Bible Study This Wednesday")
@@ -608,12 +614,16 @@ export default function ComposePage() {
         : formState.type
       const templateName = TEMPLATES.find((t) => t.id === formState.type)?.title || subject
 
-      // Check if an active instance already exists for this type
+      const base = addDays(new Date(), weekOffset * 7)
+      const weekStart = format(getUpcomingSunday(base), "yyyy-MM-dd")
+
+      // Check if an active instance already exists for this type + week
       const { data: existing } = await supabase
         .from("composed_instances")
         .select("id")
         .eq("template_type", templateType)
         .eq("is_active", true)
+        .eq("week_start", weekStart)
         .limit(1)
         .returns<{ id: string }[]>()
 
@@ -626,6 +636,9 @@ export default function ComposePage() {
         smtp_config_id: selectedSmtpConfig || null,
         additional_recipients: null,
         is_active: true,
+        week_start: weekStart,
+        is_recurring: isRecurring,
+        recur_until: isRecurring && recurUntil ? recurUntil : null,
         created_by: user?.id ?? null,
       }
 
@@ -637,8 +650,8 @@ export default function ComposePage() {
         if (error) {
           toast.error(`Save failed: ${error.message}`)
         } else {
-          toast.success(`"${templateName}" instance saved. Ready to send from Communication Hub.`)
-          logAudit("composed_instance_updated", "composed_instances", existing[0].id, { templateType })
+          toast.success(`"${templateName}" saved for week of ${weekStart}.`)
+          logAudit("composed_instance_updated", "composed_instances", existing[0].id, { templateType, weekStart })
         }
       } else {
         const { error } = await supabase
@@ -647,15 +660,15 @@ export default function ComposePage() {
         if (error) {
           toast.error(`Save failed: ${error.message}`)
         } else {
-          toast.success(`"${templateName}" instance saved. Ready to send from Communication Hub.`)
-          logAudit("composed_instance_created", "composed_instances", null, { templateType })
+          toast.success(`"${templateName}" saved for week of ${weekStart}.${isRecurring ? " Recurring weekly." : ""}`)
+          logAudit("composed_instance_created", "composed_instances", null, { templateType, weekStart, isRecurring })
         }
       }
 
       // Refresh saved instances list
       const { data: refreshed } = await supabase
         .from("composed_instances")
-        .select("id, template_type, name, subject, updated_at, mailing_list_id, smtp_config_id")
+        .select("id, template_type, name, subject, updated_at, mailing_list_id, smtp_config_id, week_start, is_recurring, recur_until")
         .eq("is_active", true).order("updated_at", { ascending: false })
         .returns<typeof savedInstances>()
       if (refreshed) setSavedInstances(refreshed)
@@ -677,7 +690,7 @@ export default function ComposePage() {
       .from("composed_instances")
       .select("*")
       .eq("id", instanceId)
-      .single() as { data: { id: string; template_type: string; name: string; subject: string; form_data: Record<string, unknown>; mailing_list_id: string | null; smtp_config_id: string | null } | null }
+      .single() as { data: { id: string; template_type: string; name: string; subject: string; form_data: Record<string, unknown>; mailing_list_id: string | null; smtp_config_id: string | null; is_recurring: boolean; recur_until: string | null } | null }
 
     if (data) {
       const type = data.template_type.startsWith("custom:") ? "custom" : data.template_type
@@ -686,6 +699,8 @@ export default function ComposePage() {
       setSubject(data.subject)
       setSelectedMailingList(data.mailing_list_id || "")
       setSelectedSmtpConfig(data.smtp_config_id || "")
+      setIsRecurring(data.is_recurring ?? false)
+      setRecurUntil(data.recur_until ?? "")
     }
     setLoading(false)
   }
@@ -799,7 +814,9 @@ export default function ComposePage() {
                     <p className="font-medium text-sm truncate">{si.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{si.subject}</p>
                     <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                      Updated {new Date(si.updated_at).toLocaleDateString()}
+                      {si.week_start ? `Week of ${si.week_start}` : "No week set"}
+                      {si.is_recurring && " · Recurring"}
+                      {si.is_recurring && si.recur_until && ` until ${si.recur_until}`}
                       {si.mailing_list_id && " · List set"}
                       {si.smtp_config_id && " · SMTP set"}
                     </p>
@@ -1099,6 +1116,29 @@ export default function ComposePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      size="sm"
+                      checked={isRecurring}
+                      onCheckedChange={setIsRecurring}
+                    />
+                    <Label className="text-sm">Recurring weekly</Label>
+                  </div>
+                  {isRecurring && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-muted-foreground whitespace-nowrap">Until</Label>
+                      <Input
+                        type="date"
+                        value={recurUntil}
+                        onChange={(e) => setRecurUntil(e.target.value)}
+                        className="h-8 w-40 text-sm"
+                        placeholder="No end date"
+                      />
+                      {!recurUntil && <span className="text-xs text-muted-foreground">(no end date = forever)</span>}
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button

@@ -226,6 +226,9 @@ export type ComposedInstance = {
   smtp_config_id: string | null
   additional_recipients: string | null
   is_active: boolean
+  week_start: string | null
+  is_recurring: boolean
+  recur_until: string | null
   created_by: string | null
   created_at: string
   updated_at: string
