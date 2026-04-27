@@ -151,3 +151,42 @@ export const SUBJECT_FALLBACKS: Record<string, string> = {
   wednesday_womens_study: "Women's Bible Study This Wednesday",
   bulletin: "Weekly Bulletin — {{weekLabel}}",
 }
+
+export interface PlaceholderDef {
+  token: string
+  description: string
+  example: string
+}
+
+export const TEMPLATE_PLACEHOLDERS: Record<string, PlaceholderDef[]> = {
+  birthday: [
+    { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
+    { token: "{{names}}", description: "Birthday person names", example: "John, Mary" },
+    { token: "{{count}}", description: "Number of birthdays", example: "2" },
+  ],
+  anniversary: [
+    { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
+    { token: "{{couples}}", description: "Couple names", example: "John & Mary" },
+    { token: "{{count}}", description: "Number of anniversaries", example: "1" },
+  ],
+  friday_bible_study: [
+    { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
+    { token: "{{date}}", description: "Event date", example: "Friday, May 2nd" },
+    { token: "{{time}}", description: "Start time", example: "7:30 PM" },
+    { token: "{{topic}}", description: "Study topic", example: "Book of Acts" },
+  ],
+  wednesday_womens_study: [
+    { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
+    { token: "{{date}}", description: "Event date", example: "Wednesday, Apr 29th" },
+    { token: "{{time}}", description: "Start time", example: "7:00 PM" },
+    { token: "{{topic}}", description: "Study topic", example: "Building a Relationship with God" },
+  ],
+  bulletin: [
+    { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
+    { token: "{{date}}", description: "Current date", example: "April 27, 2026" },
+  ],
+  custom: [
+    { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
+    { token: "{{date}}", description: "Current date", example: "April 27, 2026" },
+  ],
+}

@@ -64,12 +64,14 @@ import {
 import {
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
+  SUBJECT_FALLBACKS,
   extractCommonFields,
   type BibleStudyDefaults,
   type WomensStudyDefaults,
   type BulletinDefaults,
   type CommonCardFields,
 } from "@/lib/template-defaults"
+import { interpolate, interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
 import {
   BirthdayEditForm,
   AnniversaryEditForm,
@@ -148,6 +150,14 @@ type CommType =
   | "womens_study"
   | "bulletin"
 
+const COMM_TYPE_TO_ET: Record<CommType, string> = {
+  birthday: "birthday",
+  anniversary: "anniversary",
+  bible_study: "friday_bible_study",
+  womens_study: "wednesday_womens_study",
+  bulletin: "bulletin",
+}
+
 // Subject-based matching to find existing dispatches for each type
 const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
   birthday: (s) => /birthday/i.test(s),
@@ -203,6 +213,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [weekLabel, setWeekLabel] = useState("")
+  const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
   const [dispatches, setDispatches] = useState<
     Record<CommType, DispatchRecord | null>
   >({
@@ -533,6 +544,10 @@ export default function DashboardPage() {
         }
       }
 
+      setSavedSubjectTemplates(
+        Object.fromEntries(Object.entries(savedDefaults).map(([k, v]) => [k, v.subject]))
+      )
+
       // Build composed instances map (template_type → data)
       // Priority: exact week match > recurring (filter expired) > legacy (null week_start)
       const weekStr = format(bulSun, "yyyy-MM-dd")
@@ -834,104 +849,112 @@ export default function DashboardPage() {
   // ---- Preview HTML builders (memoized) ----
   const birthdayPreview = useMemo(() => {
     if (birthdayForm.birthdays.length === 0) return null
+    const vars = makeBirthdayVars(birthdayForm.weekLabel, birthdayForm.birthdays.map(b => b.name))
     return buildBirthdayCard({
       weekLabel: birthdayForm.weekLabel,
       birthdays: birthdayForm.birthdays,
-      message: birthdayForm.message || undefined,
-      headerSubtitle: birthdayForm.headerSubtitle || undefined,
+      message: interp(birthdayForm.message, vars),
+      headerSubtitle: interp(birthdayForm.headerSubtitle, vars),
       primaryColor: birthdayForm.primaryColor || undefined,
-      footerVerse: birthdayForm.footerVerse || undefined,
+      footerVerse: interp(birthdayForm.footerVerse, vars),
       resourceLinks: (birthdayForm.resourceLinks ?? []).filter((l) => l.url),
     })
   }, [birthdayForm])
 
   const anniversaryPreview = useMemo(() => {
     if (anniversaryForm.anniversaries.length === 0) return null
+    const vars = makeAnniversaryVars(anniversaryForm.weekLabel, anniversaryForm.anniversaries.map(a => `${a.husbandName} & ${a.wifeName}`))
     return buildAnniversaryCard({
       weekLabel: anniversaryForm.weekLabel,
       anniversaries: anniversaryForm.anniversaries,
-      message: anniversaryForm.message || undefined,
-      headerSubtitle: anniversaryForm.headerSubtitle || undefined,
+      message: interp(anniversaryForm.message, vars),
+      headerSubtitle: interp(anniversaryForm.headerSubtitle, vars),
       primaryColor: anniversaryForm.primaryColor || undefined,
-      footerVerse: anniversaryForm.footerVerse || undefined,
+      footerVerse: interp(anniversaryForm.footerVerse, vars),
       resourceLinks: (anniversaryForm.resourceLinks ?? []).filter((l) => l.url),
     })
   }, [anniversaryForm])
 
-  const bibleStudyPreview = useMemo(
-    () =>
-      buildBibleStudyCard({
-        title: bibleStudyForm.title || undefined,
-        date: bibleStudyForm.date,
-        time: bibleStudyForm.time,
-        topic: bibleStudyForm.topic || undefined,
-        message: bibleStudyForm.message || undefined,
-        headerSubtitle: bibleStudyForm.headerSubtitle || undefined,
-        primaryColor: bibleStudyForm.primaryColor || undefined,
-        footerVerse: bibleStudyForm.footerVerse || undefined,
-        resourceLinks: (bibleStudyForm.resourceLinks ?? []).filter((l) => l.url),
-        locations: bibleStudyForm.locations.map((loc) => ({
-          label: loc.label,
-          hostNames: loc.hostNames || undefined,
-          address: loc.address || undefined,
-          city: loc.city || undefined,
-          phone: loc.phone || undefined,
-        })),
-      }),
-    [bibleStudyForm]
-  )
+  const bibleStudyPreview = useMemo(() => {
+    const vars = makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
+    return buildBibleStudyCard({
+      title: interp(bibleStudyForm.title, vars),
+      date: bibleStudyForm.date,
+      time: bibleStudyForm.time,
+      topic: interp(bibleStudyForm.topic, vars),
+      message: interp(bibleStudyForm.message, vars),
+      headerSubtitle: interp(bibleStudyForm.headerSubtitle, vars),
+      primaryColor: bibleStudyForm.primaryColor || undefined,
+      footerVerse: interp(bibleStudyForm.footerVerse, vars),
+      resourceLinks: (bibleStudyForm.resourceLinks ?? []).filter((l) => l.url),
+      locations: bibleStudyForm.locations.map((loc) => ({
+        label: loc.label,
+        hostNames: loc.hostNames || undefined,
+        address: loc.address || undefined,
+        city: loc.city || undefined,
+        phone: loc.phone || undefined,
+      })),
+    })
+  }, [bibleStudyForm, weekLabel])
 
-  const womensStudyPreview = useMemo(
-    () =>
-      buildWomensStudyCard({
-        title: womensStudyForm.title || undefined,
-        topic: womensStudyForm.topic || undefined,
-        date: womensStudyForm.date,
-        time: womensStudyForm.time,
-        zoomLink: womensStudyForm.zoomLink || undefined,
-        zoomMeetingId: womensStudyForm.zoomMeetingId || undefined,
-        zoomPasscode: womensStudyForm.zoomPasscode || undefined,
-        location: womensStudyForm.location || undefined,
-        message: womensStudyForm.message || undefined,
-        headerSubtitle: womensStudyForm.headerSubtitle || undefined,
-        primaryColor: womensStudyForm.primaryColor || undefined,
-        footerVerse: womensStudyForm.footerVerse || undefined,
-        resourceLinks: (womensStudyForm.resourceLinks ?? []).filter((l) => l.url),
-      }),
-    [womensStudyForm]
-  )
+  const womensStudyPreview = useMemo(() => {
+    const vars = makeEventVars(weekLabel, womensStudyForm.date, womensStudyForm.time, womensStudyForm.topic || "")
+    return buildWomensStudyCard({
+      title: interp(womensStudyForm.title, vars),
+      topic: interp(womensStudyForm.topic, vars),
+      date: womensStudyForm.date,
+      time: womensStudyForm.time,
+      zoomLink: womensStudyForm.zoomLink || undefined,
+      zoomMeetingId: womensStudyForm.zoomMeetingId || undefined,
+      zoomPasscode: womensStudyForm.zoomPasscode || undefined,
+      location: womensStudyForm.location || undefined,
+      message: interp(womensStudyForm.message, vars),
+      headerSubtitle: interp(womensStudyForm.headerSubtitle, vars),
+      primaryColor: womensStudyForm.primaryColor || undefined,
+      footerVerse: interp(womensStudyForm.footerVerse, vars),
+      resourceLinks: (womensStudyForm.resourceLinks ?? []).filter((l) => l.url),
+    })
+  }, [womensStudyForm, weekLabel])
 
-  const bulletinPreview = useMemo(
-    () =>
-      buildBulletinCard({
-        weekLabel: bulletinForm.weekLabel,
-        birthdays: bulletinForm.birthdays,
-        anniversaries: bulletinForm.anniversaries,
-        helpers: bulletinForm.helpers,
-        events: bulletinForm.events,
-        resourceLinks: bulletinForm.resourceLinks,
-        message: bulletinForm.message || undefined,
-        headerSubtitle: bulletinForm.headerSubtitle || undefined,
-        primaryColor: bulletinForm.primaryColor || undefined,
-        footerVerse: bulletinForm.footerVerse || undefined,
-      }),
-    [bulletinForm]
-  )
+  const bulletinPreview = useMemo(() => {
+    const vars = makeBulletinVars(weekLabel, weekLabel)
+    return buildBulletinCard({
+      weekLabel: bulletinForm.weekLabel,
+      birthdays: bulletinForm.birthdays,
+      anniversaries: bulletinForm.anniversaries,
+      helpers: bulletinForm.helpers,
+      events: bulletinForm.events,
+      resourceLinks: bulletinForm.resourceLinks,
+      message: interp(bulletinForm.message, vars),
+      headerSubtitle: interp(bulletinForm.headerSubtitle, vars),
+      primaryColor: bulletinForm.primaryColor || undefined,
+      footerVerse: interp(bulletinForm.footerVerse, vars),
+    })
+  }, [bulletinForm, weekLabel])
 
   // ---- Subject lines (custom override or auto-generated) ----
+  function getSubjectVars(type: CommType) {
+    switch (type) {
+      case "birthday":    return makeBirthdayVars(weekLabel, birthdayForm.birthdays.map(b => b.name))
+      case "anniversary": return makeAnniversaryVars(weekLabel, anniversaryForm.anniversaries.map(a => `${a.husbandName} & ${a.wifeName}`))
+      case "bible_study": return makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
+      case "womens_study":return makeEventVars(weekLabel, womensStudyForm.date, womensStudyForm.time, womensStudyForm.topic || "")
+      case "bulletin":    return makeBulletinVars(weekLabel, weekLabel)
+    }
+  }
+
   function getSubject(type: CommType): string {
     if (customSubjects[type]) return customSubjects[type]!
+    const etKey = COMM_TYPE_TO_ET[type]
+    const savedTmpl = savedSubjectTemplates[etKey]
+    if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
+    // Fallback to exact original behavior when no saved template exists
     switch (type) {
-      case "birthday":
-        return `Happy Birthday! — Week of ${weekLabel}`
-      case "anniversary":
-        return `Happy Anniversary! — Week of ${weekLabel}`
-      case "bible_study":
-        return `Bible Study This Friday — ${bibleStudyForm.date}`
-      case "womens_study":
-        return `Women's Bible Study This Wednesday`
-      case "bulletin":
-        return `Weekly Bulletin for ${bulletinForm.weekLabel}`
+      case "birthday":    return `Happy Birthday! — Week of ${weekLabel}`
+      case "anniversary": return `Happy Anniversary! — Week of ${weekLabel}`
+      case "bible_study": return `Bible Study This Friday — ${bibleStudyForm.date}`
+      case "womens_study":return `Women's Bible Study This Wednesday`
+      case "bulletin":    return `Weekly Bulletin for ${bulletinForm.weekLabel}`
     }
   }
 

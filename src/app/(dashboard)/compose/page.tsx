@@ -55,12 +55,16 @@ import { getUpcomingSunday, getBulletinWeekBounds } from "@/lib/date-utils"
 import {
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
+  SUBJECT_FALLBACKS,
+  TEMPLATE_PLACEHOLDERS,
   extractCommonFields,
   type BibleStudyDefaults,
   type WomensStudyDefaults,
   type BulletinDefaults,
   type CommonCardFields,
+  type PlaceholderDef,
 } from "@/lib/template-defaults"
+import { interpolate, interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
 
 // ---------------------------------------------------------------------------
 // Template metadata
@@ -130,6 +134,8 @@ interface CustomFormState {
   primaryColor: string
   footerText: string
   resourceLinks: { label: string; url: string }[]
+  weekLabel?: string
+  date?: string
 }
 
 type FormState =
@@ -269,14 +275,15 @@ function buildPreview(form: FormState): string {
     }
     case "custom": {
       const d = form.data
+      const vars = makeBulletinVars(d.weekLabel || "", d.date || "")
       return buildCustomCard({
-        title: d.title || "Announcement",
+        title: interp(d.title, vars) || "Announcement",
         subtitle: d.subtitle || undefined,
         emoji: d.emoji || undefined,
         bannerImageUrl: d.bannerImageUrl || undefined,
-        bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${d.body}</p>`,
+        bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${interp(d.body, vars) ?? d.body}</p>`,
         primaryColor: d.primaryColor || undefined,
-        footerText: d.footerText || undefined,
+        footerText: interp(d.footerText, vars),
         resourceLinks: (d.resourceLinks ?? []).filter((l: { url: string }) => l.url),
       })
     }
@@ -350,11 +357,12 @@ export default function ComposePage() {
     // Fetch saved template defaults for this type (no FK join)
     const etName = TEMPLATE_TO_EVENT_TYPE[templateId]
     let savedData: Record<string, unknown> = {}
+    let savedSubjectTmpl: string | null = null
     if (etName) {
       const [etRes, tmplRes] = await Promise.all([
         supabase.from("event_types").select("id, name").returns<{ id: string; name: string }[]>(),
-        supabase.from("email_templates").select("event_type_id, body_template").eq("is_default", true)
-          .returns<{ event_type_id: string; body_template: string }[]>(),
+        supabase.from("email_templates").select("event_type_id, body_template, subject_template").eq("is_default", true)
+          .returns<{ event_type_id: string; body_template: string; subject_template: string }[]>(),
       ])
       const etMap: Record<string, string> = {}
       if (etRes.data) for (const et of etRes.data) etMap[et.name] = et.id
@@ -363,6 +371,7 @@ export default function ComposePage() {
       if (match) {
         const parsed = parseBodyTemplate(etName, match.body_template)
         if (parsed) savedData = parsed.data as Record<string, unknown>
+        if (match.subject_template) savedSubjectTmpl = match.subject_template
       }
     }
     const monday = startOfWeek(today, { weekStartsOn: 1 })
@@ -399,7 +408,10 @@ export default function ComposePage() {
             ...extractCommonFields(savedData as CommonCardFields),
           },
         })
-        setSubject(`Happy Birthday! — Week of ${weekLabel}`)
+        setSubject(interpolate(
+          savedSubjectTmpl ?? `Happy Birthday! — Week of {{weekLabel}}`,
+          makeBirthdayVars(weekLabel, bdays.map(b => b.name))
+        ))
         break
       }
 
@@ -427,7 +439,10 @@ export default function ComposePage() {
             ...extractCommonFields(savedData as CommonCardFields),
           },
         })
-        setSubject(`Happy Anniversary! — Week of ${weekLabel}`)
+        setSubject(interpolate(
+          savedSubjectTmpl ?? `Happy Anniversary! — Week of {{weekLabel}}`,
+          makeAnniversaryVars(weekLabel, anns.map(a => `${a.husbandName} & ${a.wifeName}`))
+        ))
         break
       }
 
@@ -505,18 +520,23 @@ export default function ComposePage() {
             locations: mergedLocs,
           },
         })
-        setSubject(`Bible Study This Friday — ${format(fri, "MMM d")}`)
+        const bsDate = format(fri, "MMM d")
+        setSubject(interpolate(
+          savedSubjectTmpl ?? `Bible Study This Friday — {{date}}`,
+          makeEventVars(weekLabel, bsDate, "", "")
+        ))
         break
       }
 
       case "womens_study": {
         const ws = savedData as WomensStudyDefaults
+        const wsDate = format(addDays(monday, 2), "EEEE, MMMM do")
         setFormState({
           type: "womens_study",
           data: {
             title: ws.title ?? "Women's Bible Study",
             topic: ws.topic ?? "Building a Relationship with God",
-            date: format(addDays(monday, 2), "EEEE, MMMM do"),
+            date: wsDate,
             time: ws.time ?? "7:00 PM",
             zoomLink: ws.zoomLink ?? "",
             zoomMeetingId: ws.zoomMeetingId ?? "",
@@ -525,7 +545,10 @@ export default function ComposePage() {
             ...extractCommonFields(ws),
           },
         })
-        setSubject("Women's Bible Study This Wednesday")
+        setSubject(interpolate(
+          savedSubjectTmpl ?? `Women's Bible Study This Wednesday`,
+          makeEventVars(weekLabel, wsDate, ws.time ?? "7:00 PM", ws.topic ?? "")
+        ))
         break
       }
 
@@ -604,7 +627,10 @@ export default function ComposePage() {
             ...extractCommonFields(bulDef),
           },
         })
-        setSubject(`Weekly Bulletin for Sunday ${format(bulSunday, "MMMM d, yyyy")}`)
+        setSubject(interpolate(
+          savedSubjectTmpl ?? `Weekly Bulletin — {{weekLabel}}`,
+          makeBulletinVars(bulLabel, format(bulSunday, "MMMM d, yyyy"))
+        ))
         break
       }
     }
@@ -937,6 +963,12 @@ export default function ComposePage() {
               style={isSelected ? { borderColor: color, boxShadow: `0 0 0 1px ${color}` } : {}}
               onClick={() => {
                 setSelectedTemplate(`custom:${ct.id}`)
+                const today = addDays(new Date(), weekOffset * 7)
+                const mon = startOfWeek(today, { weekStartsOn: 1 })
+                const sun = endOfWeek(today, { weekStartsOn: 1 })
+                const wLabel = `${format(mon, "MMM d")} – ${format(sun, "MMM d")}`
+                const dateStr = format(today, "MMMM d, yyyy")
+                const ctVars = makeBulletinVars(wLabel, dateStr)
                 try {
                   const body = JSON.parse(ct.body_template)
                   setFormState({
@@ -950,13 +982,15 @@ export default function ComposePage() {
                       primaryColor: body.primaryColor || "",
                       footerText: body.footerText || "",
                       resourceLinks: body.resourceLinks || [],
+                      weekLabel: wLabel,
+                      date: dateStr,
                     },
                   })
-                  setSubject(ct.subject_template || ct.name)
+                  setSubject(interpolate(ct.subject_template || ct.name, ctVars))
                 } catch {
                   setFormState({
                     type: "custom",
-                    data: { title: ct.name, subtitle: "", emoji: "📋", bannerImageUrl: "", body: ct.body_template, primaryColor: "", footerText: "", resourceLinks: [] },
+                    data: { title: ct.name, subtitle: "", emoji: "📋", bannerImageUrl: "", body: ct.body_template, primaryColor: "", footerText: "", resourceLinks: [], weekLabel: wLabel, date: dateStr },
                   })
                   setSubject(ct.name)
                 }
@@ -982,9 +1016,14 @@ export default function ComposePage() {
           className={`cursor-pointer transition-all hover:shadow-md border-dashed ${selectedTemplate === "custom:new" ? "ring-2" : ""}`}
           onClick={() => {
             setSelectedTemplate("custom:new")
+            const today = addDays(new Date(), weekOffset * 7)
+            const mon = startOfWeek(today, { weekStartsOn: 1 })
+            const sun = endOfWeek(today, { weekStartsOn: 1 })
+            const wLabel = `${format(mon, "MMM d")} – ${format(sun, "MMM d")}`
+            const dateStr = format(today, "MMMM d, yyyy")
             setFormState({
               type: "custom",
-              data: { title: "", subtitle: "Christ Church of India, San Ramon", emoji: "📋", bannerImageUrl: "", body: "", primaryColor: "#6B7280", footerText: "", resourceLinks: [] },
+              data: { title: "", subtitle: "Christ Church of India, San Ramon", emoji: "📋", bannerImageUrl: "", body: "", primaryColor: "#6B7280", footerText: "", resourceLinks: [], weekLabel: wLabel, date: dateStr },
             })
             setSubject("")
             setLoading(false)
@@ -1240,11 +1279,12 @@ export default function ComposePage() {
 // Sub-form components (only template-specific forms that aren't shared)
 // ===========================================================================
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   )
 }
@@ -1318,6 +1358,30 @@ function PrayerMeetingForm({
 // ---------------------------------------------------------------------------
 // Custom Announcement Form
 // ---------------------------------------------------------------------------
+
+function CustomPlaceholderHint() {
+  const placeholders: PlaceholderDef[] = TEMPLATE_PLACEHOLDERS["custom"] ?? []
+  if (placeholders.length === 0) return null
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Available Placeholders</p>
+      <div className="flex flex-wrap gap-1.5">
+        {placeholders.map((p) => (
+          <button
+            key={p.token}
+            type="button"
+            title={`${p.description} — e.g. "${p.example}"`}
+            className="inline-flex items-center rounded border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground hover:bg-accent transition-colors"
+            onClick={() => navigator.clipboard.writeText(p.token).catch(() => {})}
+          >
+            {p.token}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground">Click to copy. Use in subject, title, body, or footer fields.</p>
+    </div>
+  )
+}
 
 const EMOJI_PRESETS = ["📋", "📢", "🙏", "⛪", "❌", "✅", "📅", "🎉", "💡", "⚠️", "📖", "🕊️"]
 const COLOR_PRESETS = ["#6B7280", "#3B82F6", "#EF4444", "#F59E0B", "#059669", "#8B5CF6", "#EC4899", "#0D9488"]
@@ -1439,7 +1503,9 @@ function CustomForm({
         <p className="text-[11px] text-muted-foreground">Replaces the emoji header when set. Ideal size: 480px wide.</p>
       </div>
 
-      <Field label="Message Body" htmlFor="ct-body">
+      <CustomPlaceholderHint />
+
+      <Field label="Message Body" htmlFor="ct-body" hint="Placeholders above are replaced when the card is built">
         <Textarea
           id="ct-body"
           value={data.body}

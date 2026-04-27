@@ -45,10 +45,13 @@ import {
   type AnniversaryDefaults,
   type BulletinDefaults,
   type BibleStudyLocationDefault,
+  type PlaceholderDef,
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
   SUBJECT_FALLBACKS,
+  TEMPLATE_PLACEHOLDERS,
 } from "@/lib/template-defaults"
+import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
 import { HostFamilyInput } from "@/components/dashboard/communication-edit-forms"
 import { formatPhone } from "@/lib/utils"
 import {
@@ -176,6 +179,34 @@ function ResourceLinksEditor({
         <Plus className="size-3.5" />
         Add Link
       </Button>
+    </div>
+  )
+}
+
+function PlaceholderReference({ typeName }: { typeName: string }) {
+  const placeholders: PlaceholderDef[] = TEMPLATE_PLACEHOLDERS[typeName] ?? []
+  if (placeholders.length === 0) return null
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Available Placeholders</p>
+      <div className="flex flex-wrap gap-1.5">
+        {placeholders.map((p) => (
+          <button
+            key={p.token}
+            type="button"
+            title={`${p.description} — e.g. "${p.example}"`}
+            className="inline-flex items-center rounded border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground hover:bg-accent transition-colors"
+            onClick={() => {
+              navigator.clipboard.writeText(p.token)
+                .then(() => {/* copied */})
+                .catch(() => {/* ignore */})
+            }}
+          >
+            {p.token}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground">Click to copy. Use in subject, message, or footer fields.</p>
     </div>
   )
 }
@@ -370,30 +401,39 @@ export default function TemplatesPage() {
   const previewHtml = useMemo(() => {
     const sampleWeek = "Apr 26 – May 2"
     switch (activeTab) {
-      case "birthday":
+      case "birthday": {
+        const vars = makeBirthdayVars(sampleWeek, ["John", "Mary"])
         return buildBirthdayCard({
           weekLabel: sampleWeek,
-          birthdays: [{ name: "Sample Person", date: "4/27" }],
-          message: birthdayData.message || undefined,
-          footerVerse: birthdayData.footerVerse || undefined,
+          birthdays: [{ name: "John", date: "4/27" }, { name: "Mary", date: "4/29" }],
+          message: interp(birthdayData.message, vars),
+          footerVerse: interp(birthdayData.footerVerse, vars),
           primaryColor: birthdayData.primaryColor || undefined,
+          headerSubtitle: interp(birthdayData.headerSubtitle, vars),
+          resourceLinks: (birthdayData.resourceLinks ?? []).filter(l => l.url),
         })
-      case "anniversary":
+      }
+      case "anniversary": {
+        const vars = makeAnniversaryVars(sampleWeek, ["John & Mary"])
         return buildAnniversaryCard({
           weekLabel: sampleWeek,
           anniversaries: [{ husbandName: "John", wifeName: "Mary", date: "4/28", years: 10 }],
-          message: anniversaryData.message || undefined,
-          footerVerse: anniversaryData.footerVerse || undefined,
+          message: interp(anniversaryData.message, vars),
+          footerVerse: interp(anniversaryData.footerVerse, vars),
           primaryColor: anniversaryData.primaryColor || undefined,
+          headerSubtitle: interp(anniversaryData.headerSubtitle, vars),
+          resourceLinks: (anniversaryData.resourceLinks ?? []).filter(l => l.url),
         })
-      case "friday_bible_study":
+      }
+      case "friday_bible_study": {
+        const vars = makeEventVars(sampleWeek, "Friday, May 1st", bibleStudyData.time || "7:30 PM", bibleStudyData.topic || "Book of Acts")
         return buildBibleStudyCard({
-          title: bibleStudyData.title || undefined,
+          title: interp(bibleStudyData.title, vars),
           date: "Friday, May 1st",
           time: bibleStudyData.time || "7:30 PM",
-          topic: bibleStudyData.topic || undefined,
-          message: bibleStudyData.message || undefined,
-          footerVerse: bibleStudyData.footerVerse || undefined,
+          topic: interp(bibleStudyData.topic, vars),
+          message: interp(bibleStudyData.message, vars),
+          footerVerse: interp(bibleStudyData.footerVerse, vars),
           primaryColor: bibleStudyData.primaryColor || undefined,
           resourceLinks: (bibleStudyData.resourceLinks ?? []).filter(l => l.url),
           locations: (bibleStudyData.locations || []).map((loc) => ({
@@ -404,30 +444,38 @@ export default function TemplatesPage() {
             phone: loc.phone || undefined,
           })),
         })
-      case "wednesday_womens_study":
+      }
+      case "wednesday_womens_study": {
+        const vars = makeEventVars(sampleWeek, "Wednesday, Apr 29th", womensStudyData.time || "7:00 PM", womensStudyData.topic || "Building a Relationship with God")
         return buildWomensStudyCard({
-          title: womensStudyData.title || undefined,
-          topic: womensStudyData.topic || undefined,
+          title: interp(womensStudyData.title, vars),
+          topic: interp(womensStudyData.topic, vars),
           date: "Wednesday, April 29th",
           time: womensStudyData.time || "7:00 PM",
           zoomLink: womensStudyData.zoomLink || undefined,
           zoomMeetingId: womensStudyData.zoomMeetingId || undefined,
           zoomPasscode: womensStudyData.zoomPasscode || undefined,
           location: womensStudyData.location || undefined,
-          message: womensStudyData.message || undefined,
-          footerVerse: womensStudyData.footerVerse || undefined,
+          message: interp(womensStudyData.message, vars),
+          footerVerse: interp(womensStudyData.footerVerse, vars),
           primaryColor: womensStudyData.primaryColor || undefined,
           resourceLinks: (womensStudyData.resourceLinks ?? []).filter(l => l.url),
         })
-      case "bulletin":
+      }
+      case "bulletin": {
+        const vars = makeBulletinVars(sampleWeek, "April 27, 2026")
         return buildBulletinCard({
           weekLabel: `Week of ${sampleWeek}`,
           birthdays: [{ name: "Sample Person", date: "4/27" }],
           anniversaries: [{ names: "John & Mary", date: "4/28" }],
           helpers: [],
           events: bulletinData.events || [],
+          message: interp(bulletinData.message, vars),
+          footerVerse: interp(bulletinData.footerVerse, vars),
           primaryColor: bulletinData.primaryColor || undefined,
+          resourceLinks: (bulletinData.resourceLinks ?? []).filter(l => l.url),
         })
+      }
       default:
         return ""
     }
@@ -499,13 +547,15 @@ export default function TemplatesPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Field label="Subject Line Template" htmlFor={`${tab.name}-subject`} hint="Use {{weekLabel}}, {{date}} as placeholders">
+                  <Field label="Subject Line Template" htmlFor={`${tab.name}-subject`}>
                     <Input
                       id={`${tab.name}-subject`}
                       value={subjects[tab.name] || ""}
                       onChange={(e) => setSubjects((prev) => ({ ...prev, [tab.name]: e.target.value }))}
                     />
                   </Field>
+
+                  <PlaceholderReference typeName={tab.name} />
 
                   <ColorPickerField
                     value={
@@ -939,6 +989,7 @@ export default function TemplatesPage() {
                       onChange={(e) => setEditingCustom({ ...editingCustom, subject: e.target.value })}
                     />
                   </Field>
+                  <PlaceholderReference typeName="custom" />
                   <Field label="Title" htmlFor="ct-title">
                     <Input
                       id="ct-title"
