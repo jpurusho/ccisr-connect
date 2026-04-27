@@ -19,7 +19,7 @@ import { MembersCardView } from "@/components/members/members-card-view"
 import { FamilyView } from "@/components/members/family-view"
 import { MemberFormDialog } from "@/components/members/member-form-dialog"
 import type { Tag } from "@/types/database"
-import { Plus, Search, LayoutGrid, Table2, Users, Download, Upload, Merge, GitMerge } from "lucide-react"
+import { Plus, Search, LayoutGrid, Table2, Users, Download, Upload, Merge, GitMerge, UserCheck, UserX, Baby, Home } from "lucide-react"
 import { MemberExportDialog } from "@/components/members/member-export"
 import { MemberImportDialog } from "@/components/members/member-import"
 import { MemberDedupDialog } from "@/components/members/member-dedup"
@@ -37,7 +37,9 @@ export default function MembersPage() {
 
 function MembersPageContent() {
   const searchParams = useSearchParams()
-  const [memberCount, setMemberCount] = useState<number | null>(null)
+  const [stats, setStats] = useState<{
+    total: number; active: number; inactive: number; families: number; children: number
+  } | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<FilterValue>(
     (searchParams.get("filter") as FilterValue) || "active"
@@ -61,12 +63,22 @@ function MembersPageContent() {
   const [refreshKey, setRefreshKey] = useState(0)
   const defaultView = searchParams.get("view") || "table"
 
-  const fetchCount = useCallback(async () => {
+  const fetchStats = useCallback(async () => {
     const supabase = createClient()
-    const { count } = await supabase
-      .from("members")
-      .select("*", { count: "exact", head: true })
-    setMemberCount(count ?? 0)
+    const [totalRes, activeRes, inactiveRes, familiesRes, childrenRes] = await Promise.all([
+      supabase.from("members").select("*", { count: "exact", head: true }),
+      supabase.from("members").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("members").select("*", { count: "exact", head: true }).eq("is_active", false),
+      supabase.from("families").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("members").select("*", { count: "exact", head: true }).eq("role_in_family", "child"),
+    ])
+    setStats({
+      total: totalRes.count ?? 0,
+      active: activeRes.count ?? 0,
+      inactive: inactiveRes.count ?? 0,
+      families: familiesRes.count ?? 0,
+      children: childrenRes.count ?? 0,
+    })
   }, [])
 
   const fetchCities = useCallback(async () => {
@@ -92,10 +104,10 @@ function MembersPageContent() {
   }, [])
 
   useEffect(() => {
-    fetchCount()
+    fetchStats()
     fetchCities()
     fetchTags()
-  }, [fetchCount, fetchCities, fetchTags, refreshKey])
+  }, [fetchStats, fetchCities, fetchTags, refreshKey])
 
   function handleSuccess() {
     setRefreshKey((k) => k + 1)
@@ -108,9 +120,7 @@ function MembersPageContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Members</h1>
           <p className="text-muted-foreground">
-            {memberCount !== null
-              ? `${memberCount} member${memberCount !== 1 ? "s" : ""} total`
-              : "Loading..."}
+            {stats ? `${stats.total} member${stats.total !== 1 ? "s" : ""} total` : "Loading..."}
           </p>
         </div>
         <div className="flex gap-2">
@@ -134,6 +144,27 @@ function MembersPageContent() {
           </Button>
         </div>
       </div>
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {[
+            { label: "Families", value: stats.families, icon: Home, color: "text-blue-600 dark:text-blue-400" },
+            { label: "Active", value: stats.active, icon: UserCheck, color: "text-green-600 dark:text-green-400" },
+            { label: "Inactive", value: stats.inactive, icon: UserX, color: "text-gray-500" },
+            { label: "Children", value: stats.children, icon: Baby, color: "text-purple-600 dark:text-purple-400" },
+            { label: "Total", value: stats.total, icon: Users, color: "text-foreground" },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-2.5 rounded-lg border px-3 py-2">
+              <s.icon className={`size-4 shrink-0 ${s.color}`} />
+              <div className="min-w-0">
+                <p className="text-lg font-semibold leading-tight">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground">{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Search and filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
