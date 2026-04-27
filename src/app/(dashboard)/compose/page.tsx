@@ -695,7 +695,19 @@ export default function ComposePage() {
     if (data) {
       const type = data.template_type.startsWith("custom:") ? "custom" : data.template_type
       setSelectedTemplate(data.template_type as TemplateId)
-      setFormState({ type, data: data.form_data } as unknown as FormState)
+      const fd = data.form_data
+      const patched = {
+        ...fd,
+        resourceLinks: (fd.resourceLinks ?? []) as { label: string; url: string }[],
+        message: (fd.message ?? "") as string,
+        primaryColor: (fd.primaryColor ?? "") as string,
+        footerVerse: (fd.footerVerse ?? "") as string,
+        // Migrate old single-link bible study fields
+        ...(!fd.resourceLinks && fd.resourceLinkUrl ? {
+          resourceLinks: [{ label: (fd.resourceLinkLabel as string) || "View Resources", url: fd.resourceLinkUrl as string }],
+        } : {}),
+      }
+      setFormState({ type, data: patched } as unknown as FormState)
       setSubject(data.subject)
       setSelectedMailingList(data.mailing_list_id || "")
       setSelectedSmtpConfig(data.smtp_config_id || "")
@@ -801,16 +813,15 @@ export default function ComposePage() {
           <CardContent>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {savedInstances.map((si) => (
-                <button
+                <div
                   key={si.id}
-                  type="button"
-                  className="flex items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+                  className="group relative flex items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent cursor-pointer"
                   onClick={() => loadSavedInstance(si.id)}
                 >
                   <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Send className="size-4" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{si.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{si.subject}</p>
                     <p className="text-[10px] text-muted-foreground/60 mt-0.5">
@@ -821,7 +832,29 @@ export default function ComposePage() {
                       {si.smtp_config_id && " · SMTP set"}
                     </p>
                   </div>
-                </button>
+                  <button
+                    type="button"
+                    title="Delete instance"
+                    className="absolute right-2 top-2 hidden rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive group-hover:block"
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      const supabase = createClient()
+                      const { error } = await supabase
+                        .from("composed_instances")
+                        .delete()
+                        .eq("id", si.id)
+                      if (error) {
+                        toast.error(`Delete failed: ${error.message}`)
+                      } else {
+                        setSavedInstances((prev) => prev.filter((s) => s.id !== si.id))
+                        logAudit("composed_instance_deleted", "composed_instances", si.id, { name: si.name })
+                        toast.success(`"${si.name}" deleted`)
+                      }
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           </CardContent>
