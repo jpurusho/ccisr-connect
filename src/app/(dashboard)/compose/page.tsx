@@ -89,11 +89,15 @@ const TEMPLATE_TO_EVENT_TYPE: Record<string, string> = {
 // Form types — imported from edit-forms (single source of truth)
 import {
   HostFamilyInput,
+  BibleStudyEditForm,
+  WomensStudyEditForm,
+  BulletinEditForm,
   type BirthdayFormData as BirthdayFormState,
   type AnniversaryFormData as AnniversaryFormState,
   type BibleStudyFormData as BibleStudyFormState,
   type BibleStudyLocationData as BibleStudyLocationState,
   type WomensStudyFormData as WomensStudyFormState,
+  type BulletinFormData as BulletinFormState,
 } from "@/components/dashboard/communication-edit-forms"
 import { formatPhone } from "@/lib/utils"
 
@@ -107,14 +111,6 @@ interface PrayerMeetingFormState {
   dinnerNote: string
   signupLink: string
   message: string
-}
-
-interface BulletinFormState {
-  weekLabel: string
-  birthdays: { name: string; date: string }[]
-  anniversaries: { names: string; date: string }[]
-  helpers: { role: string; name: string }[]
-  events: { title: string; details: string }[]
 }
 
 interface CustomFormState {
@@ -569,6 +565,10 @@ export default function ComposePage() {
               { title: "Women's Bible Study", details: "Building a Relationship with God — Wednesdays @ 7:00 PM via Zoom" },
               { title: "San Ramon Bible Study", details: "Studying the Book of Acts — Friday at 7:30 PM" },
             ],
+            resourceLinks: [],
+            message: "",
+            primaryColor: "",
+            footerVerse: "",
           },
         })
         setSubject(`Weekly Bulletin for Sunday ${format(bulSunday, "MMMM d, yyyy")}`)
@@ -1020,13 +1020,13 @@ export default function ComposePage() {
                     />
                   )}
                   {formState.type === "bible_study" && (
-                    <BibleStudyForm
+                    <BibleStudyEditForm
                       data={formState.data}
                       onChange={(data) => updateForm("bible_study", () => data)}
                     />
                   )}
                   {formState.type === "womens_study" && (
-                    <WomensStudyForm
+                    <WomensStudyEditForm
                       data={formState.data}
                       onChange={(data) => updateForm("womens_study", () => data)}
                     />
@@ -1038,7 +1038,7 @@ export default function ComposePage() {
                     />
                   )}
                   {formState.type === "bulletin" && (
-                    <BulletinForm
+                    <BulletinEditForm
                       data={formState.data}
                       onChange={(data) => updateForm("bulletin", () => data)}
                     />
@@ -1388,167 +1388,6 @@ function AnniversaryForm({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Bible Study Form
-// ---------------------------------------------------------------------------
-
-function BibleStudyForm({
-  data,
-  onChange,
-}: {
-  data: BibleStudyFormState
-  onChange: (data: BibleStudyFormState) => void
-}) {
-  function set<K extends keyof Omit<BibleStudyFormState, "locations">>(field: K, value: BibleStudyFormState[K]) {
-    onChange({ ...data, [field]: value })
-  }
-
-  function updateLocation(index: number, field: keyof BibleStudyLocationState, value: string) {
-    const updated = [...data.locations]
-    updated[index] = { ...updated[index], [field]: value }
-    onChange({ ...data, locations: updated })
-  }
-
-  function removeLocation(index: number) {
-    onChange({ ...data, locations: data.locations.filter((_, i) => i !== index) })
-  }
-
-  function addLocation() {
-    onChange({
-      ...data,
-      locations: [...data.locations, { label: "", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" }],
-    })
-  }
-
-  return (
-    <div className="space-y-4">
-      <Field label="Card Title" htmlFor="bs-title">
-        <Input id="bs-title" value={data.title} onChange={(e) => set("title", e.target.value)} placeholder="Bible Study This Friday" />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Date" htmlFor="bs-date">
-          <Input id="bs-date" value={data.date} onChange={(e) => set("date", e.target.value)} placeholder="Friday, May 2nd" />
-        </Field>
-        <Field label="Time" htmlFor="bs-time">
-          <Input id="bs-time" value={data.time} onChange={(e) => set("time", e.target.value)} placeholder="7:30 PM" />
-        </Field>
-      </div>
-      <Field label="Topic (leave empty to exclude)" htmlFor="bs-topic">
-        <Input id="bs-topic" value={data.topic} onChange={(e) => set("topic", e.target.value)} />
-      </Field>
-
-      {data.locations.map((loc, i) => (
-        <div key={i} className="space-y-2 rounded-md border p-3">
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Location name"
-              value={loc.label}
-              onChange={(e) => updateLocation(i, "label", e.target.value)}
-              className="flex-1 font-medium"
-            />
-            {data.locations.length > 1 && (
-              <Button variant="ghost" size="icon-sm" onClick={() => removeLocation(i)}>
-                <Trash2 className="size-3.5 text-muted-foreground" />
-              </Button>
-            )}
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <HostFamilyInput
-              value={loc.hostNames}
-              onChange={(v) => updateLocation(i, "hostNames", v)}
-              onSelect={(f) => {
-                const locs = [...data.locations]
-                locs[i] = {
-                  ...locs[i],
-                  hostNames: `${f.family_name}'s Residence`,
-                  address: f.full_address ?? locs[i].address,
-                  city: [f.city, f.state, f.zip].filter(Boolean).join(", ") || locs[i].city,
-                  phone: formatPhone(f.home_phone) || locs[i].phone,
-                }
-                onChange({ ...data, locations: locs })
-              }}
-            />
-            <Input placeholder="Phone" value={loc.phone} onChange={(e) => updateLocation(i, "phone", e.target.value)} />
-          </div>
-          <Input placeholder="Address" value={loc.address} onChange={(e) => updateLocation(i, "address", e.target.value)} />
-          <Input placeholder="City, State ZIP" value={loc.city} onChange={(e) => updateLocation(i, "city", e.target.value)} />
-        </div>
-      ))}
-      <Button variant="outline" size="sm" onClick={addLocation}>
-        <Plus className="size-3.5" />
-        Add Location
-      </Button>
-
-      <Field label="Custom Message (optional)" htmlFor="bs-msg">
-        <Textarea
-          id="bs-msg"
-          placeholder="Leave blank for default message"
-          value={data.message}
-          onChange={(e) => set("message", e.target.value)}
-        />
-      </Field>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Women's Study Form
-// ---------------------------------------------------------------------------
-
-function WomensStudyForm({
-  data,
-  onChange,
-}: {
-  data: WomensStudyFormState
-  onChange: (data: WomensStudyFormState) => void
-}) {
-  function set<K extends keyof WomensStudyFormState>(field: K, value: WomensStudyFormState[K]) {
-    onChange({ ...data, [field]: value })
-  }
-
-  return (
-    <div className="space-y-4">
-      <Field label="Card Title" htmlFor="ws-title">
-        <Input id="ws-title" value={data.title} onChange={(e) => set("title", e.target.value)} placeholder="Women's Bible Study" />
-      </Field>
-      <Field label="Topic (leave empty to exclude)" htmlFor="ws-topic">
-        <Input id="ws-topic" value={data.topic} onChange={(e) => set("topic", e.target.value)} />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Date" htmlFor="ws-date">
-          <Input id="ws-date" value={data.date} onChange={(e) => set("date", e.target.value)} placeholder="Wednesday, May 7th" />
-        </Field>
-        <Field label="Time" htmlFor="ws-time">
-          <Input id="ws-time" value={data.time} onChange={(e) => set("time", e.target.value)} placeholder="7:00 PM" />
-        </Field>
-      </div>
-      <Field label="Zoom Link (leave empty to exclude)" htmlFor="ws-zoom">
-        <Input id="ws-zoom" value={data.zoomLink} onChange={(e) => set("zoomLink", e.target.value)} placeholder="https://zoom.us/j/..." />
-      </Field>
-      {data.zoomLink && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Meeting ID" htmlFor="ws-zmid">
-            <Input id="ws-zmid" value={data.zoomMeetingId} onChange={(e) => set("zoomMeetingId", e.target.value)} placeholder="779 2123 2378" />
-          </Field>
-          <Field label="Passcode" htmlFor="ws-zmpw">
-            <Input id="ws-zmpw" value={data.zoomPasscode} onChange={(e) => set("zoomPasscode", e.target.value)} placeholder="6gLy8u" />
-          </Field>
-        </div>
-      )}
-      <Field label="Location (used when no Zoom link)" htmlFor="ws-loc">
-        <Input id="ws-loc" value={data.location} onChange={(e) => set("location", e.target.value)} placeholder="e.g., Fellowship Hall" />
-      </Field>
-      <Field label="Custom Message (optional)" htmlFor="ws-msg">
-        <Textarea
-          id="ws-msg"
-          placeholder="Leave blank for default message"
-          value={data.message}
-          onChange={(e) => set("message", e.target.value)}
-        />
-      </Field>
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Prayer Meeting Form
@@ -1615,211 +1454,6 @@ function PrayerMeetingForm({
           onChange={(e) => set("message", e.target.value)}
         />
       </Field>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Bulletin Form
-// ---------------------------------------------------------------------------
-
-function BulletinForm({
-  data,
-  onChange,
-}: {
-  data: BulletinFormState
-  onChange: (data: BulletinFormState) => void
-}) {
-  // --- Birthdays ---
-  function updateBirthday(i: number, field: string, value: string) {
-    const updated = [...data.birthdays]
-    updated[i] = { ...updated[i], [field]: value }
-    onChange({ ...data, birthdays: updated })
-  }
-  function removeBirthday(i: number) {
-    onChange({ ...data, birthdays: data.birthdays.filter((_, idx) => idx !== i) })
-  }
-  function addBirthday() {
-    onChange({ ...data, birthdays: [...data.birthdays, { name: "", date: "" }] })
-  }
-
-  // --- Anniversaries ---
-  function updateAnniversary(i: number, field: string, value: string) {
-    const updated = [...data.anniversaries]
-    updated[i] = { ...updated[i], [field]: value }
-    onChange({ ...data, anniversaries: updated })
-  }
-  function removeAnniversary(i: number) {
-    onChange({ ...data, anniversaries: data.anniversaries.filter((_, idx) => idx !== i) })
-  }
-  function addAnniversary() {
-    onChange({ ...data, anniversaries: [...data.anniversaries, { names: "", date: "" }] })
-  }
-
-  // --- Helpers ---
-  function updateHelper(i: number, field: string, value: string) {
-    const updated = [...data.helpers]
-    updated[i] = { ...updated[i], [field]: value }
-    onChange({ ...data, helpers: updated })
-  }
-  function removeHelper(i: number) {
-    onChange({ ...data, helpers: data.helpers.filter((_, idx) => idx !== i) })
-  }
-  function addHelper() {
-    onChange({ ...data, helpers: [...data.helpers, { role: "", name: "" }] })
-  }
-
-  // --- Events ---
-  function updateEvent(i: number, field: string, value: string) {
-    const updated = [...data.events]
-    updated[i] = { ...updated[i], [field]: value }
-    onChange({ ...data, events: updated })
-  }
-  function removeEvent(i: number) {
-    onChange({ ...data, events: data.events.filter((_, idx) => idx !== i) })
-  }
-  function addEvent() {
-    onChange({ ...data, events: [...data.events, { title: "", details: "" }] })
-  }
-
-  return (
-    <div className="space-y-5">
-      <Field label="Week Label" htmlFor="bul-week">
-        <Input
-          id="bul-week"
-          value={data.weekLabel}
-          onChange={(e) => onChange({ ...data, weekLabel: e.target.value })}
-        />
-      </Field>
-
-      {/* Birthdays */}
-      <ListSection
-        label="Birthdays"
-        items={data.birthdays}
-        fields={[
-          { key: "name", placeholder: "Name", className: "flex-1" },
-          { key: "date", placeholder: "Date", className: "w-24" },
-        ]}
-        onUpdate={updateBirthday}
-        onRemove={removeBirthday}
-        onAdd={addBirthday}
-        addLabel="Add Birthday"
-      />
-
-      {/* Anniversaries */}
-      <ListSection
-        label="Anniversaries"
-        items={data.anniversaries}
-        fields={[
-          { key: "names", placeholder: "Names (e.g., John & Jane)", className: "flex-1" },
-          { key: "date", placeholder: "Date", className: "w-24" },
-        ]}
-        onUpdate={updateAnniversary}
-        onRemove={removeAnniversary}
-        onAdd={addAnniversary}
-        addLabel="Add Anniversary"
-      />
-
-      {/* Helpers */}
-      <ListSection
-        label="Helpers This Month"
-        items={data.helpers}
-        fields={[
-          { key: "role", placeholder: "Role (e.g., Usher)", className: "w-36" },
-          { key: "name", placeholder: "Name", className: "flex-1" },
-        ]}
-        onUpdate={updateHelper}
-        onRemove={removeHelper}
-        onAdd={addHelper}
-        addLabel="Add Helper"
-      />
-
-      {/* Events */}
-      <div className="space-y-2">
-        <Label>Events</Label>
-        {data.events.map((evt, i) => (
-          <div key={i} className="space-y-1.5 rounded-md border border-border p-2.5">
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Title"
-                value={evt.title}
-                onChange={(e) => updateEvent(i, "title", e.target.value)}
-                className="flex-1"
-              />
-              <Button variant="ghost" size="icon-sm" onClick={() => removeEvent(i)}>
-                <Trash2 className="size-3.5 text-muted-foreground" />
-              </Button>
-            </div>
-            <Textarea
-              placeholder="Details"
-              value={evt.details}
-              onChange={(e) => updateEvent(i, "details", e.target.value)}
-              className="min-h-10"
-            />
-          </div>
-        ))}
-        <Button variant="outline" size="sm" onClick={addEvent}>
-          <Plus className="size-3.5" />
-          Add Event
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Generic list section used in Bulletin form
-// ---------------------------------------------------------------------------
-
-interface ListFieldDef {
-  key: string
-  placeholder: string
-  className?: string
-}
-
-function ListSection<T extends Record<string, string>>({
-  label,
-  items,
-  fields,
-  onUpdate,
-  onRemove,
-  onAdd,
-  addLabel,
-}: {
-  label: string
-  items: T[]
-  fields: ListFieldDef[]
-  onUpdate: (index: number, field: string, value: string) => void
-  onRemove: (index: number) => void
-  onAdd: () => void
-  addLabel: string
-}) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-2">
-          {fields.map((f) => (
-            <Input
-              key={f.key}
-              placeholder={f.placeholder}
-              value={(item as Record<string, string>)[f.key] ?? ""}
-              onChange={(e) => onUpdate(i, f.key, e.target.value)}
-              className={f.className}
-            />
-          ))}
-          <Button variant="ghost" size="icon-sm" onClick={() => onRemove(i)}>
-            <Trash2 className="size-3.5 text-muted-foreground" />
-          </Button>
-        </div>
-      ))}
-      {items.length === 0 && (
-        <p className="text-xs text-muted-foreground">None added yet.</p>
-      )}
-      <Button variant="outline" size="sm" onClick={onAdd}>
-        <Plus className="size-3.5" />
-        {addLabel}
-      </Button>
     </div>
   )
 }
