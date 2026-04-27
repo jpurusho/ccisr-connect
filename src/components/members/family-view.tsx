@@ -27,7 +27,7 @@ type FamilyWithDetails = Family & {
 
 interface FamilyViewProps {
   searchQuery: string
-  filter: "all" | "active" | "inactive" | "newcomers"
+  filter: "all" | "active" | "inactive" | "newcomers" | "children"
   cityFilter?: string
 }
 
@@ -67,9 +67,11 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
       result = result.filter((f) => f.is_active)
     } else if (filter === "inactive") {
       result = result.filter((f) => !f.is_active)
+    } else if (filter === "children") {
+      result = result.filter((f) => f.members.some((m) => m.role_in_family === "child"))
     } else if (filter === "newcomers") {
       result = result.filter((f) =>
-        f.members.some((m) => m.is_newcomer)  // fallback to DB field for families without tag data
+        f.members.some((m) => m.is_newcomer)
       )
     }
 

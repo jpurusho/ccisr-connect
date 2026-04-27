@@ -33,7 +33,7 @@ type MemberWithFamily = Member & {
 
 interface MembersTableProps {
   searchQuery: string
-  filter: "all" | "active" | "inactive" | "newcomers"
+  filter: "all" | "active" | "inactive" | "newcomers" | "children"
   cityFilter?: string
   roleFilter?: string
   tagFilter?: string
@@ -101,6 +101,8 @@ export function MembersTable({
       result = result.filter((m) => m.is_active)
     } else if (filter === "inactive") {
       result = result.filter((m) => !m.is_active)
+    } else if (filter === "children") {
+      result = result.filter((m) => m.role_in_family === "child")
     } else if (filter === "newcomers") {
       result = result.filter((m) =>
         getMemberTags(m).some((t) => t.name.toLowerCase() === "newcomer")

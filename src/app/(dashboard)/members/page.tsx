@@ -25,7 +25,7 @@ import { MemberImportDialog } from "@/components/members/member-import"
 import { MemberDedupDialog } from "@/components/members/member-dedup"
 import { FamilyMergeDialog } from "@/components/members/family-merge"
 
-type FilterValue = "all" | "active" | "inactive" | "newcomers"
+type FilterValue = "all" | "active" | "inactive" | "newcomers" | "children"
 
 export default function MembersPage() {
   return (
@@ -61,7 +61,7 @@ function MembersPageContent() {
   const [dedupOpen, setDedupOpen] = useState(false)
   const [familyMergeOpen, setFamilyMergeOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const defaultView = searchParams.get("view") || "table"
+  const [viewTab, setViewTab] = useState(searchParams.get("view") || "table")
 
   const fetchStats = useCallback(async () => {
     const supabase = createClient()
@@ -148,21 +148,43 @@ function MembersPageContent() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {[
-            { label: "Families", value: stats.families, icon: Home, color: "text-blue-600 dark:text-blue-400" },
-            { label: "Active", value: stats.active, icon: UserCheck, color: "text-green-600 dark:text-green-400" },
-            { label: "Inactive", value: stats.inactive, icon: UserX, color: "text-gray-500" },
-            { label: "Children", value: stats.children, icon: Baby, color: "text-purple-600 dark:text-purple-400" },
-            { label: "Total", value: stats.total, icon: Users, color: "text-foreground" },
-          ].map((s) => (
-            <div key={s.label} className="flex items-center gap-2.5 rounded-lg border px-3 py-2">
-              <s.icon className={`size-4 shrink-0 ${s.color}`} />
-              <div className="min-w-0">
-                <p className="text-lg font-semibold leading-tight">{s.value}</p>
-                <p className="text-[11px] text-muted-foreground">{s.label}</p>
-              </div>
-            </div>
-          ))}
+          {([
+            { label: "Families", value: stats.families, icon: Home, color: "text-blue-600 dark:text-blue-400", filterKey: "families" as const },
+            { label: "Active", value: stats.active, icon: UserCheck, color: "text-green-600 dark:text-green-400", filterKey: "active" as const },
+            { label: "Inactive", value: stats.inactive, icon: UserX, color: "text-gray-500", filterKey: "inactive" as const },
+            { label: "Children", value: stats.children, icon: Baby, color: "text-purple-600 dark:text-purple-400", filterKey: "children" as const },
+            { label: "Total", value: stats.total, icon: Users, color: "text-foreground", filterKey: "all" as const },
+          ] as const).map((s) => {
+            const isActive = s.filterKey === "families"
+              ? viewTab === "family" && filter === "all"
+              : filter === s.filterKey && viewTab !== "family"
+            return (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => {
+                  if (s.filterKey === "families") {
+                    setFilter("all")
+                    setRoleFilter("all")
+                    setViewTab("family")
+                  } else {
+                    setFilter(s.filterKey)
+                    setRoleFilter("all")
+                    if (viewTab === "family") setViewTab("table")
+                  }
+                }}
+                className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted/50 ${
+                  isActive ? "ring-2 ring-primary/40 border-primary/30 bg-primary/5" : ""
+                }`}
+              >
+                <s.icon className={`size-4 shrink-0 ${s.color}`} />
+                <div className="min-w-0">
+                  <p className="text-lg font-semibold leading-tight">{s.value}</p>
+                  <p className="text-[11px] text-muted-foreground">{s.label}</p>
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -188,6 +210,7 @@ function MembersPageContent() {
             <SelectItem value="all">All Members</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="children">Children</SelectItem>
             <SelectItem value="newcomers">Newcomers</SelectItem>
           </SelectContent>
         </Select>
@@ -228,23 +251,21 @@ function MembersPageContent() {
             </SelectContent>
           </Select>
         )}
-        {roleFilter !== "all" && (
-          <Select value={roleFilter} onValueChange={(val) => setRoleFilter(val ?? "all")}>
-            <SelectTrigger className="w-full sm:w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="husband">Husband</SelectItem>
-              <SelectItem value="wife">Wife</SelectItem>
-              <SelectItem value="child">Child</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
+        <Select value={roleFilter} onValueChange={(val) => setRoleFilter(val ?? "all")}>
+          <SelectTrigger className="w-full sm:w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="husband">Husband</SelectItem>
+            <SelectItem value="wife">Wife</SelectItem>
+            <SelectItem value="child">Child</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Views */}
-      <Tabs defaultValue={defaultView}>
+      <Tabs value={viewTab} onValueChange={(val) => setViewTab(val as string)}>
         <TabsList>
           <TabsTrigger value="table">
             <Table2 className="size-4" />

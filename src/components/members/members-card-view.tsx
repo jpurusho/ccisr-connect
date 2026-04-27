@@ -26,7 +26,7 @@ function getMemberCity(m: MemberWithFamily): string {
 
 interface MembersCardViewProps {
   searchQuery: string
-  filter: "all" | "active" | "inactive" | "newcomers"
+  filter: "all" | "active" | "inactive" | "newcomers" | "children"
   cityFilter?: string
 }
 
@@ -60,6 +60,8 @@ export function MembersCardView({ searchQuery, filter, cityFilter }: MembersCard
       result = result.filter((m) => m.is_active)
     } else if (filter === "inactive") {
       result = result.filter((m) => !m.is_active)
+    } else if (filter === "children") {
+      result = result.filter((m) => m.role_in_family === "child")
     } else if (filter === "newcomers") {
       result = result.filter((m) =>
         (m.member_tags ?? []).some((mt) => mt.tags?.name?.toLowerCase() === "newcomer")
