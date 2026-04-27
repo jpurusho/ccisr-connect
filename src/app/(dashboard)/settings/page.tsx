@@ -99,10 +99,12 @@ export default function SettingsPage() {
               <Palette className="size-4" />
               <span className="hidden sm:inline">Themes</span>
             </TabsTrigger>
-            <TabsTrigger value="email">
-              <Server className="size-4" />
-              <span className="hidden sm:inline">Email Configuration</span>
-            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="email">
+                <Server className="size-4" />
+                <span className="hidden sm:inline">Email Configuration</span>
+              </TabsTrigger>
+            )}
             {isAdmin && (
               <TabsTrigger value="users">
                 <UserCog className="size-4" />
@@ -127,9 +129,11 @@ export default function SettingsPage() {
             <ThemeSelector />
           </TabsContent>
 
-          <TabsContent value="email" className="mt-6">
-            <SmtpConfigPanel />
-          </TabsContent>
+          {isAdmin && (
+            <TabsContent value="email" className="mt-6">
+              <SmtpConfigPanel />
+            </TabsContent>
+          )}
 
           {isAdmin && (
             <TabsContent value="users" className="mt-6">

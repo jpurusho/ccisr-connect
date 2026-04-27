@@ -1,11 +1,16 @@
 import type { NextConfig } from "next"
 import { execSync } from "child_process"
+import { readFileSync } from "fs"
 
 function getAppVersion(): string {
+  const pkgVersion = JSON.parse(readFileSync("package.json", "utf8")).version as string
   try {
-    return execSync("git describe --tags --always", { encoding: "utf8" }).trim()
+    const described = execSync("git describe --tags --always", { encoding: "utf8" }).trim()
+    // If git describe found a tag (starts with v + digit), strip the v and use it
+    // Otherwise (shallow clone with no reachable tag) fall back to package.json version
+    return /^v\d/.test(described) ? described.replace(/^v/, "") : pkgVersion
   } catch {
-    return process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "unknown"
+    return pkgVersion
   }
 }
 
