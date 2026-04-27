@@ -149,7 +149,7 @@ export interface ResourceLinkItem {
   url: string
 }
 
-function ResourceLinksEditor({
+export function ResourceLinksEditor({
   links,
   onChange,
 }: {
@@ -208,7 +208,7 @@ interface CardStyleFieldsData {
   footerVerse: string
 }
 
-function CardStyleFields<T extends CardStyleFieldsData>({
+export function CardStyleFields<T extends CardStyleFieldsData>({
   data,
   onChange,
   idPrefix,
@@ -264,6 +264,9 @@ export interface BirthdayFormData {
   weekLabel: string
   birthdays: BirthdayEntry[]
   message: string
+  primaryColor: string
+  footerVerse: string
+  resourceLinks: { label: string; url: string }[]
 }
 
 export function BirthdayEditForm({
@@ -330,15 +333,11 @@ export function BirthdayEditForm({
         </Button>
       </div>
 
-      <Field label="Custom Message (optional)" htmlFor="bday-inline-msg">
-        <Textarea
-          id="bday-inline-msg"
-          placeholder="Leave blank for default message"
-          value={data.message}
-          onChange={(e) => onChange({ ...data, message: e.target.value })}
-          className="min-h-12"
-        />
-      </Field>
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
+      <CardStyleFields data={data} onChange={onChange} idPrefix="bday-i" />
     </div>
   )
 }
@@ -351,6 +350,9 @@ export interface AnniversaryFormData {
   weekLabel: string
   anniversaries: AnniversaryEntry[]
   message: string
+  primaryColor: string
+  footerVerse: string
+  resourceLinks: { label: string; url: string }[]
 }
 
 export function AnniversaryEditForm({
@@ -443,15 +445,11 @@ export function AnniversaryEditForm({
         </Button>
       </div>
 
-      <Field label="Custom Message (optional)" htmlFor="ann-inline-msg">
-        <Textarea
-          id="ann-inline-msg"
-          placeholder="Leave blank for default message"
-          value={data.message}
-          onChange={(e) => onChange({ ...data, message: e.target.value })}
-          className="min-h-12"
-        />
-      </Field>
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
+      <CardStyleFields data={data} onChange={onChange} idPrefix="ann-i" />
     </div>
   )
 }

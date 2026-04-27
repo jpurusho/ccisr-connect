@@ -218,11 +218,17 @@ export default function DashboardPage() {
     weekLabel: "",
     birthdays: [],
     message: "",
+    primaryColor: "",
+    footerVerse: "",
+    resourceLinks: [],
   })
   const [anniversaryForm, setAnniversaryForm] = useState<AnniversaryFormData>({
     weekLabel: "",
     anniversaries: [],
     message: "",
+    primaryColor: "",
+    footerVerse: "",
+    resourceLinks: [],
   })
   const [bibleStudyForm, setBibleStudyForm] = useState<BibleStudyFormData>({
     title: "Bible Study This Friday",
@@ -585,6 +591,9 @@ export default function DashboardPage() {
         message: inactiveBdays.length > 0
           ? `Note: Inactive members with birthdays this week: ${inactiveBdays.join(", ")}`
           : bdDef.message ?? "",
+        primaryColor: (bdDef as Record<string, unknown>).primaryColor as string ?? "",
+        footerVerse: (bdDef as Record<string, unknown>).footerVerse as string ?? "",
+        resourceLinks: ((bdDef as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
       })
 
       // ---- Process anniversaries (skip inactive families) ----
@@ -621,6 +630,9 @@ export default function DashboardPage() {
         message: inactiveAnnis.length > 0
           ? `Note: ${inactiveAnnis.length} inactive family anniversar${inactiveAnnis.length > 1 ? "ies" : "y"} not shown`
           : anDef.message ?? "",
+        primaryColor: (anDef as Record<string, unknown>).primaryColor as string ?? "",
+        footerVerse: (anDef as Record<string, unknown>).footerVerse as string ?? "",
+        resourceLinks: ((anDef as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
       })
 
       // ---- Process Bible Study (multi-location) ----
@@ -820,6 +832,9 @@ export default function DashboardPage() {
       weekLabel: birthdayForm.weekLabel,
       birthdays: birthdayForm.birthdays,
       message: birthdayForm.message || undefined,
+      primaryColor: birthdayForm.primaryColor || undefined,
+      footerVerse: birthdayForm.footerVerse || undefined,
+      resourceLinks: (birthdayForm.resourceLinks ?? []).filter((l) => l.url),
     })
   }, [birthdayForm])
 
@@ -829,6 +844,9 @@ export default function DashboardPage() {
       weekLabel: anniversaryForm.weekLabel,
       anniversaries: anniversaryForm.anniversaries,
       message: anniversaryForm.message || undefined,
+      primaryColor: anniversaryForm.primaryColor || undefined,
+      footerVerse: anniversaryForm.footerVerse || undefined,
+      resourceLinks: (anniversaryForm.resourceLinks ?? []).filter((l) => l.url),
     })
   }, [anniversaryForm])
 
@@ -1415,12 +1433,12 @@ export default function DashboardPage() {
 
           {/* Selected card expanded */}
           {selectedCard === "birthday" && (
-            <WeeklyCommunicationCard title="Birthdays This Week" accentColor="#7C3AED" icon={Cake} status={getStatus("birthday")} summaryLines={birthdaySummary} subject={getSubject("birthday")} onSubjectChange={(v) => setSubjectOverride("birthday", v)} scheduledAt={getScheduledAt("birthday")} previewHtml={birthdayPreview} onSchedule={() => handleSchedule("birthday")} onSendNow={() => handleSendNow("birthday")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.birthday.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, mailingListId: id } }))} selectedSmtpConfig={commOptions.birthday.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, smtpConfigId: id } }))} sendCount={dispatchCounts.birthday} additionalRecipients={commOptions.birthday.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, additionalRecipients: v } }))}>
+            <WeeklyCommunicationCard title="Birthdays This Week" accentColor="#7C3AED" icon={Cake} status={getStatus("birthday")} summaryLines={birthdaySummary} subject={getSubject("birthday")} onSubjectChange={(v) => setSubjectOverride("birthday", v)} scheduledAt={getScheduledAt("birthday")} previewHtml={birthdayPreview} resourceLinks={(birthdayForm.resourceLinks ?? []).filter((l) => l.url)} onSchedule={() => handleSchedule("birthday")} onSendNow={() => handleSendNow("birthday")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.birthday.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, mailingListId: id } }))} selectedSmtpConfig={commOptions.birthday.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, smtpConfigId: id } }))} sendCount={dispatchCounts.birthday} additionalRecipients={commOptions.birthday.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, additionalRecipients: v } }))}>
               <BirthdayEditForm data={birthdayForm} onChange={setBirthdayForm} />
             </WeeklyCommunicationCard>
           )}
           {selectedCard === "anniversary" && (
-            <WeeklyCommunicationCard title="Anniversaries This Week" accentColor="#D97706" icon={Heart} status={getStatus("anniversary")} summaryLines={anniversarySummary} subject={getSubject("anniversary")} onSubjectChange={(v) => setSubjectOverride("anniversary", v)} scheduledAt={getScheduledAt("anniversary")} previewHtml={anniversaryPreview} onSchedule={() => handleSchedule("anniversary")} onSendNow={() => handleSendNow("anniversary")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.anniversary.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, mailingListId: id } }))} selectedSmtpConfig={commOptions.anniversary.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, smtpConfigId: id } }))} sendCount={dispatchCounts.anniversary} additionalRecipients={commOptions.anniversary.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, additionalRecipients: v } }))}>
+            <WeeklyCommunicationCard title="Anniversaries This Week" accentColor="#D97706" icon={Heart} status={getStatus("anniversary")} summaryLines={anniversarySummary} subject={getSubject("anniversary")} onSubjectChange={(v) => setSubjectOverride("anniversary", v)} scheduledAt={getScheduledAt("anniversary")} previewHtml={anniversaryPreview} resourceLinks={(anniversaryForm.resourceLinks ?? []).filter((l) => l.url)} onSchedule={() => handleSchedule("anniversary")} onSendNow={() => handleSendNow("anniversary")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.anniversary.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, mailingListId: id } }))} selectedSmtpConfig={commOptions.anniversary.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, smtpConfigId: id } }))} sendCount={dispatchCounts.anniversary} additionalRecipients={commOptions.anniversary.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, additionalRecipients: v } }))}>
               <AnniversaryEditForm data={anniversaryForm} onChange={setAnniversaryForm} />
             </WeeklyCommunicationCard>
           )}

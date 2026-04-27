@@ -416,7 +416,9 @@ export interface PrayerMeetingCardData {
   signupLink?: string;
   message?: string;
   primaryColor?: string;
+  footerVerse?: string;
   resourceLink?: ResourceLink;
+  resourceLinks?: ResourceLink[];
 }
 
 export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
@@ -457,11 +459,11 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
 ${details}
 </table>
 ${signupHtml}
-${data.resourceLink?.url ? `<div style="text-align:center;margin-top:12px"><a href="${data.resourceLink.url}" style="display:inline-block;padding:8px 20px;border:2px solid ${colors.primary};color:${colors.primary};text-decoration:none;border-radius:8px;font-size:13px;font-weight:600">${data.resourceLink.label || "View Resources"}</a></div>` : ""}`,
+${resourceLinksHtml([...(data.resourceLinks ?? []), ...(data.resourceLink ? [data.resourceLink] : [])], colors)}`,
       colors
     ) +
     footerRow(
-      '"For where two or three gather in my name, there am I with them." — Matthew 18:20',
+      data.footerVerse || '"For where two or three gather in my name, there am I with them." — Matthew 18:20',
       colors
     );
 

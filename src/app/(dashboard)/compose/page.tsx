@@ -89,6 +89,8 @@ const TEMPLATE_TO_EVENT_TYPE: Record<string, string> = {
 // Form types — imported from edit-forms (single source of truth)
 import {
   HostFamilyInput,
+  ResourceLinksEditor,
+  CardStyleFields,
   BibleStudyEditForm,
   WomensStudyEditForm,
   BulletinEditForm,
@@ -111,6 +113,9 @@ interface PrayerMeetingFormState {
   dinnerNote: string
   signupLink: string
   message: string
+  primaryColor: string
+  footerVerse: string
+  resourceLinks: { label: string; url: string }[]
 }
 
 interface CustomFormState {
@@ -164,6 +169,9 @@ function buildPreview(form: FormState): string {
         weekLabel: d.weekLabel,
         birthdays,
         message: d.message || undefined,
+        primaryColor: d.primaryColor || undefined,
+        footerVerse: d.footerVerse || undefined,
+        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
       })
     }
     case "anniversary": {
@@ -176,6 +184,9 @@ function buildPreview(form: FormState): string {
         weekLabel: d.weekLabel,
         anniversaries,
         message: d.message || undefined,
+        primaryColor: d.primaryColor || undefined,
+        footerVerse: d.footerVerse || undefined,
+        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
       })
     }
     case "bible_study": {
@@ -227,6 +238,9 @@ function buildPreview(form: FormState): string {
         dinnerNote: d.dinnerNote || undefined,
         signupLink: d.signupLink || undefined,
         message: d.message || undefined,
+        primaryColor: d.primaryColor || undefined,
+        footerVerse: d.footerVerse || undefined,
+        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
       })
     }
     case "bulletin": {
@@ -364,7 +378,14 @@ export default function ComposePage() {
 
         setFormState({
           type: "birthday",
-          data: { weekLabel, birthdays: bdays, message: "" },
+          data: {
+            weekLabel,
+            birthdays: bdays,
+            message: (savedData.message as string) ?? "",
+            primaryColor: (savedData.primaryColor as string) ?? "",
+            footerVerse: (savedData.footerVerse as string) ?? "",
+            resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
+          },
         })
         setSubject(`Happy Birthday! — Week of ${weekLabel}`)
         break
@@ -387,7 +408,14 @@ export default function ComposePage() {
 
         setFormState({
           type: "anniversary",
-          data: { weekLabel, anniversaries: anns, message: "" },
+          data: {
+            weekLabel,
+            anniversaries: anns,
+            message: (savedData.message as string) ?? "",
+            primaryColor: (savedData.primaryColor as string) ?? "",
+            footerVerse: (savedData.footerVerse as string) ?? "",
+            resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
+          },
         })
         setSubject(`Happy Anniversary! — Week of ${weekLabel}`)
         break
@@ -508,7 +536,10 @@ export default function ComposePage() {
             time: "6:30 PM",
             dinnerNote: "Dinner provided by the host family",
             signupLink: "",
-            message: "",
+            message: (savedData.message as string) ?? "",
+            primaryColor: (savedData.primaryColor as string) ?? "",
+            footerVerse: (savedData.footerVerse as string) ?? "",
+            resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
           },
         })
         setSubject("Monthly Prayer Meeting")
@@ -554,6 +585,8 @@ export default function ComposePage() {
             date: `${a.anniversary_month}/${a.anniversary_day}`,
           }))
 
+        const bulDef = savedData as BulletinDefaults
+        const fallbackBul = FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults
         setFormState({
           type: "bulletin",
           data: {
@@ -561,14 +594,14 @@ export default function ComposePage() {
             birthdays: bdays,
             anniversaries: anns,
             helpers: [],
-            events: [
+            events: bulDef.events ?? fallbackBul.events ?? [
               { title: "Women's Bible Study", details: "Building a Relationship with God — Wednesdays @ 7:00 PM via Zoom" },
               { title: "San Ramon Bible Study", details: "Studying the Book of Acts — Friday at 7:30 PM" },
             ],
-            resourceLinks: [],
-            message: "",
-            primaryColor: "",
-            footerVerse: "",
+            resourceLinks: (bulDef.resourceLinks ?? []) as { label: string; url: string }[],
+            message: bulDef.message ?? "",
+            primaryColor: bulDef.primaryColor ?? "",
+            footerVerse: bulDef.footerVerse ?? "",
           },
         })
         setSubject(`Weekly Bulletin for Sunday ${format(bulSunday, "MMMM d, yyyy")}`)
@@ -1446,14 +1479,11 @@ function PrayerMeetingForm({
       <Field label="Signup Link" htmlFor="pm-signup">
         <Input id="pm-signup" value={data.signupLink} onChange={(e) => set("signupLink", e.target.value)} placeholder="https://..." />
       </Field>
-      <Field label="Custom Message (optional)" htmlFor="pm-msg">
-        <Textarea
-          id="pm-msg"
-          placeholder="Leave blank for default message"
-          value={data.message}
-          onChange={(e) => set("message", e.target.value)}
-        />
-      </Field>
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
+      <CardStyleFields data={data} onChange={onChange} idPrefix="pm" />
     </div>
   )
 }
