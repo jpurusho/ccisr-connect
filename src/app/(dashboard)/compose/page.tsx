@@ -49,6 +49,7 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
+  ImagePlus,
 } from "lucide-react"
 import { startOfWeek, endOfWeek, format, addDays, nextFriday, isFriday } from "date-fns"
 import { logAudit } from "@/lib/audit"
@@ -122,6 +123,7 @@ interface CustomFormState {
   title: string
   subtitle: string
   emoji: string
+  bannerImageUrl: string
   body: string
   primaryColor: string
   footerText: string
@@ -259,6 +261,7 @@ function buildPreview(form: FormState): string {
         title: d.title || "Announcement",
         subtitle: d.subtitle || undefined,
         emoji: d.emoji || undefined,
+        bannerImageUrl: d.bannerImageUrl || undefined,
         bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${d.body}</p>`,
         primaryColor: d.primaryColor || undefined,
         footerText: d.footerText || undefined,
@@ -735,6 +738,7 @@ export default function ComposePage() {
         message: (fd.message ?? "") as string,
         primaryColor: (fd.primaryColor ?? "") as string,
         footerVerse: (fd.footerVerse ?? "") as string,
+        bannerImageUrl: (fd.bannerImageUrl ?? "") as string,
         // Migrate old single-link bible study fields
         ...(!fd.resourceLinks && fd.resourceLinkUrl ? {
           resourceLinks: [{ label: (fd.resourceLinkLabel as string) || "View Resources", url: fd.resourceLinkUrl as string }],
@@ -943,6 +947,7 @@ export default function ComposePage() {
                       title: body.title || ct.name,
                       subtitle: body.subtitle || "",
                       emoji: body.emoji || "📋",
+                      bannerImageUrl: body.bannerImageUrl || "",
                       body: body.body || "",
                       primaryColor: body.primaryColor || "",
                       footerText: body.footerText || "",
@@ -953,7 +958,7 @@ export default function ComposePage() {
                 } catch {
                   setFormState({
                     type: "custom",
-                    data: { title: ct.name, subtitle: "", emoji: "📋", body: ct.body_template, primaryColor: "", footerText: "", resourceLinks: [] },
+                    data: { title: ct.name, subtitle: "", emoji: "📋", bannerImageUrl: "", body: ct.body_template, primaryColor: "", footerText: "", resourceLinks: [] },
                   })
                   setSubject(ct.name)
                 }
@@ -981,7 +986,7 @@ export default function ComposePage() {
             setSelectedTemplate("custom:new")
             setFormState({
               type: "custom",
-              data: { title: "", subtitle: "Christ Church of India, San Ramon", emoji: "📋", body: "", primaryColor: "#6B7280", footerText: "", resourceLinks: [] },
+              data: { title: "", subtitle: "Christ Church of India, San Ramon", emoji: "📋", bannerImageUrl: "", body: "", primaryColor: "#6B7280", footerText: "", resourceLinks: [] },
             })
             setSubject("")
             setLoading(false)
@@ -1505,9 +1510,33 @@ function CustomForm({
   onSaveAsTemplate: (name: string) => void
 }) {
   const [saveTemplateName, setSaveTemplateName] = useState("")
+  const [uploading, setUploading] = useState(false)
 
   function set<K extends keyof CustomFormState>(field: K, value: CustomFormState[K]) {
     onChange({ ...data, [field]: value })
+  }
+
+  async function handleBannerUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split(".").pop() || "jpg"
+      const path = `banners/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from("card-images").upload(path, file, { upsert: true })
+      if (error) {
+        toast.error(`Upload failed: ${error.message}`)
+        return
+      }
+      const { data: urlData } = supabase.storage.from("card-images").getPublicUrl(path)
+      onChange({ ...data, bannerImageUrl: urlData.publicUrl })
+      toast.success("Banner uploaded")
+    } catch {
+      toast.error("Upload failed")
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -1553,6 +1582,41 @@ function CustomForm({
           />
         </div>
       </div>
+      {/* Banner Image */}
+      <div className="space-y-1.5">
+        <Label>Banner Image (optional)</Label>
+        {data.bannerImageUrl ? (
+          <div className="relative rounded-lg border overflow-hidden">
+            <img src={data.bannerImageUrl} alt="Banner" className="w-full max-h-48 object-cover" />
+            <Button
+              variant="destructive"
+              size="sm"
+              className="absolute top-2 right-2"
+              onClick={() => set("bannerImageUrl", "")}
+            >
+              <Trash2 className="size-3.5" />
+              Remove
+            </Button>
+          </div>
+        ) : (
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/30">
+            {uploading ? (
+              <><Loader2 className="size-4 animate-spin" /> Uploading...</>
+            ) : (
+              <><ImagePlus className="size-5" /> Click to upload JPG, PNG, or WebP (max 5MB)</>
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleBannerUpload}
+              disabled={uploading}
+            />
+          </label>
+        )}
+        <p className="text-[11px] text-muted-foreground">Replaces the emoji header when set. Ideal size: 480px wide.</p>
+      </div>
+
       <Field label="Message Body" htmlFor="ct-body">
         <Textarea
           id="ct-body"
