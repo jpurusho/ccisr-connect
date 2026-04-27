@@ -40,7 +40,31 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { Plus, UserCog, Shield, ShieldCheck, User, Loader2 } from "lucide-react"
+import { Plus, UserCog, Shield, ShieldCheck, User, Loader2, Check, Minus } from "lucide-react"
+
+type PermValue = true | false | "read-only"
+
+const ROLE_PERMISSIONS: { feature: string; super_admin: PermValue; admin: PermValue; operator: PermValue }[] = [
+  { feature: "Members — view, create, edit, delete", super_admin: true, admin: true, operator: true },
+  { feature: "Events — view, create, edit, delete",  super_admin: true, admin: true, operator: true },
+  { feature: "Event Types — manage",                 super_admin: true, admin: true, operator: "read-only" },
+  { feature: "Email Templates — full CRUD",          super_admin: true, admin: true, operator: true },
+  { feature: "Mailing Lists — full CRUD",            super_admin: true, admin: true, operator: true },
+  { feature: "Dispatch — create & send",             super_admin: true, admin: true, operator: true },
+  { feature: "Dispatch History — view",              super_admin: true, admin: true, operator: "read-only" },
+  { feature: "SMTP Configs — manage",                super_admin: true, admin: true, operator: "read-only" },
+  { feature: "Audit Log — view",                     super_admin: true, admin: true, operator: "read-only" },
+  { feature: "User Management — view/edit/deactivate", super_admin: true, admin: true, operator: false },
+  { feature: "Invite Users — create new accounts",   super_admin: true, admin: false, operator: false },
+]
+
+function PermCell({ value }: { value: PermValue }) {
+  if (value === true)
+    return <Check className="mx-auto size-4 text-green-600" />
+  if (value === false)
+    return <Minus className="mx-auto size-4 text-muted-foreground/40" />
+  return <span className="text-xs text-muted-foreground">read-only</span>
+}
 
 const ROLE_CONFIG: Record<UserRole, { label: string; icon: typeof Shield; color: string }> = {
   super_admin: { label: "Super Admin", icon: ShieldCheck, color: "text-red-600" },
@@ -239,6 +263,50 @@ export function UserManagementPanel() {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="size-5" />
+            Role Permissions
+          </CardTitle>
+          <CardDescription>What each role can do in CCISR Connect</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-56">Feature</TableHead>
+                <TableHead className="text-center">
+                  <span className="flex items-center justify-center gap-1">
+                    <ShieldCheck className="size-3.5 text-red-600" /> Super Admin
+                  </span>
+                </TableHead>
+                <TableHead className="text-center">
+                  <span className="flex items-center justify-center gap-1">
+                    <Shield className="size-3.5 text-amber-600" /> Admin
+                  </span>
+                </TableHead>
+                <TableHead className="text-center">
+                  <span className="flex items-center justify-center gap-1">
+                    <User className="size-3.5 text-blue-600" /> Operator
+                  </span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ROLE_PERMISSIONS.map(({ feature, super_admin, admin, operator }) => (
+                <TableRow key={feature}>
+                  <TableCell className="text-sm font-medium">{feature}</TableCell>
+                  <TableCell className="text-center"><PermCell value={super_admin} /></TableCell>
+                  <TableCell className="text-center"><PermCell value={admin} /></TableCell>
+                  <TableCell className="text-center"><PermCell value={operator} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
