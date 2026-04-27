@@ -83,52 +83,35 @@ export function UserManagementPanel() {
     setSaving(true)
     try {
       const supabase = createClient()
+      const token = (await supabase.auth.getSession()).data.session?.access_token
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users`,
-        {
-          method: "POST",
-          headers: {
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: inviteEmail.trim(),
-            email_confirm: true,
-            user_metadata: { full_name: inviteDisplayName.trim() || inviteEmail.trim() },
-          }),
-        }
-      )
+      const res = await fetch("/api/users/invite", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          display_name: inviteDisplayName.trim() || null,
+          role: inviteRole,
+        }),
+      })
 
       if (!res.ok) {
         const err = await res.json()
-        toast.error(`Failed to create auth user: ${err.message || err.msg || "Unknown error"}`)
+        toast.error(`Failed to invite user: ${err.error || "Unknown error"}`)
         setSaving(false)
         return
       }
 
-      const authUser = await res.json()
-
-      const { error } = await supabase.from("app_users").insert({
-        id: authUser.id,
-        email: inviteEmail.trim(),
-        display_name: inviteDisplayName.trim() || null,
-        role: inviteRole,
-        is_active: true,
-      } as never)
-
-      if (error) {
-        toast.error(`Failed to create app user: ${error.message}`)
-      } else {
-        toast.success(`User ${inviteEmail.trim()} invited as ${inviteRole}`)
-        logAudit("user_invited", "app_users", null, { email: inviteEmail.trim(), role: inviteRole })
-        setDialogOpen(false)
-        setInviteEmail("")
-        setInviteDisplayName("")
-        setInviteRole("operator")
-        fetchUsers()
-      }
+      toast.success(`User ${inviteEmail.trim()} invited as ${inviteRole}`)
+      logAudit("user_invited", "app_users", null, { email: inviteEmail.trim(), role: inviteRole })
+      setDialogOpen(false)
+      setInviteEmail("")
+      setInviteDisplayName("")
+      setInviteRole("operator")
+      fetchUsers()
     } catch {
       toast.error("An unexpected error occurred")
     } finally {
