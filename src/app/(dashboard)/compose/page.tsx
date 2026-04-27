@@ -114,6 +114,7 @@ interface PrayerMeetingFormState {
   dinnerNote: string
   signupLink: string
   message: string
+  headerSubtitle: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -171,6 +172,7 @@ function buildPreview(form: FormState): string {
         weekLabel: d.weekLabel,
         birthdays,
         message: d.message || undefined,
+        headerSubtitle: d.headerSubtitle || undefined,
         primaryColor: d.primaryColor || undefined,
         footerVerse: d.footerVerse || undefined,
         resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
@@ -186,6 +188,7 @@ function buildPreview(form: FormState): string {
         weekLabel: d.weekLabel,
         anniversaries,
         message: d.message || undefined,
+        headerSubtitle: d.headerSubtitle || undefined,
         primaryColor: d.primaryColor || undefined,
         footerVerse: d.footerVerse || undefined,
         resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
@@ -199,6 +202,7 @@ function buildPreview(form: FormState): string {
         time: d.time,
         topic: d.topic || undefined,
         message: d.message || undefined,
+        headerSubtitle: d.headerSubtitle || undefined,
         primaryColor: d.primaryColor || undefined,
         footerVerse: d.footerVerse || undefined,
         resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
@@ -223,6 +227,7 @@ function buildPreview(form: FormState): string {
         zoomPasscode: d.zoomPasscode || undefined,
         location: d.location || undefined,
         message: d.message || undefined,
+        headerSubtitle: d.headerSubtitle || undefined,
         primaryColor: d.primaryColor || undefined,
         footerVerse: d.footerVerse || undefined,
         resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
@@ -240,6 +245,7 @@ function buildPreview(form: FormState): string {
         dinnerNote: d.dinnerNote || undefined,
         signupLink: d.signupLink || undefined,
         message: d.message || undefined,
+        headerSubtitle: d.headerSubtitle || undefined,
         primaryColor: d.primaryColor || undefined,
         footerVerse: d.footerVerse || undefined,
         resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
@@ -249,10 +255,15 @@ function buildPreview(form: FormState): string {
       const d = form.data
       return buildBulletinCard({
         weekLabel: d.weekLabel,
+        headerSubtitle: d.headerSubtitle || undefined,
         birthdays: d.birthdays,
         anniversaries: d.anniversaries,
         helpers: d.helpers,
         events: d.events,
+        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
+        message: d.message || undefined,
+        primaryColor: d.primaryColor || undefined,
+        footerVerse: d.footerVerse || undefined,
       })
     }
     case "custom": {
@@ -385,6 +396,7 @@ export default function ComposePage() {
             weekLabel,
             birthdays: bdays,
             message: (savedData.message as string) ?? "",
+            headerSubtitle: (savedData.headerSubtitle as string) ?? "",
             primaryColor: (savedData.primaryColor as string) ?? "",
             footerVerse: (savedData.footerVerse as string) ?? "",
             resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
@@ -415,6 +427,7 @@ export default function ComposePage() {
             weekLabel,
             anniversaries: anns,
             message: (savedData.message as string) ?? "",
+            headerSubtitle: (savedData.headerSubtitle as string) ?? "",
             primaryColor: (savedData.primaryColor as string) ?? "",
             footerVerse: (savedData.footerVerse as string) ?? "",
             resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
@@ -488,6 +501,7 @@ export default function ComposePage() {
             time: instance?.instance_time ? formatTime(instance.instance_time) : bsDef.time ?? "7:30 PM",
             topic: bsDef.topic ?? fallbackBs.topic ?? "Studying the Book of Acts",
             message: bsDef.message ?? "",
+            headerSubtitle: (bsDef as Record<string, unknown>).headerSubtitle as string ?? "",
             primaryColor: bsDef.primaryColor ?? "",
             footerVerse: bsDef.footerVerse ?? "",
             resourceLinks: (() => {
@@ -518,6 +532,7 @@ export default function ComposePage() {
             zoomPasscode: (savedData as WomensStudyDefaults).zoomPasscode ?? "",
             location: (savedData as WomensStudyDefaults).location ?? "",
             message: (savedData as WomensStudyDefaults).message ?? "",
+            headerSubtitle: (savedData as Record<string, unknown>).headerSubtitle as string ?? "",
             primaryColor: (savedData as WomensStudyDefaults).primaryColor ?? "",
             footerVerse: (savedData as WomensStudyDefaults).footerVerse ?? "",
             resourceLinks: ((savedData as Record<string, unknown>).resourceLinks ?? []) as { label: string; url: string }[],
@@ -540,6 +555,7 @@ export default function ComposePage() {
             dinnerNote: "Dinner provided by the host family",
             signupLink: "",
             message: (savedData.message as string) ?? "",
+            headerSubtitle: (savedData.headerSubtitle as string) ?? "",
             primaryColor: (savedData.primaryColor as string) ?? "",
             footerVerse: (savedData.footerVerse as string) ?? "",
             resourceLinks: (savedData.resourceLinks ?? []) as { label: string; url: string }[],
@@ -603,6 +619,7 @@ export default function ComposePage() {
             ],
             resourceLinks: (bulDef.resourceLinks ?? []) as { label: string; url: string }[],
             message: bulDef.message ?? "",
+            headerSubtitle: (bulDef as Record<string, unknown>).headerSubtitle as string ?? "",
             primaryColor: bulDef.primaryColor ?? "",
             footerVerse: bulDef.footerVerse ?? "",
           },
@@ -739,6 +756,7 @@ export default function ComposePage() {
         primaryColor: (fd.primaryColor ?? "") as string,
         footerVerse: (fd.footerVerse ?? "") as string,
         bannerImageUrl: (fd.bannerImageUrl ?? "") as string,
+        headerSubtitle: (fd.headerSubtitle ?? "") as string,
         // Migrate old single-link bible study fields
         ...(!fd.resourceLinks && fd.resourceLinkUrl ? {
           resourceLinks: [{ label: (fd.resourceLinkLabel as string) || "View Resources", url: fd.resourceLinkUrl as string }],

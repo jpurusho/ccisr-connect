@@ -204,6 +204,7 @@ export function ResourceLinksEditor({
 
 interface CardStyleFieldsData {
   message: string
+  headerSubtitle: string
   primaryColor: string
   footerVerse: string
 }
@@ -226,6 +227,14 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           value={data.message}
           onChange={(e) => onChange({ ...data, message: e.target.value })}
           className="min-h-12"
+        />
+      </Field>
+      <Field label="Header Subtitle (optional)" htmlFor={`${idPrefix}-hsub`}>
+        <Input
+          id={`${idPrefix}-hsub`}
+          value={data.headerSubtitle}
+          onChange={(e) => onChange({ ...data, headerSubtitle: e.target.value })}
+          placeholder="Christ Church of India, San Ramon"
         />
       </Field>
       <div className="grid gap-2 sm:grid-cols-2">
@@ -264,6 +273,7 @@ export interface BirthdayFormData {
   weekLabel: string
   birthdays: BirthdayEntry[]
   message: string
+  headerSubtitle: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -350,6 +360,7 @@ export interface AnniversaryFormData {
   weekLabel: string
   anniversaries: AnniversaryEntry[]
   message: string
+  headerSubtitle: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -474,6 +485,7 @@ export interface BibleStudyFormData {
   time: string
   topic: string
   message: string
+  headerSubtitle: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -656,6 +668,7 @@ export interface WomensStudyFormData {
   zoomPasscode: string
   location: string
   message: string
+  headerSubtitle: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -767,6 +780,7 @@ export interface BulletinFormData {
   events: { title: string; details: string }[]
   resourceLinks: { label: string; url: string }[]
   message: string
+  headerSubtitle: string
   primaryColor: string
   footerVerse: string
   weeksAhead?: number

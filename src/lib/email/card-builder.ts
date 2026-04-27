@@ -151,6 +151,7 @@ export interface BirthdayCardData {
   weekLabel: string;
   birthdays: BirthdayEntry[];
   message?: string;
+  headerSubtitle?: string;
   footerVerse?: string;
   primaryColor?: string;
   resourceLinks?: ResourceLink[];
@@ -177,7 +178,7 @@ export function buildBirthdayCard(data: BirthdayCardData): string {
   const content =
     headerRow(
       "Happy Birthday!",
-      `Christ Church of India, San Ramon`,
+      data.headerSubtitle || "Christ Church of India, San Ramon",
       "🎂",
       colors
     ) +
@@ -208,6 +209,7 @@ export interface AnniversaryCardData {
   weekLabel: string;
   anniversaries: AnniversaryEntry[];
   message?: string;
+  headerSubtitle?: string;
   footerVerse?: string;
   primaryColor?: string;
   resourceLinks?: ResourceLink[];
@@ -234,7 +236,7 @@ export function buildAnniversaryCard(data: AnniversaryCardData): string {
   const content =
     headerRow(
       "Happy Anniversary!",
-      `Christ Church of India, San Ramon`,
+      data.headerSubtitle || "Christ Church of India, San Ramon",
       "💍",
       colors
     ) +
@@ -275,6 +277,7 @@ export interface BibleStudyCardData {
   time: string;
   topic?: string;
   message?: string;
+  headerSubtitle?: string;
   footerVerse?: string;
   primaryColor?: string;
   resourceLink?: ResourceLink;
@@ -325,7 +328,7 @@ ${details}
   const content =
     headerRow(
       data.title || "Bible Study This Friday",
-      "Christ Church of India, San Ramon",
+      data.headerSubtitle || "Christ Church of India, San Ramon",
       "📖",
       colors
     ) +
@@ -355,6 +358,7 @@ export interface WomensStudyCardData {
   zoomPasscode?: string;
   location?: string;
   message?: string;
+  headerSubtitle?: string;
   footerVerse?: string;
   primaryColor?: string;
   resourceLinks?: ResourceLink[];
@@ -386,7 +390,7 @@ export function buildWomensStudyCard(data: WomensStudyCardData): string {
   const content =
     headerRow(
       data.title || "Women's Bible Study",
-      "Christ Church of India, San Ramon",
+      data.headerSubtitle || "Christ Church of India, San Ramon",
       "🕊️",
       colors
     ) +
@@ -415,6 +419,7 @@ export interface PrayerMeetingCardData {
   dinnerNote?: string;
   signupLink?: string;
   message?: string;
+  headerSubtitle?: string;
   primaryColor?: string;
   footerVerse?: string;
   resourceLink?: ResourceLink;
@@ -449,7 +454,7 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
   const content =
     headerRow(
       "Monthly Prayer Meeting",
-      "Christ Church of India, San Ramon",
+      data.headerSubtitle || "Christ Church of India, San Ramon",
       "🙏",
       colors
     ) +
@@ -480,6 +485,7 @@ export interface BulletinItem {
 
 export interface BulletinCardData {
   weekLabel: string;
+  headerSubtitle?: string;
   birthdays: { name: string; date: string }[];
   anniversaries: { names: string; date: string }[];
   helpers: { role: string; name: string }[];
@@ -532,9 +538,23 @@ ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font
 </table>`;
   }
 
+  const messageHtml = data.message
+    ? `<div style="margin:16px 0 0;padding:12px 16px;background:${colors.bgLight};border-radius:8px;font-size:14px;color:${colors.textDark};line-height:1.6;white-space:pre-wrap">${data.message}</div>`
+    : "";
+
+  const churchLine = data.headerSubtitle
+    ? `<p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.75);font-weight:500;text-transform:uppercase;letter-spacing:1px">${data.headerSubtitle}</p>`
+    : "";
+
+  const bulletinHeader = `<tr><td style="background:${colors.primary};padding:24px 28px;text-align:center">
+<p style="margin:0;font-size:32px;line-height:1">⛪</p>
+${churchLine}<p style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">Weekly Bulletin</p>
+<p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.85);font-weight:500">${data.weekLabel}</p>
+</td></tr>`;
+
   const content =
-    headerRow("Weekly Bulletin", data.weekLabel, "⛪", colors) +
-    contentRow(`${sections}
+    bulletinHeader +
+    contentRow(`${sections}${messageHtml}
 ${resourceLinksHtml(data.resourceLinks, colors)}`, colors) +
     footerRow(
       data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect",
