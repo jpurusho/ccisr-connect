@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { DynamicBreadcrumb } from "@/components/layout/dynamic-breadcrumb"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { Toaster } from "@/components/ui/sonner"
+import { AppUserProvider } from "@/hooks/use-app-user"
 
 export default function DashboardLayout({
   children,
@@ -22,9 +23,11 @@ export default function DashboardLayout({
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex-1 overflow-auto p-4 md:p-6">
-          {children}
-        </div>
+        <AppUserProvider>
+          <div className="flex-1 overflow-auto p-4 md:p-6">
+            {children}
+          </div>
+        </AppUserProvider>
       </SidebarInset>
       <Toaster />
     </SidebarProvider>

@@ -12,10 +12,12 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ThemeSelector } from "@/components/settings/theme-selector"
 import { SmtpConfigPanel } from "@/components/settings/smtp-config"
 import { UserManagementPanel } from "@/components/settings/user-management"
 import { TagManagementPanel } from "@/components/settings/tag-management"
+import { useAppUser } from "@/hooks/use-app-user"
 
 import { APP_VERSION } from "@/lib/version"
 
@@ -65,6 +67,9 @@ function AboutPanel() {
 }
 
 export default function SettingsPage() {
+  const { appUser, loading } = useAppUser()
+  const isAdmin = appUser?.role === "admin" || appUser?.role === "super_admin"
+
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-3">
@@ -79,61 +84,72 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="themes">
-        <TabsList
-          variant="line"
-          className="w-full justify-start overflow-x-auto scrollbar-none"
-        >
-          <TabsTrigger value="themes">
-            <Palette className="size-4" />
-            <span className="hidden sm:inline">Themes</span>
-          </TabsTrigger>
-          <TabsTrigger value="email">
-            <Server className="size-4" />
-            <span className="hidden sm:inline">Email Configuration</span>
-          </TabsTrigger>
-          <TabsTrigger value="users">
-            <UserCog className="size-4" />
-            <span className="hidden sm:inline">User Management</span>
-          </TabsTrigger>
-          <TabsTrigger value="tags">
-            <Tag className="size-4" />
-            <span className="hidden sm:inline">Tags</span>
-          </TabsTrigger>
-          <TabsTrigger value="activity">
-            <Activity className="size-4" />
-            <span className="hidden sm:inline">Activity Log</span>
-          </TabsTrigger>
-          <TabsTrigger value="about">
-            <Info className="size-4" />
-            <span className="hidden sm:inline">About</span>
-          </TabsTrigger>
-        </TabsList>
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      ) : (
+        <Tabs defaultValue="themes">
+          <TabsList
+            variant="line"
+            className="w-full justify-start overflow-x-auto scrollbar-none"
+          >
+            <TabsTrigger value="themes">
+              <Palette className="size-4" />
+              <span className="hidden sm:inline">Themes</span>
+            </TabsTrigger>
+            <TabsTrigger value="email">
+              <Server className="size-4" />
+              <span className="hidden sm:inline">Email Configuration</span>
+            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="users">
+                <UserCog className="size-4" />
+                <span className="hidden sm:inline">User Management</span>
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="tags">
+              <Tag className="size-4" />
+              <span className="hidden sm:inline">Tags</span>
+            </TabsTrigger>
+            <TabsTrigger value="activity">
+              <Activity className="size-4" />
+              <span className="hidden sm:inline">Activity Log</span>
+            </TabsTrigger>
+            <TabsTrigger value="about">
+              <Info className="size-4" />
+              <span className="hidden sm:inline">About</span>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="themes" className="mt-6">
-          <ThemeSelector />
-        </TabsContent>
+          <TabsContent value="themes" className="mt-6">
+            <ThemeSelector />
+          </TabsContent>
 
-        <TabsContent value="email" className="mt-6">
-          <SmtpConfigPanel />
-        </TabsContent>
+          <TabsContent value="email" className="mt-6">
+            <SmtpConfigPanel />
+          </TabsContent>
 
-        <TabsContent value="users" className="mt-6">
-          <UserManagementPanel />
-        </TabsContent>
+          {isAdmin && (
+            <TabsContent value="users" className="mt-6">
+              <UserManagementPanel />
+            </TabsContent>
+          )}
 
-        <TabsContent value="tags" className="mt-6">
-          <TagManagementPanel />
-        </TabsContent>
+          <TabsContent value="tags" className="mt-6">
+            <TagManagementPanel />
+          </TabsContent>
 
-        <TabsContent value="activity" className="mt-6">
-          <ActivityLogPanel />
-        </TabsContent>
+          <TabsContent value="activity" className="mt-6">
+            <ActivityLogPanel />
+          </TabsContent>
 
-        <TabsContent value="about" className="mt-6">
-          <AboutPanel />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="about" className="mt-6">
+            <AboutPanel />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   )
 }

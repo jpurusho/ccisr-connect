@@ -35,8 +35,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Plus, Server, Mail, Loader2, Trash2, Eye, EyeOff } from "lucide-react"
+import { useAppUser } from "@/hooks/use-app-user"
 
 export function SmtpConfigPanel() {
+  const { appUser } = useAppUser()
+  const canManage = appUser?.role === "admin" || appUser?.role === "super_admin"
   const [configs, setConfigs] = useState<SmtpConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -200,10 +203,12 @@ export function SmtpConfigPanel() {
             Configure email accounts for sending communications.
           </p>
         </div>
-        <Button onClick={() => openDialog()}>
-          <Plus className="size-4" />
-          Add SMTP Account
-        </Button>
+        {canManage && (
+          <Button onClick={() => openDialog()}>
+            <Plus className="size-4" />
+            Add SMTP Account
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -267,25 +272,28 @@ export function SmtpConfigPanel() {
                       <Switch
                         checked={config.is_active}
                         onCheckedChange={() => toggleActive(config)}
+                        disabled={!canManage}
                       />
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openDialog(config)}
-                        >
-                          <Server className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => deleteConfig(config)}
-                        >
-                          <Trash2 className="size-3.5 text-destructive" />
-                        </Button>
-                      </div>
+                      {canManage && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openDialog(config)}
+                          >
+                            <Server className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => deleteConfig(config)}
+                          >
+                            <Trash2 className="size-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

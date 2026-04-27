@@ -41,6 +41,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Plus, UserCog, Shield, ShieldCheck, User, Loader2, Check, Minus } from "lucide-react"
+import { useAppUser } from "@/hooks/use-app-user"
 
 type PermValue = true | false | "read-only"
 
@@ -73,6 +74,10 @@ const ROLE_CONFIG: Record<UserRole, { label: string; icon: typeof Shield; color:
 }
 
 export function UserManagementPanel() {
+  const { appUser: currentUser } = useAppUser()
+  const isSuperAdmin = currentUser?.role === "super_admin"
+  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin"
+
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -183,10 +188,12 @@ export function UserManagementPanel() {
             Manage who can access CCISR Connect and their permissions.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="size-4" />
-          Invite User
-        </Button>
+        {isSuperAdmin && (
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="size-4" />
+            Invite User
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -232,6 +239,7 @@ export function UserManagementPanel() {
                         <Select
                           value={user.role}
                           onValueChange={(val) => updateRole(user, val as UserRole)}
+                          disabled={!isAdmin}
                         >
                           <SelectTrigger className="w-36">
                             <div className="flex items-center gap-1.5">
@@ -255,6 +263,7 @@ export function UserManagementPanel() {
                         <Switch
                           checked={user.is_active}
                           onCheckedChange={() => toggleActive(user)}
+                          disabled={!isAdmin}
                         />
                       </TableCell>
                     </TableRow>
@@ -310,7 +319,7 @@ export function UserManagementPanel() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={isSuperAdmin && dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Invite User</DialogTitle>
