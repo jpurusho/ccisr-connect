@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { Plus, Server, Mail, Loader2, Trash2, Eye, EyeOff } from "lucide-react"
+import { Plus, Server, Mail, Loader2, Trash2, Eye, EyeOff, FlaskConical } from "lucide-react"
 
 export default function SmtpConfigPage() {
   const [configs, setConfigs] = useState<SmtpConfig[]>([])
@@ -42,6 +42,7 @@ export default function SmtpConfigPage() {
   const [editingConfig, setEditingConfig] = useState<SmtpConfig | null>(null)
   const [saving, setSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [testingId, setTestingId] = useState<string | null>(null)
 
   // Form state
   const [name, setName] = useState("")
@@ -170,6 +171,27 @@ export default function SmtpConfigPage() {
     }
   }
 
+  async function handleTest(config: SmtpConfig) {
+    setTestingId(config.id)
+    try {
+      const res = await fetch("/api/smtp/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ smtpConfigId: config.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(`Test email sent to ${config.from_email}`)
+      } else {
+        toast.error(`Test failed: ${data.error}`)
+      }
+    } catch {
+      toast.error("Network error during test")
+    } finally {
+      setTestingId(null)
+    }
+  }
+
   async function deleteConfig(config: SmtpConfig) {
     if (!confirm(`Delete SMTP config "${config.name}"? This cannot be undone.`)) return
 
@@ -267,6 +289,17 @@ export default function SmtpConfigPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          title="Send test email"
+                          disabled={testingId === config.id}
+                          onClick={() => handleTest(config)}
+                        >
+                          {testingId === config.id
+                            ? <Loader2 className="size-3.5 animate-spin" />
+                            : <FlaskConical className="size-3.5 text-green-600" />}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon-sm"

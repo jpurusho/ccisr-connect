@@ -253,6 +253,13 @@ export function WeeklyCommunicationCard({
 
   const selectedMlName = mailingLists?.find((ml) => ml.id === selectedMailingList)?.name
   const selectedSmtpLabel = smtpConfigs?.find((s) => s.id === selectedSmtpConfig)?.name
+  const canDispatch =
+    !!selectedSmtpConfig && (!!selectedMailingList || !!(additionalRecipients?.trim()))
+  const dispatchTitle = !selectedSmtpConfig
+    ? "Select a Send From account first"
+    : !selectedMailingList && !additionalRecipients?.trim()
+    ? "Select a mailing list or add recipient emails first"
+    : undefined
 
   return (
     <>
@@ -435,26 +442,46 @@ export function WeeklyCommunicationCard({
               <Button
                 size="sm"
                 onClick={onSendNow}
-                style={{ backgroundColor: accentColor }}
+                style={canDispatch ? { backgroundColor: accentColor } : undefined}
                 className="text-white hover:opacity-90"
+                disabled={!canDispatch}
+                title={dispatchTitle}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
                 Send Now
               </Button>
-              <Button variant="outline" size="sm" onClick={onSchedule}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onSchedule}
+                disabled={!canDispatch}
+                title={dispatchTitle}
+              >
                 <Clock className="size-3.5" data-icon="inline-start" />
                 Queue
               </Button>
             </>
           )}
           {(status === "sent" || status === "scheduled") && (
-            <Button size="sm" variant="outline" onClick={onSendNow}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onSendNow}
+              disabled={!canDispatch}
+              title={dispatchTitle}
+            >
               <RefreshCw className="size-3.5" data-icon="inline-start" />
               Send Reminder
             </Button>
           )}
           {status === "failed" && (
-            <Button size="sm" onClick={onSendNow} variant="destructive">
+            <Button
+              size="sm"
+              onClick={onSendNow}
+              variant="destructive"
+              disabled={!canDispatch}
+              title={dispatchTitle}
+            >
               <Send className="size-3.5" data-icon="inline-start" />
               Retry
             </Button>
@@ -487,8 +514,10 @@ export function WeeklyCommunicationCard({
                   setPreviewing(false)
                   onSendNow()
                 }}
-                style={{ backgroundColor: accentColor }}
+                style={canDispatch ? { backgroundColor: accentColor } : undefined}
                 className="text-white hover:opacity-90"
+                disabled={!canDispatch}
+                title={dispatchTitle}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
                 Send Now

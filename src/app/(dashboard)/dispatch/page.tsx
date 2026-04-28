@@ -537,8 +537,12 @@ export default function DispatchQueuePage() {
     return status === "failed"
   }
 
-  function canSend(status: DispatchStatus) {
+  function canEdit(status: DispatchStatus) {
     return status === "pending" || status === "previewed" || status === "approved"
+  }
+
+  function canSend(status: DispatchStatus) {
+    return status === "approved"
   }
 
   function canReschedule(status: DispatchStatus) {
@@ -986,7 +990,7 @@ export default function DispatchQueuePage() {
               </div>
 
               {/* Editable mailing list + SMTP for pending/approved dispatches */}
-              {canSend(previewItem.status) && (
+              {canEdit(previewItem.status) && (
                 <div className="grid gap-3 sm:grid-cols-2 rounded-lg border bg-muted/30 p-3">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Mailing List</Label>
@@ -994,10 +998,11 @@ export default function DispatchQueuePage() {
                       value={previewItem.mailing_list_id || ""}
                       onValueChange={async (val) => {
                         const supabase = createClient()
-                        await supabase
+                        const { error } = await supabase
                           .from("dispatch_queue")
                           .update({ mailing_list_id: val || null } as never)
                           .eq("id", previewItem.id)
+                        if (error) { toast.error(`Update failed: ${error.message}`); return }
                         setPreviewItem({ ...previewItem, mailing_list_id: val } as typeof previewItem)
                         setDispatches((prev) =>
                           prev.map((d) => d.id === previewItem.id ? { ...d, mailing_list_id: val } as typeof d : d)
@@ -1029,10 +1034,11 @@ export default function DispatchQueuePage() {
                       value={previewItem.smtp_config_id || ""}
                       onValueChange={async (val) => {
                         const supabase = createClient()
-                        await supabase
+                        const { error } = await supabase
                           .from("dispatch_queue")
                           .update({ smtp_config_id: val || null } as never)
                           .eq("id", previewItem.id)
+                        if (error) { toast.error(`Update failed: ${error.message}`); return }
                         setPreviewItem({ ...previewItem, smtp_config_id: val } as typeof previewItem)
                         setDispatches((prev) =>
                           prev.map((d) => d.id === previewItem.id ? { ...d, smtp_config_id: val } as typeof d : d)
