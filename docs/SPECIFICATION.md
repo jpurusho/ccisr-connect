@@ -296,7 +296,8 @@ users 1──* audit_log
 | event_instance_id | uuid FK -> event_instances | nullable |
 | email_template_id | uuid FK -> email_templates | |
 | smtp_config_id | uuid FK -> smtp_configs | |
-| mailing_list_id | uuid FK -> mailing_lists | |
+| mailing_list_id | uuid FK -> mailing_lists | nullable |
+| additional_recipients | text | nullable; comma-separated email addresses added alongside or instead of a mailing list |
 | subject | text | Rendered subject |
 | body_html | text | Rendered HTML body |
 | scheduled_at | timestamptz | When to send |

@@ -30,7 +30,6 @@ import {
   Download,
   Image,
   Share2,
-  MessageCircle,
   type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -155,24 +154,19 @@ export function WeeklyCommunicationCard({
   async function downloadAsImage() {
     if (!previewHtml) return
     const container = document.createElement("div")
-    container.style.cssText = "position:absolute;left:-9999px;top:0;width:480px;background:#fff;padding:16px;"
+    container.style.cssText = "position:fixed;top:0;left:0;z-index:-9999;width:480px;background:#fff;padding:16px;pointer-events:none;"
     container.innerHTML = previewHtml
     document.body.appendChild(container)
     try {
-      const { default: html2canvas } = await import("html2canvas")
-      const canvas = await html2canvas(container, { scale: 2, useCORS: true })
+      const { toPng } = await import("html-to-image")
+      const dataUrl = await toPng(container, { pixelRatio: 2 })
       const link = document.createElement("a")
       link.download = `${title.replace(/\s+/g, "-").toLowerCase()}.png`
-      link.href = canvas.toDataURL("image/png")
+      link.href = dataUrl
       link.click()
-    } catch {
-      const blob = new Blob([`<html><body>${previewHtml}</body></html>`], { type: "text/html" })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.download = `${title.replace(/\s+/g, "-").toLowerCase()}.html`
-      link.href = url
-      link.click()
-      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("html-to-image failed:", err)
+      toast.error("Failed to generate image. Try the PDF download instead.")
     } finally {
       document.body.removeChild(container)
     }
@@ -187,39 +181,34 @@ export function WeeklyCommunicationCard({
 
   async function shareToWhatsApp() {
     if (!previewHtml) return
-
     const shareText = buildShareText()
-
-    // On mobile with file sharing support, download image first then open WhatsApp with text
     const container = document.createElement("div")
-    container.style.cssText = "position:absolute;left:-9999px;top:0;width:480px;background:#fff;padding:16px;"
+    container.style.cssText = "position:fixed;top:0;left:0;z-index:-9999;width:480px;background:#fff;padding:16px;pointer-events:none;"
     container.innerHTML = previewHtml
     document.body.appendChild(container)
     try {
-      const { default: html2canvas } = await import("html2canvas")
-      const canvas = await html2canvas(container, { scale: 2, useCORS: true })
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"))
-      if (!blob) throw new Error("Failed to create image")
+      const { toBlob, toPng } = await import("html-to-image")
       const filename = `${title.replace(/\s+/g, "-").toLowerCase()}.png`
+
+      const blob = await toBlob(container, { pixelRatio: 2 })
+      if (!blob) throw new Error("Failed to create image")
       const file = new File([blob], filename, { type: "image/png" })
 
-      // Try native share with file (works on mobile — opens WhatsApp directly with image)
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ text: shareText, files: [file] })
         return
       }
 
       // Desktop fallback: download image + open WhatsApp Web with text
+      const dataUrl = await toPng(container, { pixelRatio: 2 })
       const link = document.createElement("a")
       link.download = filename
-      link.href = canvas.toDataURL("image/png")
+      link.href = dataUrl
       link.click()
-
       const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + "\n\n(image downloaded — attach it to this message)")}`
       window.open(waUrl, "_blank")
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return
-      // Fallback: just open WhatsApp with text
       const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`
       window.open(waUrl, "_blank")
     } finally {
@@ -230,27 +219,27 @@ export function WeeklyCommunicationCard({
   async function shareCard() {
     if (!previewHtml) return
     const container = document.createElement("div")
-    container.style.cssText = "position:absolute;left:-9999px;top:0;width:480px;background:#fff;padding:16px;"
+    container.style.cssText = "position:fixed;top:0;left:0;z-index:-9999;width:480px;background:#fff;padding:16px;pointer-events:none;"
     container.innerHTML = previewHtml
     document.body.appendChild(container)
     try {
-      const { default: html2canvas } = await import("html2canvas")
-      const canvas = await html2canvas(container, { scale: 2, useCORS: true })
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"))
-      if (!blob) throw new Error("Failed to create image")
+      const { toBlob, toPng } = await import("html-to-image")
       const filename = `${title.replace(/\s+/g, "-").toLowerCase()}.png`
-      const file = new File([blob], filename, { type: "image/png" })
-
       const shareText = buildShareText()
+
+      const blob = await toBlob(container, { pixelRatio: 2 })
+      if (!blob) throw new Error("Failed to create image")
+      const file = new File([blob], filename, { type: "image/png" })
 
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ text: shareText, files: [file] })
       } else if (navigator.share) {
         await navigator.share({ text: shareText })
       } else {
+        const dataUrl = await toPng(container, { pixelRatio: 2 })
         const link = document.createElement("a")
         link.download = filename
-        link.href = canvas.toDataURL("image/png")
+        link.href = dataUrl
         link.click()
         toast.info("Image downloaded")
       }
@@ -382,20 +371,10 @@ export function WeeklyCommunicationCard({
             size="sm"
             onClick={shareToWhatsApp}
             disabled={!previewHtml}
-            title="Share via WhatsApp"
-            className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950"
+            title="Share"
           >
-            <MessageCircle className="size-3.5" />
-            WhatsApp
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={shareCard}
-            disabled={!previewHtml}
-            title="Share via other apps"
-          >
-            <Share2 className="size-3.5" />
+            <Share2 className="size-3.5" data-icon="inline-start" />
+            Share
           </Button>
 
           {/* Inline dropdowns */}

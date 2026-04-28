@@ -1017,6 +1017,12 @@ export default function DispatchQueuePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {previewItem.additional_recipients && (
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Additional Recipients</Label>
+                      <p className="text-xs">{previewItem.additional_recipients}</p>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Send From</Label>
                     <Select
@@ -1059,8 +1065,8 @@ export default function DispatchQueuePage() {
             {previewItem && canSend(previewItem.status) && (
               <Button
                 onClick={() => {
-                  if (!previewItem.mailing_list_id) {
-                    toast.error("Please select a mailing list first")
+                  if (!previewItem.mailing_list_id && !previewItem.additional_recipients?.trim()) {
+                    toast.error("Please select a mailing list or add recipient emails first")
                     return
                   }
                   if (!previewItem.smtp_config_id) {

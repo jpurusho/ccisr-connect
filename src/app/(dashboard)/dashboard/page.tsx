@@ -995,8 +995,8 @@ export default function DashboardPage() {
       }
 
       const opts = commOptions[type]
-      if (!opts.mailingListId) {
-        toast.error("Please select a mailing list before sending.")
+      if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
+        toast.error("Please select a mailing list or add recipient emails before sending.")
         return
       }
       if (!opts.smtpConfigId) {
@@ -1020,6 +1020,7 @@ export default function DashboardPage() {
             status: "pending",
             mailing_list_id: opts.mailingListId || null,
             smtp_config_id: opts.smtpConfigId || null,
+            additional_recipients: opts.additionalRecipients.trim() || null,
             created_by: user?.id ?? null,
           } as never)
           .select("id")
@@ -1086,8 +1087,8 @@ export default function DashboardPage() {
         return
       }
       const opts = commOptions[type]
-      if (!opts.mailingListId) {
-        toast.error("Please select a mailing list before scheduling.")
+      if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
+        toast.error("Please select a mailing list or add recipient emails before scheduling.")
         return
       }
       if (!opts.smtpConfigId) {
@@ -1145,6 +1146,7 @@ export default function DashboardPage() {
           status: "pending",
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
+          additional_recipients: opts.additionalRecipients.trim() || null,
           created_by: user?.id ?? null,
         } as never)
         .select("id")

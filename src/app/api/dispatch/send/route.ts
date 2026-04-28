@@ -6,7 +6,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(req: NextRequest) {
-  const { dispatchId, additionalRecipients: extraEmails } = await req.json()
+  const { dispatchId } = await req.json()
   if (!dispatchId) {
     return NextResponse.json({ error: "dispatchId required" }, { status: 400 })
   }
@@ -100,9 +100,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Add extra comma-separated recipients
-  if (extraEmails && typeof extraEmails === "string") {
-    const extras = extraEmails.split(",").map((e: string) => e.trim()).filter(Boolean)
+  // Add extra comma-separated recipients stored on the dispatch record
+  if (dispatch.additional_recipients && typeof dispatch.additional_recipients === "string") {
+    const extras = dispatch.additional_recipients.split(",").map((e: string) => e.trim()).filter(Boolean)
     recipients.to.push(...extras)
   }
 
