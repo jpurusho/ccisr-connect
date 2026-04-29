@@ -329,3 +329,10 @@
     display: none;
   }
 }
+
+/* Fix native date/time pickers in dark mode */
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"] {
+  color-scheme: dark;
+}
