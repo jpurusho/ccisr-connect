@@ -797,6 +797,8 @@ export default function ComposePage() {
         data: { user },
       } = await supabase.auth.getUser()
 
+      const composeWeekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), "yyyy-MM-dd")
+
       const { data: inserted, error } = await supabase
         .from("dispatch_queue")
         .insert({
@@ -805,6 +807,7 @@ export default function ComposePage() {
           scheduled_at: new Date().toISOString(),
           status: "pending",
           template_type: selectedTemplate?.startsWith("custom:") ? "custom" : selectedTemplate || null,
+          week_start: composeWeekStart,
           mailing_list_id: selectedMailingList || null,
           smtp_config_id: selectedSmtpConfig || null,
           created_by: user?.id ?? null,

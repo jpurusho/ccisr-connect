@@ -161,7 +161,7 @@ export type MailingListMember = {
 export type DispatchQueue = {
   id: string
   event_instance_id: string | null
-  email_template_id: string
+  email_template_id: string | null
   smtp_config_id: string
   mailing_list_id: string
   additional_recipients: string | null

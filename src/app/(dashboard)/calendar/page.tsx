@@ -127,15 +127,14 @@ export default function CalendarPage() {
         )
         .in("anniversary_month", visibleMonths),
 
-      // Dispatches in date range
+      // Dispatches in date range (prefer week_start, fallback to scheduled_at)
       supabase
         .from("dispatch_queue")
-        .select("id, subject, status, template_type, scheduled_at, created_at")
+        .select("id, subject, status, template_type, scheduled_at, created_at, week_start")
         .not("status", "eq", "cancelled")
-        .gte("created_at", startStr)
-        .lte("created_at", endStr + "T23:59:59")
+        .or(`and(week_start.gte.${startStr},week_start.lte.${endStr}),and(week_start.is.null,scheduled_at.gte.${startStr},scheduled_at.lte.${endStr}T23:59:59)`)
         .order("created_at", { ascending: false })
-        .returns<{ id: string; subject: string; status: DispatchStatus; template_type: string | null; scheduled_at: string | null; created_at: string }[]>(),
+        .returns<{ id: string; subject: string; status: DispatchStatus; template_type: string | null; scheduled_at: string | null; created_at: string; week_start: string | null }[]>(),
     ])
 
     const instances = (instancesResult.data ?? []) as EventInstance[]
@@ -334,7 +333,9 @@ export default function CalendarPage() {
     }
 
     for (const d of dispatches) {
-      const dispatchDate = d.scheduled_at ? new Date(d.scheduled_at) : new Date(d.created_at)
+      const dispatchDate = d.week_start ? new Date(d.week_start + "T00:00:00")
+        : d.scheduled_at ? new Date(d.scheduled_at)
+        : new Date(d.created_at)
       if (days.some((day) => isSameDay(day, dispatchDate))) {
         const typeLabel = d.template_type ? DISPATCH_LABELS[d.template_type] : null
         calEvents.push({

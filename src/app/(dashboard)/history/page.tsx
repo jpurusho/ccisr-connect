@@ -202,7 +202,12 @@ export default function HistoryPage() {
                 <TableBody>
                   {dispatches.map((d) => (
                     <TableRow key={d.id}>
-                      <TableCell className="font-medium max-w-xs truncate">{d.subject}</TableCell>
+                      <TableCell className="font-medium max-w-xs">
+                        <span className="truncate block">{d.subject}</span>
+                        {d.template_type && (
+                          <span className="text-[10px] text-muted-foreground">{d.template_type.replace(/_/g, " ")}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{format(new Date(d.scheduled_at), "MMM d, yyyy h:mm a")}</TableCell>
                       <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{d.sent_at ? format(new Date(d.sent_at), "MMM d, yyyy h:mm a") : "—"}</TableCell>
                       <TableCell>

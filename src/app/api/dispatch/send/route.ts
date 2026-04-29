@@ -162,9 +162,14 @@ export async function POST(req: NextRequest) {
       dispatch_id: dispatchId,
       full_snapshot: {
         subject: dispatch.subject,
+        body_html: dispatch.body_html,
         recipients: allRecipients,
         smtp_account: smtp.name,
         from: smtp.from_email,
+        template_type: dispatch.template_type ?? null,
+        week_start: dispatch.week_start ?? null,
+        mailing_list_id: dispatch.mailing_list_id ?? null,
+        additional_recipients: dispatch.additional_recipients ?? null,
       },
       sent_at: new Date().toISOString(),
     } as never)
