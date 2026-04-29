@@ -268,6 +268,7 @@ export default function DashboardPage() {
 
   // ---- Composed instance tracking ----
   const [instanceIds, setInstanceIds] = useState<Partial<Record<CommType, string>>>({})
+  const [instanceWeeks, setInstanceWeeks] = useState<Partial<Record<CommType, string>>>({})
   const [savingInstance, setSavingInstance] = useState<CommType | null>(null)
 
   const [dispatches, setDispatches] = useState<
@@ -652,13 +653,18 @@ export default function DashboardPage() {
         }
       }
 
-      // Track composed instance IDs for save/delete
+      // Track composed instance IDs and week_start for save/delete
       const resolvedInstanceIds: Partial<Record<CommType, string>> = {}
+      const resolvedInstanceWeeks: Partial<Record<CommType, string>> = {}
       const commTypeKeys: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
       for (const ct of commTypeKeys) {
-        if (composedMap[ct]) resolvedInstanceIds[ct] = composedMap[ct].id
+        if (composedMap[ct]) {
+          resolvedInstanceIds[ct] = composedMap[ct].id
+          if (composedMap[ct].week_start) resolvedInstanceWeeks[ct] = composedMap[ct].week_start!
+        }
       }
       setInstanceIds(resolvedInstanceIds)
+      setInstanceWeeks(resolvedInstanceWeeks)
 
       // Priority: composed instance > template defaults > hardcoded fallbacks
       const resolve = (ciKey: string, etKey: string, fallbackKey?: string): CommonCardFields & Record<string, unknown> =>
@@ -1779,13 +1785,20 @@ export default function DashboardPage() {
               bulletin: "Weekly Bulletin",
             }
 
-            const summaries: Record<CommType, string[]> = {
+            const baseSummaries: Record<CommType, string[]> = {
               birthday: birthdaySummary,
               anniversary: anniversarySummary,
               bible_study: bibleStudySummary,
               womens_study: womensStudySummary,
               prayer_meeting: prayerMeetingSummary,
               bulletin: bulletinSummary,
+            }
+
+            const summaries = { ...baseSummaries }
+            const iw = instanceWeeks[type]
+            if (iw) {
+              const weekDate = new Date(iw + "T00:00:00")
+              summaries[type] = [...summaries[type], `📌 Draft saved for week of ${format(weekDate, "MMM d")}`]
             }
 
             const links: Record<CommType, { label: string; url: string }[]> = {
