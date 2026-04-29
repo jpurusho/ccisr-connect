@@ -16,6 +16,7 @@ import {
   getMonth,
 } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
+import { getOccurrences } from "@/lib/recurrence"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { WeekView } from "@/components/calendar/week-view"
@@ -232,6 +233,34 @@ export default function CalendarPage() {
             }
           : null,
       })
+    }
+
+    // Build CalendarEvents from recurrence rules (for dates without explicit instances)
+    const instanceDates = new Set(
+      instances.map((i) => `${i.event_id}:${i.instance_date}`)
+    )
+    for (const event of eventsData) {
+      if (!event.recurrence_rule) continue
+      const eventType = typesMap.get(event.event_type_id)
+      const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
+      const occurrences = getOccurrences(event.recurrence_rule, visibleRange.start, visibleRange.end)
+
+      for (const occ of occurrences) {
+        const dateStr = format(occ, "yyyy-MM-dd")
+        if (instanceDates.has(`${event.id}:${dateStr}`)) continue
+
+        calEvents.push({
+          id: `recurring-${event.id}-${dateStr}`,
+          kind: "event",
+          title: event.title,
+          date: occ,
+          color,
+          time: event.default_time ?? null,
+          status: "confirmed",
+          eventTypeName: eventType?.name ?? null,
+          description: event.description,
+        })
+      }
     }
 
     // Build CalendarEvents from birthdays

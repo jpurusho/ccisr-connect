@@ -55,9 +55,8 @@ import {
   endOfWeek,
   format,
   addDays,
-  nextFriday,
-  isFriday,
 } from "date-fns"
+import { getOccurrences } from "@/lib/recurrence"
 
 import {
   WeeklyCommunicationCard,
@@ -446,10 +445,6 @@ export default function DashboardPage() {
       const next7Months = [...new Set(next7Days.map((d) => d.month))]
       const next7Set = new Set(next7Days.map((d) => `${d.month}-${d.day}`))
 
-      // Friday for bible study
-      const fri = isFriday(baseDate) ? baseDate : nextFriday(baseDate)
-      const friISO = format(fri, "yyyy-MM-dd")
-
       // Monday/Sunday ISO for dispatch query
       const mondayISO = format(monday, "yyyy-MM-dd")
       const sundayISO = format(sunday, "yyyy-MM-dd")
@@ -462,7 +457,8 @@ export default function DashboardPage() {
         birthdayCountRes,
         weekBirthdaysRes,
         weekAnniversariesRes,
-        bibleStudyRes,
+        activeEventsRes,
+        weekInstancesRes,
         weekDispatchesRes,
         mailingListsRes,
         smtpConfigsRes,
@@ -531,24 +527,29 @@ export default function DashboardPage() {
             }[]
           >(),
 
-        // Bible study instance
+        // Active events (for recurrence rules)
+        supabase
+          .from("events")
+          .select("id, title, event_type_id, recurrence_rule, default_time")
+          .eq("is_active", true)
+          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null }[]>(),
+
+        // Event instances for this week (host/location overrides)
         supabase
           .from("event_instances")
-          .select(
-            "instance_date, instance_time, location_override, notes, host_family_id"
-          )
-          .eq("instance_date", friISO)
-          .eq("status", "confirmed")
-          .limit(1)
-          .returns<
-            {
-              instance_date: string
-              instance_time: string | null
-              location_override: string | null
-              notes: string | null
-              host_family_id: string | null
-            }[]
-          >(),
+          .select("event_id, instance_date, instance_time, location_override, notes, host_family_id, status")
+          .gte("instance_date", format(bulSun, "yyyy-MM-dd"))
+          .lte("instance_date", format(bulSat, "yyyy-MM-dd"))
+          .neq("status", "cancelled")
+          .returns<{
+            event_id: string
+            instance_date: string
+            instance_time: string | null
+            location_override: string | null
+            notes: string | null
+            host_family_id: string | null
+            status: string
+          }[]>(),
 
         // This week dispatches
         supabase
@@ -604,7 +605,8 @@ export default function DashboardPage() {
       if (birthdayCountRes.error) throw birthdayCountRes.error
       if (weekBirthdaysRes.error) throw weekBirthdaysRes.error
       if (weekAnniversariesRes.error) throw weekAnniversariesRes.error
-      if (bibleStudyRes.error) throw bibleStudyRes.error
+      if (activeEventsRes.error) throw activeEventsRes.error
+      if (weekInstancesRes.error) throw weekInstancesRes.error
       if (weekDispatchesRes.error) throw weekDispatchesRes.error
       if (mailingListsRes.error) throw mailingListsRes.error
       if (smtpConfigsRes.error) throw smtpConfigsRes.error
@@ -764,63 +766,65 @@ export default function DashboardPage() {
           : anCommon.message,
       })
 
-      // ---- Process Bible Study (multi-location) ----
-      const bsInstance =
-        bibleStudyRes.data && bibleStudyRes.data.length > 0
-          ? bibleStudyRes.data[0]
-          : null
+      // ---- Recurrence-based event processing ----
+      // Build event type name map for matching events to comm types
+      const activeEvents = activeEventsRes.data ?? []
+      const weekInstances = weekInstancesRes.data ?? []
 
-      let bsHostName = "TBD"
-      let bsAddress = "TBD"
-      let bsPhone = ""
-      let bsCity = ""
+      // Helper: find event instance for a specific event on a specific date
+      const findInstance = (eventId: string, dateStr: string) =>
+        weekInstances.find((i) => i.event_id === eventId && i.instance_date === dateStr)
 
-      if (bsInstance?.host_family_id) {
+      // Helper: resolve host family info from an instance
+      async function resolveHostFamily(hostFamilyId: string | null) {
+        if (!hostFamilyId) return { hostName: "TBD", address: "TBD", city: "", phone: "" }
         const [familyRes, addrRes] = await Promise.all([
-          supabase
-            .from("families")
-            .select("family_name, home_phone")
-            .eq("id", bsInstance.host_family_id)
-            .returns<{ family_name: string; home_phone: string | null }[]>()
-            .single(),
-          supabase
-            .from("addresses")
-            .select("full_address, city, state, zip")
-            .eq("family_id", bsInstance.host_family_id)
-            .eq("is_current", true)
-            .returns<{ full_address: string; city: string | null; state: string | null; zip: string | null }[]>()
-            .limit(1)
-            .single(),
+          supabase.from("families").select("family_name, home_phone").eq("id", hostFamilyId)
+            .returns<{ family_name: string; home_phone: string | null }[]>().single(),
+          supabase.from("addresses").select("full_address, city, state, zip").eq("family_id", hostFamilyId).eq("is_current", true)
+            .returns<{ full_address: string; city: string | null; state: string | null; zip: string | null }[]>().limit(1).single(),
         ])
-
-        if (familyRes.data) {
-          bsHostName = familyRes.data.family_name
-          bsPhone = familyRes.data.home_phone ?? ""
-        }
-        if (addrRes.data) {
-          bsAddress = addrRes.data.full_address
-          bsCity = [addrRes.data.city, addrRes.data.state, addrRes.data.zip].filter(Boolean).join(", ")
+        return {
+          hostName: familyRes.data?.family_name ?? "TBD",
+          address: addrRes.data?.full_address ?? "TBD",
+          city: [addrRes.data?.city, addrRes.data?.state, addrRes.data?.zip].filter(Boolean).join(", "),
+          phone: familyRes.data?.home_phone ?? "",
         }
       }
 
-      if (bsInstance?.location_override) bsAddress = bsInstance.location_override
+      // Find events by type name
+      const findEventByType = (typeName: string) =>
+        activeEvents.find((e) => {
+          const etName = etIdToName[e.event_type_id]
+          return etName === typeName
+        })
+
+      // ---- Process Bible Study (recurrence-based) ----
+      const bsEvent = findEventByType("friday_bible_study")
+      const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, bulSun, bulSat) : []
+      const bsDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
+      const bsInstance = bsDate && bsEvent ? findInstance(bsEvent.id, format(bsDate, "yyyy-MM-dd")) : null
+
+      let bsHostData = { hostName: "TBD", address: "TBD", city: "", phone: "" }
+      if (bsInstance?.host_family_id) {
+        bsHostData = await resolveHostFamily(bsInstance.host_family_id)
+      }
+      if (bsInstance?.location_override) bsHostData.address = bsInstance.location_override
       if (bsInstance?.notes) {
         const contactMatch = bsInstance.notes.match(/Contact:\s*(.+)/i)
-        if (contactMatch) bsPhone = contactMatch[1].trim()
+        if (contactMatch) bsHostData.phone = contactMatch[1].trim()
       }
 
-      // Merge saved locations with DB host data for first location
       const savedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
       const mergedLocs = savedLocs.map((loc, i) => {
         const base = { onVacation: false, vacationMessage: "", ...loc }
-        if (i === 0 && bsHostName !== "TBD" && !base.onVacation) {
-          return { ...base, hostNames: bsHostName, address: bsAddress, city: bsCity, phone: bsPhone }
+        if (i === 0 && bsHostData.hostName !== "TBD" && !base.onVacation) {
+          return { ...base, hostNames: bsHostData.hostName, address: bsHostData.address, city: bsHostData.city, phone: bsHostData.phone }
         }
         return base
       })
 
       const bsCommon = extractCommonFields(bsDef)
-      // Migrate legacy single-link format
       if (bsCommon.resourceLinks.length === 0) {
         const def = bsDef as Record<string, unknown>
         const url = (def.resourceLinkUrl as string) ?? ""
@@ -828,7 +832,7 @@ export default function DashboardPage() {
       }
       setBibleStudyForm({
         title: bsDef.title ?? "Bible Study This Friday",
-        date: format(fri, "EEEE, MMMM do"),
+        date: bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week",
         time: bsInstance?.instance_time
           ? formatTime(bsInstance.instance_time)
           : bsDef.time ?? "7:30 PM",
@@ -837,13 +841,16 @@ export default function DashboardPage() {
         locations: mergedLocs,
       })
 
-      // ---- Women's Study ----
-      const wed = addDays(bulSun, 3) // Wednesday of bulletin week
+      // ---- Women's Study (recurrence-based) ----
+      const wsEvent = findEventByType("wednesday_womens_study")
+      const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, bulSun, bulSat) : []
+      const wsDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
+
       const wsCommon = extractCommonFields(wsDef)
       setWomensStudyForm({
         title: wsDef.title ?? "Women's Bible Study",
         topic: wsDef.topic ?? "Building a Relationship with God",
-        date: format(wed, "EEEE, MMMM do"),
+        date: wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week",
         time: wsDef.time ?? "7:00 PM",
         zoomLink: wsDef.zoomLink ?? "",
         zoomMeetingId: wsDef.zoomMeetingId ?? "",
@@ -852,15 +859,26 @@ export default function DashboardPage() {
         ...wsCommon,
       })
 
-      // ---- Prayer Meeting ----
+      // ---- Prayer Meeting (recurrence-based) ----
+      const pmEvent = findEventByType("monthly_prayer")
+      const pmOccurrences = pmEvent ? getOccurrences(pmEvent.recurrence_rule, bulSun, bulSat) : []
+      const pmDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
+      const pmInstance = pmDate && pmEvent ? findInstance(pmEvent.id, format(pmDate, "yyyy-MM-dd")) : null
+
+      let pmHostData = { hostName: pmDef.hostNames ?? "TBD", address: pmDef.address ?? "TBD", city: pmDef.city ?? "", phone: pmDef.phone ?? "" }
+      if (pmInstance?.host_family_id) {
+        pmHostData = await resolveHostFamily(pmInstance.host_family_id)
+      }
+      if (pmInstance?.location_override) pmHostData.address = pmInstance.location_override
+
       const pmCommon = extractCommonFields(pmDef)
       setPrayerMeetingForm({
-        date: pmDef.date ?? "",
-        time: pmDef.time ?? "6:00 PM",
-        hostNames: pmDef.hostNames ?? "TBD",
-        address: pmDef.address ?? "TBD",
-        city: pmDef.city ?? "",
-        phone: pmDef.phone ?? "",
+        date: pmDate ? format(pmDate, "EEEE, MMMM do") : pmDef.date ?? "",
+        time: pmInstance?.instance_time ? formatTime(pmInstance.instance_time) : pmDef.time ?? "6:00 PM",
+        hostNames: pmHostData.hostName,
+        address: pmHostData.address,
+        city: pmHostData.city,
+        phone: pmHostData.phone,
         dinnerNote: pmDef.dinnerNote ?? "",
         signupLink: pmDef.signupLink ?? "",
         ...pmCommon,
@@ -1714,9 +1732,9 @@ export default function DashboardPage() {
               const hasContent: Record<CommType, boolean> = {
                 birthday: birthdayForm.birthdays.length > 0,
                 anniversary: anniversaryForm.anniversaries.length > 0,
-                bible_study: true,
-                womens_study: true,
-                prayer_meeting: !!prayerMeetingForm.date,
+                bible_study: bibleStudyForm.date !== "No bible study this week",
+                womens_study: womensStudyForm.date !== "No study this week",
+                prayer_meeting: !!prayerMeetingForm.date && prayerMeetingForm.date !== "",
                 bulletin: true,
               }
               const contentCounts: Record<CommType, number> = {
