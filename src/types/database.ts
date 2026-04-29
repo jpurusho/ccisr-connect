@@ -166,6 +166,7 @@ export type DispatchQueue = {
   mailing_list_id: string
   additional_recipients: string | null
   template_type: string | null
+  week_start: string | null
   subject: string
   body_html: string
   scheduled_at: string | null

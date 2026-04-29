@@ -107,6 +107,7 @@ interface DispatchRecord {
   scheduled_at: string | null
   created_at: string
   template_type: string | null
+  week_start: string | null
 }
 
 interface MailingListOption {
@@ -545,10 +546,9 @@ export default function DashboardPage() {
         // This week dispatches
         supabase
           .from("dispatch_queue")
-          .select("id, subject, status, scheduled_at, created_at, template_type")
-          .gte("created_at", wkSunISO)
-          .lte("created_at", wkSatISO + "T23:59:59")
+          .select("id, subject, status, scheduled_at, created_at, template_type, week_start")
           .not("status", "eq", "cancelled")
+          .or(`week_start.eq.${wkSunISO},and(week_start.is.null,created_at.gte.${wkSunISO},created_at.lte.${wkSatISO}T23:59:59)`)
           .order("created_at", { ascending: false })
           .returns<DispatchRecord[]>(),
 
@@ -1272,6 +1272,8 @@ export default function DashboardPage() {
           data: { user },
         } = await supabase.auth.getUser()
 
+        const dispatchWeekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+
         const { data: inserted, error } = await supabase
           .from("dispatch_queue")
           .insert({
@@ -1280,6 +1282,7 @@ export default function DashboardPage() {
             scheduled_at: new Date().toISOString(),
             status: "pending",
             template_type: type,
+            week_start: dispatchWeekStart,
             mailing_list_id: opts.mailingListId || null,
             smtp_config_id: opts.smtpConfigId || null,
             additional_recipients: opts.additionalRecipients.trim() || null,
@@ -1305,6 +1308,7 @@ export default function DashboardPage() {
               scheduled_at: new Date().toISOString(),
               created_at: new Date().toISOString(),
               template_type: type,
+              week_start: dispatchWeekStart,
             },
           }))
           setDispatchCounts((prev) => ({
@@ -1402,6 +1406,8 @@ export default function DashboardPage() {
         data: { user },
       } = await supabase.auth.getUser()
 
+      const schedWeekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+
       const { data: inserted, error } = await supabase
         .from("dispatch_queue")
         .insert({
@@ -1410,6 +1416,7 @@ export default function DashboardPage() {
           scheduled_at: scheduledAt,
           status: "pending",
           template_type: type,
+          week_start: schedWeekStart,
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
           additional_recipients: opts.additionalRecipients.trim() || null,
@@ -1433,6 +1440,7 @@ export default function DashboardPage() {
             scheduled_at: scheduledAt,
             created_at: new Date().toISOString(),
             template_type: type,
+            week_start: schedWeekStart,
           },
         }))
         setDispatchCounts((prev) => ({
