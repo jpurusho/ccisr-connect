@@ -12,8 +12,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Users,
   Home,
@@ -29,6 +35,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Settings2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -167,6 +174,30 @@ const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
   bulletin: (s) => /bulletin/i.test(s),
 }
 
+// ── Template visibility ──────────────────────────────────────────────────
+
+const BUILTIN_TEMPLATES: { type: CommType; label: string; color: string; icon: typeof Cake }[] = [
+  { type: "bulletin", label: "Bulletin", color: "#4F46E5", icon: Newspaper },
+  { type: "birthday", label: "Birthdays", color: "#7C3AED", icon: Cake },
+  { type: "anniversary", label: "Anniversaries", color: "#D97706", icon: Heart },
+  { type: "bible_study", label: "Bible Study", color: "#0D9488", icon: BookOpen },
+  { type: "womens_study", label: "Women's Study", color: "#DB2777", icon: Users },
+]
+
+const TEMPLATE_STORAGE_KEY = "ccisr-dashboard-templates"
+
+function loadVisibleTemplates(): CommType[] {
+  if (typeof window === "undefined") return BUILTIN_TEMPLATES.map((t) => t.type)
+  try {
+    const saved = localStorage.getItem(TEMPLATE_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved) as string[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as CommType[]
+    }
+  } catch { /* ignore */ }
+  return BUILTIN_TEMPLATES.map((t) => t.type)
+}
+
 // ── Stat card config type ─────────────────────────────────────────────────
 
 interface StatCardConfig {
@@ -214,6 +245,21 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [weekLabel, setWeekLabel] = useState("")
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
+  // ---- Template visibility ----
+  const [visibleTemplates, setVisibleTemplates] = useState<CommType[]>(() => loadVisibleTemplates())
+
+  function toggleTemplate(type: CommType) {
+    setVisibleTemplates((prev) => {
+      const next = prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+      localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  // ---- Composed instance tracking ----
+  const [instanceIds, setInstanceIds] = useState<Partial<Record<CommType, string>>>({})
+  const [savingInstance, setSavingInstance] = useState<CommType | null>(null)
+
   const [dispatches, setDispatches] = useState<
     Record<CommType, DispatchRecord | null>
   >({
@@ -504,10 +550,10 @@ export default function DashboardPage() {
         // Composed instances for this week: exact match, recurring that covers this week, or legacy (no week_start)
         supabase
           .from("composed_instances")
-          .select("template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until")
+          .select("id, template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until")
           .eq("is_active", true)
           .or(`week_start.eq.${format(bulSun, "yyyy-MM-dd")},week_start.is.null,and(is_recurring.eq.true,week_start.lte.${format(bulSun, "yyyy-MM-dd")})`)
-          .returns<{ template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null }[]>(),
+          .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null }[]>(),
       ])
 
       // Check errors
@@ -565,6 +611,14 @@ export default function DashboardPage() {
           }
         }
       }
+
+      // Track composed instance IDs for save/delete
+      const resolvedInstanceIds: Partial<Record<CommType, string>> = {}
+      const commTypeKeys: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "bulletin"]
+      for (const ct of commTypeKeys) {
+        if (composedMap[ct]) resolvedInstanceIds[ct] = composedMap[ct].id
+      }
+      setInstanceIds(resolvedInstanceIds)
 
       // Priority: composed instance > template defaults > hardcoded fallbacks
       const resolve = (ciKey: string, etKey: string, fallbackKey?: string): CommonCardFields & Record<string, unknown> =>
@@ -793,6 +847,14 @@ export default function DashboardPage() {
       }
       setCommOptions(prefilledOptions)
 
+      // Pre-fill custom subjects from composed instances
+      const subjectOverrides: Partial<Record<CommType, string>> = {}
+      for (const ct of commTypeKeys) {
+        const ci = composedMap[ct]
+        if (ci?.subject) subjectOverrides[ct] = ci.subject
+      }
+      setCustomSubjects(subjectOverrides)
+
       // ---- Match dispatches to communication types (count all, keep latest) ----
       const weekDispatches = weekDispatchesRes.data ?? []
       const matchedDispatches: Record<CommType, DispatchRecord | null> = {
@@ -975,6 +1037,98 @@ export default function DashboardPage() {
         return womensStudyPreview
       case "bulletin":
         return bulletinPreview
+    }
+  }
+
+  // ---- Form data helper (for save) ----
+  function getFormData(type: CommType): Record<string, unknown> {
+    switch (type) {
+      case "birthday": return birthdayForm as unknown as Record<string, unknown>
+      case "anniversary": return anniversaryForm as unknown as Record<string, unknown>
+      case "bible_study": return bibleStudyForm as unknown as Record<string, unknown>
+      case "womens_study": return womensStudyForm as unknown as Record<string, unknown>
+      case "bulletin": return bulletinForm as unknown as Record<string, unknown>
+    }
+  }
+
+  // ---- Save / Delete instance ----
+  async function handleSaveInstance(type: CommType) {
+    setSavingInstance(type)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const base = addDays(new Date(), weekOffset * 7)
+      const weekStart = format(getUpcomingSunday(base), "yyyy-MM-dd")
+      const templateName = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
+
+      const payload = {
+        template_type: type,
+        name: templateName,
+        subject: getSubject(type),
+        form_data: getFormData(type),
+        mailing_list_id: commOptions[type].mailingListId || null,
+        smtp_config_id: commOptions[type].smtpConfigId || null,
+        additional_recipients: commOptions[type].additionalRecipients || null,
+        is_active: true,
+        week_start: weekStart,
+        is_recurring: false,
+        recur_until: null,
+        created_by: user?.id ?? null,
+      }
+
+      const existingId = instanceIds[type]
+      if (existingId) {
+        const { error } = await supabase
+          .from("composed_instances")
+          .update(payload as never)
+          .eq("id", existingId)
+        if (error) {
+          toast.error(`Save failed: ${error.message}`)
+        } else {
+          toast.success(`${templateName} draft saved`)
+          logAudit("composed_instance_updated", "composed_instances", existingId, { type, weekStart })
+        }
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("composed_instances")
+          .insert(payload as never)
+          .select("id")
+          .single() as { data: { id: string } | null; error: { message: string } | null }
+        if (error) {
+          toast.error(`Save failed: ${error.message}`)
+        } else {
+          toast.success(`${templateName} draft saved`)
+          setInstanceIds((prev) => ({ ...prev, [type]: inserted?.id ?? undefined }))
+          logAudit("composed_instance_created", "composed_instances", inserted?.id, { type, weekStart })
+        }
+      }
+    } catch {
+      toast.error("An unexpected error occurred")
+    } finally {
+      setSavingInstance(null)
+    }
+  }
+
+  async function handleDeleteInstance(type: CommType) {
+    const id = instanceIds[type]
+    if (!id) return
+    const label = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
+    if (!confirm(`Delete the saved ${label} draft for this week?`)) return
+
+    const supabase = createClient()
+    const { error } = await supabase.from("composed_instances").delete().eq("id", id)
+    if (error) {
+      toast.error(`Delete failed: ${error.message}`)
+    } else {
+      toast.success("Draft deleted")
+      setInstanceIds((prev) => {
+        const next = { ...prev }
+        delete next[type]
+        return next
+      })
+      logAudit("composed_instance_deleted", "composed_instances", id, { type })
+      fetchAll()
     }
   }
 
@@ -1431,68 +1585,142 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Summary pills */}
-          <div className="flex flex-wrap gap-2">
-            {([
-              { type: "bulletin" as CommType, label: "Bulletin", color: "#4F46E5", icon: Newspaper },
-              { type: "birthday" as CommType, label: "Birthdays", color: "#7C3AED", icon: Cake },
-              { type: "anniversary" as CommType, label: "Anniversaries", color: "#D97706", icon: Heart },
-              { type: "bible_study" as CommType, label: "Bible Study", color: "#0D9488", icon: BookOpen },
-              { type: "womens_study" as CommType, label: "Women's Study", color: "#DB2777", icon: Users },
-            ]).map(({ type, label, color, icon: Icon }) => {
-              const status = getStatus(type)
-              const count = dispatchCounts[type]
-              const isActive = selectedCard === type
-              return (
-                <button
-                  key={type}
-                  onClick={() => setSelectedCard(type)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
-                    isActive ? "text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                  style={isActive ? { backgroundColor: color } : undefined}
-                >
-                  <Icon className="size-3.5" />
-                  {label}
-                  {status === "sent" && count > 0 && (
-                    <span className={`rounded-full px-1.5 text-[10px] ${isActive ? "bg-white/20" : "bg-foreground/10"}`}>
-                      {count}x
-                    </span>
-                  )}
-                  {status === "scheduled" && (
-                    <span className={`size-1.5 rounded-full ${isActive ? "bg-white/60" : "bg-amber-400"}`} />
-                  )}
-                </button>
-              )
-            })}
+          {/* Template pills + config */}
+          <div className="flex flex-wrap items-center gap-2">
+            {BUILTIN_TEMPLATES
+              .filter((t) => visibleTemplates.includes(t.type))
+              .map(({ type, label, color, icon: TIcon }) => {
+                const status = getStatus(type)
+                const count = dispatchCounts[type]
+                const isActive = selectedCard === type
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedCard(type)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                      isActive ? "text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                    style={isActive ? { backgroundColor: color } : undefined}
+                  >
+                    <TIcon className="size-3.5" />
+                    {label}
+                    {status === "sent" && count > 0 && (
+                      <span className={`rounded-full px-1.5 text-[10px] ${isActive ? "bg-white/20" : "bg-foreground/10"}`}>
+                        {count}x
+                      </span>
+                    )}
+                    {status === "scheduled" && (
+                      <span className={`size-1.5 rounded-full ${isActive ? "bg-white/60" : "bg-amber-400"}`} />
+                    )}
+                    {instanceIds[type] && (
+                      <span className={`size-1.5 rounded-full ${isActive ? "bg-white/80" : "bg-green-400"}`} title="Draft saved" />
+                    )}
+                  </button>
+                )
+              })}
+
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <Button variant="ghost" size="sm" className="rounded-full h-8 px-2.5 text-muted-foreground">
+                    <Settings2 className="size-3.5" />
+                  </Button>
+                }
+              />
+              <PopoverContent align="end" className="w-64">
+                <p className="text-sm font-medium mb-3">Show on Dashboard</p>
+                <div className="space-y-2">
+                  {BUILTIN_TEMPLATES.map(({ type, label, icon: TIcon, color }) => (
+                    <div key={type} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TIcon className="size-3.5" style={{ color }} />
+                        <span className="text-sm">{label}</span>
+                      </div>
+                      <Switch
+                        size="sm"
+                        checked={visibleTemplates.includes(type)}
+                        onCheckedChange={() => toggleTemplate(type)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
-          {/* Selected card expanded */}
-          {selectedCard === "birthday" && (
-            <WeeklyCommunicationCard title="Birthdays This Week" accentColor="#7C3AED" icon={Cake} status={getStatus("birthday")} summaryLines={birthdaySummary} subject={getSubject("birthday")} onSubjectChange={(v) => setSubjectOverride("birthday", v)} scheduledAt={getScheduledAt("birthday")} previewHtml={birthdayPreview} resourceLinks={(birthdayForm.resourceLinks ?? []).filter((l) => l.url)} onSchedule={() => handleSchedule("birthday")} onSendNow={() => handleSendNow("birthday")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.birthday.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, mailingListId: id } }))} selectedSmtpConfig={commOptions.birthday.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, smtpConfigId: id } }))} sendCount={dispatchCounts.birthday} additionalRecipients={commOptions.birthday.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, birthday: { ...prev.birthday, additionalRecipients: v } }))}>
-              <BirthdayEditForm data={birthdayForm} onChange={setBirthdayForm} />
-            </WeeklyCommunicationCard>
-          )}
-          {selectedCard === "anniversary" && (
-            <WeeklyCommunicationCard title="Anniversaries This Week" accentColor="#D97706" icon={Heart} status={getStatus("anniversary")} summaryLines={anniversarySummary} subject={getSubject("anniversary")} onSubjectChange={(v) => setSubjectOverride("anniversary", v)} scheduledAt={getScheduledAt("anniversary")} previewHtml={anniversaryPreview} resourceLinks={(anniversaryForm.resourceLinks ?? []).filter((l) => l.url)} onSchedule={() => handleSchedule("anniversary")} onSendNow={() => handleSendNow("anniversary")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.anniversary.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, mailingListId: id } }))} selectedSmtpConfig={commOptions.anniversary.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, smtpConfigId: id } }))} sendCount={dispatchCounts.anniversary} additionalRecipients={commOptions.anniversary.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, anniversary: { ...prev.anniversary, additionalRecipients: v } }))}>
-              <AnniversaryEditForm data={anniversaryForm} onChange={setAnniversaryForm} />
-            </WeeklyCommunicationCard>
-          )}
-          {selectedCard === "bible_study" && (
-            <WeeklyCommunicationCard title="Friday Bible Study Invite" accentColor="#0D9488" icon={BookOpen} status={getStatus("bible_study")} summaryLines={bibleStudySummary} subject={getSubject("bible_study")} onSubjectChange={(v) => setSubjectOverride("bible_study", v)} scheduledAt={getScheduledAt("bible_study")} previewHtml={bibleStudyPreview} resourceLinks={(bibleStudyForm.resourceLinks ?? []).filter((l) => l.url)} onSchedule={() => handleSchedule("bible_study")} onSendNow={() => handleSendNow("bible_study")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.bible_study.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, mailingListId: id } }))} selectedSmtpConfig={commOptions.bible_study.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, smtpConfigId: id } }))} sendCount={dispatchCounts.bible_study} additionalRecipients={commOptions.bible_study.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, bible_study: { ...prev.bible_study, additionalRecipients: v } }))}>
-              <BibleStudyEditForm data={bibleStudyForm} onChange={setBibleStudyForm} />
-            </WeeklyCommunicationCard>
-          )}
-          {selectedCard === "womens_study" && (
-            <WeeklyCommunicationCard title="Wednesday Women's Bible Study" accentColor="#DB2777" icon={Users} status={getStatus("womens_study")} summaryLines={womensStudySummary} subject={getSubject("womens_study")} onSubjectChange={(v) => setSubjectOverride("womens_study", v)} scheduledAt={getScheduledAt("womens_study")} previewHtml={womensStudyPreview} resourceLinks={[...(womensStudyForm.zoomLink ? [{ label: "Join Zoom Meeting", url: womensStudyForm.zoomLink }] : []), ...(womensStudyForm.resourceLinks ?? []).filter((l) => l.url)]} onSchedule={() => handleSchedule("womens_study")} onSendNow={() => handleSendNow("womens_study")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.womens_study.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, mailingListId: id } }))} selectedSmtpConfig={commOptions.womens_study.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, smtpConfigId: id } }))} sendCount={dispatchCounts.womens_study} additionalRecipients={commOptions.womens_study.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, womens_study: { ...prev.womens_study, additionalRecipients: v } }))}>
-              <WomensStudyEditForm data={womensStudyForm} onChange={setWomensStudyForm} />
-            </WeeklyCommunicationCard>
-          )}
-          {selectedCard === "bulletin" && (
-            <WeeklyCommunicationCard title="Weekly Bulletin" accentColor="#4F46E5" icon={Newspaper} status={getStatus("bulletin")} summaryLines={bulletinSummary} subject={getSubject("bulletin")} onSubjectChange={(v) => setSubjectOverride("bulletin", v)} scheduledAt={getScheduledAt("bulletin")} previewHtml={bulletinPreview} resourceLinks={bulletinForm.resourceLinks.filter((l) => l.url)} onSchedule={() => handleSchedule("bulletin")} onSendNow={() => handleSendNow("bulletin")} mailingLists={mailingLists} smtpConfigs={smtpConfigs} selectedMailingList={commOptions.bulletin.mailingListId} onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, mailingListId: id } }))} selectedSmtpConfig={commOptions.bulletin.smtpConfigId} onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, smtpConfigId: id } }))} sendCount={dispatchCounts.bulletin} additionalRecipients={commOptions.bulletin.additionalRecipients} onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, bulletin: { ...prev.bulletin, additionalRecipients: v } }))}>
-              <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} />
-            </WeeklyCommunicationCard>
-          )}
+          {/* Selected card (deduplicated render) */}
+          {visibleTemplates.includes(selectedCard) && (() => {
+            const tmpl = BUILTIN_TEMPLATES.find((t) => t.type === selectedCard)!
+            const type = selectedCard
+
+            const cardTitles: Record<CommType, string> = {
+              birthday: "Birthdays This Week",
+              anniversary: "Anniversaries This Week",
+              bible_study: "Friday Bible Study Invite",
+              womens_study: "Wednesday Women's Bible Study",
+              bulletin: "Weekly Bulletin",
+            }
+
+            const summaries: Record<CommType, string[]> = {
+              birthday: birthdaySummary,
+              anniversary: anniversarySummary,
+              bible_study: bibleStudySummary,
+              womens_study: womensStudySummary,
+              bulletin: bulletinSummary,
+            }
+
+            const links: Record<CommType, { label: string; url: string }[]> = {
+              birthday: (birthdayForm.resourceLinks ?? []).filter((l) => l.url),
+              anniversary: (anniversaryForm.resourceLinks ?? []).filter((l) => l.url),
+              bible_study: (bibleStudyForm.resourceLinks ?? []).filter((l) => l.url),
+              womens_study: [
+                ...(womensStudyForm.zoomLink ? [{ label: "Join Zoom Meeting", url: womensStudyForm.zoomLink }] : []),
+                ...(womensStudyForm.resourceLinks ?? []).filter((l) => l.url),
+              ],
+              bulletin: bulletinForm.resourceLinks.filter((l) => l.url),
+            }
+
+            const editForms: Record<CommType, React.ReactNode> = {
+              birthday: <BirthdayEditForm data={birthdayForm} onChange={setBirthdayForm} />,
+              anniversary: <AnniversaryEditForm data={anniversaryForm} onChange={setAnniversaryForm} />,
+              bible_study: <BibleStudyEditForm data={bibleStudyForm} onChange={setBibleStudyForm} />,
+              womens_study: <WomensStudyEditForm data={womensStudyForm} onChange={setWomensStudyForm} />,
+              bulletin: <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} />,
+            }
+
+            return (
+              <WeeklyCommunicationCard
+                key={type}
+                title={cardTitles[type]}
+                accentColor={tmpl.color}
+                icon={tmpl.icon}
+                status={getStatus(type)}
+                summaryLines={summaries[type]}
+                subject={getSubject(type)}
+                onSubjectChange={(v) => setSubjectOverride(type, v)}
+                scheduledAt={getScheduledAt(type)}
+                previewHtml={getPreview(type)}
+                resourceLinks={links[type]}
+                onSchedule={() => handleSchedule(type)}
+                onSendNow={() => handleSendNow(type)}
+                onSave={() => handleSaveInstance(type)}
+                onDelete={() => handleDeleteInstance(type)}
+                saving={savingInstance === type}
+                hasInstance={!!instanceIds[type]}
+                mailingLists={mailingLists}
+                smtpConfigs={smtpConfigs}
+                selectedMailingList={commOptions[type].mailingListId}
+                onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, [type]: { ...prev[type], mailingListId: id } }))}
+                selectedSmtpConfig={commOptions[type].smtpConfigId}
+                onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, [type]: { ...prev[type], smtpConfigId: id } }))}
+                sendCount={dispatchCounts[type]}
+                additionalRecipients={commOptions[type].additionalRecipients}
+                onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, [type]: { ...prev[type], additionalRecipients: v } }))}
+              >
+                {editForms[type]}
+              </WeeklyCommunicationCard>
+            )
+          })()}
         </div>
       )}
 

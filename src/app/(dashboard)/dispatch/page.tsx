@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import type {
@@ -32,21 +32,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Send,
@@ -56,7 +47,6 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
-  Plus,
   Mail,
   Clock,
   Trash2,
@@ -149,20 +139,11 @@ export default function DispatchQueuePage() {
   // Cancel confirmation dialog
   const [cancelTarget, setCancelTarget] = useState<DispatchQueue | null>(null)
 
-  // Create dialog
-  const [createOpen, setCreateOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
+  // Send confirmation
+  const [sendConfirmTarget, setSendConfirmTarget] = useState<DispatchQueue | null>(null)
 
   // Batch action in progress
   const [batchLoading, setBatchLoading] = useState(false)
-
-  // Form refs for create dialog
-  const subjectRef = useRef<HTMLInputElement>(null)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
-  const [formMailingList, setFormMailingList] = useState("")
-  const [formSmtpConfig, setFormSmtpConfig] = useState("")
-  const scheduleDateRef = useRef<HTMLInputElement>(null)
-  const scheduleTimeRef = useRef<HTMLInputElement>(null)
 
   // -------------------------------------------------------------------------
   // Data fetching
@@ -447,65 +428,11 @@ export default function DispatchQueuePage() {
     dispatches.length > 0 && selectedIds.size === dispatches.length
 
   // -------------------------------------------------------------------------
-  // Create dispatch
+  // Reminder detection
   // -------------------------------------------------------------------------
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    setCreating(true)
-
-    const subject = subjectRef.current?.value?.trim()
-    const bodyHtml = bodyRef.current?.value?.trim()
-    const dateVal = scheduleDateRef.current?.value
-    const timeVal = scheduleTimeRef.current?.value
-
-    if (!subject || !bodyHtml || !formMailingList || !formSmtpConfig) {
-      toast.error("Please fill in all required fields")
-      setCreating(false)
-      return
-    }
-
-    let scheduledAt: string | null = null
-    if (dateVal && timeVal) {
-      scheduledAt = new Date(`${dateVal}T${timeVal}`).toISOString()
-    } else if (dateVal) {
-      scheduledAt = new Date(`${dateVal}T00:00`).toISOString()
-    }
-
-    const supabase = createClient()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    const { error } = await supabase.from("dispatch_queue").insert({
-      subject,
-      body_html: bodyHtml,
-      mailing_list_id: formMailingList,
-      smtp_config_id: formSmtpConfig,
-      scheduled_at: scheduledAt,
-      status: "pending",
-      created_by: user?.id ?? null,
-      email_template_id: null,
-      event_instance_id: null,
-      approved_by: null,
-      sent_at: null,
-      error_message: null,
-    } as never)
-
-    if (error) {
-      toast.error("Failed to create dispatch", {
-        description: error.message,
-      })
-    } else {
-      toast.success("Dispatch scheduled")
-      setCreateOpen(false)
-      setFormMailingList("")
-      setFormSmtpConfig("")
-      fetchDispatches()
-    }
-
-    setCreating(false)
+  function isReminder(item: DispatchQueue): boolean {
+    return /^Reminder:/i.test(item.subject)
   }
 
   // -------------------------------------------------------------------------
@@ -537,10 +464,6 @@ export default function DispatchQueuePage() {
     return status === "failed"
   }
 
-  function canEdit(status: DispatchStatus) {
-    return status === "pending" || status === "previewed" || status === "approved"
-  }
-
   function canSend(status: DispatchStatus) {
     return status === "approved"
   }
@@ -549,14 +472,6 @@ export default function DispatchQueuePage() {
     return status === "pending" || status === "previewed" || status === "approved"
   }
 
-  // Default schedule date: tomorrow at 9 AM
-  const defaultSchedule = (() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    d.setHours(9, 0, 0, 0)
-    return toLocalDateTimeInputs(d)
-  })()
-
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -564,133 +479,11 @@ export default function DispatchQueuePage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dispatch Queue</h1>
-          <p className="text-muted-foreground">
-            Manage scheduled email dispatches — preview, approve, or cancel.
-          </p>
-        </div>
-
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger
-            render={
-              <Button>
-                <Plus data-icon="inline-start" className="size-4" />
-                Schedule Dispatch
-              </Button>
-            }
-          />
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Schedule a New Dispatch</DialogTitle>
-              <DialogDescription>
-                Compose an email dispatch. It will be created with
-                &quot;pending&quot; status.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleCreate} className="grid gap-4">
-              {/* Subject */}
-              <div className="grid gap-1.5">
-                <Label htmlFor="dispatch-subject">Subject *</Label>
-                <Input
-                  ref={subjectRef}
-                  id="dispatch-subject"
-                  placeholder="Email subject line"
-                  required
-                />
-              </div>
-
-              {/* Body HTML */}
-              <div className="grid gap-1.5">
-                <Label htmlFor="dispatch-body">Body HTML *</Label>
-                <Textarea
-                  ref={bodyRef}
-                  id="dispatch-body"
-                  placeholder="<h1>Hello!</h1><p>Your email content here...</p>"
-                  rows={6}
-                  required
-                />
-              </div>
-
-              {/* Mailing list */}
-              <div className="grid gap-1.5">
-                <Label>Mailing List *</Label>
-                <Select
-                  value={formMailingList}
-                  onValueChange={(val) => setFormMailingList(val ?? "")}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a mailing list">
-                      {mailingLists.find((ml) => ml.id === formMailingList)?.name || "Select a mailing list"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mailingLists.map((ml) => (
-                      <SelectItem key={ml.id} value={ml.id}>
-                        {ml.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* SMTP config */}
-              <div className="grid gap-1.5">
-                <Label>SMTP Config *</Label>
-                <Select
-                  value={formSmtpConfig}
-                  onValueChange={(val) => setFormSmtpConfig(val ?? "")}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select SMTP configuration">
-                      {smtpConfigs.find((sc) => sc.id === formSmtpConfig)?.name || "Select SMTP configuration"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {smtpConfigs.map((sc) => (
-                      <SelectItem key={sc.id} value={sc.id}>
-                        {sc.name} ({sc.from_email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Schedule date + time */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="dispatch-date">Date</Label>
-                  <Input
-                    ref={scheduleDateRef}
-                    id="dispatch-date"
-                    type="date"
-                    defaultValue={defaultSchedule.dateStr}
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="dispatch-time">Time</Label>
-                  <Input
-                    ref={scheduleTimeRef}
-                    id="dispatch-time"
-                    type="time"
-                    defaultValue={defaultSchedule.timeStr}
-                  />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <DialogClose render={<Button variant="outline" />}>
-                  Cancel
-                </DialogClose>
-                <Button type="submit" disabled={creating}>
-                  {creating ? "Creating..." : "Create Dispatch"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dispatch Queue</h1>
+        <p className="text-muted-foreground">
+          Preview, approve, and send queued emails. Create dispatches from the Dashboard.
+        </p>
       </div>
 
       {/* Tabs + Table */}
@@ -812,6 +605,11 @@ export default function DispatchQueuePage() {
                             </TableCell>
                             <TableCell className="max-w-xs truncate font-medium">
                               {d.subject}
+                              {isReminder(d) && (
+                                <Badge variant="outline" className="ml-1.5 text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">
+                                  Reminder
+                                </Badge>
+                              )}
                               {d.error_message && (
                                 <p className="mt-0.5 truncate text-xs text-red-500">
                                   {d.error_message}
@@ -868,7 +666,7 @@ export default function DispatchQueuePage() {
                                   <Button
                                     variant="ghost"
                                     size="icon-sm"
-                                    onClick={() => handleSendNow(d)}
+                                    onClick={() => setSendConfirmTarget(d)}
                                     aria-label="Send now"
                                     title="Send Now"
                                   >
@@ -989,77 +787,31 @@ export default function DispatchQueuePage() {
                 )}
               </div>
 
-              {/* Editable mailing list + SMTP for pending/approved dispatches */}
-              {canEdit(previewItem.status) && (
-                <div className="grid gap-3 sm:grid-cols-2 rounded-lg border bg-muted/30 p-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Mailing List</Label>
-                    <Select
-                      value={previewItem.mailing_list_id || ""}
-                      onValueChange={async (val) => {
-                        const supabase = createClient()
-                        const { error } = await supabase
-                          .from("dispatch_queue")
-                          .update({ mailing_list_id: val || null } as never)
-                          .eq("id", previewItem.id)
-                        if (error) { toast.error(`Update failed: ${error.message}`); return }
-                        setPreviewItem({ ...previewItem, mailing_list_id: val } as typeof previewItem)
-                        setDispatches((prev) =>
-                          prev.map((d) => d.id === previewItem.id ? { ...d, mailing_list_id: val } as typeof d : d)
-                        )
-                        toast.success("Mailing list updated")
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Select list...">
-                          {mailingLists.find((ml) => ml.id === previewItem.mailing_list_id)?.name || "Select list..."}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {mailingLists.map((ml) => (
-                          <SelectItem key={ml.id} value={ml.id}>{ml.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {previewItem.additional_recipients && (
-                    <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs text-muted-foreground">Additional Recipients</Label>
-                      <p className="text-xs">{previewItem.additional_recipients}</p>
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Send From</Label>
-                    <Select
-                      value={previewItem.smtp_config_id || ""}
-                      onValueChange={async (val) => {
-                        const supabase = createClient()
-                        const { error } = await supabase
-                          .from("dispatch_queue")
-                          .update({ smtp_config_id: val || null } as never)
-                          .eq("id", previewItem.id)
-                        if (error) { toast.error(`Update failed: ${error.message}`); return }
-                        setPreviewItem({ ...previewItem, smtp_config_id: val } as typeof previewItem)
-                        setDispatches((prev) =>
-                          prev.map((d) => d.id === previewItem.id ? { ...d, smtp_config_id: val } as typeof d : d)
-                        )
-                        toast.success("SMTP account updated")
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Select account...">
-                          {smtpConfigs.find((sc) => sc.id === previewItem.smtp_config_id)?.name || "Select account..."}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {smtpConfigs.map((sc) => (
-                          <SelectItem key={sc.id} value={sc.id}>{sc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {/* Send configuration (read-only) */}
+              <div className="grid gap-3 sm:grid-cols-2 rounded-lg border bg-muted/30 p-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Mailing List</Label>
+                  <p className="text-sm">
+                    {mailingLists.find((ml) => ml.id === previewItem.mailing_list_id)?.name || (
+                      <span className="text-amber-600 text-xs">Not configured</span>
+                    )}
+                  </p>
                 </div>
-              )}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Send From</Label>
+                  <p className="text-sm">
+                    {smtpConfigs.find((sc) => sc.id === previewItem.smtp_config_id)?.name || (
+                      <span className="text-amber-600 text-xs">Not configured</span>
+                    )}
+                  </p>
+                </div>
+                {previewItem.additional_recipients && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Additional Recipients</Label>
+                    <p className="text-xs">{previewItem.additional_recipients}</p>
+                  </div>
+                )}
+              </div>
 
               <div
                 className="rounded border bg-white p-4 text-black"
@@ -1071,16 +823,8 @@ export default function DispatchQueuePage() {
             {previewItem && canSend(previewItem.status) && (
               <Button
                 onClick={() => {
-                  if (!previewItem.mailing_list_id && !previewItem.additional_recipients?.trim()) {
-                    toast.error("Please select a mailing list or add recipient emails first")
-                    return
-                  }
-                  if (!previewItem.smtp_config_id) {
-                    toast.error("Please select a Send From account first")
-                    return
-                  }
-                  handleSendNow(previewItem)
                   setPreviewItem(null)
+                  setSendConfirmTarget(previewItem)
                 }}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
@@ -1167,6 +911,56 @@ export default function DispatchQueuePage() {
             >
               <Clock className="size-3.5" data-icon="inline-start" />
               Save Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send confirmation dialog */}
+      <Dialog
+        open={!!sendConfirmTarget}
+        onOpenChange={(open) => {
+          if (!open) setSendConfirmTarget(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Send Now?</DialogTitle>
+            <DialogDescription>
+              Send &quot;{sendConfirmTarget?.subject}&quot; immediately?
+              This will deliver to all configured recipients.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm space-y-1.5">
+            <p>
+              <span className="text-muted-foreground">Mailing list:</span>{" "}
+              <strong>{mailingLists.find((m) => m.id === sendConfirmTarget?.mailing_list_id)?.name || "None"}</strong>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Send from:</span>{" "}
+              <strong>{smtpConfigs.find((s) => s.id === sendConfirmTarget?.smtp_config_id)?.name || "None"}</strong>
+            </p>
+            {sendConfirmTarget?.additional_recipients && (
+              <p>
+                <span className="text-muted-foreground">Extra recipients:</span>{" "}
+                <span className="text-xs">{sendConfirmTarget.additional_recipients}</span>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendConfirmTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (sendConfirmTarget) {
+                  handleSendNow(sendConfirmTarget)
+                  setSendConfirmTarget(null)
+                }
+              }}
+            >
+              <Send className="size-3.5" data-icon="inline-start" />
+              Confirm Send
             </Button>
           </DialogFooter>
         </DialogContent>

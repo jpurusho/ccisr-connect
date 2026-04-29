@@ -26,14 +26,25 @@ import {
   Check,
   AlertCircle,
   ChevronUp,
+  ChevronDown,
   RefreshCw,
   Download,
   Image,
   Share2,
+  Save,
+  Trash2,
+  Loader2,
   type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import {
+  downloadAsPdf,
+  downloadAsImage,
+  shareViaWhatsApp,
+  shareCard,
+  buildShareText,
+} from "@/lib/card-export"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,6 +81,10 @@ export interface WeeklyCommunicationCardProps {
   resourceLinks?: ResourceLink[]
   onSchedule: () => void
   onSendNow: () => void
+  onSave?: () => void
+  onDelete?: () => void
+  saving?: boolean
+  hasInstance?: boolean
   children?: ReactNode
   mailingLists?: MailingListOption[]
   smtpConfigs?: SmtpConfigOption[]
@@ -91,7 +106,7 @@ function statusConfig(status: CommunicationStatus) {
     case "draft":
       return { label: "Draft", variant: "secondary" as const, icon: Pencil }
     case "scheduled":
-      return { label: "Scheduled", variant: "default" as const, icon: Clock }
+      return { label: "Queued", variant: "default" as const, icon: Clock }
     case "sent":
       return { label: "Sent", variant: "default" as const, icon: Check }
     case "failed":
@@ -115,6 +130,10 @@ export function WeeklyCommunicationCard({
   previewHtml,
   onSchedule,
   onSendNow,
+  onSave,
+  onDelete,
+  saving = false,
+  hasInstance = false,
   children,
   mailingLists,
   smtpConfigs,
@@ -129,130 +148,11 @@ export function WeeklyCommunicationCard({
 }: WeeklyCommunicationCardProps) {
   const [editing, setEditing] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   const sc = statusConfig(status)
   const StatusIcon = sc.icon
 
-  function downloadAsPdf() {
-    if (!previewHtml) return
-    const iframe = document.createElement("iframe")
-    iframe.style.cssText = "position:fixed;left:-9999px;top:0;width:600px;height:800px;"
-    document.body.appendChild(iframe)
-    const doc = iframe.contentDocument
-    if (!doc) { document.body.removeChild(iframe); return }
-    doc.open()
-    doc.write(`<!DOCTYPE html><html><head><title>${title}</title>
-      <style>*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}body{font-family:'Inter',-apple-system,sans-serif;margin:20px;display:flex;justify-content:center;}@media print{body{margin:0;}}</style>
-    </head><body>${previewHtml}</body></html>`)
-    doc.close()
-    setTimeout(() => {
-      iframe.contentWindow?.print()
-      setTimeout(() => document.body.removeChild(iframe), 1000)
-    }, 300)
-  }
-
-  async function downloadAsImage() {
-    if (!previewHtml) return
-    const container = document.createElement("div")
-    container.style.cssText = "position:fixed;top:0;left:0;z-index:-9999;width:480px;background:#fff;padding:16px;pointer-events:none;"
-    container.innerHTML = previewHtml
-    document.body.appendChild(container)
-    try {
-      const { toPng } = await import("html-to-image")
-      const dataUrl = await toPng(container, { pixelRatio: 2 })
-      const link = document.createElement("a")
-      link.download = `${title.replace(/\s+/g, "-").toLowerCase()}.png`
-      link.href = dataUrl
-      link.click()
-    } catch (err) {
-      console.error("html-to-image failed:", err)
-      toast.error("Failed to generate image. Try the PDF download instead.")
-    } finally {
-      document.body.removeChild(container)
-    }
-  }
-
-  function buildShareText() {
-    const linkLines = (resourceLinks ?? [])
-      .filter((l) => l.url)
-      .map((l) => `${l.label || "Link"}: ${l.url}`)
-    return [subject || title, ...linkLines].join("\n")
-  }
-
-  async function shareToWhatsApp() {
-    if (!previewHtml) return
-    const shareText = buildShareText()
-    const container = document.createElement("div")
-    container.style.cssText = "position:fixed;top:0;left:0;z-index:-9999;width:480px;background:#fff;padding:16px;pointer-events:none;"
-    container.innerHTML = previewHtml
-    document.body.appendChild(container)
-    try {
-      const { toBlob, toPng } = await import("html-to-image")
-      const filename = `${title.replace(/\s+/g, "-").toLowerCase()}.png`
-
-      const blob = await toBlob(container, { pixelRatio: 2 })
-      if (!blob) throw new Error("Failed to create image")
-      const file = new File([blob], filename, { type: "image/png" })
-
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ text: shareText, files: [file] })
-        return
-      }
-
-      // Desktop fallback: download image + open WhatsApp Web with text
-      const dataUrl = await toPng(container, { pixelRatio: 2 })
-      const link = document.createElement("a")
-      link.download = filename
-      link.href = dataUrl
-      link.click()
-      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + "\n\n(image downloaded — attach it to this message)")}`
-      window.open(waUrl, "_blank")
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return
-      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`
-      window.open(waUrl, "_blank")
-    } finally {
-      document.body.removeChild(container)
-    }
-  }
-
-  async function shareCard() {
-    if (!previewHtml) return
-    const container = document.createElement("div")
-    container.style.cssText = "position:fixed;top:0;left:0;z-index:-9999;width:480px;background:#fff;padding:16px;pointer-events:none;"
-    container.innerHTML = previewHtml
-    document.body.appendChild(container)
-    try {
-      const { toBlob, toPng } = await import("html-to-image")
-      const filename = `${title.replace(/\s+/g, "-").toLowerCase()}.png`
-      const shareText = buildShareText()
-
-      const blob = await toBlob(container, { pixelRatio: 2 })
-      if (!blob) throw new Error("Failed to create image")
-      const file = new File([blob], filename, { type: "image/png" })
-
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ text: shareText, files: [file] })
-      } else if (navigator.share) {
-        await navigator.share({ text: shareText })
-      } else {
-        const dataUrl = await toPng(container, { pixelRatio: 2 })
-        const link = document.createElement("a")
-        link.download = filename
-        link.href = dataUrl
-        link.click()
-        toast.info("Image downloaded")
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return
-      toast.error("Share failed")
-    } finally {
-      document.body.removeChild(container)
-    }
-  }
-
-  const selectedMlName = mailingLists?.find((ml) => ml.id === selectedMailingList)?.name
-  const selectedSmtpLabel = smtpConfigs?.find((s) => s.id === selectedSmtpConfig)?.name
   const canDispatch =
     !!selectedSmtpConfig && (!!selectedMailingList || !!(additionalRecipients?.trim()))
   const dispatchTitle = !selectedSmtpConfig
@@ -260,6 +160,32 @@ export function WeeklyCommunicationCard({
     : !selectedMailingList && !additionalRecipients?.trim()
     ? "Select a mailing list or add recipient emails first"
     : undefined
+
+  const selectedMlName = mailingLists?.find((ml) => ml.id === selectedMailingList)?.name
+  const selectedSmtpLabel = smtpConfigs?.find((s) => s.id === selectedSmtpConfig)?.name
+
+  function getShareText() {
+    return buildShareText(title, subject, resourceLinks)
+  }
+
+  function handleDownloadImage() {
+    if (!previewHtml) return
+    downloadAsImage(previewHtml, title).catch(() => {
+      toast.error("Failed to generate image. Try the PDF download instead.")
+    })
+  }
+
+  function handleShareWhatsApp() {
+    if (!previewHtml) return
+    shareViaWhatsApp(previewHtml, title, getShareText())
+  }
+
+  function handleShare() {
+    if (!previewHtml) return
+    shareCard(previewHtml, title, getShareText()).catch(() => {
+      toast.error("Share failed")
+    })
+  }
 
   return (
     <>
@@ -332,8 +258,60 @@ export function WeeklyCommunicationCard({
           )}
         </CardContent>
 
-        {/* Action bar: buttons + dropdowns inline */}
-        <div className="flex flex-wrap items-center gap-2 px-4 pb-3 pl-5 pt-3">
+        {/* ── Row 1: Send Configuration ── */}
+        <div className="flex flex-wrap items-center gap-2 px-4 pl-5 pt-3">
+          {mailingLists && mailingLists.length > 0 && onMailingListChange && (
+            <Select
+              value={selectedMailingList || ""}
+              onValueChange={(val) => onMailingListChange(val ?? "")}
+            >
+              <SelectTrigger className="h-8 w-auto min-w-32 max-w-48 gap-1 text-xs px-2.5">
+                <SelectValue placeholder="Mailing list...">
+                  {selectedMlName || "Mailing list..."}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {mailingLists.map((ml) => (
+                  <SelectItem key={ml.id} value={ml.id}>
+                    {ml.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {smtpConfigs && smtpConfigs.length > 0 && onSmtpConfigChange && (
+            <Select
+              value={selectedSmtpConfig || ""}
+              onValueChange={(val) => onSmtpConfigChange(val ?? "")}
+            >
+              <SelectTrigger className="h-8 w-auto min-w-32 max-w-48 gap-1 text-xs px-2.5">
+                <SelectValue placeholder="Send from...">
+                  {selectedSmtpLabel || "Send from..."}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {smtpConfigs.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {onAdditionalRecipientsChange && editing && (
+            <input
+              type="text"
+              value={additionalRecipients || ""}
+              onChange={(e) => onAdditionalRecipientsChange(e.target.value)}
+              placeholder="Extra emails: a@b.com, c@d.com"
+              className="h-8 min-w-40 flex-1 rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
+
+        {/* ── Row 2: Primary Actions ── */}
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pl-5 pt-2">
           <Button
             variant="outline"
             size="sm"
@@ -355,88 +333,37 @@ export function WeeklyCommunicationCard({
             <Eye className="size-3.5" data-icon="inline-start" />
             Preview
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={downloadAsPdf}
-            disabled={!previewHtml}
-            title="Download as PDF"
-          >
-            <Download className="size-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={downloadAsImage}
-            disabled={!previewHtml}
-            title="Download as Image"
-          >
-            <Image className="size-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={shareToWhatsApp}
-            disabled={!previewHtml}
-            title="Share"
-          >
-            <Share2 className="size-3.5" data-icon="inline-start" />
-            Share
-          </Button>
 
-          {/* Inline dropdowns */}
-          {mailingLists && mailingLists.length > 0 && onMailingListChange && (
-            <Select
-              value={selectedMailingList || ""}
-              onValueChange={(val) => onMailingListChange(val ?? "")}
+          {onSave && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSave}
+              disabled={saving}
             >
-              <SelectTrigger className="h-7 w-auto min-w-28 max-w-40 gap-1 text-xs px-2">
-                <SelectValue placeholder="List...">
-                  {selectedMlName || "List..."}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {mailingLists.map((ml) => (
-                  <SelectItem key={ml.id} value={ml.id}>
-                    {ml.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {saving ? (
+                <Loader2 className="size-3.5 animate-spin" data-icon="inline-start" />
+              ) : (
+                <Save className="size-3.5" data-icon="inline-start" />
+              )}
+              Save
+            </Button>
           )}
-          {smtpConfigs && smtpConfigs.length > 0 && onSmtpConfigChange && (
-            <Select
-              value={selectedSmtpConfig || ""}
-              onValueChange={(val) => onSmtpConfigChange(val ?? "")}
+
+          {onDelete && hasInstance && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              className="text-muted-foreground hover:text-destructive"
             >
-              <SelectTrigger className="h-7 w-auto min-w-28 max-w-40 gap-1 text-xs px-2">
-                <SelectValue placeholder="Send from...">
-                  {selectedSmtpLabel || "Send from..."}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {smtpConfigs.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Trash2 className="size-3.5" data-icon="inline-start" />
+              Delete
+            </Button>
           )}
 
-          {/* Additional recipients */}
-          {onAdditionalRecipientsChange && (
-            <input
-              type="text"
-              value={additionalRecipients || ""}
-              onChange={(e) => onAdditionalRecipientsChange(e.target.value)}
-              placeholder="Add emails: a@b.com, c@d.com"
-              className="h-7 min-w-40 flex-1 rounded-md border border-input bg-transparent px-2 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-              onClick={(e) => e.stopPropagation()}
-            />
-          )}
+          <div className="flex-1" />
 
-          {/* Action buttons */}
           {status === "draft" && (
             <>
               <Button
@@ -448,7 +375,7 @@ export function WeeklyCommunicationCard({
                 title={dispatchTitle}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
-                Send Now
+                Queue for Dispatch
               </Button>
               <Button
                 variant="outline"
@@ -458,7 +385,7 @@ export function WeeklyCommunicationCard({
                 title={dispatchTitle}
               >
                 <Clock className="size-3.5" data-icon="inline-start" />
-                Queue
+                Schedule
               </Button>
             </>
           )}
@@ -485,6 +412,59 @@ export function WeeklyCommunicationCard({
               <Send className="size-3.5" data-icon="inline-start" />
               Retry
             </Button>
+          )}
+        </div>
+
+        {/* ── Row 3: Collapsible Share & Export ── */}
+        <div className="px-4 pl-5 pb-3">
+          <button
+            type="button"
+            onClick={() => setShareOpen(!shareOpen)}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {shareOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+            Share & Export
+          </button>
+          {shareOpen && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => previewHtml && downloadAsPdf(previewHtml, title)}
+                disabled={!previewHtml}
+              >
+                <Download className="size-3.5" data-icon="inline-start" />
+                PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadImage}
+                disabled={!previewHtml}
+              >
+                <Image className="size-3.5" data-icon="inline-start" />
+                Image
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleShareWhatsApp}
+                disabled={!previewHtml}
+                className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950"
+              >
+                <Share2 className="size-3.5" data-icon="inline-start" />
+                WhatsApp
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleShare}
+                disabled={!previewHtml}
+              >
+                <Share2 className="size-3.5" data-icon="inline-start" />
+                Share
+              </Button>
+            </div>
           )}
         </div>
 
@@ -520,7 +500,7 @@ export function WeeklyCommunicationCard({
                 title={dispatchTitle}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
-                Send Now
+                Queue for Dispatch
               </Button>
             )}
           </DialogFooter>

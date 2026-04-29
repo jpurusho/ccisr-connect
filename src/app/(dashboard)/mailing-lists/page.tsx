@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import type { MailingList, RecipientType } from "@/types/database"
@@ -16,6 +16,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -36,6 +43,8 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  Search,
+  UserPlus,
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -59,34 +68,36 @@ interface MemberOption {
   email: string | null
 }
 
-const RECIPIENT_SECTIONS: { value: RecipientType; label: string; description: string }[] = [
-  { value: "to", label: "To", description: "Primary recipients" },
-  { value: "cc", label: "CC", description: "Carbon copy" },
-  { value: "bcc", label: "BCC", description: "Blind carbon copy" },
-]
-
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function MailingListsPage() {
+  // ---- List state ----
   const [lists, setLists] = useState<MailingListWithCount[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingList, setEditingList] = useState<MailingList | null>(null)
   const [saving, setSaving] = useState(false)
 
+  // List form fields
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [googleGroupEmail, setGoogleGroupEmail] = useState("")
 
+  // ---- Expansion + recipients ----
   const [expandedListId, setExpandedListId] = useState<string | null>(null)
   const [recipients, setRecipients] = useState<ListRecipient[]>([])
   const [recipientsLoading, setRecipientsLoading] = useState(false)
 
-  const [addSearches, setAddSearches] = useState<Record<string, string>>({})
-  const [addEmails, setAddEmails] = useState<Record<string, string>>({})
-  const [addModes, setAddModes] = useState<Record<string, "member" | "external">>({})
-  const [searchResults, setSearchResults] = useState<Record<string, MemberOption[]>>({})
+  // ---- Add recipients (flat state) ----
+  const [addSearch, setAddSearch] = useState("")
+  const [addEmails, setAddEmails] = useState("")
+  const [addType, setAddType] = useState<RecipientType>("to")
+  const [searchResults, setSearchResults] = useState<MemberOption[]>([])
   const [addingRecipient, setAddingRecipient] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  // ---- Data fetching ----
 
   const fetchLists = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true)
@@ -152,13 +163,21 @@ export default function MailingListsPage() {
     } else {
       setExpandedListId(listId)
       fetchRecipients(listId)
+      resetAddState()
     }
   }
 
-  async function searchMembers(query: string, sectionKey: string) {
-    setAddSearches((prev) => ({ ...prev, [sectionKey]: query }))
+  function resetAddState() {
+    setAddSearch("")
+    setAddEmails("")
+    setAddType("to")
+    setSearchResults([])
+  }
+
+  async function searchMembers(query: string) {
+    setAddSearch(query)
     if (query.trim().length < 2) {
-      setSearchResults((prev) => ({ ...prev, [sectionKey]: [] }))
+      setSearchResults([])
       return
     }
     const supabase = createClient()
@@ -170,43 +189,75 @@ export default function MailingListsPage() {
       .limit(10)
       .returns<MemberOption[]>()
 
-    setSearchResults((prev) => ({ ...prev, [sectionKey]: data ?? [] }))
+    setSearchResults(data ?? [])
   }
 
-  async function addRecipient(type: RecipientType, memberId?: string, email?: string) {
+  async function addMemberRecipient(memberId: string) {
     if (!expandedListId) return
     setAddingRecipient(true)
     const supabase = createClient()
 
-    const payload: Record<string, unknown> = {
-      mailing_list_id: expandedListId,
-      recipient_type: type,
-    }
-    if (memberId) {
-      payload.member_id = memberId
-    } else if (email) {
-      payload.external_email = email.trim()
+    const { error } = await supabase
+      .from("mailing_list_members")
+      .insert({
+        mailing_list_id: expandedListId,
+        recipient_type: addType,
+        member_id: memberId,
+      } as never)
+
+    if (error) {
+      toast.error(error.message.includes("duplicate")
+        ? "This member is already in the list"
+        : `Failed: ${error.message}`)
     } else {
+      toast.success("Member added")
+      logAudit("mailing_list_member_added", "mailing_list_members", expandedListId, {
+        memberId, type: addType,
+      })
+      setAddSearch("")
+      setSearchResults([])
+      fetchRecipients(expandedListId)
+      fetchLists()
+    }
+    setAddingRecipient(false)
+  }
+
+  async function addBulkEmails() {
+    if (!expandedListId || !addEmails.trim()) return
+    setAddingRecipient(true)
+    const supabase = createClient()
+
+    const emails = addEmails
+      .split(/[,\n]/)
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0 && e.includes("@"))
+
+    if (emails.length === 0) {
+      toast.error("No valid email addresses found")
       setAddingRecipient(false)
       return
     }
 
+    const payloads = emails.map((e) => ({
+      mailing_list_id: expandedListId,
+      recipient_type: addType,
+      external_email: e,
+    }))
+
     const { error } = await supabase
       .from("mailing_list_members")
-      .insert(payload as never)
+      .insert(payloads as never[])
 
     if (error) {
       toast.error(error.message.includes("duplicate")
-        ? "This recipient is already in the list"
+        ? "Some recipients already exist in the list"
         : `Failed: ${error.message}`)
     } else {
-      toast.success("Recipient added")
-      logAudit("mailing_list_member_added", "mailing_list_members", expandedListId, {
-        memberId, email, type,
+      toast.success(`${emails.length} recipient${emails.length > 1 ? "s" : ""} added`)
+      logAudit("mailing_list_members_bulk_added", "mailing_list_members", expandedListId, {
+        count: emails.length, type: addType,
       })
-      setAddSearches((prev) => ({ ...prev, [type]: "" }))
-      setAddEmails((prev) => ({ ...prev, [type]: "" }))
-      setSearchResults((prev) => ({ ...prev, [type]: [] }))
+      setAddEmails("")
       fetchRecipients(expandedListId)
       fetchLists()
     }
@@ -224,10 +275,24 @@ export default function MailingListsPage() {
     if (error) {
       toast.error(`Failed: ${error.message}`)
     } else {
-      toast.success("Recipient removed")
+      setRecipients((prev) => prev.filter((r) => r.id !== recipientId))
       logAudit("mailing_list_member_removed", "mailing_list_members", expandedListId, { recipientId })
-      fetchRecipients(expandedListId)
       fetchLists()
+    }
+  }
+
+  async function updateRecipientType(recipientId: string, newType: RecipientType) {
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("mailing_list_members")
+      .update({ recipient_type: newType } as never)
+      .eq("id", recipientId)
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+    } else {
+      setRecipients((prev) =>
+        prev.map((r) => r.id === recipientId ? { ...r, recipient_type: newType } : r)
+      )
     }
   }
 
@@ -316,6 +381,12 @@ export default function MailingListsPage() {
     }
   }
 
+  // ── Derived data ───────────────────────────────────────────────────────
+
+  const toRecipients = recipients.filter((r) => r.recipient_type === "to")
+  const ccRecipients = recipients.filter((r) => r.recipient_type === "cc")
+  const bccRecipients = recipients.filter((r) => r.recipient_type === "bcc")
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
@@ -355,7 +426,7 @@ export default function MailingListsPage() {
             const isExpanded = expandedListId === list.id
 
             return (
-              <Card key={list.id} className={isExpanded ? "overflow-visible" : ""}>
+              <Card key={list.id}>
                 <CardHeader
                   className="cursor-pointer"
                   onClick={() => toggleExpand(list.id)}
@@ -403,7 +474,7 @@ export default function MailingListsPage() {
                 </CardHeader>
 
                 {isExpanded && (
-                  <CardContent className="border-t pt-4">
+                  <CardContent className="border-t pt-4 space-y-4">
                     {recipientsLoading ? (
                       <div className="space-y-2">
                         {Array.from({ length: 3 }).map((_, i) => (
@@ -411,137 +482,172 @@ export default function MailingListsPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="space-y-5">
-                        {RECIPIENT_SECTIONS.map((section) => {
-                          const type = section.value
-                          const typeRecipients = recipients.filter((r) => r.recipient_type === type)
-                          const mode = addModes[type] ?? "member"
-                          const search = addSearches[type] ?? ""
-                          const email = addEmails[type] ?? ""
-                          const results = searchResults[type] ?? []
+                      <>
+                        {/* ── Summary bar ── */}
+                        {recipients.length > 0 && (
+                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            <span>{toRecipients.length} To</span>
+                            <span>{ccRecipients.length} CC</span>
+                            <span>{bccRecipients.length} BCC</span>
+                            <span className="font-medium text-foreground">{recipients.length} total</span>
+                          </div>
+                        )}
 
-                          return (
-                            <div key={type} className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <span className="text-sm font-semibold">{section.label}</span>
-                                  <span className="ml-2 text-xs text-muted-foreground">{section.description}</span>
-                                  {typeRecipients.length > 0 && (
-                                    <Badge variant="secondary" className="ml-2 text-xs">
-                                      {typeRecipients.length}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant={mode === "member" ? "default" : "ghost"}
-                                    size="sm"
-                                    className="h-6 text-xs px-2"
-                                    onClick={() => setAddModes((prev) => ({ ...prev, [type]: "member" }))}
-                                  >
-                                    Member
-                                  </Button>
-                                  <Button
-                                    variant={mode === "external" ? "default" : "ghost"}
-                                    size="sm"
-                                    className="h-6 text-xs px-2"
-                                    onClick={() => setAddModes((prev) => ({ ...prev, [type]: "external" }))}
-                                  >
-                                    Email
-                                  </Button>
-                                </div>
-                              </div>
+                        {/* ── Add Recipients Area ── */}
+                        <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <UserPlus className="size-4 text-muted-foreground shrink-0" />
+                            <span className="text-sm font-medium">Add Recipients</span>
+                            <div className="ml-auto">
+                              <Select value={addType} onValueChange={(v) => setAddType(v as RecipientType)}>
+                                <SelectTrigger className="h-7 w-20 text-xs px-2">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="to">To</SelectItem>
+                                  <SelectItem value="cc">CC</SelectItem>
+                                  <SelectItem value="bcc">BCC</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
 
-                              <div className="flex gap-2">
-                                {mode === "member" ? (
-                                  <div className="relative flex-1">
-                                    <Input
-                                      value={search}
-                                      onChange={(e) => searchMembers(e.target.value, type)}
-                                      placeholder="Search member..."
-                                      className="h-8 text-sm"
-                                    />
-                                    {results.length > 0 && (
-                                      <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                                        {results.map((m) => (
-                                          <button
-                                            key={m.id}
-                                            type="button"
-                                            className="flex w-full items-center justify-between px-3 py-1.5 text-sm hover:bg-accent text-left"
-                                            onClick={() => addRecipient(type, m.id)}
-                                            disabled={addingRecipient}
-                                          >
-                                            <span className="font-medium">{m.full_name}</span>
-                                            <span className="text-xs text-muted-foreground">{m.email || "no email"}</span>
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Input
-                                      type="email"
-                                      value={email}
-                                      onChange={(e) => setAddEmails((prev) => ({ ...prev, [type]: e.target.value }))}
-                                      placeholder="email@example.com"
-                                      className="h-8 text-sm flex-1"
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter" && email.trim()) {
-                                          e.preventDefault()
-                                          addRecipient(type, undefined, email)
-                                        }
-                                      }}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      className="h-8"
-                                      disabled={!email.trim() || addingRecipient}
-                                      onClick={() => addRecipient(type, undefined, email)}
+                          {/* Member search */}
+                          <div className="relative">
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                              <Input
+                                ref={searchRef}
+                                value={addSearch}
+                                onChange={(e) => searchMembers(e.target.value)}
+                                onFocus={() => setSearchFocused(true)}
+                                onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+                                placeholder="Search members by name..."
+                                className="h-8 text-sm pl-8"
+                                disabled={addingRecipient}
+                              />
+                            </div>
+                            {searchFocused && addSearch.length >= 2 && (
+                              <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-48 overflow-y-auto">
+                                {searchResults.length > 0 ? (
+                                  searchResults.map((m) => (
+                                    <button
+                                      key={m.id}
+                                      type="button"
+                                      className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent text-left"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => addMemberRecipient(m.id)}
+                                      disabled={addingRecipient}
                                     >
-                                      <Plus className="size-3.5" />
-                                    </Button>
-                                  </>
+                                      <span className="font-medium">{m.full_name}</span>
+                                      <span className="text-xs text-muted-foreground">{m.email || "no email"}</span>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="px-3 py-3 text-center text-sm text-muted-foreground">
+                                    No members found for &ldquo;{addSearch}&rdquo;
+                                  </div>
                                 )}
                               </div>
+                            )}
+                          </div>
 
-                              {typeRecipients.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5 pt-1">
-                                  {typeRecipients.map((r) => (
-                                    <Badge
-                                      key={r.id}
-                                      variant="secondary"
-                                      className="gap-1 pr-1 font-normal"
-                                    >
-                                      <span className="max-w-40 truncate">
-                                        {r.member_name || r.external_email}
-                                      </span>
-                                      {r.member_name && r.member_email && (
-                                        <span className="text-[10px] opacity-60 hidden sm:inline">
-                                          {r.member_email}
-                                        </span>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => removeRecipient(r.id)}
-                                        className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
-                                      >
-                                        <X className="size-3" />
-                                      </button>
-                                    </Badge>
-                                  ))}
-                                </div>
-                              )}
+                          {/* Bulk email input */}
+                          <div className="space-y-1.5">
+                            <div className="flex gap-2">
+                              <Input
+                                value={addEmails}
+                                onChange={(e) => setAddEmails(e.target.value)}
+                                placeholder="Add emails (comma separated)"
+                                className="h-8 text-sm flex-1"
+                                disabled={addingRecipient}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && addEmails.trim()) {
+                                    e.preventDefault()
+                                    addBulkEmails()
+                                  }
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                className="h-8"
+                                disabled={!addEmails.trim() || addingRecipient}
+                                onClick={addBulkEmails}
+                              >
+                                {addingRecipient ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <Plus className="size-3.5" />
+                                )}
+                                Add
+                              </Button>
                             </div>
-                          )
-                        })}
+                            <p className="text-[10px] text-muted-foreground">
+                              Paste multiple emails separated by commas or newlines
+                            </p>
+                          </div>
+                        </div>
 
-                        {recipients.length === 0 && (
-                          <p className="text-center text-sm text-muted-foreground py-2">
-                            No recipients yet. Add members or emails to any field above.
+                        {/* ── Recipient list grouped by type ── */}
+                        {recipients.length === 0 ? (
+                          <p className="text-center text-sm text-muted-foreground py-4">
+                            No recipients yet. Search for members or add email addresses above.
                           </p>
+                        ) : (
+                          <div className="space-y-3">
+                            {(["to", "cc", "bcc"] as const).map((type) => {
+                              const typeRecipients = recipients.filter(
+                                (r) => r.recipient_type === type
+                              )
+                              if (typeRecipients.length === 0) return null
+                              return (
+                                <div key={type}>
+                                  <p className="text-[10px] font-semibold uppercase text-muted-foreground mb-1.5 tracking-wider">
+                                    {type} ({typeRecipients.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {typeRecipients.map((r) => (
+                                      <Badge
+                                        key={r.id}
+                                        variant="secondary"
+                                        className="gap-1 pr-1 font-normal"
+                                      >
+                                        <select
+                                          value={r.recipient_type}
+                                          onChange={(e) =>
+                                            updateRecipientType(r.id, e.target.value as RecipientType)
+                                          }
+                                          className="h-4 border-none bg-transparent text-[10px] font-semibold uppercase outline-none cursor-pointer appearance-none w-7"
+                                          title="Change recipient type"
+                                        >
+                                          <option value="to">TO</option>
+                                          <option value="cc">CC</option>
+                                          <option value="bcc">BCC</option>
+                                        </select>
+                                        <span className="max-w-40 truncate">
+                                          {r.member_name || r.external_email}
+                                        </span>
+                                        {r.member_name && r.member_email && (
+                                          <span className="text-[10px] opacity-60 hidden sm:inline">
+                                            {r.member_email}
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => removeRecipient(r.id)}
+                                          className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                                        >
+                                          <X className="size-3" />
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
-                      </div>
+                      </>
                     )}
                   </CardContent>
                 )}
@@ -595,7 +701,7 @@ export default function MailingListsPage() {
                 placeholder="group@googlegroups.com"
               />
               <p className="text-xs text-muted-foreground">
-                Optional — link a Google Group to this mailing list.
+                Optional — emails sent to this list will also go to the Google Group address.
               </p>
             </div>
             <DialogFooter>
