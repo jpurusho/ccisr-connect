@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { format, parse } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -138,6 +139,52 @@ function Field({
     <div className="space-y-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Shared: Date picker that outputs formatted display string
+// ---------------------------------------------------------------------------
+
+function DateField({
+  label,
+  htmlFor,
+  value,
+  onChange,
+}: {
+  label: string
+  htmlFor: string
+  value: string
+  onChange: (formatted: string) => void
+}) {
+  // Try to parse the display string back to a date for the input value
+  let isoValue = ""
+  if (value && value !== "No bible study this week" && value !== "No study this week") {
+    try {
+      const parsed = parse(value, "EEEE, MMMM do", new Date())
+      if (!isNaN(parsed.getTime())) isoValue = format(parsed, "yyyy-MM-dd")
+    } catch { /* ignore */ }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          id={htmlFor}
+          type="date"
+          value={isoValue}
+          onChange={(e) => {
+            if (e.target.value) {
+              const d = new Date(e.target.value + "T00:00:00")
+              onChange(format(d, "EEEE, MMMM do"))
+            }
+          }}
+          className="w-40"
+        />
+        <span className="text-sm text-muted-foreground truncate">{value || "No date set"}</span>
+      </div>
     </div>
   )
 }
@@ -563,14 +610,12 @@ export function BibleStudyEditForm({
         />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Date" htmlFor="bs-i-date">
-          <Input
-            id="bs-i-date"
-            value={data.date}
-            onChange={(e) => set("date", e.target.value)}
-            placeholder="Friday, May 2nd"
-          />
-        </Field>
+        <DateField
+          label="Date"
+          htmlFor="bs-i-date"
+          value={data.date}
+          onChange={(v) => set("date", v)}
+        />
         <Field label="Time" htmlFor="bs-i-time">
           <Input
             id="bs-i-time"
@@ -737,14 +782,12 @@ export function WomensStudyEditForm({
         />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Date" htmlFor="ws-i-date">
-          <Input
-            id="ws-i-date"
-            value={data.date}
-            onChange={(e) => set("date", e.target.value)}
-            placeholder="Wednesday, May 7th"
-          />
-        </Field>
+        <DateField
+          label="Date"
+          htmlFor="ws-i-date"
+          value={data.date}
+          onChange={(v) => set("date", v)}
+        />
         <Field label="Time" htmlFor="ws-i-time">
           <Input
             id="ws-i-time"
@@ -838,14 +881,12 @@ export function PrayerMeetingEditForm({
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Date" htmlFor="pm-i-date">
-          <Input
-            id="pm-i-date"
-            value={data.date}
-            onChange={(e) => set("date", e.target.value)}
-            placeholder="Saturday, May 3rd"
-          />
-        </Field>
+        <DateField
+          label="Date"
+          htmlFor="pm-i-date"
+          value={data.date}
+          onChange={(v) => set("date", v)}
+        />
         <Field label="Time" htmlFor="pm-i-time">
           <Input
             id="pm-i-time"
