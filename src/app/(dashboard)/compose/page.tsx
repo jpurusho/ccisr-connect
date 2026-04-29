@@ -119,7 +119,9 @@ interface PrayerMeetingFormState {
   dinnerNote: string
   signupLink: string
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]

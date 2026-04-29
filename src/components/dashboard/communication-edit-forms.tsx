@@ -206,7 +206,9 @@ export function ResourceLinksEditor({
 
 interface CardStyleFieldsData {
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
 }
@@ -231,6 +233,25 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           className="min-h-12"
         />
       </Field>
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+        <Field label="Email Header Title (optional)" htmlFor={`${idPrefix}-htitle`}>
+          <Input
+            id={`${idPrefix}-htitle`}
+            value={data.headerTitle}
+            onChange={(e) => onChange({ ...data, headerTitle: e.target.value })}
+            placeholder="Leave blank for default"
+          />
+        </Field>
+        <Field label="Emoji" htmlFor={`${idPrefix}-emoji`}>
+          <Input
+            id={`${idPrefix}-emoji`}
+            value={data.headerEmoji}
+            onChange={(e) => onChange({ ...data, headerEmoji: e.target.value })}
+            placeholder="🎂"
+            className="w-16 text-center text-lg"
+          />
+        </Field>
+      </div>
       <Field label="Header Subtitle (optional)" htmlFor={`${idPrefix}-hsub`}>
         <Input
           id={`${idPrefix}-hsub`}
@@ -275,7 +296,9 @@ export interface BirthdayFormData {
   weekLabel: string
   birthdays: BirthdayEntry[]
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -362,7 +385,9 @@ export interface AnniversaryFormData {
   weekLabel: string
   anniversaries: AnniversaryEntry[]
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -487,7 +512,9 @@ export interface BibleStudyFormData {
   time: string
   topic: string
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -670,7 +697,9 @@ export interface WomensStudyFormData {
   zoomPasscode: string
   location: string
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -784,7 +813,9 @@ export interface PrayerMeetingFormData {
   dinnerNote: string
   signupLink: string
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
@@ -898,7 +929,9 @@ export interface BulletinFormData {
   events: { title: string; details: string }[]
   resourceLinks: { label: string; url: string }[]
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
   weeksAhead?: number

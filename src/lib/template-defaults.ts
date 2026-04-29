@@ -15,7 +15,9 @@ export interface ResourceLinkDefault {
 
 export interface CommonCardFields {
   message?: string
+  headerTitle?: string
   headerSubtitle?: string
+  headerEmoji?: string
   footerVerse?: string
   primaryColor?: string
   resourceLinks?: ResourceLinkDefault[]
@@ -63,14 +65,18 @@ export interface PrayerMeetingDefaults extends CommonCardFields {
  */
 export function extractCommonFields(def: CommonCardFields): {
   message: string
+  headerTitle: string
   headerSubtitle: string
+  headerEmoji: string
   primaryColor: string
   footerVerse: string
   resourceLinks: ResourceLinkDefault[]
 } {
   return {
     message: def.message ?? "",
+    headerTitle: def.headerTitle ?? "",
     headerSubtitle: def.headerSubtitle ?? "",
+    headerEmoji: def.headerEmoji ?? "",
     primaryColor: def.primaryColor ?? "",
     footerVerse: def.footerVerse ?? "",
     resourceLinks: (def.resourceLinks ?? []) as ResourceLinkDefault[],

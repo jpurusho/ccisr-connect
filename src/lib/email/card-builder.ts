@@ -151,7 +151,9 @@ export interface BirthdayCardData {
   weekLabel: string;
   birthdays: BirthdayEntry[];
   message?: string;
+  headerTitle?: string;
   headerSubtitle?: string;
+  headerEmoji?: string;
   footerVerse?: string;
   primaryColor?: string;
   resourceLinks?: ResourceLink[];
@@ -177,9 +179,9 @@ export function buildBirthdayCard(data: BirthdayCardData): string {
 
   const content =
     headerRow(
-      "Happy Birthday!",
+      data.headerTitle || "Happy Birthday!",
       data.headerSubtitle || "Christ Church of India, San Ramon",
-      "🎂",
+      data.headerEmoji || "🎂",
       colors
     ) +
     contentRow(
@@ -209,7 +211,9 @@ export interface AnniversaryCardData {
   weekLabel: string;
   anniversaries: AnniversaryEntry[];
   message?: string;
+  headerTitle?: string;
   headerSubtitle?: string;
+  headerEmoji?: string;
   footerVerse?: string;
   primaryColor?: string;
   resourceLinks?: ResourceLink[];
@@ -235,9 +239,9 @@ export function buildAnniversaryCard(data: AnniversaryCardData): string {
 
   const content =
     headerRow(
-      "Happy Anniversary!",
+      data.headerTitle || "Happy Anniversary!",
       data.headerSubtitle || "Christ Church of India, San Ramon",
-      "💍",
+      data.headerEmoji || "💍",
       colors
     ) +
     contentRow(
@@ -278,6 +282,7 @@ export interface BibleStudyCardData {
   topic?: string;
   message?: string;
   headerSubtitle?: string;
+  headerEmoji?: string;
   footerVerse?: string;
   primaryColor?: string;
   resourceLink?: ResourceLink;
@@ -329,7 +334,7 @@ ${details}
     headerRow(
       data.title || "Bible Study This Friday",
       data.headerSubtitle || "Christ Church of India, San Ramon",
-      "📖",
+      data.headerEmoji || "📖",
       colors
     ) +
     contentRow(
@@ -357,6 +362,7 @@ export interface WomensStudyCardData {
   zoomMeetingId?: string;
   zoomPasscode?: string;
   location?: string;
+  headerEmoji?: string;
   message?: string;
   headerSubtitle?: string;
   footerVerse?: string;
@@ -391,7 +397,7 @@ export function buildWomensStudyCard(data: WomensStudyCardData): string {
     headerRow(
       data.title || "Women's Bible Study",
       data.headerSubtitle || "Christ Church of India, San Ramon",
-      "🕊️",
+      data.headerEmoji || "🕊️",
       colors
     ) +
     contentRow(
@@ -419,7 +425,9 @@ export interface PrayerMeetingCardData {
   dinnerNote?: string;
   signupLink?: string;
   message?: string;
+  headerTitle?: string;
   headerSubtitle?: string;
+  headerEmoji?: string;
   primaryColor?: string;
   footerVerse?: string;
   resourceLink?: ResourceLink;
@@ -453,9 +461,9 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
 
   const content =
     headerRow(
-      "Monthly Prayer Meeting",
+      data.headerTitle || "Monthly Prayer Meeting",
       data.headerSubtitle || "Christ Church of India, San Ramon",
-      "🙏",
+      data.headerEmoji || "🙏",
       colors
     ) +
     contentRow(
@@ -485,7 +493,9 @@ export interface BulletinItem {
 
 export interface BulletinCardData {
   weekLabel: string;
+  headerTitle?: string;
   headerSubtitle?: string;
+  headerEmoji?: string;
   birthdays: { name: string; date: string }[];
   anniversaries: { names: string; date: string }[];
   helpers: { role: string; name: string }[];
@@ -545,9 +555,11 @@ ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font
   const churchName = data.headerSubtitle || "Christ Church of India, San Ramon";
   const churchLine = `<p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.75);font-weight:500;text-transform:uppercase;letter-spacing:1px">${churchName}</p>`;
 
+  const bulletinEmoji = data.headerEmoji || "⛪";
+  const bulletinTitle = data.headerTitle || "Weekly Bulletin";
   const bulletinHeader = `<tr><td style="background:${colors.primary};padding:24px 28px;text-align:center">
-<p style="margin:0;font-size:32px;line-height:1">⛪</p>
-${churchLine}<p style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">Weekly Bulletin</p>
+<p style="margin:0;font-size:32px;line-height:1">${bulletinEmoji}</p>
+${churchLine}<p style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${bulletinTitle}</p>
 <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.85);font-weight:500">${data.weekLabel}</p>
 </td></tr>`;
 
