@@ -1723,147 +1723,42 @@ export default function DashboardPage() {
               prayer_meeting: !!prayerMeetingForm.date && prayerMeetingForm.date !== "",
               bulletin: true,
             }
-            const contentCounts: Record<CommType, number> = {
-              birthday: birthdayForm.birthdays.length,
-              anniversary: anniversaryForm.anniversaries.length,
-              bible_study: bibleStudyForm.locations.length,
-              womens_study: 0,
-              prayer_meeting: 0,
-              bulletin: bulletinForm.birthdays.length + bulletinForm.anniversaries.length + bulletinForm.events.length,
-            }
-
-            return <>
-          {/* Template pills + config */}
-          <div className="flex flex-wrap items-center gap-2">
-            {BUILTIN_TEMPLATES
-                .filter((t) => visibleTemplates.includes(t.type))
-                .map(({ type, label, color, icon: TIcon }) => {
-                  const status = getStatus(type)
-                  const count = dispatchCounts[type]
-                  const isActive = selectedCard === type
-                  const hasData = hasContent[type]
-                  const dataCount = contentCounts[type]
-                  const hasDraft = !!instanceIds[type]
-
-                  return (
-                    <button
-                      key={type}
-                      onClick={() => setSelectedCard(type)}
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
-                        isActive ? "text-white shadow-sm"
-                        : hasData ? "bg-muted text-foreground hover:bg-muted/80"
-                        : "bg-muted/50 text-muted-foreground hover:bg-muted/60"
-                      }`}
-                      style={isActive ? { backgroundColor: color } : undefined}
-                    >
-                      <TIcon className="size-3.5" />
-                      {label}
-                      {hasData && dataCount > 0 && (
-                        <span className={`rounded-full px-1.5 text-[10px] ${isActive ? "bg-white/20" : "bg-foreground/10"}`}>
-                          {dataCount}
-                        </span>
-                      )}
-                      {status === "sent" && count > 0 && (
-                        <span className={`rounded-full px-1.5 text-[10px] ${isActive ? "bg-white/30" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>
-                          {count}x sent
-                        </span>
-                      )}
-                      {status === "scheduled" && (
-                        <span className={`size-1.5 rounded-full ${isActive ? "bg-white/60" : "bg-amber-400"}`} title="Scheduled" />
-                      )}
-                      {hasDraft && (
-                        <span className={`size-1.5 rounded-full ${isActive ? "bg-white/80" : "bg-green-400"}`} title="Draft saved" />
-                      )}
-                    </button>
-                  )
-                })}
-
-            <Popover>
-              <PopoverTrigger
-                render={
-                  <Button variant="ghost" size="sm" className="rounded-full h-8 px-2.5 text-muted-foreground">
-                    <Settings2 className="size-3.5" />
-                  </Button>
-                }
-              />
-              <PopoverContent align="end" className="w-64">
-                <p className="text-sm font-medium mb-3">Show on Dashboard</p>
-                <div className="space-y-2">
-                  {BUILTIN_TEMPLATES.map(({ type, label, icon: TIcon, color }) => (
-                    <div key={type} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <TIcon className="size-3.5" style={{ color }} />
-                        <span className="text-sm">{label}</span>
-                      </div>
-                      <Switch
-                        size="sm"
-                        checked={visibleTemplates.includes(type)}
-                        onCheckedChange={() => toggleTemplate(type)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Selected card (deduplicated render) */}
-          {visibleTemplates.includes(selectedCard) && (() => {
-            const tmpl = BUILTIN_TEMPLATES.find((t) => t.type === selectedCard)!
-            const type = selectedCard
 
             const cardTitles: Record<CommType, string> = {
-              birthday: "Birthdays This Week",
-              anniversary: "Anniversaries This Week",
-              bible_study: "Friday Bible Study Invite",
-              womens_study: "Wednesday Women's Bible Study",
-              prayer_meeting: "Monthly Prayer Meeting",
+              birthday: "Birthdays",
+              anniversary: "Anniversaries",
+              bible_study: "Bible Study",
+              womens_study: "Women's Study",
+              prayer_meeting: "Prayer Meeting",
               bulletin: "Weekly Bulletin",
             }
 
-            const baseSummaries: Record<CommType, string[]> = {
+            const shortSummaries: Record<CommType, string> = {
+              birthday: birthdayForm.birthdays.length > 0
+                ? `${birthdayForm.birthdays.length} birthday${birthdayForm.birthdays.length > 1 ? "s" : ""}`
+                : "None this week",
+              anniversary: anniversaryForm.anniversaries.length > 0
+                ? `${anniversaryForm.anniversaries.length} anniversary${anniversaryForm.anniversaries.length > 1 ? "ies" : "y"}`
+                : "None this week",
+              bible_study: bibleStudyForm.date !== "No bible study this week"
+                ? `${bibleStudyForm.date} at ${bibleStudyForm.time}`
+                : "No study this week",
+              womens_study: womensStudyForm.date !== "No study this week"
+                ? `${womensStudyForm.date} at ${womensStudyForm.time}`
+                : "No study this week",
+              prayer_meeting: prayerMeetingForm.date
+                ? `${prayerMeetingForm.date} at ${prayerMeetingForm.time}`
+                : "Not scheduled",
+              bulletin: `${bulletinForm.birthdays.length + bulletinForm.anniversaries.length + bulletinForm.events.length} items`,
+            }
+
+            const fullSummaries: Record<CommType, string[]> = {
               birthday: birthdaySummary,
               anniversary: anniversarySummary,
               bible_study: bibleStudySummary,
               womens_study: womensStudySummary,
               prayer_meeting: prayerMeetingSummary,
               bulletin: bulletinSummary,
-            }
-
-            // Build status indicators
-            const summaries = { ...baseSummaries }
-            const indicators: string[] = []
-            const status = getStatus(type)
-            const count = dispatchCounts[type]
-            const hasData = hasContent[type]
-            const isPastWeek = weekOffset < 0
-            const hasDraft = !!instanceIds[type]
-
-            if (!hasData && !isPastWeek) {
-              indicators.push("No event this week")
-            } else if (!hasData && isPastWeek) {
-              indicators.push("No event that week")
-            }
-            if (status === "sent" && count > 0) {
-              indicators.push(`✅ Email sent${count > 1 ? ` (${count}x)` : ""}`)
-            } else if (status === "scheduled") {
-              indicators.push("⏳ Queued for dispatch")
-            }
-            if (hasDraft) {
-              const iw = instanceWeeks[type]
-              if (iw) {
-                const weekDate = new Date(iw + "T00:00:00")
-                indicators.push(`📌 Draft saved for week of ${format(weekDate, "MMM d")}`)
-              } else {
-                indicators.push("📌 Draft saved")
-              }
-            }
-            if (isPastWeek && !hasDraft && status === "draft" && hasData) {
-              indicators.push("⚠️ Not dispatched")
-            }
-
-            if (indicators.length > 0) {
-              summaries[type] = [...summaries[type], ...indicators]
             }
 
             const links: Record<CommType, { label: string; url: string }[]> = {
@@ -1890,6 +1785,133 @@ export default function DashboardPage() {
               bulletin: <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} />,
             }
 
+            const visibleCards = BUILTIN_TEMPLATES.filter((t) => visibleTemplates.includes(t.type))
+
+            return <>
+          {/* ── Mini-card grid ── */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleCards.map(({ type, label, color, icon: TIcon }) => {
+              const status = getStatus(type)
+              const count = dispatchCounts[type]
+              const hasData = hasContent[type]
+              const hasDraft = !!instanceIds[type]
+              const isSelected = selectedCard === type
+
+              return (
+                <button
+                  key={type}
+                  onClick={() => setSelectedCard(isSelected ? type : type)}
+                  className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
+                    isSelected
+                      ? "ring-2 ring-offset-1 shadow-sm"
+                      : hasData
+                      ? "border-border hover:border-foreground/20"
+                      : "border-dashed border-muted-foreground/20 opacity-60"
+                  }`}
+                  style={isSelected ? { borderColor: color, "--tw-ring-color": color } as React.CSSProperties : undefined}
+                >
+                  {/* Left accent + icon */}
+                  <div
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: color + "15", color }}
+                  >
+                    <TIcon className="size-4" />
+                  </div>
+
+                  {/* Content */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold truncate">{cardTitles[type]}</span>
+                      {/* Status badges */}
+                      {status === "sent" && count > 0 && (
+                        <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          Sent{count > 1 ? ` ${count}x` : ""}
+                        </span>
+                      )}
+                      {status === "scheduled" && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          Queued
+                        </span>
+                      )}
+                      {hasDraft && status === "draft" && (
+                        <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                          Draft
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                      {shortSummaries[type]}
+                    </p>
+                    {weekOffset < 0 && !hasDraft && status === "draft" && hasData && (
+                      <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">Not dispatched</p>
+                    )}
+                  </div>
+
+                  {/* Active dot */}
+                  {hasData && (
+                    <span className="absolute right-2 top-2 size-2 rounded-full" style={{ backgroundColor: color }} />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* ── Settings popover ── */}
+          <div className="flex justify-end">
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
+                    <Settings2 className="size-3.5" />
+                    Customize cards
+                  </Button>
+                }
+              />
+              <PopoverContent align="end" className="w-64">
+                <p className="text-sm font-medium mb-3">Show on Dashboard</p>
+                <div className="space-y-2">
+                  {BUILTIN_TEMPLATES.map(({ type, label, icon: TIcon, color }) => (
+                    <div key={type} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TIcon className="size-3.5" style={{ color }} />
+                        <span className="text-sm">{label}</span>
+                      </div>
+                      <Switch
+                        size="sm"
+                        checked={visibleTemplates.includes(type)}
+                        onCheckedChange={() => toggleTemplate(type)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* ── Expanded card detail ── */}
+          {visibleTemplates.includes(selectedCard) && (() => {
+            const tmpl = BUILTIN_TEMPLATES.find((t) => t.type === selectedCard)!
+            const type = selectedCard
+
+            // Build status indicators for the full card
+            const summaries = [...fullSummaries[type]]
+            const status = getStatus(type)
+            const count = dispatchCounts[type]
+            const hasDraft = !!instanceIds[type]
+
+            if (status === "sent" && count > 0) {
+              summaries.push(`✅ Email sent${count > 1 ? ` (${count}x)` : ""}`)
+            } else if (status === "scheduled") {
+              summaries.push("⏳ Queued for dispatch")
+            }
+            if (hasDraft) {
+              const iw = instanceWeeks[type]
+              if (iw) {
+                const weekDate = new Date(iw + "T00:00:00")
+                summaries.push(`📌 Draft saved for week of ${format(weekDate, "MMM d")}`)
+              }
+            }
+
             return (
               <WeeklyCommunicationCard
                 key={type}
@@ -1897,7 +1919,7 @@ export default function DashboardPage() {
                 accentColor={tmpl.color}
                 icon={tmpl.icon}
                 status={getStatus(type)}
-                summaryLines={summaries[type]}
+                summaryLines={summaries}
                 subject={getSubject(type)}
                 onSubjectChange={(v) => setSubjectOverride(type, v)}
                 scheduledAt={getScheduledAt(type)}
