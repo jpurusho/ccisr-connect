@@ -1,6 +1,6 @@
 "use client"
 
-import { Settings, Palette, Server, UserCog, Info, Church, Tag, Activity } from "lucide-react"
+import { Settings, Palette, Server, UserCog, Info, Church, Tag, Activity, CalendarDays } from "lucide-react"
 import dynamic from "next/dynamic"
 const ActivityLogPanel = dynamic(() => import("@/components/settings/activity-log-panel"), { ssr: false })
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -17,6 +17,7 @@ import { ThemeSelector } from "@/components/settings/theme-selector"
 import { SmtpConfigPanel } from "@/components/settings/smtp-config"
 import { UserManagementPanel } from "@/components/settings/user-management"
 import { TagManagementPanel } from "@/components/settings/tag-management"
+import { EventSchedulePanel } from "@/components/settings/event-schedule-panel"
 import { useAppUser } from "@/hooks/use-app-user"
 
 import { APP_VERSION } from "@/lib/version"
@@ -111,6 +112,12 @@ export default function SettingsPage() {
                 <span className="hidden sm:inline">User Management</span>
               </TabsTrigger>
             )}
+            {isAdmin && (
+              <TabsTrigger value="schedules">
+                <CalendarDays className="size-4" />
+                <span className="hidden sm:inline">Event Schedules</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="tags">
               <Tag className="size-4" />
               <span className="hidden sm:inline">Tags</span>
@@ -138,6 +145,12 @@ export default function SettingsPage() {
           {isAdmin && (
             <TabsContent value="users" className="mt-6">
               <UserManagementPanel />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="schedules" className="mt-6">
+              <EventSchedulePanel />
             </TabsContent>
           )}
 
