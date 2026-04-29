@@ -23,6 +23,7 @@ interface FamilySearchResult {
   family_name: string
   home_phone: string | null
   full_address: string | null
+  street: string | null
   city: string | null
   state: string | null
   zip: string | null
@@ -72,6 +73,7 @@ export function HostFamilyInput({
           family_name: f.family_name,
           home_phone: phone,
           full_address: address,
+          street: addr?.street ?? null,
           city: addr?.city ?? null,
           state: addr?.state ?? null,
           zip: addr?.zip ?? null,

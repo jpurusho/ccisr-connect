@@ -1315,8 +1315,8 @@ function PrayerMeetingForm({
               onChange({
                 ...data,
                 hostNames: `${f.family_name}'s Residence`,
-                address: f.full_address ?? data.address,
-                city: [f.city, f.state, f.zip].filter(Boolean).join(", ") || data.city,
+                address: f.street ?? f.full_address ?? data.address,
+                city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || data.city,
                 phone: formatPhone(f.home_phone) || data.phone,
               })
             }}
