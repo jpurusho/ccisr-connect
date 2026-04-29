@@ -109,6 +109,9 @@ interface DispatchRecord {
   created_at: string
   template_type: string | null
   week_start: string | null
+  mailing_list_id: string | null
+  smtp_config_id: string | null
+  additional_recipients: string | null
 }
 
 interface MailingListOption {
@@ -547,7 +550,7 @@ export default function DashboardPage() {
         // This week dispatches
         supabase
           .from("dispatch_queue")
-          .select("id, subject, body_html, status, scheduled_at, created_at, template_type, week_start")
+          .select("id, subject, body_html, status, scheduled_at, created_at, template_type, week_start, mailing_list_id, smtp_config_id, additional_recipients")
           .not("status", "eq", "cancelled")
           .or(`week_start.eq.${wkSunISO},and(week_start.is.null,created_at.gte.${wkSunISO},created_at.lte.${wkSatISO}T23:59:59)`)
           .order("created_at", { ascending: false })
@@ -914,7 +917,6 @@ export default function DashboardPage() {
           }
         }
       }
-      setCommOptions(prefilledOptions)
 
       // Pre-fill custom subjects from composed instances
       const subjectOverrides: Partial<Record<CommType, string>> = {}
@@ -922,7 +924,6 @@ export default function DashboardPage() {
         const ci = composedMap[ct]
         if (ci?.subject) subjectOverrides[ct] = ci.subject
       }
-      setCustomSubjects(subjectOverrides)
 
       // ---- Match dispatches to communication types (count all, keep latest) ----
       const weekDispatches = weekDispatchesRes.data ?? []
@@ -967,6 +968,22 @@ export default function DashboardPage() {
 
       setDispatches(matchedDispatches)
       setDispatchCounts(counts)
+
+      // Fallback: pre-fill mailing list + SMTP from dispatches when no composed instance
+      for (const ct of commTypes) {
+        if (!prefilledOptions[ct].mailingListId && !prefilledOptions[ct].smtpConfigId) {
+          const d = matchedDispatches[ct]
+          if (d) {
+            prefilledOptions[ct] = {
+              mailingListId: d.mailing_list_id || "",
+              smtpConfigId: d.smtp_config_id || "",
+              additionalRecipients: d.additional_recipients || "",
+            }
+          }
+        }
+      }
+      setCommOptions(prefilledOptions)
+      setCustomSubjects(subjectOverrides)
     } catch (err) {
       console.error("Dashboard fetch error:", err)
       setError(
@@ -1332,6 +1349,9 @@ export default function DashboardPage() {
               created_at: new Date().toISOString(),
               template_type: type,
               week_start: dispatchWeekStart,
+              mailing_list_id: opts.mailingListId || null,
+              smtp_config_id: opts.smtpConfigId || null,
+              additional_recipients: opts.additionalRecipients.trim() || null,
             },
           }))
           setDispatchCounts((prev) => ({
@@ -1465,6 +1485,9 @@ export default function DashboardPage() {
             created_at: new Date().toISOString(),
             template_type: type,
             week_start: schedWeekStart,
+            mailing_list_id: opts.mailingListId || null,
+            smtp_config_id: opts.smtpConfigId || null,
+            additional_recipients: opts.additionalRecipients.trim() || null,
           },
         }))
         setDispatchCounts((prev) => ({
