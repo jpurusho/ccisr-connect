@@ -1769,6 +1769,14 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Status legend */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-green-500" />Sent — email delivered</span>
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-500" />Queued — waiting to send</span>
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-500" />Draft — saved, not sent</span>
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full border border-muted-foreground/30" />No action taken</span>
+          </div>
+
           {(() => {
             const hasContent: Record<CommType, boolean> = {
               birthday: birthdayForm.birthdays.length > 0,
