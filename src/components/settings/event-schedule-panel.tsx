@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { format } from "date-fns"
+import { format, addDays, isAfter } from "date-fns"
 import { logAudit } from "@/lib/audit"
 import {
   Card,
@@ -50,6 +50,10 @@ interface ParsedRule {
   nthWeek: string
   except: string[]
   until: string
+}
+
+const DAY_MAP: Record<string, number> = {
+  SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6,
 }
 
 const DAY_OPTIONS = [
@@ -140,6 +144,8 @@ export function EventSchedulePanel() {
   const [editTime, setEditTime] = useState("")
   const [saving, setSaving] = useState(false)
   const [newExceptDate, setNewExceptDate] = useState("")
+  const [rangeFrom, setRangeFrom] = useState("")
+  const [rangeTo, setRangeTo] = useState("")
 
   const fetchEvents = useCallback(async () => {
     setLoading(true)
@@ -249,6 +255,51 @@ export function EventSchedulePanel() {
       ...prev,
       except: prev.except.filter(d => d !== date),
     }))
+  }
+
+  function addExceptionRange() {
+    if (!rangeFrom || !rangeTo) return
+    const from = new Date(rangeFrom + "T00:00:00")
+    const to = new Date(rangeTo + "T00:00:00")
+    if (isAfter(from, to)) {
+      toast.error("Start date must be before end date")
+      return
+    }
+
+    const targetDow = DAY_MAP[editRule.byDay]
+    const newDates: string[] = []
+    let d = new Date(from)
+    const currentDow = d.getDay()
+    const diff = (targetDow - currentDow + 7) % 7
+    d = addDays(d, diff)
+
+    if (editRule.freq === "WEEKLY") {
+      while (!isAfter(d, to)) {
+        const iso = format(d, "yyyy-MM-dd")
+        if (!editRule.except.includes(iso)) newDates.push(iso)
+        d = addDays(d, 7)
+      }
+    } else {
+      // For monthly, just add every occurrence of that day in range
+      while (!isAfter(d, to)) {
+        const iso = format(d, "yyyy-MM-dd")
+        if (!editRule.except.includes(iso)) newDates.push(iso)
+        d = addDays(d, 7)
+      }
+    }
+
+    if (newDates.length === 0) {
+      toast.error("No matching dates found in range")
+      return
+    }
+
+    setEditRule(prev => ({
+      ...prev,
+      except: [...prev.except, ...newDates].sort(),
+    }))
+    setRangeFrom("")
+    setRangeTo("")
+    toast.success(`Added ${newDates.length} skip date${newDates.length > 1 ? "s" : ""}`)
   }
 
   return (
@@ -425,24 +476,57 @@ export function EventSchedulePanel() {
                       </div>
 
                       {/* Exception dates */}
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Label>Skip Dates (vacations, holidays)</Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="date"
-                            value={newExceptDate}
-                            onChange={(e) => setNewExceptDate(e.target.value)}
-                            className="w-44"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={addException}
-                            disabled={!newExceptDate}
-                          >
-                            <Plus className="size-3.5" />
-                            Add
-                          </Button>
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">Add a single date:</p>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="date"
+                              value={newExceptDate}
+                              onChange={(e) => setNewExceptDate(e.target.value)}
+                              className="w-44"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={addException}
+                              disabled={!newExceptDate}
+                            >
+                              <Plus className="size-3.5" />
+                              Add
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">
+                            Or skip a date range (adds all {DAY_OPTIONS.find(d => d.value === editRule.byDay)?.label || "event"}s in range):
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Input
+                              type="date"
+                              value={rangeFrom}
+                              onChange={(e) => setRangeFrom(e.target.value)}
+                              className="w-40"
+                              placeholder="From"
+                            />
+                            <span className="text-xs text-muted-foreground">to</span>
+                            <Input
+                              type="date"
+                              value={rangeTo}
+                              onChange={(e) => setRangeTo(e.target.value)}
+                              className="w-40"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={addExceptionRange}
+                              disabled={!rangeFrom || !rangeTo}
+                            >
+                              <Plus className="size-3.5" />
+                              Add Range
+                            </Button>
+                          </div>
                         </div>
                         {editRule.except.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5 mt-1">
