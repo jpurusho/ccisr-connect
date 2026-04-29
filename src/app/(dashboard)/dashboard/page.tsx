@@ -103,6 +103,7 @@ interface Stats {
 interface DispatchRecord {
   id: string
   subject: string
+  body_html: string | null
   status: string
   scheduled_at: string | null
   created_at: string
@@ -546,7 +547,7 @@ export default function DashboardPage() {
         // This week dispatches
         supabase
           .from("dispatch_queue")
-          .select("id, subject, status, scheduled_at, created_at, template_type, week_start")
+          .select("id, subject, body_html, status, scheduled_at, created_at, template_type, week_start")
           .not("status", "eq", "cancelled")
           .or(`week_start.eq.${wkSunISO},and(week_start.is.null,created_at.gte.${wkSunISO},created_at.lte.${wkSatISO}T23:59:59)`)
           .order("created_at", { ascending: false })
@@ -1116,6 +1117,9 @@ export default function DashboardPage() {
   }
 
   function getSubject(type: CommType): string {
+    // If dispatched, show the exact subject that was sent
+    const d = dispatches[type]
+    if (d && (d.status === "sent" || d.status === "sending")) return d.subject
     if (customSubjects[type]) return customSubjects[type]!
     const etKey = COMM_TYPE_TO_ET[type]
     const savedTmpl = savedSubjectTemplates[etKey]
@@ -1135,7 +1139,25 @@ export default function DashboardPage() {
   }
 
   // ---- Get preview for type ----
+  // If dispatched/queued, show the exact HTML that was sent/queued.
+  // Otherwise show the live-computed preview for editing.
   function getPreview(type: CommType): string | null {
+    const d = dispatches[type]
+    if (d?.body_html && (d.status === "sent" || d.status === "sending" || d.status === "pending" || d.status === "approved")) {
+      return d.body_html
+    }
+    switch (type) {
+      case "birthday":       return birthdayPreview
+      case "anniversary":    return anniversaryPreview
+      case "bible_study":    return bibleStudyPreview
+      case "womens_study":   return womensStudyPreview
+      case "prayer_meeting": return prayerMeetingPreview
+      case "bulletin":       return bulletinPreview
+    }
+  }
+
+  // Get the live-computed preview (ignoring dispatch state) — used when creating new dispatches
+  function getLivePreview(type: CommType): string | null {
     switch (type) {
       case "birthday":       return birthdayPreview
       case "anniversary":    return anniversaryPreview
@@ -1242,7 +1264,7 @@ export default function DashboardPage() {
   // ---- Queue / Send ----
   const handleSendNow = useCallback(
     async (type: CommType) => {
-      const html = getPreview(type)
+      const html = getLivePreview(type)
       let subject = getSubject(type)
       if (!html) {
         toast.error("No content to send. Please add data first.")
@@ -1304,6 +1326,7 @@ export default function DashboardPage() {
             [type]: {
               id: inserted?.id ?? "local",
               subject,
+              body_html: html,
               status: "pending",
               scheduled_at: new Date().toISOString(),
               created_at: new Date().toISOString(),
@@ -1350,7 +1373,7 @@ export default function DashboardPage() {
 
   const handleSchedule = useCallback(
     async (type: CommType) => {
-      const html = getPreview(type)
+      const html = getLivePreview(type)
       if (!html) {
         toast.error("No content to schedule. Please add data first.")
         return
@@ -1390,7 +1413,7 @@ export default function DashboardPage() {
     const type = scheduleDialog.commType
     if (!type) return
 
-    const html = getPreview(type)
+    const html = getLivePreview(type)
     const subject = getSubject(type)
     if (!html) return
 
@@ -1436,6 +1459,7 @@ export default function DashboardPage() {
           [type]: {
             id: inserted?.id ?? "local",
             subject,
+            body_html: html,
             status: "pending",
             scheduled_at: scheduledAt,
             created_at: new Date().toISOString(),
