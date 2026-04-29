@@ -30,11 +30,13 @@ import type {
   WeddingAnniversary,
   Family,
   Address,
+  DispatchStatus,
 } from "@/types/database"
 import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  Send,
 } from "lucide-react"
 
 // Default fallback color for events without a color_scheme
@@ -91,6 +93,7 @@ export default function CalendarPage() {
       eventTypesResult,
       birthdaysResult,
       anniversariesResult,
+      dispatchesResult,
     ] = await Promise.all([
       // Event instances in date range
       supabase
@@ -122,6 +125,16 @@ export default function CalendarPage() {
           "id, family_id, husband_member_id, wife_member_id, anniversary_month, anniversary_day"
         )
         .in("anniversary_month", visibleMonths),
+
+      // Dispatches in date range
+      supabase
+        .from("dispatch_queue")
+        .select("id, subject, status, template_type, scheduled_at, created_at")
+        .not("status", "eq", "cancelled")
+        .gte("created_at", startStr)
+        .lte("created_at", endStr + "T23:59:59")
+        .order("created_at", { ascending: false })
+        .returns<{ id: string; subject: string; status: DispatchStatus; template_type: string | null; scheduled_at: string | null; created_at: string }[]>(),
     ])
 
     const instances = (instancesResult.data ?? []) as EventInstance[]
@@ -129,6 +142,7 @@ export default function CalendarPage() {
     const eventTypes = (eventTypesResult.data ?? []) as EventType[]
     const birthdays = (birthdaysResult.data ?? []) as Member[]
     const anniversaries = (anniversariesResult.data ?? []) as WeddingAnniversary[]
+    const dispatches = dispatchesResult.data ?? []
 
     // Build lookup maps
     const eventsMap = new Map(eventsData.map((e) => [e.id, e]))
@@ -272,12 +286,46 @@ export default function CalendarPage() {
       }
     }
 
+    // Build CalendarEvents from dispatches
+    const DISPATCH_COLORS: Record<string, string> = {
+      birthday: "#7C3AED",
+      anniversary: "#D97706",
+      bible_study: "#0D9488",
+      womens_study: "#DB2777",
+      prayer_meeting: "#059669",
+      bulletin: "#4F46E5",
+    }
+    const DISPATCH_LABELS: Record<string, string> = {
+      birthday: "Birthday Email",
+      anniversary: "Anniversary Email",
+      bible_study: "Bible Study Email",
+      womens_study: "Women's Study Email",
+      prayer_meeting: "Prayer Meeting Email",
+      bulletin: "Bulletin Email",
+    }
+
+    for (const d of dispatches) {
+      const dispatchDate = d.scheduled_at ? new Date(d.scheduled_at) : new Date(d.created_at)
+      if (days.some((day) => isSameDay(day, dispatchDate))) {
+        const typeLabel = d.template_type ? DISPATCH_LABELS[d.template_type] : null
+        calEvents.push({
+          id: `dispatch-${d.id}`,
+          kind: "dispatch",
+          title: typeLabel || d.subject,
+          date: dispatchDate,
+          color: (d.template_type && DISPATCH_COLORS[d.template_type]) || "#6B7280",
+          description: d.subject,
+          dispatchStatus: d.status,
+          templateType: d.template_type,
+        })
+      }
+    }
+
     // Sort by date, then time
     calEvents.sort((a, b) => {
       const dateDiff = a.date.getTime() - b.date.getTime()
       if (dateDiff !== 0) return dateDiff
-      // Events first, then birthdays, then anniversaries
-      const kindOrder = { event: 0, birthday: 1, anniversary: 2 }
+      const kindOrder = { event: 0, dispatch: 1, birthday: 2, anniversary: 3 }
       return kindOrder[a.kind] - kindOrder[b.kind]
     })
 
@@ -396,6 +444,10 @@ export default function CalendarPage() {
         <div className="flex items-center gap-1.5">
           <CalendarDays className="size-3 text-muted-foreground" />
           Events
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Send className="size-3 text-muted-foreground" />
+          Dispatches
         </div>
       </div>
 

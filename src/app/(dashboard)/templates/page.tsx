@@ -349,6 +349,56 @@ export default function TemplatesPage() {
     }
   }
 
+  const ET_NAME_TO_COMM_TYPE: Record<string, string> = {
+    birthday: "birthday",
+    anniversary: "anniversary",
+    friday_bible_study: "bible_study",
+    wednesday_womens_study: "womens_study",
+    monthly_prayer: "prayer_meeting",
+    bulletin: "bulletin",
+  }
+
+  async function checkAndOfferDraftRefresh(typeName: string, bodyJson: string, subjectTmpl: string) {
+    const commType = ET_NAME_TO_COMM_TYPE[typeName]
+    if (!commType) return
+
+    const supabase = createClient()
+    const { data: drafts } = await supabase
+      .from("composed_instances")
+      .select("id, name, week_start")
+      .eq("template_type", commType)
+      .eq("is_active", true)
+      .returns<{ id: string; name: string; week_start: string | null }[]>()
+
+    if (!drafts || drafts.length === 0) return
+
+    const label = typeName.replace(/_/g, " ")
+    toast(`${drafts.length} saved draft${drafts.length > 1 ? "s" : ""} use the old ${label} template`, {
+      duration: 10000,
+      action: {
+        label: "Refresh Drafts",
+        onClick: async () => {
+          const parsed = JSON.parse(bodyJson)
+          let updated = 0
+          for (const draft of drafts) {
+            const { error } = await supabase
+              .from("composed_instances")
+              .update({
+                form_data: parsed,
+                subject: subjectTmpl,
+              } as never)
+              .eq("id", draft.id)
+            if (!error) updated++
+          }
+          if (updated > 0) {
+            toast.success(`${updated} draft${updated > 1 ? "s" : ""} refreshed with new template`)
+            logAudit("drafts_refreshed_from_template", "composed_instances", null, { typeName, count: updated })
+          }
+        },
+      },
+    })
+  }
+
   async function handleSave(typeName: string) {
     const etId = eventTypeIds[typeName]
     if (!etId) {
@@ -365,7 +415,7 @@ export default function TemplatesPage() {
       const existing = templates.find((t) => t.event_type_name === typeName)
 
       if (existing) {
-        const { error, status, statusText } = await supabase
+        const { error } = await supabase
           .from("email_templates")
           .update({
             subject_template: subjectTmpl,
@@ -379,9 +429,10 @@ export default function TemplatesPage() {
           toast.success(`${typeName.replace(/_/g, " ")} template saved`)
           logAudit("template_updated", "email_templates", existing.id, { typeName })
           await fetchTemplates()
+          await checkAndOfferDraftRefresh(typeName, bodyJson, subjectTmpl)
         }
       } else {
-        const { data: inserted, error, status, statusText } = await supabase
+        const { data: inserted, error } = await supabase
           .from("email_templates")
           .insert({
             name: `${typeName} default`,
@@ -391,7 +442,7 @@ export default function TemplatesPage() {
             is_default: true,
           } as never)
           .select("id")
-          .single() as { data: { id: string } | null; error: { message: string } | null; status: number; statusText: string }
+          .single() as { data: { id: string } | null; error: { message: string } | null }
 
         if (error) {
           toast.error(`Create failed: ${error.message}`)

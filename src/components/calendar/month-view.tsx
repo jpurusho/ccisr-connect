@@ -22,11 +22,14 @@ interface MonthViewProps {
   onEventClick: (event: CalendarEvent) => void
 }
 
-/** Assign a dot color based on event kind/color */
 function dotColor(event: CalendarEvent): string {
   if (event.kind === "birthday") return "bg-purple-500"
   if (event.kind === "anniversary") return "bg-amber-500"
   return ""
+}
+
+function isDispatchSent(event: CalendarEvent): boolean {
+  return event.kind === "dispatch" && event.dispatchStatus === "sent"
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -115,17 +118,19 @@ export function MonthView({
                       event.kind === "birthday" &&
                         "bg-purple-500 text-white dark:bg-purple-600",
                       event.kind === "anniversary" &&
-                        "bg-amber-500 text-white dark:bg-amber-600"
+                        "bg-amber-500 text-white dark:bg-amber-600",
+                      event.kind === "dispatch" &&
+                        "border border-dashed"
                     )}
                     style={
-                      event.kind === "event"
-                        ? {
-                            backgroundColor: event.color,
-                            color: "#fff",
-                          }
+                      event.kind === "dispatch"
+                        ? { borderColor: event.color, color: event.color, backgroundColor: event.color + "12" }
+                        : event.kind === "event"
+                        ? { backgroundColor: event.color, color: "#fff" }
                         : undefined
                     }
                   >
+                    {event.kind === "dispatch" && isDispatchSent(event) ? "✓ " : ""}
                     {event.title}
                   </div>
                 ))}
@@ -137,11 +142,12 @@ export function MonthView({
                       key={event.id}
                       className={cn(
                         "size-1.5 rounded-full",
-                        dotColor(event)
+                        dotColor(event),
+                        event.kind === "dispatch" && "ring-1 ring-current"
                       )}
                       style={
-                        event.kind === "event"
-                          ? { backgroundColor: event.color }
+                        event.kind === "event" || event.kind === "dispatch"
+                          ? { backgroundColor: event.kind === "dispatch" ? "transparent" : event.color, color: event.color }
                           : undefined
                       }
                     />
@@ -207,10 +213,14 @@ export function DayDetailPanel({
                   event.kind === "birthday" &&
                     "bg-purple-50 dark:bg-purple-950/20",
                   event.kind === "anniversary" &&
-                    "bg-amber-50 dark:bg-amber-950/20"
+                    "bg-amber-50 dark:bg-amber-950/20",
+                  event.kind === "dispatch" &&
+                    "border border-dashed"
                 )}
                 style={
-                  event.kind === "event"
+                  event.kind === "dispatch"
+                    ? { borderColor: event.color, backgroundColor: `${event.color}08` }
+                    : event.kind === "event"
                     ? { backgroundColor: `${event.color}08` }
                     : undefined
                 }
@@ -222,7 +232,7 @@ export function DayDetailPanel({
                     event.kind === "anniversary" && "bg-amber-500"
                   )}
                   style={
-                    event.kind === "event"
+                    event.kind === "event" || event.kind === "dispatch"
                       ? { backgroundColor: event.color }
                       : undefined
                   }
@@ -230,7 +240,15 @@ export function DayDetailPanel({
                 <span className="flex-1 truncate font-medium">
                   {event.title}
                 </span>
-                {event.time && (
+                {event.kind === "dispatch" && event.dispatchStatus && (
+                  <span className={cn(
+                    "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+                    event.dispatchStatus === "sent" ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400" : "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                  )}>
+                    {event.dispatchStatus === "sent" ? "Sent" : event.dispatchStatus}
+                  </span>
+                )}
+                {event.kind !== "dispatch" && event.time && (
                   <span className="text-xs text-muted-foreground">
                     {event.time}
                   </span>

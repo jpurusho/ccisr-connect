@@ -1,6 +1,6 @@
-import type { EventInstanceStatus } from "@/types/database"
+import type { EventInstanceStatus, DispatchStatus } from "@/types/database"
 
-export type CalendarEventKind = "event" | "birthday" | "anniversary"
+export type CalendarEventKind = "event" | "birthday" | "anniversary" | "dispatch"
 
 export type CalendarEvent = {
   id: string
@@ -19,4 +19,6 @@ export type CalendarEvent = {
     name: string
     address?: string | null
   } | null
+  dispatchStatus?: DispatchStatus | null
+  templateType?: string | null
 }

@@ -2,7 +2,7 @@
 
 import { format, isSameDay, isToday } from "date-fns"
 import { cn } from "@/lib/utils"
-import { Cake, Heart, CalendarDays } from "lucide-react"
+import { Cake, Heart, CalendarDays, Send, Check, Clock } from "lucide-react"
 import type { CalendarEvent } from "./types"
 
 interface WeekViewProps {
@@ -20,6 +20,8 @@ function EventPill({
 }) {
   const isBirthday = event.kind === "birthday"
   const isAnniversary = event.kind === "anniversary"
+  const isDispatch = event.kind === "dispatch"
+  const isSent = isDispatch && event.dispatchStatus === "sent"
 
   return (
     <button
@@ -28,22 +30,32 @@ function EventPill({
       className={cn(
         "group/pill flex w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-xs transition-all hover:opacity-80",
         isBirthday && "bg-purple-500 text-white",
-        isAnniversary && "bg-amber-500 text-white"
+        isAnniversary && "bg-amber-500 text-white",
+        isDispatch && "border border-dashed"
       )}
       style={
-        !isBirthday && !isAnniversary
-          ? {
-              backgroundColor: event.color,
-              color: "#fff",
-            }
+        isDispatch
+          ? { borderColor: event.color, color: event.color, backgroundColor: event.color + "12" }
+          : !isBirthday && !isAnniversary
+          ? { backgroundColor: event.color, color: "#fff" }
           : undefined
       }
     >
       {isBirthday && <Cake className="size-3 shrink-0" />}
       {isAnniversary && <Heart className="size-3 shrink-0" />}
       {event.kind === "event" && <CalendarDays className="size-3 shrink-0" />}
+      {isDispatch && (isSent
+        ? <Check className="size-3 shrink-0" />
+        : <Send className="size-3 shrink-0" />
+      )}
       <span className="truncate font-medium">{event.title}</span>
-      {event.time && (
+      {isDispatch && isSent && (
+        <span className="ml-auto shrink-0 text-[10px] opacity-70">Sent</span>
+      )}
+      {isDispatch && !isSent && event.dispatchStatus && (
+        <span className="ml-auto shrink-0 text-[10px] opacity-70">{event.dispatchStatus}</span>
+      )}
+      {!isDispatch && event.time && (
         <span className="ml-auto shrink-0 text-[10px] opacity-70">
           {event.time}
         </span>
