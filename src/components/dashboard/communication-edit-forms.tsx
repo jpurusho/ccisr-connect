@@ -593,8 +593,8 @@ export function BibleStudyEditForm({
                   locs[i] = {
                     ...locs[i],
                     hostNames: `${f.family_name}'s Residence`,
-                    address: f.full_address ?? locs[i].address,
-                    city: [f.city, f.state, f.zip].filter(Boolean).join(", ") || locs[i].city,
+                    address: f.street ?? f.full_address ?? locs[i].address,
+                    city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || locs[i].city,
                     phone: formatPhone(f.home_phone) || locs[i].phone,
                   }
                   onChange({ ...data, locations: locs })
