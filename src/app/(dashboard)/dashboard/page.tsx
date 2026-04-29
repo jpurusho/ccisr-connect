@@ -425,19 +425,30 @@ export default function DashboardPage() {
       const today = new Date()
       // Apply week offset for future scheduling
       const baseDate = addDays(today, weekOffset * 7)
-      // All weekly communications target the bulletin week: coming Sunday through following Saturday
+      // Current calendar week (Sun-Sat) — events, birthdays, anniversaries happen THIS week
+      const curSun = startOfWeek(baseDate, { weekStartsOn: 0 })
+      const curSat = endOfWeek(baseDate, { weekStartsOn: 0 })
+      const curWeekLabel = `${format(curSun, "MMM d")} – ${format(curSat, "MMM d")}`
+      setWeekLabel(curWeekLabel)
+
+      // Bulletin week (upcoming Sunday → following Saturday) — bulletin content is for NEXT week
       const bulSun = getUpcomingSunday(baseDate)
       const { saturday: bulSat } = getBulletinWeekBounds(bulSun)
-      const wl = `${format(bulSun, "MMM d")} – ${format(bulSat, "MMM d")}`
-      setWeekLabel(wl)
+      const bulWeekLabel = `${format(bulSun, "MMM d")} – ${format(bulSat, "MMM d")}`
 
-      // Also keep Mon-Sun for dispatch query range
+      // Mon-Sun for dispatch query range
       const monday = startOfWeek(baseDate, { weekStartsOn: 1 })
       const sunday = endOfWeek(baseDate, { weekStartsOn: 1 })
 
-      const weekDays = getWeekDays(bulSun, bulSat)
+      // Current week days — for birthdays, anniversaries, events
+      const weekDays = getWeekDays(curSun, curSat)
       const weekMonths = [...new Set(weekDays.map((d) => d.month))]
       const weekSet = new Set(weekDays.map((d) => `${d.month}-${d.day}`))
+
+      // Bulletin week days — for bulletin content
+      const bulWeekDays = getWeekDays(bulSun, bulSat)
+      const bulWeekMonths = [...new Set(bulWeekDays.map((d) => d.month))]
+      const bulWeekSet = new Set(bulWeekDays.map((d) => `${d.month}-${d.day}`))
 
       // Next 7 days for stat card
       const next7End = addDays(today, 6)
@@ -490,13 +501,13 @@ export default function DashboardPage() {
           .in("birth_month", next7Months)
           .returns<{ birth_month: number; birth_day: number; family: { is_active: boolean } | null }[]>(),
 
-        // This week birthdays (include inactive for dimmed display)
+        // Birthdays for current + bulletin weeks (include inactive for dimmed display)
         supabase
           .from("members")
           .select("id, full_name, birth_month, birth_day, is_active, family:families!family_id(is_active)")
           .not("birth_month", "is", null)
           .not("birth_day", "is", null)
-          .in("birth_month", weekMonths)
+          .in("birth_month", [...new Set([...weekMonths, ...bulWeekMonths])])
           .returns<
             {
               id: string
@@ -508,13 +519,13 @@ export default function DashboardPage() {
             }[]
           >(),
 
-        // This week anniversaries (include family active status)
+        // Anniversaries for current + bulletin weeks (include family active status)
         supabase
           .from("wedding_anniversaries")
           .select(
             "id, anniversary_month, anniversary_day, anniversary_year, family:families!family_id(is_active), husband:members!husband_member_id(full_name, is_active), wife:members!wife_member_id(full_name, is_active)"
           )
-          .in("anniversary_month", weekMonths)
+          .in("anniversary_month", [...new Set([...weekMonths, ...bulWeekMonths])])
           .returns<
             {
               id: string
@@ -534,12 +545,12 @@ export default function DashboardPage() {
           .eq("is_active", true)
           .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null }[]>(),
 
-        // Event instances for this week (host/location overrides)
+        // Event instances for current week (host/location overrides)
         supabase
           .from("event_instances")
           .select("event_id, instance_date, instance_time, location_override, notes, host_family_id, status")
-          .gte("instance_date", format(bulSun, "yyyy-MM-dd"))
-          .lte("instance_date", format(bulSat, "yyyy-MM-dd"))
+          .gte("instance_date", format(curSun, "yyyy-MM-dd"))
+          .lte("instance_date", format(curSat, "yyyy-MM-dd"))
           .neq("status", "cancelled")
           .returns<{
             event_id: string
@@ -589,12 +600,12 @@ export default function DashboardPage() {
           .select("id, name")
           .returns<{ id: string; name: string }[]>(),
 
-        // Composed instances for this week: exact match or recurring that covers this week
+        // Composed instances: match current week, bulletin week, or recurring
         supabase
           .from("composed_instances")
           .select("id, template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until")
           .eq("is_active", true)
-          .or(`week_start.eq.${format(bulSun, "yyyy-MM-dd")},and(is_recurring.eq.true,week_start.lte.${format(bulSun, "yyyy-MM-dd")})`)
+          .or(`week_start.eq.${format(curSun, "yyyy-MM-dd")},week_start.eq.${format(bulSun, "yyyy-MM-dd")},and(is_recurring.eq.true,week_start.lte.${format(curSun, "yyyy-MM-dd")})`)
           .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null }[]>(),
       ])
 
@@ -638,18 +649,20 @@ export default function DashboardPage() {
       )
 
       // Build composed instances map (template_type → data)
-      // Priority: exact week match > recurring (filter expired) > legacy (null week_start)
-      const weekStr = format(bulSun, "yyyy-MM-dd")
+      // Non-bulletin cards use current week Sunday, bulletin uses bulletin week Sunday
+      const curWeekStr = format(curSun, "yyyy-MM-dd")
+      const bulWeekStr = format(bulSun, "yyyy-MM-dd")
       type CIRow = (typeof composedInstancesRes.data extends (infer U)[] | null ? U : never)
       const composedMap: Record<string, CIRow> = {}
       if (composedInstancesRes.data) {
         for (const ci of composedInstancesRes.data) {
-          if (ci.is_recurring && ci.recur_until && ci.recur_until < weekStr) continue
+          const matchWeek = ci.template_type === "bulletin" ? bulWeekStr : curWeekStr
+          if (ci.is_recurring && ci.recur_until && ci.recur_until < matchWeek) continue
           const existing = composedMap[ci.template_type]
           if (!existing) {
             composedMap[ci.template_type] = ci
           } else {
-            const rank = (c: CIRow) => c.week_start === weekStr ? 2 : c.is_recurring ? 1 : 0
+            const rank = (c: CIRow) => c.week_start === matchWeek ? 2 : c.is_recurring ? 1 : 0
             if (rank(ci) > rank(existing)) composedMap[ci.template_type] = ci
           }
         }
@@ -720,7 +733,7 @@ export default function DashboardPage() {
 
       const bdCommon = extractCommonFields(bdDef)
       setBirthdayForm({
-        weekLabel: wl,
+        weekLabel: curWeekLabel,
         birthdays: bdayEntries,
         ...bdCommon,
         message: inactiveBdays.length > 0
@@ -758,7 +771,7 @@ export default function DashboardPage() {
 
       const anCommon = extractCommonFields(anDef)
       setAnniversaryForm({
-        weekLabel: wl,
+        weekLabel: curWeekLabel,
         anniversaries: anniEntries,
         ...anCommon,
         message: inactiveAnnis.length > 0
@@ -801,7 +814,7 @@ export default function DashboardPage() {
 
       // ---- Process Bible Study (recurrence-based) ----
       const bsEvent = findEventByType("friday_bible_study")
-      const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, bulSun, bulSat) : []
+      const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, curSun, curSat) : []
       const bsDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
       const bsInstance = bsDate && bsEvent ? findInstance(bsEvent.id, format(bsDate, "yyyy-MM-dd")) : null
 
@@ -843,7 +856,7 @@ export default function DashboardPage() {
 
       // ---- Women's Study (recurrence-based) ----
       const wsEvent = findEventByType("wednesday_womens_study")
-      const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, bulSun, bulSat) : []
+      const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, curSun, curSat) : []
       const wsDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
 
       const wsCommon = extractCommonFields(wsDef)
@@ -861,7 +874,7 @@ export default function DashboardPage() {
 
       // ---- Prayer Meeting (recurrence-based) ----
       const pmEvent = findEventByType("monthly_prayer")
-      const pmOccurrences = pmEvent ? getOccurrences(pmEvent.recurrence_rule, bulSun, bulSat) : []
+      const pmOccurrences = pmEvent ? getOccurrences(pmEvent.recurrence_rule, curSun, curSat) : []
       const pmDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
       const pmInstance = pmDate && pmEvent ? findInstance(pmEvent.id, format(pmDate, "yyyy-MM-dd")) : null
 
@@ -885,17 +898,25 @@ export default function DashboardPage() {
       })
 
       // ---- Bulletin ----
-      // Bulletin reuses the same Sun-Sat range already computed at top
+      // Bulletin uses bulletin week range for its content
+      const bulBdays = (weekBirthdaysRes.data ?? [])
+        .filter((m) => bulWeekSet.has(`${m.birth_month}-${m.birth_day}`) && isActiveMember(m))
+      const bulAnnis = (weekAnniversariesRes.data ?? [])
+        .filter((a) => bulWeekSet.has(`${a.anniversary_month}-${a.anniversary_day}`) && a.family?.is_active !== false)
+
+      const bulBdayEntries = bulBdays.map((m) => ({ name: m.full_name, date: `${m.birth_month}/${m.birth_day}` }))
+      const bulAnniEntries = bulAnnis.map((a) => ({
+        names: `${a.husband?.full_name?.split(" ")[0] ?? "?"} & ${a.wife?.full_name?.split(" ")[0] ?? "?"}`,
+        date: `${a.anniversary_month}/${a.anniversary_day}`,
+      }))
+
       const bulEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
 
       const bulCommon = extractCommonFields(bulDef)
       setBulletinForm({
-        weekLabel: `Sunday ${format(bulSun, "MMMM d, yyyy")} — Week of ${wl}`,
-        birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
-        anniversaries: anniEntries.map((a) => ({
-          names: `${a.husbandName} & ${a.wifeName}`,
-          date: a.date,
-        })),
+        weekLabel: `Sunday ${format(bulSun, "MMMM d, yyyy")} — Week of ${bulWeekLabel}`,
+        birthdays: bulBdayEntries,
+        anniversaries: bulAnniEntries,
         helpers: [],
         events: bulEvents,
         ...bulCommon,
@@ -1178,7 +1199,9 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       const base = addDays(new Date(), weekOffset * 7)
-      const weekStart = format(getUpcomingSunday(base), "yyyy-MM-dd")
+      const curSunSave = startOfWeek(base, { weekStartsOn: 0 })
+      const bulSunSave = getUpcomingSunday(base)
+      const weekStart = format(type === "bulletin" ? bulSunSave : curSunSave, "yyyy-MM-dd")
       const templateName = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
 
       const payload = {
