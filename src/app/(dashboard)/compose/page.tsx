@@ -802,6 +802,7 @@ export default function ComposePage() {
           body_html: previewHtml,
           scheduled_at: new Date().toISOString(),
           status: "pending",
+          template_type: selectedTemplate?.startsWith("custom:") ? "custom" : selectedTemplate || null,
           mailing_list_id: selectedMailingList || null,
           smtp_config_id: selectedSmtpConfig || null,
           created_by: user?.id ?? null,

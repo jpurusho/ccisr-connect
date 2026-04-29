@@ -771,6 +771,122 @@ export function WomensStudyEditForm({
 }
 
 // ---------------------------------------------------------------------------
+// Prayer Meeting Edit Form (inline)
+// ---------------------------------------------------------------------------
+
+export interface PrayerMeetingFormData {
+  date: string
+  time: string
+  hostNames: string
+  address: string
+  city: string
+  phone: string
+  dinnerNote: string
+  signupLink: string
+  message: string
+  headerSubtitle: string
+  primaryColor: string
+  footerVerse: string
+  resourceLinks: { label: string; url: string }[]
+}
+
+export function PrayerMeetingEditForm({
+  data,
+  onChange,
+}: {
+  data: PrayerMeetingFormData
+  onChange: (data: PrayerMeetingFormData) => void
+}) {
+  function set<K extends keyof PrayerMeetingFormData>(
+    field: K,
+    value: PrayerMeetingFormData[K]
+  ) {
+    onChange({ ...data, [field]: value })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Date" htmlFor="pm-i-date">
+          <Input
+            id="pm-i-date"
+            value={data.date}
+            onChange={(e) => set("date", e.target.value)}
+            placeholder="Saturday, May 3rd"
+          />
+        </Field>
+        <Field label="Time" htmlFor="pm-i-time">
+          <Input
+            id="pm-i-time"
+            value={data.time}
+            onChange={(e) => set("time", e.target.value)}
+            placeholder="6:00 PM"
+          />
+        </Field>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <HostFamilyInput
+          value={data.hostNames}
+          onChange={(v) => set("hostNames", v)}
+          onSelect={(f) => {
+            onChange({
+              ...data,
+              hostNames: `${f.family_name}'s Residence`,
+              address: f.street ?? f.full_address ?? data.address,
+              city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || data.city,
+              phone: formatPhone(f.home_phone) || data.phone,
+            })
+          }}
+        />
+        <Field label="Phone" htmlFor="pm-i-phone">
+          <Input
+            id="pm-i-phone"
+            value={data.phone}
+            onChange={(e) => set("phone", e.target.value)}
+          />
+        </Field>
+      </div>
+      <Field label="Address" htmlFor="pm-i-addr">
+        <Input
+          id="pm-i-addr"
+          value={data.address}
+          onChange={(e) => set("address", e.target.value)}
+          placeholder="123 Main St"
+        />
+      </Field>
+      <Field label="City, State ZIP" htmlFor="pm-i-city">
+        <Input
+          id="pm-i-city"
+          value={data.city}
+          onChange={(e) => set("city", e.target.value)}
+        />
+      </Field>
+      <Field label="Dinner Note (optional)" htmlFor="pm-i-dinner">
+        <Input
+          id="pm-i-dinner"
+          value={data.dinnerNote}
+          onChange={(e) => set("dinnerNote", e.target.value)}
+          placeholder="e.g., Potluck dinner at 6 PM — please bring a dish to share"
+        />
+      </Field>
+      <Field label="Signup Link (optional)" htmlFor="pm-i-signup">
+        <Input
+          id="pm-i-signup"
+          value={data.signupLink}
+          onChange={(e) => set("signupLink", e.target.value)}
+          placeholder="https://..."
+        />
+      </Field>
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
+      <CardStyleFields data={data} onChange={onChange} idPrefix="pm-i" />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Bulletin Edit Form (inline)
 // ---------------------------------------------------------------------------
 

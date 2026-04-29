@@ -54,6 +54,7 @@ interface DispatchRecord {
   subject: string
   body_html: string
   status: string
+  template_type: string | null
   scheduled_at: string
   sent_at: string | null
   created_at: string
@@ -91,7 +92,7 @@ export default function HistoryPage() {
     const supabase = createClient()
     let query = supabase
       .from("dispatch_queue")
-      .select("id, subject, body_html, status, scheduled_at, sent_at, created_at, error_message", { count: "exact" })
+      .select("id, subject, body_html, status, template_type, scheduled_at, sent_at, created_at, error_message", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 

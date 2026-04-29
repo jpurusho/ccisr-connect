@@ -28,6 +28,7 @@ import {
   BookOpen,
   Heart,
   Newspaper,
+  HandHelping,
   CalendarDays,
   Mail,
   History,
@@ -43,6 +44,7 @@ import {
   buildAnniversaryCard,
   buildBibleStudyCard,
   buildWomensStudyCard,
+  buildPrayerMeetingCard,
   buildBulletinCard,
   type BirthdayEntry,
   type AnniversaryEntry,
@@ -75,6 +77,7 @@ import {
   extractCommonFields,
   type BibleStudyDefaults,
   type WomensStudyDefaults,
+  type PrayerMeetingDefaults,
   type BulletinDefaults,
   type CommonCardFields,
 } from "@/lib/template-defaults"
@@ -84,11 +87,13 @@ import {
   AnniversaryEditForm,
   BibleStudyEditForm,
   WomensStudyEditForm,
+  PrayerMeetingEditForm,
   BulletinEditForm,
   type BirthdayFormData,
   type AnniversaryFormData,
   type BibleStudyFormData,
   type WomensStudyFormData,
+  type PrayerMeetingFormData,
   type BulletinFormData,
 } from "@/components/dashboard/communication-edit-forms"
 
@@ -107,6 +112,7 @@ interface DispatchRecord {
   status: string
   scheduled_at: string | null
   created_at: string
+  template_type: string | null
 }
 
 interface MailingListOption {
@@ -155,6 +161,7 @@ type CommType =
   | "anniversary"
   | "bible_study"
   | "womens_study"
+  | "prayer_meeting"
   | "bulletin"
 
 const COMM_TYPE_TO_ET: Record<CommType, string> = {
@@ -162,15 +169,17 @@ const COMM_TYPE_TO_ET: Record<CommType, string> = {
   anniversary: "anniversary",
   bible_study: "friday_bible_study",
   womens_study: "wednesday_womens_study",
+  prayer_meeting: "monthly_prayer",
   bulletin: "bulletin",
 }
 
-// Subject-based matching to find existing dispatches for each type
+// Fallback subject-based matching for legacy dispatches without template_type
 const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
   birthday: (s) => /birthday/i.test(s),
   anniversary: (s) => /anniversary/i.test(s),
   bible_study: (s) => /bible.?study/i.test(s) && !/women/i.test(s),
   womens_study: (s) => /women.*(?:bible|study)/i.test(s),
+  prayer_meeting: (s) => /prayer/i.test(s),
   bulletin: (s) => /bulletin/i.test(s),
 }
 
@@ -182,6 +191,7 @@ const BUILTIN_TEMPLATES: { type: CommType; label: string; color: string; icon: t
   { type: "anniversary", label: "Anniversaries", color: "#D97706", icon: Heart },
   { type: "bible_study", label: "Bible Study", color: "#0D9488", icon: BookOpen },
   { type: "womens_study", label: "Women's Study", color: "#DB2777", icon: Users },
+  { type: "prayer_meeting", label: "Prayer Meeting", color: "#059669", icon: HandHelping },
 ]
 
 const TEMPLATE_STORAGE_KEY = "ccisr-dashboard-templates"
@@ -267,6 +277,7 @@ export default function DashboardPage() {
     anniversary: null,
     bible_study: null,
     womens_study: null,
+    prayer_meeting: null,
     bulletin: null,
   })
 
@@ -319,6 +330,21 @@ export default function DashboardPage() {
     footerVerse: "",
     resourceLinks: [],
   })
+  const [prayerMeetingForm, setPrayerMeetingForm] = useState<PrayerMeetingFormData>({
+    date: "",
+    time: "6:00 PM",
+    hostNames: "TBD",
+    address: "TBD",
+    city: "",
+    phone: "",
+    dinnerNote: "",
+    signupLink: "",
+    message: "",
+    headerSubtitle: "",
+    primaryColor: "",
+    footerVerse: "",
+    resourceLinks: [],
+  })
   const [bulletinForm, setBulletinForm] = useState<BulletinFormData>({
     weekLabel: "",
     birthdays: [],
@@ -345,6 +371,7 @@ export default function DashboardPage() {
     anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
     bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
     womens_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+    prayer_meeting: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
     bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
   })
 
@@ -354,6 +381,7 @@ export default function DashboardPage() {
     anniversary: 0,
     bible_study: 0,
     womens_study: 0,
+    prayer_meeting: 0,
     bulletin: 0,
   })
 
@@ -512,7 +540,7 @@ export default function DashboardPage() {
         // This week dispatches
         supabase
           .from("dispatch_queue")
-          .select("id, subject, status, scheduled_at, created_at")
+          .select("id, subject, status, scheduled_at, created_at, template_type")
           .gte("created_at", mondayISO)
           .lte("created_at", sundayISO + "T23:59:59")
           .not("status", "eq", "cancelled")
@@ -614,7 +642,7 @@ export default function DashboardPage() {
 
       // Track composed instance IDs for save/delete
       const resolvedInstanceIds: Partial<Record<CommType, string>> = {}
-      const commTypeKeys: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "bulletin"]
+      const commTypeKeys: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
       for (const ct of commTypeKeys) {
         if (composedMap[ct]) resolvedInstanceIds[ct] = composedMap[ct].id
       }
@@ -626,6 +654,7 @@ export default function DashboardPage() {
 
       const bsDef = resolve("bible_study", "friday_bible_study", "friday_bible_study") as BibleStudyDefaults
       const wsDef = resolve("womens_study", "wednesday_womens_study", "wednesday_womens_study") as WomensStudyDefaults
+      const pmDef = resolve("prayer_meeting", "monthly_prayer") as PrayerMeetingDefaults
       const bdDef = resolve("birthday", "birthday") as CommonCardFields
       const anDef = resolve("anniversary", "anniversary") as CommonCardFields
       const bulDef = resolve("bulletin", "bulletin", "bulletin") as BulletinDefaults
@@ -805,6 +834,20 @@ export default function DashboardPage() {
         ...wsCommon,
       })
 
+      // ---- Prayer Meeting ----
+      const pmCommon = extractCommonFields(pmDef)
+      setPrayerMeetingForm({
+        date: pmDef.date ?? "",
+        time: pmDef.time ?? "6:00 PM",
+        hostNames: pmDef.hostNames ?? "TBD",
+        address: pmDef.address ?? "TBD",
+        city: pmDef.city ?? "",
+        phone: pmDef.phone ?? "",
+        dinnerNote: pmDef.dinnerNote ?? "",
+        signupLink: pmDef.signupLink ?? "",
+        ...pmCommon,
+      })
+
       // ---- Bulletin ----
       // Bulletin reuses the same Sun-Sat range already computed at top
       const bulEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
@@ -827,12 +870,13 @@ export default function DashboardPage() {
       setSmtpConfigs(smtpConfigsRes.data ?? [])
 
       // ---- Pre-fill mailing list + SMTP from composed instances ----
-      const commTypes: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "bulletin"]
+      const commTypes: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
       const prefilledOptions: Record<CommType, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }> = {
         birthday: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         womens_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+        prayer_meeting: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
       }
       for (const ct of commTypes) {
@@ -862,6 +906,7 @@ export default function DashboardPage() {
         anniversary: null,
         bible_study: null,
         womens_study: null,
+        prayer_meeting: null,
         bulletin: null,
       }
       const counts: Record<CommType, number> = {
@@ -869,15 +914,27 @@ export default function DashboardPage() {
         anniversary: 0,
         bible_study: 0,
         womens_study: 0,
+        prayer_meeting: 0,
         bulletin: 0,
       }
 
       for (const d of weekDispatches) {
-        for (const [type, matcher] of Object.entries(DISPATCH_MATCHERS)) {
-          if (matcher(d.subject)) {
-            counts[type as CommType]++
-            if (!matchedDispatches[type as CommType]) {
-              matchedDispatches[type as CommType] = d
+        let matched = false
+        // Prefer explicit template_type over subject regex
+        if (d.template_type && (d.template_type as CommType) in counts) {
+          const ct = d.template_type as CommType
+          counts[ct]++
+          if (!matchedDispatches[ct]) matchedDispatches[ct] = d
+          matched = true
+        }
+        // Fallback: regex match for legacy dispatches without template_type
+        if (!matched) {
+          for (const [type, matcher] of Object.entries(DISPATCH_MATCHERS)) {
+            if (matcher(d.subject)) {
+              counts[type as CommType]++
+              if (!matchedDispatches[type as CommType]) {
+                matchedDispatches[type as CommType] = d
+              }
             }
           }
         }
@@ -978,6 +1035,24 @@ export default function DashboardPage() {
     })
   }, [womensStudyForm, weekLabel])
 
+  const prayerMeetingPreview = useMemo(() => {
+    return buildPrayerMeetingCard({
+      hostNames: prayerMeetingForm.hostNames,
+      address: prayerMeetingForm.address,
+      city: prayerMeetingForm.city || undefined,
+      phone: prayerMeetingForm.phone || undefined,
+      date: prayerMeetingForm.date || "TBD",
+      time: prayerMeetingForm.time,
+      dinnerNote: prayerMeetingForm.dinnerNote || undefined,
+      signupLink: prayerMeetingForm.signupLink || undefined,
+      message: prayerMeetingForm.message || undefined,
+      headerSubtitle: prayerMeetingForm.headerSubtitle || undefined,
+      primaryColor: prayerMeetingForm.primaryColor || undefined,
+      footerVerse: prayerMeetingForm.footerVerse || undefined,
+      resourceLinks: (prayerMeetingForm.resourceLinks ?? []).filter((l) => l.url),
+    })
+  }, [prayerMeetingForm])
+
   const bulletinPreview = useMemo(() => {
     const vars = makeBulletinVars(weekLabel, weekLabel)
     return buildBulletinCard({
@@ -997,11 +1072,12 @@ export default function DashboardPage() {
   // ---- Subject lines (custom override or auto-generated) ----
   function getSubjectVars(type: CommType) {
     switch (type) {
-      case "birthday":    return makeBirthdayVars(weekLabel, birthdayForm.birthdays.map(b => b.name))
-      case "anniversary": return makeAnniversaryVars(weekLabel, anniversaryForm.anniversaries.map(a => `${a.husbandName} & ${a.wifeName}`))
-      case "bible_study": return makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
-      case "womens_study":return makeEventVars(weekLabel, womensStudyForm.date, womensStudyForm.time, womensStudyForm.topic || "")
-      case "bulletin":    return makeBulletinVars(weekLabel, weekLabel)
+      case "birthday":       return makeBirthdayVars(weekLabel, birthdayForm.birthdays.map(b => b.name))
+      case "anniversary":    return makeAnniversaryVars(weekLabel, anniversaryForm.anniversaries.map(a => `${a.husbandName} & ${a.wifeName}`))
+      case "bible_study":    return makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
+      case "womens_study":   return makeEventVars(weekLabel, womensStudyForm.date, womensStudyForm.time, womensStudyForm.topic || "")
+      case "prayer_meeting": return makeEventVars(weekLabel, prayerMeetingForm.date, prayerMeetingForm.time, "")
+      case "bulletin":       return makeBulletinVars(weekLabel, weekLabel)
     }
   }
 
@@ -1010,13 +1086,13 @@ export default function DashboardPage() {
     const etKey = COMM_TYPE_TO_ET[type]
     const savedTmpl = savedSubjectTemplates[etKey]
     if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
-    // Fallback to exact original behavior when no saved template exists
     switch (type) {
-      case "birthday":    return `Happy Birthday! — Week of ${weekLabel}`
-      case "anniversary": return `Happy Anniversary! — Week of ${weekLabel}`
-      case "bible_study": return `Bible Study This Friday — ${bibleStudyForm.date}`
-      case "womens_study":return `Women's Bible Study This Wednesday`
-      case "bulletin":    return `Weekly Bulletin for ${bulletinForm.weekLabel}`
+      case "birthday":       return `Happy Birthday! — Week of ${weekLabel}`
+      case "anniversary":    return `Happy Anniversary! — Week of ${weekLabel}`
+      case "bible_study":    return `Bible Study This Friday — ${bibleStudyForm.date}`
+      case "womens_study":   return `Women's Bible Study This Wednesday`
+      case "prayer_meeting": return `Monthly Prayer Meeting — ${prayerMeetingForm.date || "Date TBD"}`
+      case "bulletin":       return `Weekly Bulletin for ${bulletinForm.weekLabel}`
     }
   }
 
@@ -1027,16 +1103,12 @@ export default function DashboardPage() {
   // ---- Get preview for type ----
   function getPreview(type: CommType): string | null {
     switch (type) {
-      case "birthday":
-        return birthdayPreview
-      case "anniversary":
-        return anniversaryPreview
-      case "bible_study":
-        return bibleStudyPreview
-      case "womens_study":
-        return womensStudyPreview
-      case "bulletin":
-        return bulletinPreview
+      case "birthday":       return birthdayPreview
+      case "anniversary":    return anniversaryPreview
+      case "bible_study":    return bibleStudyPreview
+      case "womens_study":   return womensStudyPreview
+      case "prayer_meeting": return prayerMeetingPreview
+      case "bulletin":       return bulletinPreview
     }
   }
 
@@ -1047,6 +1119,7 @@ export default function DashboardPage() {
       case "anniversary": return anniversaryForm as unknown as Record<string, unknown>
       case "bible_study": return bibleStudyForm as unknown as Record<string, unknown>
       case "womens_study": return womensStudyForm as unknown as Record<string, unknown>
+      case "prayer_meeting": return prayerMeetingForm as unknown as Record<string, unknown>
       case "bulletin": return bulletinForm as unknown as Record<string, unknown>
     }
   }
@@ -1172,6 +1245,7 @@ export default function DashboardPage() {
             body_html: html,
             scheduled_at: new Date().toISOString(),
             status: "pending",
+            template_type: type,
             mailing_list_id: opts.mailingListId || null,
             smtp_config_id: opts.smtpConfigId || null,
             additional_recipients: opts.additionalRecipients.trim() || null,
@@ -1196,6 +1270,7 @@ export default function DashboardPage() {
               status: "pending",
               scheduled_at: new Date().toISOString(),
               created_at: new Date().toISOString(),
+              template_type: type,
             },
           }))
           setDispatchCounts((prev) => ({
@@ -1224,11 +1299,13 @@ export default function DashboardPage() {
       anniversaryPreview,
       bibleStudyPreview,
       womensStudyPreview,
+      prayerMeetingPreview,
       bulletinPreview,
       birthdayForm,
       anniversaryForm,
       bibleStudyForm,
       womensStudyForm,
+      prayerMeetingForm,
       bulletinForm,
     ]
   )
@@ -1298,6 +1375,7 @@ export default function DashboardPage() {
           body_html: html,
           scheduled_at: scheduledAt,
           status: "pending",
+          template_type: type,
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
           additional_recipients: opts.additionalRecipients.trim() || null,
@@ -1320,6 +1398,7 @@ export default function DashboardPage() {
             status: "pending",
             scheduled_at: scheduledAt,
             created_at: new Date().toISOString(),
+            template_type: type,
           },
         }))
         setDispatchCounts((prev) => ({
@@ -1433,6 +1512,22 @@ export default function DashboardPage() {
     }
     return lines
   }, [womensStudyForm])
+
+  const prayerMeetingSummary = useMemo(() => {
+    const lines: string[] = []
+    if (prayerMeetingForm.date) {
+      lines.push(`${prayerMeetingForm.date} at ${prayerMeetingForm.time}`)
+    } else {
+      lines.push("Date not set — click Edit to configure")
+    }
+    if (prayerMeetingForm.hostNames && prayerMeetingForm.hostNames !== "TBD") {
+      lines.push(`Host: ${prayerMeetingForm.hostNames}`)
+    }
+    if (prayerMeetingForm.dinnerNote) {
+      lines.push(prayerMeetingForm.dinnerNote)
+    }
+    return lines
+  }, [prayerMeetingForm])
 
   const bulletinSummary = useMemo(() => {
     const parts: string[] = []
@@ -1658,6 +1753,7 @@ export default function DashboardPage() {
               anniversary: "Anniversaries This Week",
               bible_study: "Friday Bible Study Invite",
               womens_study: "Wednesday Women's Bible Study",
+              prayer_meeting: "Monthly Prayer Meeting",
               bulletin: "Weekly Bulletin",
             }
 
@@ -1666,6 +1762,7 @@ export default function DashboardPage() {
               anniversary: anniversarySummary,
               bible_study: bibleStudySummary,
               womens_study: womensStudySummary,
+              prayer_meeting: prayerMeetingSummary,
               bulletin: bulletinSummary,
             }
 
@@ -1677,6 +1774,10 @@ export default function DashboardPage() {
                 ...(womensStudyForm.zoomLink ? [{ label: "Join Zoom Meeting", url: womensStudyForm.zoomLink }] : []),
                 ...(womensStudyForm.resourceLinks ?? []).filter((l) => l.url),
               ],
+              prayer_meeting: [
+                ...(prayerMeetingForm.signupLink ? [{ label: "Sign Up", url: prayerMeetingForm.signupLink }] : []),
+                ...(prayerMeetingForm.resourceLinks ?? []).filter((l) => l.url),
+              ],
               bulletin: bulletinForm.resourceLinks.filter((l) => l.url),
             }
 
@@ -1685,6 +1786,7 @@ export default function DashboardPage() {
               anniversary: <AnniversaryEditForm data={anniversaryForm} onChange={setAnniversaryForm} />,
               bible_study: <BibleStudyEditForm data={bibleStudyForm} onChange={setBibleStudyForm} />,
               womens_study: <WomensStudyEditForm data={womensStudyForm} onChange={setWomensStudyForm} />,
+              prayer_meeting: <PrayerMeetingEditForm data={prayerMeetingForm} onChange={setPrayerMeetingForm} />,
               bulletin: <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} />,
             }
 

@@ -171,17 +171,17 @@ export default function SmtpConfigPage() {
     }
   }
 
-  async function handleTest(config: SmtpConfig) {
-    setTestingId(config.id)
+  async function handleTest(configId: string, toEmail: string) {
+    setTestingId(configId)
     try {
       const res = await fetch("/api/smtp/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ smtpConfigId: config.id }),
+        body: JSON.stringify({ smtpConfigId: configId }),
       })
       const data = await res.json()
       if (res.ok) {
-        toast.success(`Test email sent to ${config.from_email}`)
+        toast.success(`Test email sent to ${toEmail}`)
       } else {
         toast.error(`Test failed: ${data.error}`)
       }
@@ -290,20 +290,23 @@ export default function SmtpConfigPage() {
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          title="Send test email"
-                          disabled={testingId === config.id}
-                          onClick={() => handleTest(config)}
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                          disabled={testingId === config.id || !config.is_active}
+                          onClick={() => handleTest(config.id, config.from_email)}
+                          title={!config.is_active ? "Enable account to test" : "Send test email"}
                         >
                           {testingId === config.id
                             ? <Loader2 className="size-3.5 animate-spin" />
-                            : <FlaskConical className="size-3.5 text-green-600" />}
+                            : <FlaskConical className="size-3.5" />}
+                          Test
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => openDialog(config)}
+                          title="Edit"
                         >
                           <Server className="size-3.5" />
                         </Button>
@@ -311,6 +314,7 @@ export default function SmtpConfigPage() {
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => deleteConfig(config)}
+                          title="Delete"
                         >
                           <Trash2 className="size-3.5 text-destructive" />
                         </Button>
@@ -406,7 +410,7 @@ export default function SmtpConfigPage() {
                     id="smtpPass"
                     type={showPassword ? "text" : "password"}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => setPassword(e.target.value.replace(/\s/g, ""))}
                     placeholder={editingConfig ? "••••••••" : "App password"}
                     required={!editingConfig}
                   />
@@ -418,6 +422,9 @@ export default function SmtpConfigPage() {
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Gmail app passwords have spaces — they are stripped automatically.
+                </p>
               </div>
             </div>
 
@@ -457,6 +464,32 @@ export default function SmtpConfigPage() {
                 onCheckedChange={(checked) => setIsAdminOnly(checked)}
               />
             </div>
+
+            {editingConfig && (
+              <div className="rounded-md border border-dashed border-green-300 bg-green-50/50 dark:bg-green-950/20 p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Test Connection</p>
+                    <p className="text-xs text-muted-foreground">
+                      Sends a test email to {editingConfig.from_email}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                    disabled={testingId === editingConfig.id}
+                    onClick={() => handleTest(editingConfig.id, editingConfig.from_email)}
+                  >
+                    {testingId === editingConfig.id
+                      ? <Loader2 className="size-3.5 animate-spin" />
+                      : <FlaskConical className="size-3.5" />}
+                    Send Test Email
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <DialogFooter>
               <Button

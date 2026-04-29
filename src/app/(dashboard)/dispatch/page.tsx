@@ -435,6 +435,16 @@ export default function DispatchQueuePage() {
     return /^Reminder:/i.test(item.subject)
   }
 
+  const TEMPLATE_TYPE_LABELS: Record<string, { label: string; className: string }> = {
+    birthday: { label: "Birthday", className: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800" },
+    anniversary: { label: "Anniversary", className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800" },
+    bible_study: { label: "Bible Study", className: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800" },
+    womens_study: { label: "Women's Study", className: "bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/30 dark:text-pink-400 dark:border-pink-800" },
+    bulletin: { label: "Bulletin", className: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800" },
+    prayer_meeting: { label: "Prayer", className: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800" },
+    custom: { label: "Custom", className: "bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400 dark:border-gray-600" },
+  }
+
   // -------------------------------------------------------------------------
   // Render helpers
   // -------------------------------------------------------------------------
@@ -603,13 +613,20 @@ export default function DispatchQueuePage() {
                                 aria-label={`Select dispatch: ${d.subject}`}
                               />
                             </TableCell>
-                            <TableCell className="max-w-xs truncate font-medium">
-                              {d.subject}
-                              {isReminder(d) && (
-                                <Badge variant="outline" className="ml-1.5 text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">
-                                  Reminder
-                                </Badge>
-                              )}
+                            <TableCell className="max-w-xs font-medium">
+                              <span className="truncate block">{d.subject}</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {d.template_type && TEMPLATE_TYPE_LABELS[d.template_type] && (
+                                  <Badge variant="outline" className={`text-[10px] ${TEMPLATE_TYPE_LABELS[d.template_type].className}`}>
+                                    {TEMPLATE_TYPE_LABELS[d.template_type].label}
+                                  </Badge>
+                                )}
+                                {isReminder(d) && (
+                                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">
+                                    Reminder
+                                  </Badge>
+                                )}
+                              </div>
                               {d.error_message && (
                                 <p className="mt-0.5 truncate text-xs text-red-500">
                                   {d.error_message}

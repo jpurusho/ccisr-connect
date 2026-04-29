@@ -149,6 +149,7 @@ export const SUBJECT_FALLBACKS: Record<string, string> = {
   anniversary: "Happy Anniversary! — Week of {{weekLabel}}",
   friday_bible_study: "Bible Study This Friday — {{date}}",
   wednesday_womens_study: "Women's Bible Study This Wednesday",
+  monthly_prayer: "Monthly Prayer Meeting — {{date}}",
   bulletin: "Weekly Bulletin — {{weekLabel}}",
 }
 
@@ -180,6 +181,11 @@ export const TEMPLATE_PLACEHOLDERS: Record<string, PlaceholderDef[]> = {
     { token: "{{date}}", description: "Event date", example: "Wednesday, Apr 29th" },
     { token: "{{time}}", description: "Start time", example: "7:00 PM" },
     { token: "{{topic}}", description: "Study topic", example: "Building a Relationship with God" },
+  ],
+  monthly_prayer: [
+    { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
+    { token: "{{date}}", description: "Event date", example: "Saturday, May 3rd" },
+    { token: "{{time}}", description: "Start time", example: "6:00 PM" },
   ],
   bulletin: [
     { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },

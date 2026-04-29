@@ -23,6 +23,7 @@ import {
   BookOpen,
   Users,
   Newspaper,
+  HandHelping,
   Save,
   Eye,
   Plus,
@@ -36,11 +37,13 @@ import {
   buildAnniversaryCard,
   buildBibleStudyCard,
   buildWomensStudyCard,
+  buildPrayerMeetingCard,
   buildBulletinCard,
 } from "@/lib/email/card-builder"
 import {
   type BibleStudyDefaults,
   type WomensStudyDefaults,
+  type PrayerMeetingDefaults,
   type BirthdayDefaults,
   type AnniversaryDefaults,
   type BulletinDefaults,
@@ -74,6 +77,7 @@ const EVENT_TYPE_TABS = [
   { name: "anniversary", label: "Anniversary", icon: Heart, color: "#D97706" },
   { name: "friday_bible_study", label: "Bible Study", icon: BookOpen, color: "#0D9488" },
   { name: "wednesday_womens_study", label: "Women's Study", icon: Users, color: "#DB2777" },
+  { name: "monthly_prayer", label: "Prayer Meeting", icon: HandHelping, color: "#059669" },
   { name: "bulletin", label: "Bulletin", icon: Newspaper, color: "#4F46E5" },
 ]
 
@@ -222,6 +226,8 @@ export default function TemplatesPage() {
   // Custom templates
   const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string }[]>([])
   const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown> } | null>(null)
+  const [creatingCustom, setCreatingCustom] = useState(false)
+  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", body: "", footerText: "", resourceLinks: [] as { label: string; url: string }[] })
 
   // Per-type form state
   const [subjects, setSubjects] = useState<Record<string, string>>({})
@@ -233,6 +239,7 @@ export default function TemplatesPage() {
   const [womensStudyData, setWomensStudyData] = useState<WomensStudyDefaults>(
     FALLBACK_DEFAULTS.wednesday_womens_study.data as WomensStudyDefaults
   )
+  const [prayerMeetingData, setPrayerMeetingData] = useState<PrayerMeetingDefaults>({})
   const [bulletinData, setBulletinData] = useState<BulletinDefaults>(
     FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults
   )
@@ -275,6 +282,7 @@ export default function TemplatesPage() {
     setAnniversaryData({})
     setBibleStudyData(FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults)
     setWomensStudyData(FALLBACK_DEFAULTS.wednesday_womens_study.data as WomensStudyDefaults)
+    setPrayerMeetingData({})
     setBulletinData(FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults)
 
     const saved: SavedTemplate[] = []
@@ -309,6 +317,9 @@ export default function TemplatesPage() {
             case "wednesday_womens_study":
               setWomensStudyData({ ...(FALLBACK_DEFAULTS.wednesday_womens_study.data as WomensStudyDefaults), ...parsed.data })
               break
+            case "monthly_prayer":
+              setPrayerMeetingData(parsed.data as PrayerMeetingDefaults)
+              break
             case "bulletin":
               setBulletinData({ ...(FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults), ...parsed.data })
               break
@@ -332,6 +343,7 @@ export default function TemplatesPage() {
       case "anniversary": return anniversaryData
       case "friday_bible_study": return bibleStudyData
       case "wednesday_womens_study": return womensStudyData
+      case "monthly_prayer": return prayerMeetingData
       case "bulletin": return bulletinData
       default: return {}
     }
@@ -462,6 +474,23 @@ export default function TemplatesPage() {
           resourceLinks: (womensStudyData.resourceLinks ?? []).filter(l => l.url),
         })
       }
+      case "monthly_prayer": {
+        return buildPrayerMeetingCard({
+          hostNames: prayerMeetingData.hostNames || "Sample Family",
+          address: prayerMeetingData.address || "123 Main St",
+          city: prayerMeetingData.city || "San Ramon, CA",
+          phone: prayerMeetingData.phone || "(925) 555-1234",
+          date: prayerMeetingData.date || "Saturday, May 3rd",
+          time: prayerMeetingData.time || "6:00 PM",
+          dinnerNote: prayerMeetingData.dinnerNote || "Potluck dinner — please bring a dish to share",
+          signupLink: prayerMeetingData.signupLink || undefined,
+          message: prayerMeetingData.message || undefined,
+          headerSubtitle: prayerMeetingData.headerSubtitle || undefined,
+          primaryColor: prayerMeetingData.primaryColor || undefined,
+          footerVerse: prayerMeetingData.footerVerse || undefined,
+          resourceLinks: (prayerMeetingData.resourceLinks ?? []).filter(l => l.url),
+        })
+      }
       case "bulletin": {
         const vars = makeBulletinVars(sampleWeek, "April 27, 2026")
         return buildBulletinCard({
@@ -479,7 +508,7 @@ export default function TemplatesPage() {
       default:
         return ""
     }
-  }, [activeTab, birthdayData, anniversaryData, bibleStudyData, womensStudyData, bulletinData])
+  }, [activeTab, birthdayData, anniversaryData, bibleStudyData, womensStudyData, prayerMeetingData, bulletinData])
 
   if (loading) {
     return (
@@ -563,6 +592,7 @@ export default function TemplatesPage() {
                       : tab.name === "anniversary" ? anniversaryData.primaryColor
                       : tab.name === "friday_bible_study" ? bibleStudyData.primaryColor
                       : tab.name === "wednesday_womens_study" ? womensStudyData.primaryColor
+                      : tab.name === "monthly_prayer" ? prayerMeetingData.primaryColor
                       : tab.name === "bulletin" ? bulletinData.primaryColor
                       : undefined
                     }
@@ -573,6 +603,7 @@ export default function TemplatesPage() {
                         case "anniversary": setAnniversaryData((p) => ({ ...p, primaryColor: color })); break
                         case "friday_bible_study": setBibleStudyData((p) => ({ ...p, primaryColor: color })); break
                         case "wednesday_womens_study": setWomensStudyData((p) => ({ ...p, primaryColor: color })); break
+                        case "monthly_prayer": setPrayerMeetingData((p) => ({ ...p, primaryColor: color })); break
                         case "bulletin": setBulletinData((p) => ({ ...p, primaryColor: color })); break
                       }
                     }}
@@ -856,6 +887,96 @@ export default function TemplatesPage() {
                     </>
                   )}
 
+                  {/* Prayer Meeting fields */}
+                  {tab.name === "monthly_prayer" && (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Default Date" htmlFor="pm-date" hint="e.g., First Saturday of each month">
+                          <Input
+                            id="pm-date"
+                            value={prayerMeetingData.date || ""}
+                            onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, date: e.target.value }))}
+                            placeholder="Saturday, May 3rd"
+                          />
+                        </Field>
+                        <Field label="Default Time" htmlFor="pm-time">
+                          <Input
+                            id="pm-time"
+                            value={prayerMeetingData.time || ""}
+                            onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, time: e.target.value }))}
+                            placeholder="6:00 PM"
+                          />
+                        </Field>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Default Host" htmlFor="pm-host">
+                          <Input
+                            id="pm-host"
+                            value={prayerMeetingData.hostNames || ""}
+                            onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, hostNames: e.target.value }))}
+                            placeholder="Host family name"
+                          />
+                        </Field>
+                        <Field label="Phone" htmlFor="pm-phone">
+                          <Input
+                            id="pm-phone"
+                            value={prayerMeetingData.phone || ""}
+                            onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, phone: e.target.value }))}
+                          />
+                        </Field>
+                      </div>
+                      <Field label="Address" htmlFor="pm-addr">
+                        <Input
+                          id="pm-addr"
+                          value={prayerMeetingData.address || ""}
+                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, address: e.target.value }))}
+                        />
+                      </Field>
+                      <Field label="City, State ZIP" htmlFor="pm-city">
+                        <Input
+                          id="pm-city"
+                          value={prayerMeetingData.city || ""}
+                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, city: e.target.value }))}
+                        />
+                      </Field>
+                      <Field label="Dinner Note" htmlFor="pm-dinner" hint="Leave empty to exclude">
+                        <Input
+                          id="pm-dinner"
+                          value={prayerMeetingData.dinnerNote || ""}
+                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, dinnerNote: e.target.value }))}
+                          placeholder="Potluck dinner — please bring a dish to share"
+                        />
+                      </Field>
+                      <Field label="Signup Link" htmlFor="pm-signup" hint="Leave empty to exclude">
+                        <Input
+                          id="pm-signup"
+                          value={prayerMeetingData.signupLink || ""}
+                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, signupLink: e.target.value }))}
+                          placeholder="https://..."
+                        />
+                      </Field>
+                      <Field label="Invite Message" htmlFor="pm-msg" hint="Leave empty for default">
+                        <Textarea
+                          id="pm-msg"
+                          value={prayerMeetingData.message || ""}
+                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, message: e.target.value }))}
+                          className="min-h-16"
+                        />
+                      </Field>
+                      <Field label="Footer Bible Verse" htmlFor="pm-verse" hint="Leave empty for default">
+                        <Input
+                          id="pm-verse"
+                          value={prayerMeetingData.footerVerse || ""}
+                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, footerVerse: e.target.value }))}
+                        />
+                      </Field>
+                      <ResourceLinksEditor
+                        links={prayerMeetingData.resourceLinks ?? []}
+                        onChange={(links) => setPrayerMeetingData((prev) => ({ ...prev, resourceLinks: links }))}
+                      />
+                    </>
+                  )}
+
                   {/* Bulletin fields */}
                   {tab.name === "bulletin" && (
                     <div className="space-y-3">
@@ -963,17 +1084,134 @@ export default function TemplatesPage() {
         <TabsContent value="custom">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Custom Templates</CardTitle>
-              <CardDescription>
-                Templates created from the Compose page. Edit or delete them here.
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Custom Templates</CardTitle>
+                  <CardDescription>
+                    Create reusable templates for custom announcements, event notices, and more.
+                  </CardDescription>
+                </div>
+                {!creatingCustom && !editingCustom && (
+                  <Button
+                    onClick={() => {
+                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", body: "", footerText: "", resourceLinks: [] })
+                      setCreatingCustom(true)
+                    }}
+                  >
+                    <Plus className="size-4" />
+                    New Template
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              {customTemplates.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No custom templates yet. Create one from the Compose page using "Custom Announcement".
-                </p>
-              ) : editingCustom ? (
+              {/* Create form */}
+              {creatingCustom && (
+                <div className="space-y-4">
+                  <Field label="Template Name *" htmlFor="nc-name" hint="A short name to identify this template">
+                    <Input
+                      id="nc-name"
+                      value={newCustom.name}
+                      onChange={(e) => setNewCustom({ ...newCustom, name: e.target.value })}
+                      placeholder="e.g., Easter Announcement"
+                    />
+                  </Field>
+                  <Field label="Email Subject *" htmlFor="nc-subj">
+                    <Input
+                      id="nc-subj"
+                      value={newCustom.subject}
+                      onChange={(e) => setNewCustom({ ...newCustom, subject: e.target.value })}
+                      placeholder="e.g., Easter Service — Join Us This Sunday"
+                    />
+                  </Field>
+                  <Field label="Card Title" htmlFor="nc-title" hint="Displayed as the heading in the email card">
+                    <Input
+                      id="nc-title"
+                      value={newCustom.title}
+                      onChange={(e) => setNewCustom({ ...newCustom, title: e.target.value })}
+                      placeholder="e.g., Easter Sunday Service"
+                    />
+                  </Field>
+                  <Field label="Subtitle" htmlFor="nc-sub">
+                    <Input
+                      id="nc-sub"
+                      value={newCustom.subtitle}
+                      onChange={(e) => setNewCustom({ ...newCustom, subtitle: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Message Body" htmlFor="nc-body">
+                    <Textarea
+                      id="nc-body"
+                      value={newCustom.body}
+                      onChange={(e) => setNewCustom({ ...newCustom, body: e.target.value })}
+                      className="min-h-24"
+                      placeholder="Write the main content of the announcement..."
+                    />
+                  </Field>
+                  <Field label="Footer Text" htmlFor="nc-foot">
+                    <Input
+                      id="nc-foot"
+                      value={newCustom.footerText}
+                      onChange={(e) => setNewCustom({ ...newCustom, footerText: e.target.value })}
+                      placeholder="e.g., a Bible verse or closing note"
+                    />
+                  </Field>
+                  <ResourceLinksEditor
+                    links={newCustom.resourceLinks}
+                    onChange={(links) => setNewCustom({ ...newCustom, resourceLinks: links })}
+                  />
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={async () => {
+                        if (!newCustom.name.trim() || !newCustom.subject.trim()) {
+                          toast.error("Template name and subject are required")
+                          return
+                        }
+                        setSaving(true)
+                        const supabase = createClient()
+                        const bodyData = {
+                          title: newCustom.title,
+                          subtitle: newCustom.subtitle,
+                          body: newCustom.body,
+                          footerText: newCustom.footerText,
+                          resourceLinks: newCustom.resourceLinks.filter((l) => l.url),
+                        }
+                        const { data: inserted, error } = await supabase
+                          .from("email_templates")
+                          .insert({
+                            name: newCustom.name.trim(),
+                            subject_template: newCustom.subject.trim(),
+                            body_template: JSON.stringify(bodyData),
+                            is_default: false,
+                          } as never)
+                          .select("id")
+                          .single() as { data: { id: string } | null; error: { message: string } | null }
+                        if (error) {
+                          toast.error(`Failed: ${error.message}`)
+                        } else {
+                          toast.success(`"${newCustom.name}" created`)
+                          logAudit("custom_template_created", "email_templates", inserted?.id, { name: newCustom.name })
+                          setCreatingCustom(false)
+                          fetchTemplates()
+                        }
+                        setSaving(false)
+                      }}
+                      disabled={saving || !newCustom.name.trim() || !newCustom.subject.trim()}
+                      style={{ backgroundColor: "#6B7280" }}
+                      className="text-white hover:opacity-90"
+                    >
+                      {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                      Create Template
+                    </Button>
+                    <Button variant="outline" onClick={() => setCreatingCustom(false)} disabled={saving}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit form */}
+              {editingCustom && !creatingCustom && (
                 <div className="space-y-4">
                   <Field label="Template Name" htmlFor="ct-name">
                     <Input
@@ -1056,58 +1294,75 @@ export default function TemplatesPage() {
                     </Button>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {customTemplates.map((ct) => {
-                    let parsed: Record<string, unknown> = {}
-                    try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
-                    return (
-                      <div key={ct.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm truncate">{ct.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{ct.subject_template}</p>
-                          {typeof parsed.title === "string" && parsed.title && (
-                            <p className="text-xs text-muted-foreground/70 truncate mt-0.5">Card: {parsed.title}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-1 shrink-0 ml-2">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => {
-                              setEditingCustom({
-                                id: ct.id,
-                                name: ct.name,
-                                subject: ct.subject_template,
-                                data: parsed,
-                              })
-                            }}
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={async () => {
-                              if (!confirm(`Delete template "${ct.name}"?`)) return
-                              const supabase = createClient()
-                              const { error } = await supabase.from("email_templates").delete().eq("id", ct.id)
-                              if (error) {
-                                toast.error(`Failed: ${error.message}`)
-                              } else {
-                                toast.success(`"${ct.name}" deleted`)
-                                logAudit("custom_template_deleted", "email_templates", ct.id, { name: ct.name })
-                                fetchTemplates()
-                              }
-                            }}
-                          >
-                            <Trash2 className="size-3.5 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+              )}
+
+              {/* Template list */}
+              {!creatingCustom && !editingCustom && (
+                <>
+                  {customTemplates.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <Send className="size-10 text-muted-foreground/30 mb-3" />
+                      <p className="text-sm text-muted-foreground">No custom templates yet.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Click <strong>New Template</strong> to create your first custom announcement template.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {customTemplates.map((ct) => {
+                        let parsed: Record<string, unknown> = {}
+                        try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+                        return (
+                          <div key={ct.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-sm truncate">{ct.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{ct.subject_template}</p>
+                              {typeof parsed.title === "string" && parsed.title && (
+                                <p className="text-xs text-muted-foreground/70 truncate mt-0.5">Card: {parsed.title}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-1 shrink-0 ml-2">
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Edit"
+                                onClick={() => {
+                                  setEditingCustom({
+                                    id: ct.id,
+                                    name: ct.name,
+                                    subject: ct.subject_template,
+                                    data: parsed,
+                                  })
+                                }}
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Delete"
+                                onClick={async () => {
+                                  if (!confirm(`Delete template "${ct.name}"?`)) return
+                                  const supabase = createClient()
+                                  const { error } = await supabase.from("email_templates").delete().eq("id", ct.id)
+                                  if (error) {
+                                    toast.error(`Failed: ${error.message}`)
+                                  } else {
+                                    toast.success(`"${ct.name}" deleted`)
+                                    logAudit("custom_template_deleted", "email_templates", ct.id, { name: ct.name })
+                                    fetchTemplates()
+                                  }
+                                }}
+                              >
+                                <Trash2 className="size-3.5 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
