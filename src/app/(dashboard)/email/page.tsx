@@ -2,33 +2,28 @@
 
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Send, Clock, Mail, History, FileText } from "lucide-react"
+import { Clock, Mail, History, FileText } from "lucide-react"
 import dynamic from "next/dynamic"
 
-const ComposePanel = dynamic(() => import("@/app/(dashboard)/compose/page"), { ssr: false })
 const DispatchPanel = dynamic(() => import("@/app/(dashboard)/dispatch/page"), { ssr: false })
 const MailingListsPanel = dynamic(() => import("@/app/(dashboard)/mailing-lists/page"), { ssr: false })
 const HistoryPanel = dynamic(() => import("@/app/(dashboard)/history/page"), { ssr: false })
 const TemplatesPanel = dynamic(() => import("@/app/(dashboard)/templates/page"), { ssr: false })
 
 export default function EmailPage() {
-  const [activeTab, setActiveTab] = useState("compose")
+  const [activeTab, setActiveTab] = useState("dispatch")
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Email</h1>
         <p className="text-sm text-muted-foreground">
-          Compose, dispatch, and manage email communications.
+          Dispatch, manage templates, and review email history.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList variant="line" className="w-full justify-start overflow-x-auto scrollbar-none">
-          <TabsTrigger value="compose">
-            <Send className="size-4" />
-            <span className="hidden sm:inline">Compose</span>
-          </TabsTrigger>
           <TabsTrigger value="dispatch">
             <Clock className="size-4" />
             <span className="hidden sm:inline">Dispatch Queue</span>
@@ -47,9 +42,6 @@ export default function EmailPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="compose" className="mt-6">
-          <ComposePanel />
-        </TabsContent>
         <TabsContent value="dispatch" className="mt-6">
           <DispatchPanel />
         </TabsContent>
