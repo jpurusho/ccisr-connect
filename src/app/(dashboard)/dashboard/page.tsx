@@ -588,12 +588,12 @@ export default function DashboardPage() {
           .select("id, name")
           .returns<{ id: string; name: string }[]>(),
 
-        // Composed instances for this week: exact match, recurring that covers this week, or legacy (no week_start)
+        // Composed instances for this week: exact match or recurring that covers this week
         supabase
           .from("composed_instances")
           .select("id, template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until")
           .eq("is_active", true)
-          .or(`week_start.eq.${format(bulSun, "yyyy-MM-dd")},week_start.is.null,and(is_recurring.eq.true,week_start.lte.${format(bulSun, "yyyy-MM-dd")})`)
+          .or(`week_start.eq.${format(bulSun, "yyyy-MM-dd")},and(is_recurring.eq.true,week_start.lte.${format(bulSun, "yyyy-MM-dd")})`)
           .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null }[]>(),
       ])
 
@@ -1710,37 +1710,67 @@ export default function DashboardPage() {
         <div className="space-y-4">
           {/* Template pills + config */}
           <div className="flex flex-wrap items-center gap-2">
-            {BUILTIN_TEMPLATES
-              .filter((t) => visibleTemplates.includes(t.type))
-              .map(({ type, label, color, icon: TIcon }) => {
-                const status = getStatus(type)
-                const count = dispatchCounts[type]
-                const isActive = selectedCard === type
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedCard(type)}
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
-                      isActive ? "text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                    style={isActive ? { backgroundColor: color } : undefined}
-                  >
-                    <TIcon className="size-3.5" />
-                    {label}
-                    {status === "sent" && count > 0 && (
-                      <span className={`rounded-full px-1.5 text-[10px] ${isActive ? "bg-white/20" : "bg-foreground/10"}`}>
-                        {count}x
-                      </span>
-                    )}
-                    {status === "scheduled" && (
-                      <span className={`size-1.5 rounded-full ${isActive ? "bg-white/60" : "bg-amber-400"}`} />
-                    )}
-                    {instanceIds[type] && (
-                      <span className={`size-1.5 rounded-full ${isActive ? "bg-white/80" : "bg-green-400"}`} title="Draft saved" />
-                    )}
-                  </button>
-                )
-              })}
+            {(() => {
+              const hasContent: Record<CommType, boolean> = {
+                birthday: birthdayForm.birthdays.length > 0,
+                anniversary: anniversaryForm.anniversaries.length > 0,
+                bible_study: true,
+                womens_study: true,
+                prayer_meeting: !!prayerMeetingForm.date,
+                bulletin: true,
+              }
+              const contentCounts: Record<CommType, number> = {
+                birthday: birthdayForm.birthdays.length,
+                anniversary: anniversaryForm.anniversaries.length,
+                bible_study: bibleStudyForm.locations.length,
+                womens_study: 0,
+                prayer_meeting: 0,
+                bulletin: bulletinForm.birthdays.length + bulletinForm.anniversaries.length + bulletinForm.events.length,
+              }
+
+              return BUILTIN_TEMPLATES
+                .filter((t) => visibleTemplates.includes(t.type))
+                .map(({ type, label, color, icon: TIcon }) => {
+                  const status = getStatus(type)
+                  const count = dispatchCounts[type]
+                  const isActive = selectedCard === type
+                  const hasData = hasContent[type]
+                  const dataCount = contentCounts[type]
+                  const hasDraft = !!instanceIds[type]
+
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedCard(type)}
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                        isActive ? "text-white shadow-sm"
+                        : hasData ? "bg-muted text-foreground hover:bg-muted/80"
+                        : "bg-muted/50 text-muted-foreground hover:bg-muted/60"
+                      }`}
+                      style={isActive ? { backgroundColor: color } : undefined}
+                    >
+                      <TIcon className="size-3.5" />
+                      {label}
+                      {hasData && dataCount > 0 && (
+                        <span className={`rounded-full px-1.5 text-[10px] ${isActive ? "bg-white/20" : "bg-foreground/10"}`}>
+                          {dataCount}
+                        </span>
+                      )}
+                      {status === "sent" && count > 0 && (
+                        <span className={`rounded-full px-1.5 text-[10px] ${isActive ? "bg-white/30" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"}`}>
+                          {count}x sent
+                        </span>
+                      )}
+                      {status === "scheduled" && (
+                        <span className={`size-1.5 rounded-full ${isActive ? "bg-white/60" : "bg-amber-400"}`} title="Scheduled" />
+                      )}
+                      {hasDraft && (
+                        <span className={`size-1.5 rounded-full ${isActive ? "bg-white/80" : "bg-green-400"}`} title="Draft saved" />
+                      )}
+                    </button>
+                  )
+                })
+            })()}
 
             <Popover>
               <PopoverTrigger
