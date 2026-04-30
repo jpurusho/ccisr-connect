@@ -37,6 +37,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings2,
+  Send,
+  Pencil,
+  Trash2,
+  Plus,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -46,6 +50,7 @@ import {
   buildWomensStudyCard,
   buildPrayerMeetingCard,
   buildBulletinCard,
+  buildCustomCard,
   type BirthdayEntry,
   type AnniversaryEntry,
   extractCommonCardData,
@@ -91,6 +96,10 @@ import {
   type WomensStudyFormData,
   type PrayerMeetingFormData,
   type BulletinFormData,
+  type BaseFormData,
+  CustomSectionsEditor,
+  ResourceLinksEditor,
+  CardStyleFields,
 } from "@/components/dashboard/communication-edit-forms"
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -182,6 +191,45 @@ const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
   womens_study: (s) => /women.*(?:bible|study)/i.test(s),
   prayer_meeting: (s) => /prayer/i.test(s),
   bulletin: (s) => /bulletin/i.test(s),
+}
+
+// ── Custom dashboard template form data ──────────────────────────────────
+
+interface CustomDashFormData extends BaseFormData {
+  title: string
+  subtitle: string
+  emoji: string
+  body: string
+  footerText: string
+}
+
+function buildCustomDashPreview(form: CustomDashFormData): string {
+  return buildCustomCard({
+    title: form.title || "Announcement",
+    subtitle: form.subtitle || undefined,
+    emoji: form.emoji || undefined,
+    bodyHtml: form.body
+      ? `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${form.body}</p>`
+      : "",
+    footerText: form.footerText || undefined,
+    ...extractCommonCardData(form),
+  })
+}
+
+const EMPTY_CUSTOM_FORM: CustomDashFormData = {
+  title: "",
+  subtitle: "",
+  emoji: "📋",
+  body: "",
+  footerText: "",
+  message: "",
+  headerTitle: "",
+  headerSubtitle: "",
+  headerEmoji: "",
+  primaryColor: "",
+  footerVerse: "",
+  resourceLinks: [],
+  customSections: [],
 }
 
 // ── Template visibility ──────────────────────────────────────────────────
@@ -377,6 +425,23 @@ export default function DashboardPage() {
     primaryColor: "",
     footerVerse: "",
   })
+
+  // ---- Custom dashboard templates ----
+  interface DashboardCustomTemplate {
+    id: string
+    name: string
+    subject_template: string
+    color: string
+    emoji: string
+    defaults: Record<string, unknown>
+  }
+
+  const [customDashTemplates, setCustomDashTemplates] = useState<DashboardCustomTemplate[]>([])
+  const [customForms, setCustomForms] = useState<Record<string, CustomDashFormData>>({})
+  const [customInstanceIds, setCustomInstanceIds] = useState<Record<string, string>>({})
+  const [customDispatches, setCustomDispatches] = useState<Record<string, { status: string; count: number }>>({})
+  const [customSubjectOverrides, setCustomSubjectOverrides] = useState<Record<string, string>>({})
+  const [selectedCustomCard, setSelectedCustomCard] = useState<string | null>(null)
 
   // ---- Saved form snapshots for cancel/revert ----
   const [savedSnapshots, setSavedSnapshots] = useState<Partial<Record<CommType, Record<string, unknown>>>>({})
@@ -722,15 +787,25 @@ export default function DashboardPage() {
         .filter((m) => !isActiveMember(m))
         .map((m) => `${m.full_name} (${m.birth_month}/${m.birth_day})`)
 
+      const hasBdDraft = !!composedMap["birthday"]
       const bdCommon = extractCommonFields(bdDef)
-      setBirthdayForm({
-        weekLabel: wl,
-        birthdays: bdayEntries,
-        ...bdCommon,
-        message: inactiveBdays.length > 0
-          ? `Note: Inactive members with birthdays this week: ${inactiveBdays.join(", ")}`
-          : bdCommon.message,
-      })
+      if (hasBdDraft) {
+        const fd = composedMap["birthday"].form_data as Record<string, unknown>
+        setBirthdayForm({
+          weekLabel: (fd.weekLabel as string) ?? wl,
+          birthdays: (fd.birthdays as BirthdayFormData["birthdays"]) ?? bdayEntries,
+          ...bdCommon,
+        })
+      } else {
+        setBirthdayForm({
+          weekLabel: wl,
+          birthdays: bdayEntries,
+          ...bdCommon,
+          message: inactiveBdays.length > 0
+            ? `Note: Inactive members with birthdays this week: ${inactiveBdays.join(", ")}`
+            : bdCommon.message,
+        })
+      }
 
       // ---- Process anniversaries (skip inactive families) ----
       const currentYear = today.getFullYear()
@@ -760,15 +835,25 @@ export default function DashboardPage() {
           : undefined,
       }))
 
+      const hasAnDraft = !!composedMap["anniversary"]
       const anCommon = extractCommonFields(anDef)
-      setAnniversaryForm({
-        weekLabel: wl,
-        anniversaries: anniEntries,
-        ...anCommon,
-        message: inactiveAnnis.length > 0
-          ? `Note: ${inactiveAnnis.length} inactive family anniversar${inactiveAnnis.length > 1 ? "ies" : "y"} not shown`
-          : anCommon.message,
-      })
+      if (hasAnDraft) {
+        const fd = composedMap["anniversary"].form_data as Record<string, unknown>
+        setAnniversaryForm({
+          weekLabel: (fd.weekLabel as string) ?? wl,
+          anniversaries: (fd.anniversaries as AnniversaryFormData["anniversaries"]) ?? anniEntries,
+          ...anCommon,
+        })
+      } else {
+        setAnniversaryForm({
+          weekLabel: wl,
+          anniversaries: anniEntries,
+          ...anCommon,
+          message: inactiveAnnis.length > 0
+            ? `Note: ${inactiveAnnis.length} inactive family anniversar${inactiveAnnis.length > 1 ? "ies" : "y"} not shown`
+            : anCommon.message,
+        })
+      }
 
       // ---- Recurrence-based event processing ----
       // Build event type name map for matching events to comm types
@@ -804,29 +889,11 @@ export default function DashboardPage() {
         })
 
       // ---- Process Bible Study (recurrence-based) ----
+      const hasBsDraft = !!composedMap["bible_study"]
       const bsEvent = findEventByType("friday_bible_study")
       const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, wkSun, wkSat) : []
       const bsDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
       const bsInstance = bsDate && bsEvent ? findInstance(bsEvent.id, format(bsDate, "yyyy-MM-dd")) : null
-
-      let bsHostData = { hostName: "TBD", address: "TBD", city: "", phone: "" }
-      if (bsInstance?.host_family_id) {
-        bsHostData = await resolveHostFamily(bsInstance.host_family_id)
-      }
-      if (bsInstance?.location_override) bsHostData.address = bsInstance.location_override
-      if (bsInstance?.notes) {
-        const contactMatch = bsInstance.notes.match(/Contact:\s*(.+)/i)
-        if (contactMatch) bsHostData.phone = contactMatch[1].trim()
-      }
-
-      const savedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
-      const mergedLocs = savedLocs.map((loc, i) => {
-        const base = { onVacation: false, vacationMessage: "", ...loc }
-        if (i === 0 && bsHostData.hostName !== "TBD" && !base.onVacation) {
-          return { ...base, hostNames: bsHostData.hostName, address: bsHostData.address, city: bsHostData.city, phone: bsHostData.phone }
-        }
-        return base
-      })
 
       const bsCommon = extractCommonFields(bsDef)
       if (bsCommon.resourceLinks.length === 0) {
@@ -834,76 +901,221 @@ export default function DashboardPage() {
         const url = (def.resourceLinkUrl as string) ?? ""
         if (url) bsCommon.resourceLinks = [{ label: (def.resourceLinkLabel as string) || "View Resources", url }]
       }
-      setBibleStudyForm({
-        title: bsDef.title ?? "Bible Study This Friday",
-        date: bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week",
-        time: bsInstance?.instance_time
-          ? formatTime(bsInstance.instance_time)
-          : bsDef.time ?? "7:30 PM",
-        topic: bsDef.topic ?? "Studying the Book of Acts",
-        ...bsCommon,
-        locations: mergedLocs,
-      })
+
+      if (hasBsDraft) {
+        const fd = composedMap["bible_study"].form_data as Record<string, unknown>
+        setBibleStudyForm({
+          title: (fd.title as string) ?? bsDef.title ?? "Bible Study This Friday",
+          date: (fd.date as string) ?? (bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"),
+          time: (fd.time as string) ?? bsDef.time ?? "7:30 PM",
+          topic: (fd.topic as string) ?? bsDef.topic ?? "Studying the Book of Acts",
+          locations: (fd.locations as BibleStudyFormData["locations"]) ?? bsDef.locations ?? [],
+          ...bsCommon,
+        })
+      } else {
+        let bsHostData = { hostName: "TBD", address: "TBD", city: "", phone: "" }
+        if (bsInstance?.host_family_id) {
+          bsHostData = await resolveHostFamily(bsInstance.host_family_id)
+        }
+        if (bsInstance?.location_override) bsHostData.address = bsInstance.location_override
+        if (bsInstance?.notes) {
+          const contactMatch = bsInstance.notes.match(/Contact:\s*(.+)/i)
+          if (contactMatch) bsHostData.phone = contactMatch[1].trim()
+        }
+
+        const savedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
+        const mergedLocs = savedLocs.map((loc, i) => {
+          const base = { onVacation: false, vacationMessage: "", ...loc }
+          if (i === 0 && bsHostData.hostName !== "TBD" && !base.onVacation) {
+            return { ...base, hostNames: bsHostData.hostName, address: bsHostData.address, city: bsHostData.city, phone: bsHostData.phone }
+          }
+          return base
+        })
+
+        setBibleStudyForm({
+          title: bsDef.title ?? "Bible Study This Friday",
+          date: bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week",
+          time: bsInstance?.instance_time
+            ? formatTime(bsInstance.instance_time)
+            : bsDef.time ?? "7:30 PM",
+          topic: bsDef.topic ?? "Studying the Book of Acts",
+          ...bsCommon,
+          locations: mergedLocs,
+        })
+      }
 
       // ---- Women's Study (recurrence-based) ----
+      const hasWsDraft = !!composedMap["womens_study"]
       const wsEvent = findEventByType("wednesday_womens_study")
       const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, wkSun, wkSat) : []
       const wsDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
 
       const wsCommon = extractCommonFields(wsDef)
-      setWomensStudyForm({
-        title: wsDef.title ?? "Women's Bible Study",
-        topic: wsDef.topic ?? "Building a Relationship with God",
-        date: wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week",
-        time: wsDef.time ?? "7:00 PM",
-        zoomLink: wsDef.zoomLink ?? "",
-        zoomMeetingId: wsDef.zoomMeetingId ?? "",
-        zoomPasscode: wsDef.zoomPasscode ?? "",
-        location: wsDef.location ?? "",
-        ...wsCommon,
-      })
+      if (hasWsDraft) {
+        const fd = composedMap["womens_study"].form_data as Record<string, unknown>
+        setWomensStudyForm({
+          title: (fd.title as string) ?? wsDef.title ?? "Women's Bible Study",
+          topic: (fd.topic as string) ?? wsDef.topic ?? "Building a Relationship with God",
+          date: (fd.date as string) ?? (wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week"),
+          time: (fd.time as string) ?? wsDef.time ?? "7:00 PM",
+          zoomLink: (fd.zoomLink as string) ?? wsDef.zoomLink ?? "",
+          zoomMeetingId: (fd.zoomMeetingId as string) ?? wsDef.zoomMeetingId ?? "",
+          zoomPasscode: (fd.zoomPasscode as string) ?? wsDef.zoomPasscode ?? "",
+          location: (fd.location as string) ?? wsDef.location ?? "",
+          ...wsCommon,
+        })
+      } else {
+        setWomensStudyForm({
+          title: wsDef.title ?? "Women's Bible Study",
+          topic: wsDef.topic ?? "Building a Relationship with God",
+          date: wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week",
+          time: wsDef.time ?? "7:00 PM",
+          zoomLink: wsDef.zoomLink ?? "",
+          zoomMeetingId: wsDef.zoomMeetingId ?? "",
+          zoomPasscode: wsDef.zoomPasscode ?? "",
+          location: wsDef.location ?? "",
+          ...wsCommon,
+        })
+      }
 
       // ---- Prayer Meeting (recurrence-based) ----
+      const hasPmDraft = !!composedMap["prayer_meeting"]
       const pmEvent = findEventByType("monthly_prayer")
       const pmOccurrences = pmEvent ? getOccurrences(pmEvent.recurrence_rule, wkSun, wkSat) : []
       const pmDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
       const pmInstance = pmDate && pmEvent ? findInstance(pmEvent.id, format(pmDate, "yyyy-MM-dd")) : null
 
-      let pmHostData = { hostName: pmDef.hostNames ?? "TBD", address: pmDef.address ?? "TBD", city: pmDef.city ?? "", phone: pmDef.phone ?? "" }
-      if (pmInstance?.host_family_id) {
-        pmHostData = await resolveHostFamily(pmInstance.host_family_id)
-      }
-      if (pmInstance?.location_override) pmHostData.address = pmInstance.location_override
-
       const pmCommon = extractCommonFields(pmDef)
-      setPrayerMeetingForm({
-        date: pmDate ? format(pmDate, "EEEE, MMMM do") : pmDef.date ?? "",
-        time: pmInstance?.instance_time ? formatTime(pmInstance.instance_time) : pmDef.time ?? "6:00 PM",
-        hostNames: pmHostData.hostName,
-        address: pmHostData.address,
-        city: pmHostData.city,
-        phone: pmHostData.phone,
-        dinnerNote: pmDef.dinnerNote ?? "",
-        signupLink: pmDef.signupLink ?? "",
-        ...pmCommon,
-      })
+      if (hasPmDraft) {
+        const fd = composedMap["prayer_meeting"].form_data as Record<string, unknown>
+        setPrayerMeetingForm({
+          date: (fd.date as string) ?? pmDef.date ?? "",
+          time: (fd.time as string) ?? pmDef.time ?? "6:00 PM",
+          hostNames: (fd.hostNames as string) ?? pmDef.hostNames ?? "TBD",
+          address: (fd.address as string) ?? pmDef.address ?? "TBD",
+          city: (fd.city as string) ?? pmDef.city ?? "",
+          phone: (fd.phone as string) ?? pmDef.phone ?? "",
+          dinnerNote: (fd.dinnerNote as string) ?? pmDef.dinnerNote ?? "",
+          signupLink: (fd.signupLink as string) ?? pmDef.signupLink ?? "",
+          ...pmCommon,
+        })
+      } else {
+        let pmHostData = { hostName: pmDef.hostNames ?? "TBD", address: pmDef.address ?? "TBD", city: pmDef.city ?? "", phone: pmDef.phone ?? "" }
+        if (pmInstance?.host_family_id) {
+          pmHostData = await resolveHostFamily(pmInstance.host_family_id)
+        }
+        if (pmInstance?.location_override) pmHostData.address = pmInstance.location_override
+
+        setPrayerMeetingForm({
+          date: pmDate ? format(pmDate, "EEEE, MMMM do") : pmDef.date ?? "",
+          time: pmInstance?.instance_time ? formatTime(pmInstance.instance_time) : pmDef.time ?? "6:00 PM",
+          hostNames: pmHostData.hostName,
+          address: pmHostData.address,
+          city: pmHostData.city,
+          phone: pmHostData.phone,
+          dinnerNote: pmDef.dinnerNote ?? "",
+          signupLink: pmDef.signupLink ?? "",
+          ...pmCommon,
+        })
+      }
 
       // ---- Bulletin (same week as everything else) ----
-      const bulEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
-
+      const hasBulDraft = !!composedMap["bulletin"]
       const bulCommon = extractCommonFields(bulDef)
-      const bulHelpers = (bulDef as Record<string, unknown>).helpers as BulletinFormData["helpers"] ?? []
-      setBulletinForm({
-        weekLabel: `Week of ${wl}`,
-        birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
-        anniversaries: anniEntries.map((a) => ({
-          names: `${a.husbandName} & ${a.wifeName}`,
-          date: a.date,
-        })),
-        helpers: bulHelpers,
-        events: bulEvents,
-        ...bulCommon,
-      })
+
+      if (hasBulDraft) {
+        const fd = composedMap["bulletin"].form_data as Record<string, unknown>
+        setBulletinForm({
+          weekLabel: (fd.weekLabel as string) ?? `Week of ${wl}`,
+          birthdays: (fd.birthdays as BulletinFormData["birthdays"]) ?? bdayEntries.map((b) => ({ name: b.name, date: b.date })),
+          anniversaries: (fd.anniversaries as BulletinFormData["anniversaries"]) ?? anniEntries.map((a) => ({ names: `${a.husbandName} & ${a.wifeName}`, date: a.date })),
+          helpers: (fd.helpers as BulletinFormData["helpers"]) ?? [],
+          events: (fd.events as BulletinFormData["events"]) ?? [],
+          sectionOrder: (fd.sectionOrder as BulletinFormData["sectionOrder"]) ?? undefined,
+          ...bulCommon,
+        })
+      } else {
+        const bulEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
+        const bulHelpers = (bulDef as Record<string, unknown>).helpers as BulletinFormData["helpers"] ?? []
+        setBulletinForm({
+          weekLabel: `Week of ${wl}`,
+          birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
+          anniversaries: anniEntries.map((a) => ({
+            names: `${a.husbandName} & ${a.wifeName}`,
+            date: a.date,
+          })),
+          helpers: bulHelpers,
+          events: bulEvents,
+          ...bulCommon,
+        })
+      }
+
+      // ---- Custom dashboard templates ----
+      const { data: customTmpls } = await supabase
+        .from("email_templates")
+        .select("id, name, subject_template, body_template")
+        .eq("is_default", false)
+        .order("name")
+        .returns<{ id: string; name: string; subject_template: string; body_template: string }[]>()
+
+      const dashCustom: DashboardCustomTemplate[] = []
+      const customFormInit: Record<string, CustomDashFormData> = {}
+      const customInstIds: Record<string, string> = {}
+      const customSubjOvr: Record<string, string> = {}
+
+      for (const ct of customTmpls ?? []) {
+        const ctKey = `custom:${ct.id}`
+        let parsed: Record<string, unknown> = {}
+        try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+
+        dashCustom.push({
+          id: ct.id,
+          name: ct.name,
+          subject_template: ct.subject_template,
+          color: (parsed.primaryColor as string) || "#6B7280",
+          emoji: (parsed.emoji as string) || "📋",
+          defaults: parsed,
+        })
+
+        const ci = composedMap[ctKey]
+        if (ci) {
+          const fd = ci.form_data as Record<string, unknown>
+          customFormInit[ct.id] = {
+            title: (fd.title as string) ?? (parsed.title as string) ?? ct.name,
+            subtitle: (fd.subtitle as string) ?? (parsed.subtitle as string) ?? "",
+            emoji: (fd.emoji as string) ?? (parsed.emoji as string) ?? "📋",
+            body: (fd.body as string) ?? (parsed.body as string) ?? "",
+            footerText: (fd.footerText as string) ?? (parsed.footerText as string) ?? "",
+            message: (fd.message as string) ?? "",
+            headerTitle: (fd.headerTitle as string) ?? "",
+            headerSubtitle: (fd.headerSubtitle as string) ?? "",
+            headerEmoji: (fd.headerEmoji as string) ?? "",
+            primaryColor: (fd.primaryColor as string) ?? (parsed.primaryColor as string) ?? "",
+            footerVerse: (fd.footerVerse as string) ?? "",
+            resourceLinks: (fd.resourceLinks as BaseFormData["resourceLinks"]) ?? (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
+            customSections: (fd.customSections as BaseFormData["customSections"]) ?? (parsed.customSections as BaseFormData["customSections"]) ?? [],
+          }
+          customInstIds[ct.id] = ci.id
+          if (ci.subject) customSubjOvr[ct.id] = ci.subject
+        } else {
+          customFormInit[ct.id] = {
+            ...EMPTY_CUSTOM_FORM,
+            title: (parsed.title as string) || ct.name,
+            subtitle: (parsed.subtitle as string) || "",
+            emoji: (parsed.emoji as string) || "📋",
+            body: (parsed.body as string) || "",
+            footerText: (parsed.footerText as string) || "",
+            primaryColor: (parsed.primaryColor as string) || "",
+            resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
+            customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
+          }
+        }
+      }
+
+      setCustomDashTemplates(dashCustom)
+      setCustomForms(customFormInit)
+      setCustomInstanceIds(customInstIds)
+      setCustomSubjectOverrides(customSubjOvr)
 
       // ---- Mailing lists + SMTP configs ----
       setMailingLists(mailingListsRes.data ?? [])
@@ -996,6 +1208,22 @@ export default function DashboardPage() {
       }
       setCommOptions(prefilledOptions)
       setCustomSubjects(subjectOverrides)
+
+      // Match dispatches for custom templates
+      const customDispInfo: Record<string, { status: string; count: number }> = {}
+      for (const ct of dashCustom) {
+        const ctKey = `custom:${ct.id}`
+        let dCount = 0
+        let dStatus = "draft"
+        for (const d of weekDispatches) {
+          if (d.template_type === ctKey) {
+            dCount++
+            if (dCount === 1) dStatus = mapDispatchStatus(d.status)
+          }
+        }
+        customDispInfo[ct.id] = { status: dStatus, count: dCount }
+      }
+      setCustomDispatches(customDispInfo)
     } catch (err) {
       console.error("Dashboard fetch error:", err)
       setError(
@@ -2055,6 +2283,253 @@ export default function DashboardPage() {
               </WeeklyCommunicationCard>
             )
           })()}
+        {/* ── Custom Template Cards ── */}
+        {customDashTemplates.length > 0 && (
+          <>
+            <div className="flex items-center gap-2 pt-2">
+              <Send className="size-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold text-muted-foreground">Custom Templates</h3>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {customDashTemplates.map((ct) => {
+                const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
+                const hasDraft = !!customInstanceIds[ct.id]
+                const isSelected = selectedCustomCard === ct.id
+
+                return (
+                  <button
+                    key={ct.id}
+                    onClick={() => { setSelectedCustomCard(isSelected ? null : ct.id); setSelectedCard("bulletin") }}
+                    className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
+                      isSelected ? "ring-2 ring-offset-1 shadow-sm" : "border-border hover:border-foreground/20"
+                    }`}
+                    style={isSelected ? { borderColor: ct.color, "--tw-ring-color": ct.color } as React.CSSProperties : undefined}
+                  >
+                    <div
+                      className="flex size-9 shrink-0 items-center justify-center rounded-lg text-lg"
+                      style={{ backgroundColor: ct.color + "15" }}
+                    >
+                      {ct.emoji}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold truncate">{ct.name}</span>
+                        {di.status === "sent" && di.count > 0 && (
+                          <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            Sent{di.count > 1 ? ` ${di.count}x` : ""}
+                          </span>
+                        )}
+                        {hasDraft && di.status === "draft" && (
+                          <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            Draft
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                        {customForms[ct.id]?.title || "Custom announcement"}
+                      </p>
+                    </div>
+                    <span className="absolute right-2 top-2 size-2 rounded-full" style={{ backgroundColor: ct.color }} />
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Expanded custom card */}
+            {selectedCustomCard && (() => {
+              const ct = customDashTemplates.find((t) => t.id === selectedCustomCard)
+              if (!ct) return null
+              const form = customForms[ct.id]
+              if (!form) return null
+              const ctKey = `custom:${ct.id}`
+              const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
+              const preview = buildCustomDashPreview(form)
+              const subj = customSubjectOverrides[ct.id] || ct.subject_template || ct.name
+
+              return (
+                <WeeklyCommunicationCard
+                  key={ctKey}
+                  title={ct.name}
+                  accentColor={ct.color}
+                  icon={Send}
+                  status={di.status as CommunicationStatus}
+                  summaryLines={[form.title || "Custom announcement"]}
+                  subject={subj}
+                  onSubjectChange={(v) => setCustomSubjectOverrides((prev) => ({ ...prev, [ct.id]: v }))}
+                  previewHtml={preview}
+                  resourceLinks={(form.resourceLinks ?? []).filter((l) => l.url)}
+                  mailingLists={mailingLists}
+                  smtpConfigs={smtpConfigs}
+                  selectedMailingList={commOptions.bulletin?.mailingListId}
+                  onMailingListChange={() => {}}
+                  selectedSmtpConfig={commOptions.bulletin?.smtpConfigId}
+                  onSmtpConfigChange={() => {}}
+                  sendCount={di.count}
+                  onSchedule={() => {}}
+                  onSendNow={async () => {
+                    const html = buildCustomDashPreview(form)
+                    if (!html) { toast.error("No content"); return }
+                    setSendingType("bulletin")
+                    try {
+                      const supabase = createClient()
+                      const { data: { user } } = await supabase.auth.getUser()
+                      const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+
+                      // Auto-save draft
+                      const draftPayload = {
+                        template_type: ctKey,
+                        name: ct.name,
+                        subject: subj,
+                        form_data: form as unknown as Record<string, unknown>,
+                        is_active: true,
+                        week_start: weekStart,
+                        is_recurring: false,
+                        recur_until: null,
+                        created_by: user?.id ?? null,
+                      }
+                      const existingId = customInstanceIds[ct.id]
+                      if (existingId) {
+                        await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingId)
+                      } else {
+                        const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
+                        if (newDraft) setCustomInstanceIds((prev) => ({ ...prev, [ct.id]: newDraft.id }))
+                      }
+
+                      const opts = commOptions.bulletin
+                      const { error } = await supabase.from("dispatch_queue").insert({
+                        subject: subj,
+                        body_html: html,
+                        scheduled_at: new Date().toISOString(),
+                        status: "pending",
+                        template_type: ctKey,
+                        week_start: weekStart,
+                        mailing_list_id: opts?.mailingListId || null,
+                        smtp_config_id: opts?.smtpConfigId || null,
+                        created_by: user?.id ?? null,
+                      } as never)
+                      if (error) toast.error(`Failed: ${error.message}`)
+                      else {
+                        toast.success(`"${subj}" queued for dispatch`)
+                        setCustomDispatches((prev) => ({ ...prev, [ct.id]: { status: "scheduled", count: (prev[ct.id]?.count ?? 0) + 1 } }))
+                      }
+                    } finally { setSendingType(null) }
+                  }}
+                  onSave={async () => {
+                    setSavingInstance("bulletin")
+                    try {
+                      const supabase = createClient()
+                      const { data: { user } } = await supabase.auth.getUser()
+                      const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+                      const payload = {
+                        template_type: ctKey,
+                        name: ct.name,
+                        subject: subj,
+                        form_data: form as unknown as Record<string, unknown>,
+                        is_active: true,
+                        week_start: weekStart,
+                        is_recurring: false,
+                        recur_until: null,
+                        created_by: user?.id ?? null,
+                      }
+                      const existingId = customInstanceIds[ct.id]
+                      if (existingId) {
+                        const { error } = await supabase.from("composed_instances").update(payload as never).eq("id", existingId)
+                        if (error) toast.error(`Save failed: ${error.message}`)
+                        else toast.success(`${ct.name} draft saved`)
+                      } else {
+                        const { data: ins, error } = await supabase.from("composed_instances").insert(payload as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null }
+                        if (error) toast.error(`Save failed: ${error.message}`)
+                        else {
+                          toast.success(`${ct.name} draft saved`)
+                          if (ins) setCustomInstanceIds((prev) => ({ ...prev, [ct.id]: ins.id }))
+                        }
+                      }
+                    } finally { setSavingInstance(null) }
+                  }}
+                  onDelete={async () => {
+                    const id = customInstanceIds[ct.id]
+                    if (!id || !confirm(`Delete the saved ${ct.name} draft?`)) return
+                    const supabase = createClient()
+                    await supabase.from("composed_instances").delete().eq("id", id)
+                    setCustomInstanceIds((prev) => { const n = { ...prev }; delete n[ct.id]; return n })
+                    toast.success(`${ct.name} draft deleted`)
+                  }}
+                  onCancel={() => {
+                    const tmpl = customDashTemplates.find((t) => t.id === ct.id)
+                    if (!tmpl) return
+                    const parsed = tmpl.defaults
+                    setCustomForms((prev) => ({
+                      ...prev,
+                      [ct.id]: {
+                        ...EMPTY_CUSTOM_FORM,
+                        title: (parsed.title as string) || ct.name,
+                        subtitle: (parsed.subtitle as string) || "",
+                        emoji: (parsed.emoji as string) || "📋",
+                        body: (parsed.body as string) || "",
+                        footerText: (parsed.footerText as string) || "",
+                        primaryColor: (parsed.primaryColor as string) || "",
+                        resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
+                        customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
+                      },
+                    }))
+                  }}
+                  saving={savingInstance === "bulletin"}
+                  hasInstance={!!customInstanceIds[ct.id]}
+                >
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`ct-${ct.id}-title`}>Card Title</Label>
+                      <Input
+                        id={`ct-${ct.id}-title`}
+                        value={form.title}
+                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], title: e.target.value } }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`ct-${ct.id}-sub`}>Subtitle</Label>
+                      <Input
+                        id={`ct-${ct.id}-sub`}
+                        value={form.subtitle}
+                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], subtitle: e.target.value } }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`ct-${ct.id}-body`}>Message Body</Label>
+                      <textarea
+                        id={`ct-${ct.id}-body`}
+                        value={form.body}
+                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], body: e.target.value } }))}
+                        className="w-full min-h-24 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                        placeholder="Write your message..."
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`ct-${ct.id}-footer`}>Footer Text</Label>
+                      <Input
+                        id={`ct-${ct.id}-footer`}
+                        value={form.footerText}
+                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], footerText: e.target.value } }))}
+                      />
+                    </div>
+                    <CustomSectionsEditor
+                      sections={form.customSections ?? []}
+                      onChange={(sections) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], customSections: sections } }))}
+                    />
+                    <ResourceLinksEditor
+                      links={form.resourceLinks ?? []}
+                      onChange={(links) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], resourceLinks: links } }))}
+                    />
+                    <CardStyleFields
+                      data={form}
+                      onChange={(updated) => setCustomForms((prev) => ({ ...prev, [ct.id]: updated }))}
+                      idPrefix={`ct-${ct.id}`}
+                    />
+                  </div>
+                </WeeklyCommunicationCard>
+              )
+            })()}
+          </>
+        )}
         </>
           })()}
         </div>
