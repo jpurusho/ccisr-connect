@@ -34,6 +34,7 @@ import {
   Save,
   Trash2,
   Loader2,
+  Undo2,
   type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -83,6 +84,7 @@ export interface WeeklyCommunicationCardProps {
   onSendNow: () => void
   onSave?: () => void
   onDelete?: () => void
+  onCancel?: () => void
   saving?: boolean
   hasInstance?: boolean
   children?: ReactNode
@@ -132,6 +134,7 @@ export function WeeklyCommunicationCard({
   onSendNow,
   onSave,
   onDelete,
+  onCancel,
   saving = false,
   hasInstance = false,
   children,
@@ -313,52 +316,31 @@ export function WeeklyCommunicationCard({
         {/* ── Row 2: Primary Actions ── */}
         <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pl-5 pt-2">
           <Button
-            variant="outline"
+            variant={editing ? "default" : "outline"}
             size="sm"
-            onClick={() => setEditing((prev) => !prev)}
+            onClick={() => {
+              if (editing && onCancel) onCancel()
+              setEditing((prev) => !prev)
+            }}
+            style={editing ? { backgroundColor: accentColor } : undefined}
+            className={editing ? "text-white hover:opacity-90" : ""}
           >
             {editing ? (
               <ChevronUp className="size-3.5" data-icon="inline-start" />
             ) : (
               <Pencil className="size-3.5" data-icon="inline-start" />
             )}
-            {editing ? "Close" : "Edit"}
+            {editing ? "Close Editor" : "Edit"}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPreviewing(true)}
-            disabled={!previewHtml}
-          >
-            <Eye className="size-3.5" data-icon="inline-start" />
-            Preview
-          </Button>
-
-          {onSave && (
+          {!editing && (
             <Button
               variant="outline"
               size="sm"
-              onClick={onSave}
-              disabled={saving}
+              onClick={() => setPreviewing(true)}
+              disabled={!previewHtml}
             >
-              {saving ? (
-                <Loader2 className="size-3.5 animate-spin" data-icon="inline-start" />
-              ) : (
-                <Save className="size-3.5" data-icon="inline-start" />
-              )}
-              Save
-            </Button>
-          )}
-
-          {onDelete && hasInstance && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onDelete}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="size-3.5" data-icon="inline-start" />
-              Delete
+              <Eye className="size-3.5" data-icon="inline-start" />
+              Preview
             </Button>
           )}
 
@@ -470,9 +452,61 @@ export function WeeklyCommunicationCard({
 
         {/* Expandable edit form */}
         {editing && children && (
-          <div className="border-t px-4 py-4 pl-5">
-            {children}
-          </div>
+          <>
+            {/* Draft action bar */}
+            <div className="border-t border-b bg-muted/30 px-4 py-2.5 pl-5 flex flex-wrap items-center gap-2">
+              {onSave && (
+                <Button
+                  size="sm"
+                  onClick={() => { onSave(); setEditing(false) }}
+                  disabled={saving}
+                  style={{ backgroundColor: accentColor }}
+                  className="text-white hover:opacity-90"
+                >
+                  {saving ? (
+                    <Loader2 className="size-3.5 animate-spin" data-icon="inline-start" />
+                  ) : (
+                    <Save className="size-3.5" data-icon="inline-start" />
+                  )}
+                  Save Draft
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPreviewing(true)}
+                disabled={!previewHtml}
+              >
+                <Eye className="size-3.5" data-icon="inline-start" />
+                Preview
+              </Button>
+              {onCancel && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { onCancel(); setEditing(false) }}
+                >
+                  <Undo2 className="size-3.5" data-icon="inline-start" />
+                  Cancel
+                </Button>
+              )}
+              <div className="flex-1" />
+              {onDelete && hasInstance && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDelete}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="size-3.5" data-icon="inline-start" />
+                  Delete Draft
+                </Button>
+              )}
+            </div>
+            <div className="px-4 py-4 pl-5">
+              {children}
+            </div>
+          </>
         )}
       </Card>
 

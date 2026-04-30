@@ -48,6 +48,8 @@ import {
   buildBulletinCard,
   type BirthdayEntry,
   type AnniversaryEntry,
+  extractCommonCardData,
+  type BaseCardData,
 } from "@/lib/email/card-builder"
 import { toast } from "sonner"
 import {
@@ -292,6 +294,7 @@ export default function DashboardPage() {
     primaryColor: "",
     footerVerse: "",
     resourceLinks: [],
+    customSections: [],
   })
   const [anniversaryForm, setAnniversaryForm] = useState<AnniversaryFormData>({
     weekLabel: "",
@@ -303,6 +306,7 @@ export default function DashboardPage() {
     primaryColor: "",
     footerVerse: "",
     resourceLinks: [],
+    customSections: [],
   })
   const [bibleStudyForm, setBibleStudyForm] = useState<BibleStudyFormData>({
     title: "Bible Study This Friday",
@@ -316,6 +320,7 @@ export default function DashboardPage() {
     primaryColor: "",
     footerVerse: "",
     resourceLinks: [],
+    customSections: [],
     locations: [
       { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
       { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
@@ -337,6 +342,7 @@ export default function DashboardPage() {
     primaryColor: "",
     footerVerse: "",
     resourceLinks: [],
+    customSections: [],
   })
   const [prayerMeetingForm, setPrayerMeetingForm] = useState<PrayerMeetingFormData>({
     date: "",
@@ -354,6 +360,7 @@ export default function DashboardPage() {
     primaryColor: "",
     footerVerse: "",
     resourceLinks: [],
+    customSections: [],
   })
   const [bulletinForm, setBulletinForm] = useState<BulletinFormData>({
     weekLabel: "",
@@ -362,6 +369,7 @@ export default function DashboardPage() {
     helpers: [],
     events: [],
     resourceLinks: [],
+    customSections: [],
     message: "",
     headerTitle: "",
     headerSubtitle: "",
@@ -369,6 +377,9 @@ export default function DashboardPage() {
     primaryColor: "",
     footerVerse: "",
   })
+
+  // ---- Saved form snapshots for cancel/revert ----
+  const [savedSnapshots, setSavedSnapshots] = useState<Partial<Record<CommType, Record<string, unknown>>>>({})
 
   // ---- Custom subject overrides ----
   const [customSubjects, setCustomSubjects] = useState<Partial<Record<CommType, string>>>({})
@@ -881,6 +892,7 @@ export default function DashboardPage() {
       const bulEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
 
       const bulCommon = extractCommonFields(bulDef)
+      const bulHelpers = (bulDef as Record<string, unknown>).helpers as BulletinFormData["helpers"] ?? []
       setBulletinForm({
         weekLabel: `Week of ${wl}`,
         birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
@@ -888,7 +900,7 @@ export default function DashboardPage() {
           names: `${a.husbandName} & ${a.wifeName}`,
           date: a.date,
         })),
-        helpers: [],
+        helpers: bulHelpers,
         events: bulEvents,
         ...bulCommon,
       })
@@ -994,6 +1006,11 @@ export default function DashboardPage() {
     }
   }
 
+  useEffect(() => {
+    if (!loading) snapshotAllForms()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
+
   // ---- Computed status for each communication ----
   function getStatus(type: CommType): CommunicationStatus {
     const d = dispatches[type]
@@ -1008,19 +1025,23 @@ export default function DashboardPage() {
   }
 
   // ---- Preview HTML builders (memoized) ----
+
+  function interpCommon(form: import("@/components/dashboard/communication-edit-forms").BaseFormData, vars: Record<string, string>): BaseCardData {
+    return {
+      ...extractCommonCardData(form),
+      message: interp(form.message, vars) || undefined,
+      headerSubtitle: interp(form.headerSubtitle, vars) || undefined,
+      footerVerse: interp(form.footerVerse, vars) || undefined,
+    }
+  }
+
   const birthdayPreview = useMemo(() => {
     if (birthdayForm.birthdays.length === 0) return null
     const vars = makeBirthdayVars(birthdayForm.weekLabel, birthdayForm.birthdays.map(b => b.name))
     return buildBirthdayCard({
       weekLabel: birthdayForm.weekLabel,
       birthdays: birthdayForm.birthdays,
-      message: interp(birthdayForm.message, vars),
-      headerTitle: birthdayForm.headerTitle || undefined,
-      headerSubtitle: interp(birthdayForm.headerSubtitle, vars),
-      headerEmoji: birthdayForm.headerEmoji || undefined,
-      primaryColor: birthdayForm.primaryColor || undefined,
-      footerVerse: interp(birthdayForm.footerVerse, vars),
-      resourceLinks: (birthdayForm.resourceLinks ?? []).filter((l) => l.url),
+      ...interpCommon(birthdayForm, vars),
     })
   }, [birthdayForm])
 
@@ -1030,13 +1051,7 @@ export default function DashboardPage() {
     return buildAnniversaryCard({
       weekLabel: anniversaryForm.weekLabel,
       anniversaries: anniversaryForm.anniversaries,
-      message: interp(anniversaryForm.message, vars),
-      headerTitle: anniversaryForm.headerTitle || undefined,
-      headerSubtitle: interp(anniversaryForm.headerSubtitle, vars),
-      headerEmoji: anniversaryForm.headerEmoji || undefined,
-      primaryColor: anniversaryForm.primaryColor || undefined,
-      footerVerse: interp(anniversaryForm.footerVerse, vars),
-      resourceLinks: (anniversaryForm.resourceLinks ?? []).filter((l) => l.url),
+      ...interpCommon(anniversaryForm, vars),
     })
   }, [anniversaryForm])
 
@@ -1047,12 +1062,6 @@ export default function DashboardPage() {
       date: bibleStudyForm.date,
       time: bibleStudyForm.time,
       topic: interp(bibleStudyForm.topic, vars),
-      message: interp(bibleStudyForm.message, vars),
-      headerSubtitle: interp(bibleStudyForm.headerSubtitle, vars),
-      headerEmoji: bibleStudyForm.headerEmoji || undefined,
-      primaryColor: bibleStudyForm.primaryColor || undefined,
-      footerVerse: interp(bibleStudyForm.footerVerse, vars),
-      resourceLinks: (bibleStudyForm.resourceLinks ?? []).filter((l) => l.url),
       locations: bibleStudyForm.locations.map((loc) => ({
         label: loc.label,
         hostNames: loc.hostNames || undefined,
@@ -1060,6 +1069,7 @@ export default function DashboardPage() {
         city: loc.city || undefined,
         phone: loc.phone || undefined,
       })),
+      ...interpCommon(bibleStudyForm, vars),
     })
   }, [bibleStudyForm, weekLabel])
 
@@ -1074,12 +1084,7 @@ export default function DashboardPage() {
       zoomMeetingId: womensStudyForm.zoomMeetingId || undefined,
       zoomPasscode: womensStudyForm.zoomPasscode || undefined,
       location: womensStudyForm.location || undefined,
-      message: interp(womensStudyForm.message, vars),
-      headerSubtitle: interp(womensStudyForm.headerSubtitle, vars),
-      headerEmoji: womensStudyForm.headerEmoji || undefined,
-      primaryColor: womensStudyForm.primaryColor || undefined,
-      footerVerse: interp(womensStudyForm.footerVerse, vars),
-      resourceLinks: (womensStudyForm.resourceLinks ?? []).filter((l) => l.url),
+      ...interpCommon(womensStudyForm, vars),
     })
   }, [womensStudyForm, weekLabel])
 
@@ -1093,13 +1098,7 @@ export default function DashboardPage() {
       time: prayerMeetingForm.time,
       dinnerNote: prayerMeetingForm.dinnerNote || undefined,
       signupLink: prayerMeetingForm.signupLink || undefined,
-      message: prayerMeetingForm.message || undefined,
-      headerTitle: prayerMeetingForm.headerTitle || undefined,
-      headerSubtitle: prayerMeetingForm.headerSubtitle || undefined,
-      headerEmoji: prayerMeetingForm.headerEmoji || undefined,
-      primaryColor: prayerMeetingForm.primaryColor || undefined,
-      footerVerse: prayerMeetingForm.footerVerse || undefined,
-      resourceLinks: (prayerMeetingForm.resourceLinks ?? []).filter((l) => l.url),
+      ...extractCommonCardData(prayerMeetingForm),
     })
   }, [prayerMeetingForm])
 
@@ -1111,13 +1110,7 @@ export default function DashboardPage() {
       anniversaries: bulletinForm.anniversaries,
       helpers: bulletinForm.helpers,
       events: bulletinForm.events,
-      resourceLinks: bulletinForm.resourceLinks,
-      message: interp(bulletinForm.message, vars),
-      headerTitle: bulletinForm.headerTitle || undefined,
-      headerSubtitle: interp(bulletinForm.headerSubtitle, vars),
-      headerEmoji: bulletinForm.headerEmoji || undefined,
-      primaryColor: bulletinForm.primaryColor || undefined,
-      footerVerse: interp(bulletinForm.footerVerse, vars),
+      ...interpCommon(bulletinForm, vars),
     })
   }, [bulletinForm, weekLabel])
 
@@ -1197,6 +1190,31 @@ export default function DashboardPage() {
     }
   }
 
+  function snapshotForm(type: CommType) {
+    setSavedSnapshots((prev) => ({ ...prev, [type]: structuredClone(getFormData(type)) }))
+  }
+
+  function snapshotAllForms() {
+    const snap: Partial<Record<CommType, Record<string, unknown>>> = {}
+    const types: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
+    for (const t of types) snap[t] = structuredClone(getFormData(t))
+    setSavedSnapshots(snap)
+  }
+
+  function handleCancelEdit(type: CommType) {
+    const snap = savedSnapshots[type]
+    if (!snap) return
+    const r = structuredClone(snap) as unknown
+    switch (type) {
+      case "birthday": setBirthdayForm(r as typeof birthdayForm); break
+      case "anniversary": setAnniversaryForm(r as typeof anniversaryForm); break
+      case "bible_study": setBibleStudyForm(r as typeof bibleStudyForm); break
+      case "womens_study": setWomensStudyForm(r as typeof womensStudyForm); break
+      case "prayer_meeting": setPrayerMeetingForm(r as typeof prayerMeetingForm); break
+      case "bulletin": setBulletinForm(r as typeof bulletinForm); break
+    }
+  }
+
   // ---- Save / Delete instance ----
   async function handleSaveInstance(type: CommType) {
     setSavingInstance(type)
@@ -1233,6 +1251,7 @@ export default function DashboardPage() {
           toast.error(`Save failed: ${error.message}`)
         } else {
           toast.success(`${templateName} draft saved`)
+          snapshotForm(type)
           logAudit("composed_instance_updated", "composed_instances", existingId, { type, weekStart })
         }
       } else {
@@ -1246,6 +1265,7 @@ export default function DashboardPage() {
         } else {
           toast.success(`${templateName} draft saved`)
           setInstanceIds((prev) => ({ ...prev, [type]: inserted?.id ?? undefined }))
+          snapshotForm(type)
           logAudit("composed_instance_created", "composed_instances", inserted?.id, { type, weekStart })
         }
       }
@@ -1312,6 +1332,31 @@ export default function DashboardPage() {
         } = await supabase.auth.getUser()
 
         const dispatchWeekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+
+        // Auto-save draft before dispatching so form data persists
+        const templateName = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
+        const draftPayload = {
+          template_type: type,
+          name: templateName,
+          subject,
+          form_data: getFormData(type),
+          mailing_list_id: opts.mailingListId || null,
+          smtp_config_id: opts.smtpConfigId || null,
+          additional_recipients: opts.additionalRecipients.trim() || null,
+          is_active: true,
+          week_start: dispatchWeekStart,
+          is_recurring: false,
+          recur_until: null,
+          created_by: user?.id ?? null,
+        }
+        const existingDraftId = instanceIds[type]
+        if (existingDraftId) {
+          await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingDraftId)
+        } else {
+          const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
+          if (newDraft) setInstanceIds((prev) => ({ ...prev, [type]: newDraft.id }))
+        }
+        snapshotForm(type)
 
         const { data: inserted, error } = await supabase
           .from("dispatch_queue")
@@ -1992,6 +2037,7 @@ export default function DashboardPage() {
                 onSendNow={() => handleSendNow(type)}
                 onSave={() => handleSaveInstance(type)}
                 onDelete={() => handleDeleteInstance(type)}
+                onCancel={() => handleCancelEdit(type)}
                 saving={savingInstance === type}
                 hasInstance={!!instanceIds[type]}
                 mailingLists={mailingLists}

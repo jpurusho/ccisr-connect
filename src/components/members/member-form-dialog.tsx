@@ -81,6 +81,7 @@ export function MemberFormDialog({
   const [addrState, setAddrState] = useState("")
   const [zip, setZip] = useState("")
   const [homePhone, setHomePhone] = useState("")
+  const [addressDirty, setAddressDirty] = useState(false)
 
   // Tags
   const [availableTags, setAvailableTags] = useState<Tag[]>([])
@@ -95,7 +96,7 @@ export function MemberFormDialog({
     setLoadingFamilies(true)
     const supabase = createClient()
     const [famRes, tagRes] = await Promise.all([
-      supabase.from("families").select("*").eq("is_active", true).order("family_name", { ascending: true }),
+      supabase.from("families").select("*").order("family_name", { ascending: true }),
       supabase.from("tags").select("*").order("name").returns<Tag[]>(),
     ])
     if (famRes.data) setFamilies(famRes.data)
@@ -131,6 +132,7 @@ export function MemberFormDialog({
     setCity(addr?.city ?? "")
     setAddrState(addr?.state ?? "")
     setZip(addr?.zip ?? "")
+    setAddressDirty(false)
     const fam = famRes.data as { home_phone: string | null } | null
     setHomePhone(fam?.home_phone ?? "")
   }
@@ -183,6 +185,7 @@ export function MemberFormDialog({
       setAddrState("")
       setZip("")
       setHomePhone("")
+      setAddressDirty(false)
       setSelectedTagIds(new Set())
     }
   }, [open, member, loadingFamilies])
@@ -208,25 +211,38 @@ export function MemberFormDialog({
 
       // Create new family if needed
       if (isNewFamily && newFamilyName.trim()) {
-        const familyPayload: FamilyInsert = {
-          family_name: newFamilyName.trim(),
-          is_active: true,
-          home_phone: null,
-          notes: null,
-        }
-        const { data: newFamily, error: familyError } = await supabase
+        const { data: existingMatch } = await supabase
           .from("families")
-          .insert(familyPayload as never)
-          .select()
-          .single()
+          .select("id, family_name")
+          .ilike("family_name", newFamilyName.trim())
+          .limit(1)
+          .maybeSingle()
 
-        if (familyError || !newFamily) {
-          toast.error("Failed to create family: " + (familyError?.message ?? "Unknown error"))
-          setSaving(false)
-          return
+        if (existingMatch && !confirm(
+          `A family named "${(existingMatch as { family_name: string }).family_name}" already exists. Create a new one anyway?`
+        )) {
+          resolvedFamilyId = (existingMatch as { id: string }).id
+        } else {
+          const familyPayload: FamilyInsert = {
+            family_name: newFamilyName.trim(),
+            is_active: true,
+            home_phone: null,
+            notes: null,
+          }
+          const { data: newFamily, error: familyError } = await supabase
+            .from("families")
+            .insert(familyPayload as never)
+            .select()
+            .single()
+
+          if (familyError || !newFamily) {
+            toast.error("Failed to create family: " + (familyError?.message ?? "Unknown error"))
+            setSaving(false)
+            return
+          }
+          resolvedFamilyId = (newFamily as Family).id
+          logAudit("family_created", "families", null, { family_name: newFamilyName.trim() })
         }
-        resolvedFamilyId = (newFamily as Family).id
-        logAudit("family_created", "families", null, { family_name: newFamilyName.trim() })
       }
 
       if (!resolvedFamilyId) {
@@ -256,6 +272,8 @@ export function MemberFormDialog({
         notes: notes.trim() || null,
       }
 
+      let resolvedMemberId: string | null = member?.id ?? null
+
       if (isEditing && member) {
         const { error } = await supabase
           .from("members")
@@ -269,22 +287,39 @@ export function MemberFormDialog({
         }
         toast.success("Member updated successfully.")
         logAudit("member_updated", "members", member.id, { name: fullName })
+
+        // Clean up orphaned old family if member was moved
+        if (member.family_id !== resolvedFamilyId) {
+          const { count } = await supabase
+            .from("members")
+            .select("*", { count: "exact", head: true })
+            .eq("family_id", member.family_id)
+          if (count === 0) {
+            await supabase.from("families").delete().eq("id", member.family_id)
+            logAudit("family_auto_deleted", "families", member.family_id, {
+              reason: "last_member_moved",
+            })
+          }
+        }
       } else {
-        const { error } = await supabase
+        const { data: created, error } = await supabase
           .from("members")
           .insert(memberData as never)
+          .select("id")
+          .single()
 
-        if (error) {
-          toast.error("Failed to create member: " + error.message)
+        if (error || !created) {
+          toast.error("Failed to create member: " + (error?.message ?? "Unknown error"))
           setSaving(false)
           return
         }
+        resolvedMemberId = (created as { id: string }).id
         toast.success("Member created successfully.")
-        logAudit("member_created", "members", null, { name: fullName })
+        logAudit("member_created", "members", resolvedMemberId, { name: fullName })
       }
 
       // Save address and home phone for the family
-      if (resolvedFamilyId) {
+      if (resolvedFamilyId && addressDirty) {
         const hasAddress = street.trim() || city.trim() || addrState.trim() || zip.trim()
         if (hasAddress) {
           const fullAddress = [street.trim(), city.trim(), addrState.trim(), zip.trim()].filter(Boolean).join(", ")
@@ -296,27 +331,25 @@ export function MemberFormDialog({
             .limit(1)
             .maybeSingle()
 
+          const addrPayload = {
+            street: street.trim(),
+            city: city.trim(),
+            state: addrState.trim(),
+            zip: zip.trim(),
+            full_address: fullAddress,
+          }
+
           if (existingAddr) {
             await supabase
               .from("addresses")
-              .update({
-                street: street.trim() || null,
-                city: city.trim() || null,
-                state: addrState.trim() || null,
-                zip: zip.trim() || null,
-                full_address: fullAddress || null,
-              } as never)
+              .update(addrPayload as never)
               .eq("id", (existingAddr as { id: string }).id)
           } else {
             await supabase
               .from("addresses")
               .insert({
                 family_id: resolvedFamilyId,
-                street: street.trim() || null,
-                city: city.trim() || null,
-                state: addrState.trim() || null,
-                zip: zip.trim() || null,
-                full_address: fullAddress || null,
+                ...addrPayload,
                 is_current: true,
               } as never)
           }
@@ -331,25 +364,13 @@ export function MemberFormDialog({
       }
 
       // Sync tags
-      if (isEditing && member) {
-        await supabase.from("member_tags").delete().eq("member_id", member.id)
+      if (resolvedMemberId) {
+        if (isEditing) {
+          await supabase.from("member_tags").delete().eq("member_id", resolvedMemberId)
+        }
         if (selectedTagIds.size > 0) {
           await supabase.from("member_tags").insert(
-            [...selectedTagIds].map((tagId) => ({ member_id: member.id, tag_id: tagId })) as never
-          )
-        }
-      } else if (!isEditing && selectedTagIds.size > 0) {
-        const { data: newMember } = await supabase
-          .from("members")
-          .select("id")
-          .eq("full_name", fullName)
-          .eq("family_id", resolvedFamilyId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
-        if (newMember) {
-          await supabase.from("member_tags").insert(
-            [...selectedTagIds].map((tagId) => ({ member_id: (newMember as { id: string }).id, tag_id: tagId })) as never
+            [...selectedTagIds].map((tagId) => ({ member_id: resolvedMemberId!, tag_id: tagId })) as never
           )
         }
       }
@@ -429,7 +450,7 @@ export function MemberFormDialog({
               <Input value="Loading families..." disabled />
             ) : (
               <Select
-                value={familyId ?? undefined}
+                value={familyId ?? ""}
                 onValueChange={(val) => {
                   const fId = val as string
                   setFamilyId(fId)
@@ -444,7 +465,7 @@ export function MemberFormDialog({
                 <SelectContent>
                   {families.map((f) => (
                     <SelectItem key={f.id} value={f.id}>
-                      {f.family_name}
+                      {f.family_name}{!f.is_active ? " (inactive)" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -505,7 +526,7 @@ export function MemberFormDialog({
             <Label className="text-xs text-muted-foreground uppercase tracking-wide">Family Address</Label>
             <Input
               value={street}
-              onChange={(e) => setStreet(e.target.value)}
+              onChange={(e) => { setStreet(e.target.value); setAddressDirty(true) }}
               placeholder="Street address"
               autoComplete="off"
               data-1p-ignore
@@ -514,7 +535,7 @@ export function MemberFormDialog({
               <Input
                 className="col-span-3"
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
+                onChange={(e) => { setCity(e.target.value); setAddressDirty(true) }}
                 placeholder="City"
                 autoComplete="off"
                 data-1p-ignore
@@ -522,7 +543,7 @@ export function MemberFormDialog({
               <Input
                 className="col-span-1"
                 value={addrState}
-                onChange={(e) => setAddrState(e.target.value)}
+                onChange={(e) => { setAddrState(e.target.value); setAddressDirty(true) }}
                 placeholder="State"
                 autoComplete="off"
                 data-1p-ignore
@@ -530,7 +551,7 @@ export function MemberFormDialog({
               <Input
                 className="col-span-2"
                 value={zip}
-                onChange={(e) => setZip(e.target.value)}
+                onChange={(e) => { setZip(e.target.value); setAddressDirty(true) }}
                 placeholder="Zip"
                 autoComplete="off"
                 data-1p-ignore

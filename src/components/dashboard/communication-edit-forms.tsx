@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react"
 import { formatPhone } from "@/lib/utils"
 import type { BirthdayEntry, AnniversaryEntry } from "@/lib/email/card-builder"
 
@@ -118,6 +118,299 @@ export function HostFamilyInput({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Member Search Input (autocomplete from members DB)
+// ---------------------------------------------------------------------------
+
+export function MemberSearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  const [results, setResults] = useState<{ id: string; full_name: string }[]>([])
+  const [showResults, setShowResults] = useState(false)
+
+  async function handleSearch(query: string) {
+    onChange(query)
+    if (query.trim().length < 2) {
+      setResults([])
+      setShowResults(false)
+      return
+    }
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("members")
+      .select("id, full_name")
+      .eq("is_active", true)
+      .ilike("full_name", `%${query.trim()}%`)
+      .order("full_name")
+      .limit(8)
+
+    if (data) {
+      setResults(data)
+      setShowResults(data.length > 0)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <Input
+        placeholder={placeholder ?? "Type member name..."}
+        value={value}
+        onChange={(e) => handleSearch(e.target.value)}
+        onBlur={() => setTimeout(() => setShowResults(false), 200)}
+        onFocus={() => results.length > 0 && setShowResults(true)}
+      />
+      {showResults && (
+        <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-36 overflow-y-auto">
+          {results.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="flex w-full px-3 py-1.5 text-left text-sm hover:bg-accent"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange(m.full_name)
+                setShowResults(false)
+              }}
+            >
+              {m.full_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Custom Sections Editor (reusable across all templates)
+// ---------------------------------------------------------------------------
+
+export interface CustomSection {
+  title: string
+  emoji: string
+  color?: string
+  entries: { label: string; name: string }[]
+}
+
+const EMOJI_PRESETS = [
+  "📋", "🤝", "🍪", "🍽️", "🎵", "🙏", "📖", "⛪", "🎶", "🎤",
+  "🕊️", "💒", "🎂", "💍", "📅", "🔔", "✝️", "❤️", "🌿", "☀️",
+  "🎉", "🏠", "👨‍👩‍👧‍👦", "🧒", "👶", "🎓", "🎁", "🎈", "💐", "🕯️",
+]
+
+const SECTION_COLOR_PRESETS = [
+  { label: "Default", value: "" },
+  { label: "Blue", value: "#2563EB" },
+  { label: "Teal", value: "#0D9488" },
+  { label: "Green", value: "#059669" },
+  { label: "Orange", value: "#EA580C" },
+  { label: "Rose", value: "#DB2777" },
+  { label: "Purple", value: "#7C3AED" },
+  { label: "Red", value: "#DC2626" },
+  { label: "Amber", value: "#D97706" },
+  { label: "Indigo", value: "#4F46E5" },
+  { label: "Slate", value: "#475569" },
+]
+
+function EmojiPickerInput({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (emoji: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className="flex size-10 items-center justify-center rounded-md border text-lg hover:bg-accent transition-colors"
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        {value || "📋"}
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 rounded-lg border bg-popover p-2 shadow-lg">
+          <div className="grid grid-cols-6 gap-1">
+            {EMOJI_PRESETS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                className={`size-8 rounded text-lg hover:bg-accent transition-colors ${value === e ? "bg-accent ring-1 ring-primary" : ""}`}
+                onClick={() => { onChange(e); setOpen(false) }}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          <Input
+            placeholder="Or type any emoji"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="mt-2 w-full text-center text-lg"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function CustomSectionsEditor({
+  sections,
+  onChange,
+}: {
+  sections: CustomSection[]
+  onChange: (sections: CustomSection[]) => void
+}) {
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({})
+
+  function updateSection(idx: number, field: keyof Omit<CustomSection, "entries">, value: string) {
+    const updated = [...sections]
+    updated[idx] = { ...updated[idx], [field]: value }
+    onChange(updated)
+  }
+
+  function removeSection(idx: number) {
+    onChange(sections.filter((_, i) => i !== idx))
+  }
+
+  function moveSection(idx: number, dir: -1 | 1) {
+    const target = idx + dir
+    if (target < 0 || target >= sections.length) return
+    const updated = [...sections]
+    ;[updated[idx], updated[target]] = [updated[target], updated[idx]]
+    onChange(updated)
+  }
+
+  function addSection() {
+    onChange([...sections, { title: "", emoji: "📋", color: "", entries: [{ label: "", name: "" }] }])
+  }
+
+  function updateEntry(sIdx: number, eIdx: number, field: "label" | "name", value: string) {
+    const updated = [...sections]
+    const entries = [...updated[sIdx].entries]
+    entries[eIdx] = { ...entries[eIdx], [field]: value }
+    updated[sIdx] = { ...updated[sIdx], entries }
+    onChange(updated)
+  }
+
+  function removeEntry(sIdx: number, eIdx: number) {
+    const updated = [...sections]
+    updated[sIdx] = { ...updated[sIdx], entries: updated[sIdx].entries.filter((_, i) => i !== eIdx) }
+    onChange(updated)
+  }
+
+  function addEntry(sIdx: number) {
+    const updated = [...sections]
+    updated[sIdx] = { ...updated[sIdx], entries: [...updated[sIdx].entries, { label: "", name: "" }] }
+    onChange(updated)
+  }
+
+  return (
+    <div className="space-y-3">
+      <Label>Custom Sections</Label>
+      {sections.map((sec, sIdx) => (
+        <div key={sIdx} className="rounded-md border border-border p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <EmojiPickerInput
+              value={sec.emoji}
+              onChange={(e) => updateSection(sIdx, "emoji", e)}
+            />
+            <Input
+              placeholder="Section title (e.g., Snack Helpers)"
+              value={sec.title}
+              onChange={(e) => updateSection(sIdx, "title", e.target.value)}
+              className="flex-1 font-medium"
+            />
+            <div className="flex items-center gap-1">
+              {SECTION_COLOR_PRESETS.slice(1, 6).map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  title={c.label}
+                  className={`size-4 rounded-full border transition-transform hover:scale-125 ${(sec.color || "") === c.value ? "ring-1 ring-primary ring-offset-1" : "border-transparent"}`}
+                  style={{ backgroundColor: c.value }}
+                  onClick={() => {
+                    const updated = [...sections]
+                    updated[sIdx] = { ...updated[sIdx], color: sec.color === c.value ? "" : c.value }
+                    onChange(updated)
+                  }}
+                />
+              ))}
+              <Input
+                type="color"
+                value={sec.color || "#4F46E5"}
+                onChange={(e) => {
+                  const updated = [...sections]
+                  updated[sIdx] = { ...updated[sIdx], color: e.target.value }
+                  onChange(updated)
+                }}
+                className="h-5 w-6 cursor-pointer rounded border-0 p-0"
+                title="Custom color"
+              />
+            </div>
+            <div className="flex items-center">
+              <Button variant="ghost" size="icon-sm" onClick={() => moveSection(sIdx, -1)} disabled={sIdx === 0} title="Move up">
+                <ArrowUp className="size-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon-sm" onClick={() => moveSection(sIdx, 1)} disabled={sIdx === sections.length - 1} title="Move down">
+                <ArrowDown className="size-3.5" />
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setCollapsed((prev) => ({ ...prev, [sIdx]: !prev[sIdx] }))}
+            >
+              {collapsed[sIdx] ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+            </Button>
+            <Button variant="ghost" size="icon-sm" onClick={() => removeSection(sIdx)}>
+              <Trash2 className="size-3.5 text-muted-foreground" />
+            </Button>
+          </div>
+          {!collapsed[sIdx] && (
+            <div className="space-y-1.5 pl-1">
+              {sec.entries.map((entry, eIdx) => (
+                <div key={eIdx} className="flex items-center gap-2">
+                  <Input
+                    placeholder="Role / label"
+                    value={entry.label}
+                    onChange={(e) => updateEntry(sIdx, eIdx, "label", e.target.value)}
+                    className="w-36"
+                  />
+                  <MemberSearchInput
+                    value={entry.name}
+                    onChange={(v) => updateEntry(sIdx, eIdx, "name", v)}
+                    placeholder="Member name"
+                  />
+                  <Button variant="ghost" size="icon-sm" onClick={() => removeEntry(sIdx, eIdx)}>
+                    <Trash2 className="size-3.5 text-muted-foreground" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => addEntry(sIdx)}>
+                <Plus className="size-3.5" />
+                Add Entry
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={addSection}>
+        <Plus className="size-3.5" />
+        Add Section
+      </Button>
     </div>
   )
 }
@@ -289,13 +582,10 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
             placeholder="Leave blank for default"
           />
         </Field>
-        <Field label="Emoji" htmlFor={`${idPrefix}-emoji`}>
-          <Input
-            id={`${idPrefix}-emoji`}
+        <Field label="Emoji">
+          <EmojiPickerInput
             value={data.headerEmoji}
-            onChange={(e) => onChange({ ...data, headerEmoji: e.target.value })}
-            placeholder="🎂"
-            className="w-16 text-center text-lg"
+            onChange={(e) => onChange({ ...data, headerEmoji: e })}
           />
         </Field>
       </div>
@@ -336,12 +626,10 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
 }
 
 // ---------------------------------------------------------------------------
-// Birthday Edit Form (inline)
+// Base form data — all template form types extend this
 // ---------------------------------------------------------------------------
 
-export interface BirthdayFormData {
-  weekLabel: string
-  birthdays: BirthdayEntry[]
+export interface BaseFormData {
   message: string
   headerTitle: string
   headerSubtitle: string
@@ -349,6 +637,44 @@ export interface BirthdayFormData {
   primaryColor: string
   footerVerse: string
   resourceLinks: { label: string; url: string }[]
+  customSections?: CustomSection[]
+}
+
+// ---------------------------------------------------------------------------
+// Common fields editor — single component for all shared fields
+// ---------------------------------------------------------------------------
+
+export function CommonFieldsEditor<T extends BaseFormData>({
+  data,
+  onChange,
+  idPrefix,
+}: {
+  data: T
+  onChange: (data: T) => void
+  idPrefix: string
+}) {
+  return (
+    <>
+      <CustomSectionsEditor
+        sections={data.customSections ?? []}
+        onChange={(sections) => onChange({ ...data, customSections: sections })}
+      />
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
+      <CardStyleFields data={data} onChange={onChange} idPrefix={idPrefix} />
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Birthday Edit Form (inline)
+// ---------------------------------------------------------------------------
+
+export interface BirthdayFormData extends BaseFormData {
+  weekLabel: string
+  birthdays: BirthdayEntry[]
 }
 
 export function BirthdayEditForm({
@@ -415,11 +741,7 @@ export function BirthdayEditForm({
         </Button>
       </div>
 
-      <ResourceLinksEditor
-        links={data.resourceLinks ?? []}
-        onChange={(links) => onChange({ ...data, resourceLinks: links })}
-      />
-      <CardStyleFields data={data} onChange={onChange} idPrefix="bday-i" />
+      <CommonFieldsEditor data={data} onChange={onChange} idPrefix="bday-i" />
     </div>
   )
 }
@@ -428,16 +750,9 @@ export function BirthdayEditForm({
 // Anniversary Edit Form (inline)
 // ---------------------------------------------------------------------------
 
-export interface AnniversaryFormData {
+export interface AnniversaryFormData extends BaseFormData {
   weekLabel: string
   anniversaries: AnniversaryEntry[]
-  message: string
-  headerTitle: string
-  headerSubtitle: string
-  headerEmoji: string
-  primaryColor: string
-  footerVerse: string
-  resourceLinks: { label: string; url: string }[]
 }
 
 export function AnniversaryEditForm({
@@ -530,11 +845,7 @@ export function AnniversaryEditForm({
         </Button>
       </div>
 
-      <ResourceLinksEditor
-        links={data.resourceLinks ?? []}
-        onChange={(links) => onChange({ ...data, resourceLinks: links })}
-      />
-      <CardStyleFields data={data} onChange={onChange} idPrefix="ann-i" />
+      <CommonFieldsEditor data={data} onChange={onChange} idPrefix="ann-i" />
     </div>
   )
 }
@@ -553,18 +864,11 @@ export interface BibleStudyLocationData {
   vacationMessage: string
 }
 
-export interface BibleStudyFormData {
+export interface BibleStudyFormData extends BaseFormData {
   title: string
   date: string
   time: string
   topic: string
-  message: string
-  headerTitle: string
-  headerSubtitle: string
-  headerEmoji: string
-  primaryColor: string
-  footerVerse: string
-  resourceLinks: { label: string; url: string }[]
   locations: BibleStudyLocationData[]
 }
 
@@ -719,11 +1023,7 @@ export function BibleStudyEditForm({
         </Button>
       </div>
 
-      <ResourceLinksEditor
-        links={data.resourceLinks ?? []}
-        onChange={(links) => onChange({ ...data, resourceLinks: links })}
-      />
-      <CardStyleFields data={data} onChange={onChange} idPrefix="bs-i" />
+      <CommonFieldsEditor data={data} onChange={onChange} idPrefix="bs-i" />
     </div>
   )
 }
@@ -732,7 +1032,7 @@ export function BibleStudyEditForm({
 // Women's Study Edit Form (inline)
 // ---------------------------------------------------------------------------
 
-export interface WomensStudyFormData {
+export interface WomensStudyFormData extends BaseFormData {
   title: string
   topic: string
   date: string
@@ -741,13 +1041,6 @@ export interface WomensStudyFormData {
   zoomMeetingId: string
   zoomPasscode: string
   location: string
-  message: string
-  headerTitle: string
-  headerSubtitle: string
-  headerEmoji: string
-  primaryColor: string
-  footerVerse: string
-  resourceLinks: { label: string; url: string }[]
 }
 
 export function WomensStudyEditForm({
@@ -833,11 +1126,7 @@ export function WomensStudyEditForm({
           placeholder="e.g., Fellowship Hall"
         />
       </Field>
-      <ResourceLinksEditor
-        links={data.resourceLinks ?? []}
-        onChange={(links) => onChange({ ...data, resourceLinks: links })}
-      />
-      <CardStyleFields data={data} onChange={onChange} idPrefix="ws-i" />
+      <CommonFieldsEditor data={data} onChange={onChange} idPrefix="ws-i" />
     </div>
   )
 }
@@ -846,7 +1135,7 @@ export function WomensStudyEditForm({
 // Prayer Meeting Edit Form (inline)
 // ---------------------------------------------------------------------------
 
-export interface PrayerMeetingFormData {
+export interface PrayerMeetingFormData extends BaseFormData {
   date: string
   time: string
   hostNames: string
@@ -855,13 +1144,6 @@ export interface PrayerMeetingFormData {
   phone: string
   dinnerNote: string
   signupLink: string
-  message: string
-  headerTitle: string
-  headerSubtitle: string
-  headerEmoji: string
-  primaryColor: string
-  footerVerse: string
-  resourceLinks: { label: string; url: string }[]
 }
 
 export function PrayerMeetingEditForm({
@@ -949,11 +1231,7 @@ export function PrayerMeetingEditForm({
           placeholder="https://..."
         />
       </Field>
-      <ResourceLinksEditor
-        links={data.resourceLinks ?? []}
-        onChange={(links) => onChange({ ...data, resourceLinks: links })}
-      />
-      <CardStyleFields data={data} onChange={onChange} idPrefix="pm-i" />
+      <CommonFieldsEditor data={data} onChange={onChange} idPrefix="pm-i" />
     </div>
   )
 }
@@ -962,19 +1240,12 @@ export function PrayerMeetingEditForm({
 // Bulletin Edit Form (inline)
 // ---------------------------------------------------------------------------
 
-export interface BulletinFormData {
+export interface BulletinFormData extends BaseFormData {
   weekLabel: string
   birthdays: { name: string; date: string }[]
   anniversaries: { names: string; date: string }[]
   helpers: { role: string; name: string }[]
   events: { title: string; details: string }[]
-  resourceLinks: { label: string; url: string }[]
-  message: string
-  headerTitle: string
-  headerSubtitle: string
-  headerEmoji: string
-  primaryColor: string
-  footerVerse: string
   weeksAhead?: number
 }
 
@@ -1125,18 +1396,34 @@ export function BulletinEditForm({
       />
 
       {/* Helpers */}
-      <InlineListSection
-        label="Helpers This Month"
-        items={data.helpers}
-        fields={[
-          { key: "role", placeholder: "Role (e.g., Usher)", className: "w-36" },
-          { key: "name", placeholder: "Name", className: "flex-1" },
-        ]}
-        onUpdate={updateHelper}
-        onRemove={removeHelper}
-        onAdd={addHelper}
-        addLabel="Add Helper"
-      />
+      <div className="space-y-2">
+        <Label>Helpers This Month</Label>
+        {data.helpers.map((h, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Input
+              placeholder="Role (e.g., Usher)"
+              value={h.role}
+              onChange={(e) => updateHelper(i, "role", e.target.value)}
+              className="w-36"
+            />
+            <MemberSearchInput
+              value={h.name}
+              onChange={(v) => updateHelper(i, "name", v)}
+              placeholder="Member name"
+            />
+            <Button variant="ghost" size="icon-sm" onClick={() => removeHelper(i)}>
+              <Trash2 className="size-3.5 text-muted-foreground" />
+            </Button>
+          </div>
+        ))}
+        {data.helpers.length === 0 && (
+          <p className="text-xs text-muted-foreground">None added yet.</p>
+        )}
+        <Button variant="outline" size="sm" onClick={addHelper}>
+          <Plus className="size-3.5" />
+          Add Helper
+        </Button>
+      </div>
 
       {/* Events */}
       <div className="space-y-2">
@@ -1175,11 +1462,7 @@ export function BulletinEditForm({
         </Button>
       </div>
 
-      <ResourceLinksEditor
-        links={data.resourceLinks ?? []}
-        onChange={(links) => onChange({ ...data, resourceLinks: links })}
-      />
-      <CardStyleFields data={data} onChange={onChange} idPrefix="bul-i" />
+      <CommonFieldsEditor data={data} onChange={onChange} idPrefix="bul-i" />
     </div>
   )
 }

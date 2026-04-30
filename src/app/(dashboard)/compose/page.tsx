@@ -30,6 +30,7 @@ import {
   buildBulletinCard,
   buildCustomCard,
   EVENT_COLORS,
+  extractCommonCardData,
 } from "@/lib/email/card-builder"
 import { toast } from "sonner"
 import {
@@ -95,49 +96,42 @@ const TEMPLATE_TO_EVENT_TYPE: Record<string, string> = {
 import {
   HostFamilyInput,
   ResourceLinksEditor,
-  CardStyleFields,
+  CustomSectionsEditor,
   BirthdayEditForm,
   AnniversaryEditForm,
   BibleStudyEditForm,
   WomensStudyEditForm,
+  PrayerMeetingEditForm,
   BulletinEditForm,
   type BirthdayFormData as BirthdayFormState,
   type AnniversaryFormData as AnniversaryFormState,
   type BibleStudyFormData as BibleStudyFormState,
   type WomensStudyFormData as WomensStudyFormState,
+  type PrayerMeetingFormData as PrayerMeetingFormState,
   type BulletinFormData as BulletinFormState,
+  type BaseFormData,
 } from "@/components/dashboard/communication-edit-forms"
 import { formatPhone } from "@/lib/utils"
 
-interface PrayerMeetingFormState {
-  hostNames: string
-  address: string
-  city: string
-  phone: string
-  date: string
-  time: string
-  dinnerNote: string
-  signupLink: string
-  message: string
-  headerTitle: string
-  headerSubtitle: string
-  headerEmoji: string
-  primaryColor: string
-  footerVerse: string
-  resourceLinks: { label: string; url: string }[]
-}
-
-interface CustomFormState {
+interface CustomFormState extends BaseFormData {
   title: string
   subtitle: string
   emoji: string
   bannerImageUrl: string
   body: string
-  primaryColor: string
   footerText: string
-  resourceLinks: { label: string; url: string }[]
   weekLabel?: string
   date?: string
+}
+
+const CUSTOM_BASE_DEFAULTS: Pick<BaseFormData, "message" | "headerTitle" | "headerSubtitle" | "headerEmoji" | "primaryColor" | "footerVerse" | "resourceLinks"> = {
+  message: "",
+  headerTitle: "",
+  headerSubtitle: "",
+  headerEmoji: "",
+  primaryColor: "",
+  footerVerse: "",
+  resourceLinks: [],
 }
 
 type FormState =
@@ -170,37 +164,22 @@ function formatTime(time: string): string {
 
 /** Build preview HTML from the current form state */
 function buildPreview(form: FormState): string {
+  const common = extractCommonCardData(form.data)
   switch (form.type) {
     case "birthday": {
       const d = form.data
-      const birthdays =
-        d.birthdays.length > 0
-          ? d.birthdays
-          : [{ name: "(No birthdays this week)", date: "" }]
       return buildBirthdayCard({
         weekLabel: d.weekLabel,
-        birthdays,
-        message: d.message || undefined,
-        headerSubtitle: d.headerSubtitle || undefined,
-        primaryColor: d.primaryColor || undefined,
-        footerVerse: d.footerVerse || undefined,
-        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
+        birthdays: d.birthdays.length > 0 ? d.birthdays : [{ name: "(No birthdays this week)", date: "" }],
+        ...common,
       })
     }
     case "anniversary": {
       const d = form.data
-      const anniversaries =
-        d.anniversaries.length > 0
-          ? d.anniversaries
-          : [{ husbandName: "(No anniversaries", wifeName: "this week)", date: "" }]
       return buildAnniversaryCard({
         weekLabel: d.weekLabel,
-        anniversaries,
-        message: d.message || undefined,
-        headerSubtitle: d.headerSubtitle || undefined,
-        primaryColor: d.primaryColor || undefined,
-        footerVerse: d.footerVerse || undefined,
-        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
+        anniversaries: d.anniversaries.length > 0 ? d.anniversaries : [{ husbandName: "(No anniversaries", wifeName: "this week)", date: "" }],
+        ...common,
       })
     }
     case "bible_study": {
@@ -210,11 +189,6 @@ function buildPreview(form: FormState): string {
         date: d.date,
         time: d.time,
         topic: d.topic || undefined,
-        message: d.message || undefined,
-        headerSubtitle: d.headerSubtitle || undefined,
-        primaryColor: d.primaryColor || undefined,
-        footerVerse: d.footerVerse || undefined,
-        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
         locations: d.locations.map((loc) => ({
           label: loc.label,
           hostNames: loc.hostNames || undefined,
@@ -222,6 +196,7 @@ function buildPreview(form: FormState): string {
           city: loc.city || undefined,
           phone: loc.phone || undefined,
         })),
+        ...common,
       })
     }
     case "womens_study": {
@@ -235,11 +210,7 @@ function buildPreview(form: FormState): string {
         zoomMeetingId: d.zoomMeetingId || undefined,
         zoomPasscode: d.zoomPasscode || undefined,
         location: d.location || undefined,
-        message: d.message || undefined,
-        headerSubtitle: d.headerSubtitle || undefined,
-        primaryColor: d.primaryColor || undefined,
-        footerVerse: d.footerVerse || undefined,
-        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
+        ...common,
       })
     }
     case "prayer_meeting": {
@@ -253,26 +224,18 @@ function buildPreview(form: FormState): string {
         time: d.time,
         dinnerNote: d.dinnerNote || undefined,
         signupLink: d.signupLink || undefined,
-        message: d.message || undefined,
-        headerSubtitle: d.headerSubtitle || undefined,
-        primaryColor: d.primaryColor || undefined,
-        footerVerse: d.footerVerse || undefined,
-        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
+        ...common,
       })
     }
     case "bulletin": {
       const d = form.data
       return buildBulletinCard({
         weekLabel: d.weekLabel,
-        headerSubtitle: d.headerSubtitle || undefined,
         birthdays: d.birthdays,
         anniversaries: d.anniversaries,
         helpers: d.helpers,
         events: d.events,
-        resourceLinks: (d.resourceLinks ?? []).filter((l) => l.url),
-        message: d.message || undefined,
-        primaryColor: d.primaryColor || undefined,
-        footerVerse: d.footerVerse || undefined,
+        ...common,
       })
     }
     case "custom": {
@@ -284,9 +247,8 @@ function buildPreview(form: FormState): string {
         emoji: d.emoji || undefined,
         bannerImageUrl: d.bannerImageUrl || undefined,
         bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${interp(d.body, vars) ?? d.body}</p>`,
-        primaryColor: d.primaryColor || undefined,
         footerText: interp(d.footerText, vars),
-        resourceLinks: (d.resourceLinks ?? []).filter((l: { url: string }) => l.url),
+        ...common,
       })
     }
   }
@@ -980,6 +942,7 @@ export default function ComposePage() {
                   setFormState({
                     type: "custom",
                     data: {
+                      ...CUSTOM_BASE_DEFAULTS,
                       title: body.title || ct.name,
                       subtitle: body.subtitle || "",
                       emoji: body.emoji || "📋",
@@ -988,6 +951,7 @@ export default function ComposePage() {
                       primaryColor: body.primaryColor || "",
                       footerText: body.footerText || "",
                       resourceLinks: body.resourceLinks || [],
+                      customSections: body.customSections || [],
                       weekLabel: wLabel,
                       date: dateStr,
                     },
@@ -996,7 +960,7 @@ export default function ComposePage() {
                 } catch {
                   setFormState({
                     type: "custom",
-                    data: { title: ct.name, subtitle: "", emoji: "📋", bannerImageUrl: "", body: ct.body_template, primaryColor: "", footerText: "", resourceLinks: [], weekLabel: wLabel, date: dateStr },
+                    data: { ...CUSTOM_BASE_DEFAULTS, title: ct.name, subtitle: "", emoji: "📋", bannerImageUrl: "", body: ct.body_template, footerText: "", weekLabel: wLabel, date: dateStr },
                   })
                   setSubject(ct.name)
                 }
@@ -1029,7 +993,7 @@ export default function ComposePage() {
             const dateStr = format(today, "MMMM d, yyyy")
             setFormState({
               type: "custom",
-              data: { title: "", subtitle: "Christ Church of India, San Ramon", emoji: "📋", bannerImageUrl: "", body: "", primaryColor: "#6B7280", footerText: "", resourceLinks: [], weekLabel: wLabel, date: dateStr },
+              data: { ...CUSTOM_BASE_DEFAULTS, title: "", subtitle: "Christ Church of India, San Ramon", emoji: "📋", bannerImageUrl: "", body: "", primaryColor: "#6B7280", footerText: "", weekLabel: wLabel, date: dateStr },
             })
             setSubject("")
             setLoading(false)
@@ -1113,7 +1077,7 @@ export default function ComposePage() {
                     />
                   )}
                   {formState.type === "prayer_meeting" && (
-                    <PrayerMeetingForm
+                    <PrayerMeetingEditForm
                       data={formState.data}
                       onChange={(data) => updateForm("prayer_meeting", () => data)}
                     />
@@ -1299,68 +1263,6 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor?: st
 // Prayer Meeting Form
 // ---------------------------------------------------------------------------
 
-function PrayerMeetingForm({
-  data,
-  onChange,
-}: {
-  data: PrayerMeetingFormState
-  onChange: (data: PrayerMeetingFormState) => void
-}) {
-  function set<K extends keyof PrayerMeetingFormState>(field: K, value: PrayerMeetingFormState[K]) {
-    onChange({ ...data, [field]: value })
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Host Names" htmlFor="pm-host">
-          <HostFamilyInput
-            value={data.hostNames}
-            onChange={(v) => set("hostNames", v)}
-            onSelect={(f) => {
-              onChange({
-                ...data,
-                hostNames: `${f.family_name}'s Residence`,
-                address: f.street ?? f.full_address ?? data.address,
-                city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || data.city,
-                phone: formatPhone(f.home_phone) || data.phone,
-              })
-            }}
-          />
-        </Field>
-        <Field label="Phone" htmlFor="pm-phone">
-          <Input id="pm-phone" value={data.phone} onChange={(e) => set("phone", e.target.value)} />
-        </Field>
-      </div>
-      <Field label="Address" htmlFor="pm-addr">
-        <Input id="pm-addr" value={data.address} onChange={(e) => set("address", e.target.value)} />
-      </Field>
-      <Field label="City" htmlFor="pm-city">
-        <Input id="pm-city" value={data.city} onChange={(e) => set("city", e.target.value)} placeholder="e.g., San Ramon, CA" />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Date" htmlFor="pm-date">
-          <Input id="pm-date" value={data.date} onChange={(e) => set("date", e.target.value)} placeholder="Saturday, May 10th" />
-        </Field>
-        <Field label="Time" htmlFor="pm-time">
-          <Input id="pm-time" value={data.time} onChange={(e) => set("time", e.target.value)} placeholder="6:30 PM" />
-        </Field>
-      </div>
-      <Field label="Dinner Note" htmlFor="pm-dinner">
-        <Input id="pm-dinner" value={data.dinnerNote} onChange={(e) => set("dinnerNote", e.target.value)} placeholder="Dinner provided by the host family" />
-      </Field>
-      <Field label="Signup Link" htmlFor="pm-signup">
-        <Input id="pm-signup" value={data.signupLink} onChange={(e) => set("signupLink", e.target.value)} placeholder="https://..." />
-      </Field>
-      <ResourceLinksEditor
-        links={data.resourceLinks ?? []}
-        onChange={(links) => onChange({ ...data, resourceLinks: links })}
-      />
-      <CardStyleFields data={data} onChange={onChange} idPrefix="pm" />
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Custom Announcement Form
 // ---------------------------------------------------------------------------
@@ -1524,52 +1426,14 @@ function CustomForm({
         <Input id="ct-footer" value={data.footerText} onChange={(e) => set("footerText", e.target.value)} placeholder="Leave blank for default" />
       </Field>
 
-      {/* Resource Links */}
-      <div className="space-y-2">
-        <Label>Resource Links (optional)</Label>
-        {data.resourceLinks.map((link, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Input
-              placeholder="Label"
-              value={link.label}
-              onChange={(e) => {
-                const links = [...data.resourceLinks]
-                links[i] = { ...links[i], label: e.target.value }
-                onChange({ ...data, resourceLinks: links })
-              }}
-              className="flex-1"
-            />
-            <Input
-              placeholder="https://..."
-              value={link.url}
-              onChange={(e) => {
-                const links = [...data.resourceLinks]
-                links[i] = { ...links[i], url: e.target.value }
-                onChange({ ...data, resourceLinks: links })
-              }}
-              className="flex-1"
-            />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => {
-                const links = data.resourceLinks.filter((_, j) => j !== i)
-                onChange({ ...data, resourceLinks: links })
-              }}
-            >
-              <Trash2 className="size-3.5 text-muted-foreground" />
-            </Button>
-          </div>
-        ))}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onChange({ ...data, resourceLinks: [...data.resourceLinks, { label: "", url: "" }] })}
-        >
-          <Plus className="size-3.5" />
-          Add Link
-        </Button>
-      </div>
+      <CustomSectionsEditor
+        sections={data.customSections ?? []}
+        onChange={(sections) => onChange({ ...data, customSections: sections })}
+      />
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange({ ...data, resourceLinks: links })}
+      />
 
       {/* Save as template */}
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">

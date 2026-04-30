@@ -13,6 +13,13 @@ export interface ResourceLinkDefault {
   url: string
 }
 
+export interface CustomSectionDefault {
+  title: string
+  emoji: string
+  color?: string
+  entries: { label: string; name: string }[]
+}
+
 export interface CommonCardFields {
   message?: string
   headerTitle?: string
@@ -21,6 +28,7 @@ export interface CommonCardFields {
   footerVerse?: string
   primaryColor?: string
   resourceLinks?: ResourceLinkDefault[]
+  customSections?: CustomSectionDefault[]
 }
 
 export interface BibleStudyDefaults extends CommonCardFields {
@@ -71,6 +79,7 @@ export function extractCommonFields(def: CommonCardFields): {
   primaryColor: string
   footerVerse: string
   resourceLinks: ResourceLinkDefault[]
+  customSections: CustomSectionDefault[]
 } {
   return {
     message: def.message ?? "",
@@ -80,6 +89,7 @@ export function extractCommonFields(def: CommonCardFields): {
     primaryColor: def.primaryColor ?? "",
     footerVerse: def.footerVerse ?? "",
     resourceLinks: (def.resourceLinks ?? []) as ResourceLinkDefault[],
+    customSections: (def.customSections ?? []) as CustomSectionDefault[],
   }
 }
 

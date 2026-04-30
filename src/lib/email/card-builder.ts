@@ -99,6 +99,72 @@ export const EVENT_COLORS: Record<string, CardColors> = {
   },
 };
 
+export interface CardCustomSection {
+  title: string;
+  emoji: string;
+  color?: string;
+  entries: { label: string; name: string }[];
+}
+
+export interface BaseCardData {
+  message?: string;
+  headerTitle?: string;
+  headerSubtitle?: string;
+  headerEmoji?: string;
+  footerVerse?: string;
+  primaryColor?: string;
+  resourceLinks?: ResourceLink[];
+  customSections?: CardCustomSection[];
+}
+
+function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: CardColors): string {
+  if (!sections || sections.length === 0) return "";
+  return sections
+    .filter((s) => s.title && s.entries.some((e) => e.label || e.name))
+    .map((s) => {
+      const sColor = s.color || colors.primary;
+      const sBg = s.color ? deriveColorsFromPrimary(s.color).bgLight : "";
+      const rows = s.entries
+        .filter((e) => e.label || e.name)
+        .map(
+          (e) =>
+            `<tr><td style="padding:4px 0 4px 12px;font-size:14px;color:${colors.textDark}">${e.label || ""}</td><td style="padding:4px 12px 4px 0;font-size:13px;color:${colors.textLight};text-align:right;font-weight:500">${e.name || ""}</td></tr>`
+        )
+        .join("");
+      const bgStyle = sBg ? `background:${sBg};border-radius:8px;padding:4px 16px;` : "";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr><td style="padding:16px 0 8px;font-size:13px;font-weight:700;color:${sColor};text-transform:uppercase;letter-spacing:0.5px">${s.emoji || "📋"} ${s.title}</td></tr>${rows}</table>`;
+    })
+    .join("");
+}
+
+function commonTrailingHtml(data: BaseCardData, colors: CardColors, extraResourceLinks?: ResourceLink[]): string {
+  const allLinks = [...(data.resourceLinks ?? []), ...(extraResourceLinks ?? [])];
+  return `${customSectionsHtml(data.customSections, colors)}
+${resourceLinksHtml(allLinks, colors)}`;
+}
+
+export function extractCommonCardData(form: {
+  message?: string;
+  headerTitle?: string;
+  headerSubtitle?: string;
+  headerEmoji?: string;
+  primaryColor?: string;
+  footerVerse?: string;
+  resourceLinks?: { label: string; url: string }[];
+  customSections?: CardCustomSection[];
+}): BaseCardData {
+  return {
+    message: form.message || undefined,
+    headerTitle: form.headerTitle || undefined,
+    headerSubtitle: form.headerSubtitle || undefined,
+    headerEmoji: form.headerEmoji || undefined,
+    primaryColor: form.primaryColor || undefined,
+    footerVerse: form.footerVerse || undefined,
+    resourceLinks: (form.resourceLinks ?? []).filter((l) => l.url),
+    customSections: form.customSections,
+  };
+}
+
 function wrapCard(content: string, colors: CardColors): string {
   return `<div style="max-width:480px;margin:0 auto;font-family:'Segoe UI',system-ui,-apple-system,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${colors.border};border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
@@ -147,16 +213,9 @@ export interface BirthdayEntry {
   date: string; // e.g., "4/29" or "April 29"
 }
 
-export interface BirthdayCardData {
+export interface BirthdayCardData extends BaseCardData {
   weekLabel: string;
   birthdays: BirthdayEntry[];
-  message?: string;
-  headerTitle?: string;
-  headerSubtitle?: string;
-  headerEmoji?: string;
-  footerVerse?: string;
-  primaryColor?: string;
-  resourceLinks?: ResourceLink[];
 }
 
 export function buildBirthdayCard(data: BirthdayCardData): string {
@@ -190,7 +249,7 @@ export function buildBirthdayCard(data: BirthdayCardData): string {
 ${personRows}
 </table>
 ${messageHtml}
-${resourceLinksHtml(data.resourceLinks, colors)}`,
+${commonTrailingHtml(data, colors)}`,
       colors
     ) +
     footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
@@ -207,16 +266,9 @@ export interface AnniversaryEntry {
   years?: number;
 }
 
-export interface AnniversaryCardData {
+export interface AnniversaryCardData extends BaseCardData {
   weekLabel: string;
   anniversaries: AnniversaryEntry[];
-  message?: string;
-  headerTitle?: string;
-  headerSubtitle?: string;
-  headerEmoji?: string;
-  footerVerse?: string;
-  primaryColor?: string;
-  resourceLinks?: ResourceLink[];
 }
 
 export function buildAnniversaryCard(data: AnniversaryCardData): string {
@@ -250,7 +302,7 @@ export function buildAnniversaryCard(data: AnniversaryCardData): string {
 ${coupleRows}
 </table>
 ${messageHtml}
-${resourceLinksHtml(data.resourceLinks, colors)}`,
+${commonTrailingHtml(data, colors)}`,
       colors
     ) +
     footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
@@ -275,18 +327,12 @@ export interface ResourceLink {
   url: string;
 }
 
-export interface BibleStudyCardData {
+export interface BibleStudyCardData extends BaseCardData {
   title?: string;
   date: string;
   time: string;
   topic?: string;
-  message?: string;
-  headerSubtitle?: string;
-  headerEmoji?: string;
-  footerVerse?: string;
-  primaryColor?: string;
   resourceLink?: ResourceLink;
-  resourceLinks?: ResourceLink[];
   locations: BibleStudyLocation[];
 }
 
@@ -343,7 +389,7 @@ ${details}
 ${sharedDetails}
 </table>
 ${locationBlocks}
-${resourceLinksHtml([...(data.resourceLinks ?? []), ...(data.resourceLink ? [data.resourceLink] : [])], colors)}`,
+${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined)}`,
       colors
     ) +
     footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
@@ -353,7 +399,7 @@ ${resourceLinksHtml([...(data.resourceLinks ?? []), ...(data.resourceLink ? [dat
 
 // ---------- Women's Bible Study ----------
 
-export interface WomensStudyCardData {
+export interface WomensStudyCardData extends BaseCardData {
   title?: string;
   topic?: string;
   date: string;
@@ -362,12 +408,6 @@ export interface WomensStudyCardData {
   zoomMeetingId?: string;
   zoomPasscode?: string;
   location?: string;
-  headerEmoji?: string;
-  message?: string;
-  headerSubtitle?: string;
-  footerVerse?: string;
-  primaryColor?: string;
-  resourceLinks?: ResourceLink[];
 }
 
 export function buildWomensStudyCard(data: WomensStudyCardData): string {
@@ -405,7 +445,7 @@ export function buildWomensStudyCard(data: WomensStudyCardData): string {
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
 ${details}
 </table>
-${resourceLinksHtml(data.resourceLinks, colors)}`,
+${commonTrailingHtml(data, colors)}`,
       colors
     ) +
     footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
@@ -415,7 +455,7 @@ ${resourceLinksHtml(data.resourceLinks, colors)}`,
 
 // ---------- Monthly Prayer Meeting ----------
 
-export interface PrayerMeetingCardData {
+export interface PrayerMeetingCardData extends BaseCardData {
   hostNames: string;
   address: string;
   city?: string;
@@ -424,14 +464,7 @@ export interface PrayerMeetingCardData {
   time: string;
   dinnerNote?: string;
   signupLink?: string;
-  message?: string;
-  headerTitle?: string;
-  headerSubtitle?: string;
-  headerEmoji?: string;
-  primaryColor?: string;
-  footerVerse?: string;
   resourceLink?: ResourceLink;
-  resourceLinks?: ResourceLink[];
 }
 
 export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
@@ -472,7 +505,7 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
 ${details}
 </table>
 ${signupHtml}
-${resourceLinksHtml([...(data.resourceLinks ?? []), ...(data.resourceLink ? [data.resourceLink] : [])], colors)}`,
+${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined)}`,
       colors
     ) +
     footerRow(
@@ -491,19 +524,12 @@ export interface BulletinItem {
   value: string;
 }
 
-export interface BulletinCardData {
+export interface BulletinCardData extends BaseCardData {
   weekLabel: string;
-  headerTitle?: string;
-  headerSubtitle?: string;
-  headerEmoji?: string;
   birthdays: { name: string; date: string }[];
   anniversaries: { names: string; date: string }[];
   helpers: { role: string; name: string }[];
   events: { title: string; details: string }[];
-  message?: string;
-  primaryColor?: string;
-  footerVerse?: string;
-  resourceLinks?: ResourceLink[];
 }
 
 export function buildBulletinCard(data: BulletinCardData): string {
@@ -566,7 +592,7 @@ ${churchLine}<p style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffff
   const content =
     bulletinHeader +
     contentRow(`${sections}${messageHtml}
-${resourceLinksHtml(data.resourceLinks, colors)}`, colors) +
+${commonTrailingHtml(data, colors)}`, colors) +
     footerRow(
       data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect",
       colors
@@ -577,16 +603,14 @@ ${resourceLinksHtml(data.resourceLinks, colors)}`, colors) +
 
 // ---------- Generic / Custom Card ----------
 
-export interface CustomCardData {
+export interface CustomCardData extends BaseCardData {
   title: string;
   subtitle?: string;
   emoji?: string;
   bannerImageUrl?: string;
   bodyHtml: string;
   footerText?: string;
-  primaryColor?: string;
   colorScheme?: string;
-  resourceLinks?: ResourceLink[];
 }
 
 export function buildCustomCard(data: CustomCardData): string {
@@ -605,7 +629,7 @@ ${data.subtitle ? `<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,25
   const content =
     header +
     contentRow(`${data.bodyHtml}
-${resourceLinksHtml(data.resourceLinks, colors)}`, colors) +
+${commonTrailingHtml(data, colors)}`, colors) +
     footerRow(
       data.footerText || "Christ Church of India, San Ramon — CCISR Connect",
       colors

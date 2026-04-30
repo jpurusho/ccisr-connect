@@ -39,6 +39,7 @@ import {
   buildWomensStudyCard,
   buildPrayerMeetingCard,
   buildBulletinCard,
+  extractCommonCardData,
 } from "@/lib/email/card-builder"
 import {
   type BibleStudyDefaults,
@@ -48,6 +49,7 @@ import {
   type AnniversaryDefaults,
   type BulletinDefaults,
   type BibleStudyLocationDefault,
+  type CommonCardFields,
   type PlaceholderDef,
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
@@ -55,7 +57,7 @@ import {
   TEMPLATE_PLACEHOLDERS,
 } from "@/lib/template-defaults"
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
-import { HostFamilyInput } from "@/components/dashboard/communication-edit-forms"
+import { HostFamilyInput, CustomSectionsEditor } from "@/components/dashboard/communication-edit-forms"
 import { formatPhone } from "@/lib/utils"
 import {
   Dialog,
@@ -187,6 +189,27 @@ function ResourceLinksEditor({
   )
 }
 
+function CommonTemplateFields<T extends CommonCardFields>({
+  data,
+  onChange,
+}: {
+  data: T
+  onChange: (updater: (prev: T) => T) => void
+}) {
+  return (
+    <>
+      <CustomSectionsEditor
+        sections={data.customSections ?? []}
+        onChange={(sections) => onChange((prev) => ({ ...prev, customSections: sections }))}
+      />
+      <ResourceLinksEditor
+        links={data.resourceLinks ?? []}
+        onChange={(links) => onChange((prev) => ({ ...prev, resourceLinks: links }))}
+      />
+    </>
+  )
+}
+
 function PlaceholderReference({ typeName }: { typeName: string }) {
   const placeholders: PlaceholderDef[] = TEMPLATE_PLACEHOLDERS[typeName] ?? []
   if (placeholders.length === 0) return null
@@ -227,7 +250,7 @@ export default function TemplatesPage() {
   const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string }[]>([])
   const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown> } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
-  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", body: "", footerText: "", resourceLinks: [] as { label: string; url: string }[] })
+  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", body: "", footerText: "", resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[] })
 
   // Per-type form state
   const [subjects, setSubjects] = useState<Record<string, string>>({})
@@ -469,11 +492,10 @@ export default function TemplatesPage() {
         return buildBirthdayCard({
           weekLabel: sampleWeek,
           birthdays: [{ name: "John", date: "4/27" }, { name: "Mary", date: "4/29" }],
-          message: interp(birthdayData.message, vars),
-          footerVerse: interp(birthdayData.footerVerse, vars),
-          primaryColor: birthdayData.primaryColor || undefined,
-          headerSubtitle: interp(birthdayData.headerSubtitle, vars),
-          resourceLinks: (birthdayData.resourceLinks ?? []).filter(l => l.url),
+          ...extractCommonCardData(birthdayData),
+          message: interp(birthdayData.message, vars) || undefined,
+          footerVerse: interp(birthdayData.footerVerse, vars) || undefined,
+          headerSubtitle: interp(birthdayData.headerSubtitle, vars) || undefined,
         })
       }
       case "anniversary": {
@@ -481,24 +503,19 @@ export default function TemplatesPage() {
         return buildAnniversaryCard({
           weekLabel: sampleWeek,
           anniversaries: [{ husbandName: "John", wifeName: "Mary", date: "4/28", years: 10 }],
-          message: interp(anniversaryData.message, vars),
-          footerVerse: interp(anniversaryData.footerVerse, vars),
-          primaryColor: anniversaryData.primaryColor || undefined,
-          headerSubtitle: interp(anniversaryData.headerSubtitle, vars),
-          resourceLinks: (anniversaryData.resourceLinks ?? []).filter(l => l.url),
+          ...extractCommonCardData(anniversaryData),
+          message: interp(anniversaryData.message, vars) || undefined,
+          footerVerse: interp(anniversaryData.footerVerse, vars) || undefined,
+          headerSubtitle: interp(anniversaryData.headerSubtitle, vars) || undefined,
         })
       }
       case "friday_bible_study": {
         const vars = makeEventVars(sampleWeek, "Friday, May 1st", bibleStudyData.time || "7:30 PM", bibleStudyData.topic || "Book of Acts")
         return buildBibleStudyCard({
-          title: interp(bibleStudyData.title, vars),
           date: "Friday, May 1st",
           time: bibleStudyData.time || "7:30 PM",
+          title: interp(bibleStudyData.title, vars),
           topic: interp(bibleStudyData.topic, vars),
-          message: interp(bibleStudyData.message, vars),
-          footerVerse: interp(bibleStudyData.footerVerse, vars),
-          primaryColor: bibleStudyData.primaryColor || undefined,
-          resourceLinks: (bibleStudyData.resourceLinks ?? []).filter(l => l.url),
           locations: (bibleStudyData.locations || []).map((loc) => ({
             label: loc.label,
             hostNames: loc.hostNames || undefined,
@@ -506,23 +523,25 @@ export default function TemplatesPage() {
             city: loc.city || undefined,
             phone: loc.phone || undefined,
           })),
+          ...extractCommonCardData(bibleStudyData),
+          message: interp(bibleStudyData.message, vars) || undefined,
+          footerVerse: interp(bibleStudyData.footerVerse, vars) || undefined,
         })
       }
       case "wednesday_womens_study": {
         const vars = makeEventVars(sampleWeek, "Wednesday, Apr 29th", womensStudyData.time || "7:00 PM", womensStudyData.topic || "Building a Relationship with God")
         return buildWomensStudyCard({
-          title: interp(womensStudyData.title, vars),
-          topic: interp(womensStudyData.topic, vars),
           date: "Wednesday, April 29th",
           time: womensStudyData.time || "7:00 PM",
+          title: interp(womensStudyData.title, vars),
+          topic: interp(womensStudyData.topic, vars),
           zoomLink: womensStudyData.zoomLink || undefined,
           zoomMeetingId: womensStudyData.zoomMeetingId || undefined,
           zoomPasscode: womensStudyData.zoomPasscode || undefined,
           location: womensStudyData.location || undefined,
-          message: interp(womensStudyData.message, vars),
-          footerVerse: interp(womensStudyData.footerVerse, vars),
-          primaryColor: womensStudyData.primaryColor || undefined,
-          resourceLinks: (womensStudyData.resourceLinks ?? []).filter(l => l.url),
+          ...extractCommonCardData(womensStudyData),
+          message: interp(womensStudyData.message, vars) || undefined,
+          footerVerse: interp(womensStudyData.footerVerse, vars) || undefined,
         })
       }
       case "monthly_prayer": {
@@ -535,11 +554,7 @@ export default function TemplatesPage() {
           time: prayerMeetingData.time || "6:00 PM",
           dinnerNote: prayerMeetingData.dinnerNote || "Potluck dinner — please bring a dish to share",
           signupLink: prayerMeetingData.signupLink || undefined,
-          message: prayerMeetingData.message || undefined,
-          headerSubtitle: prayerMeetingData.headerSubtitle || undefined,
-          primaryColor: prayerMeetingData.primaryColor || undefined,
-          footerVerse: prayerMeetingData.footerVerse || undefined,
-          resourceLinks: (prayerMeetingData.resourceLinks ?? []).filter(l => l.url),
+          ...extractCommonCardData(prayerMeetingData),
         })
       }
       case "bulletin": {
@@ -550,10 +565,9 @@ export default function TemplatesPage() {
           anniversaries: [{ names: "John & Mary", date: "4/28" }],
           helpers: [],
           events: bulletinData.events || [],
-          message: interp(bulletinData.message, vars),
-          footerVerse: interp(bulletinData.footerVerse, vars),
-          primaryColor: bulletinData.primaryColor || undefined,
-          resourceLinks: (bulletinData.resourceLinks ?? []).filter(l => l.url),
+          ...extractCommonCardData(bulletinData),
+          message: interp(bulletinData.message, vars) || undefined,
+          footerVerse: interp(bulletinData.footerVerse, vars) || undefined,
         })
       }
       default:
@@ -678,10 +692,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setBirthdayData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
                       </Field>
-                      <ResourceLinksEditor
-                        links={birthdayData.resourceLinks ?? []}
-                        onChange={(links) => setBirthdayData((prev) => ({ ...prev, resourceLinks: links }))}
-                      />
+                      <CommonTemplateFields data={birthdayData} onChange={setBirthdayData} />
                     </>
                   )}
 
@@ -703,10 +714,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setAnniversaryData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
                       </Field>
-                      <ResourceLinksEditor
-                        links={anniversaryData.resourceLinks ?? []}
-                        onChange={(links) => setAnniversaryData((prev) => ({ ...prev, resourceLinks: links }))}
-                      />
+                      <CommonTemplateFields data={anniversaryData} onChange={setAnniversaryData} />
                     </>
                   )}
 
@@ -754,10 +762,7 @@ export default function TemplatesPage() {
                         />
                       </Field>
 
-                      <ResourceLinksEditor
-                        links={bibleStudyData.resourceLinks ?? []}
-                        onChange={(links) => setBibleStudyData((prev) => ({ ...prev, resourceLinks: links }))}
-                      />
+                      <CommonTemplateFields data={bibleStudyData} onChange={setBibleStudyData} />
 
                       <div className="space-y-3">
                         <Label>Default Locations</Label>
@@ -931,10 +936,7 @@ export default function TemplatesPage() {
                         />
                       </Field>
 
-                      <ResourceLinksEditor
-                        links={womensStudyData.resourceLinks ?? []}
-                        onChange={(links) => setWomensStudyData((prev) => ({ ...prev, resourceLinks: links }))}
-                      />
+                      <CommonTemplateFields data={womensStudyData} onChange={setWomensStudyData} />
                     </>
                   )}
 
@@ -1021,10 +1023,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
                       </Field>
-                      <ResourceLinksEditor
-                        links={prayerMeetingData.resourceLinks ?? []}
-                        onChange={(links) => setPrayerMeetingData((prev) => ({ ...prev, resourceLinks: links }))}
-                      />
+                      <CommonTemplateFields data={prayerMeetingData} onChange={setPrayerMeetingData} />
                     </>
                   )}
 
@@ -1086,10 +1085,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setBulletinData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
                       </Field>
-                      <ResourceLinksEditor
-                        links={bulletinData.resourceLinks ?? []}
-                        onChange={(links) => setBulletinData((prev) => ({ ...prev, resourceLinks: links }))}
-                      />
+                      <CommonTemplateFields data={bulletinData} onChange={setBulletinData} />
                     </div>
                   )}
 
@@ -1145,7 +1141,7 @@ export default function TemplatesPage() {
                 {!creatingCustom && !editingCustom && (
                   <Button
                     onClick={() => {
-                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", body: "", footerText: "", resourceLinks: [] })
+                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", body: "", footerText: "", resourceLinks: [], customSections: [] })
                       setCreatingCustom(true)
                     }}
                   >
@@ -1207,6 +1203,10 @@ export default function TemplatesPage() {
                       placeholder="e.g., a Bible verse or closing note"
                     />
                   </Field>
+                  <CustomSectionsEditor
+                    sections={newCustom.customSections}
+                    onChange={(sections) => setNewCustom({ ...newCustom, customSections: sections })}
+                  />
                   <ResourceLinksEditor
                     links={newCustom.resourceLinks}
                     onChange={(links) => setNewCustom({ ...newCustom, resourceLinks: links })}
@@ -1226,6 +1226,7 @@ export default function TemplatesPage() {
                           body: newCustom.body,
                           footerText: newCustom.footerText,
                           resourceLinks: newCustom.resourceLinks.filter((l) => l.url),
+                          customSections: newCustom.customSections.filter((s) => s.title && s.entries.some((e) => e.name)),
                         }
                         const { data: inserted, error } = await supabase
                           .from("email_templates")
@@ -1308,6 +1309,10 @@ export default function TemplatesPage() {
                       onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerText: e.target.value } })}
                     />
                   </Field>
+                  <CustomSectionsEditor
+                    sections={(editingCustom.data.customSections as { title: string; emoji: string; entries: { label: string; name: string }[] }[]) ?? []}
+                    onChange={(sections) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, customSections: sections } })}
+                  />
                   <ResourceLinksEditor
                     links={(editingCustom.data.resourceLinks as { label: string; url: string }[]) ?? []}
                     onChange={(links) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, resourceLinks: links } })}

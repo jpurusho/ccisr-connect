@@ -40,6 +40,7 @@ import {
   Users,
   Loader2,
   Tag as TagIcon,
+  History,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -68,6 +69,8 @@ export default function MemberDetailPage() {
   const [availableTags, setAvailableTags] = useState<Tag[]>([])
   const [memberTagIds, setMemberTagIds] = useState<Set<string>>(new Set())
   const [togglingTagId, setTogglingTagId] = useState<string | null>(null)
+  const [tagHistory, setTagHistory] = useState<{ action: string; tag_name: string; created_at: string }[]>([])
+  const [showTagHistory, setShowTagHistory] = useState(false)
 
   const fetchMember = useCallback(async () => {
     setLoading(true)
@@ -89,7 +92,7 @@ export default function MemberDetailPage() {
     setMember(detail)
 
     // Fetch related data in parallel
-    const [familyMembersResult, addressResult, anniversaryResult, tagsResult, memberTagsResult] =
+    const [familyMembersResult, addressResult, anniversaryResult, tagsResult, memberTagsResult, tagHistoryResult] =
       await Promise.all([
         supabase
           .from("members")
@@ -118,6 +121,14 @@ export default function MemberDetailPage() {
           .from("member_tags")
           .select("tag_id")
           .eq("member_id", memberId),
+        supabase
+          .from("audit_log")
+          .select("action, changes, created_at")
+          .eq("entity_type", "member_tags")
+          .eq("entity_id", memberId)
+          .in("action", ["tag_added", "tag_removed"])
+          .order("created_at", { ascending: false })
+          .limit(50),
       ])
 
     if (familyMembersResult.data) {
@@ -134,6 +145,15 @@ export default function MemberDetailPage() {
     }
     if (memberTagsResult.data) {
       setMemberTagIds(new Set(memberTagsResult.data.map((mt: { tag_id: string }) => mt.tag_id)))
+    }
+    if (tagHistoryResult.data) {
+      setTagHistory(
+        tagHistoryResult.data.map((row: { action: string; changes: Record<string, unknown> | null; created_at: string }) => ({
+          action: row.action,
+          tag_name: (row.changes?.tag_name as string) ?? (row.changes?.tag as string) ?? "Unknown",
+          created_at: row.created_at,
+        }))
+      )
     }
 
     setLoading(false)
@@ -171,6 +191,13 @@ export default function MemberDetailPage() {
     setPermanentlyDeleting(true)
 
     const supabase = createClient()
+
+    // Check if this is the last member in the family
+    const { count } = await supabase
+      .from("members")
+      .select("*", { count: "exact", head: true })
+      .eq("family_id", member.family_id)
+
     const { error } = await supabase
       .from("members")
       .delete()
@@ -180,6 +207,15 @@ export default function MemberDetailPage() {
       toast.error("Failed to permanently delete member: " + error.message)
       setPermanentlyDeleting(false)
       return
+    }
+
+    // Clean up empty family
+    if (count !== null && count <= 1) {
+      await supabase.from("families").delete().eq("id", member.family_id)
+      logAudit("family_auto_deleted", "families", member.family_id, {
+        reason: "last_member_deleted",
+        family_name: member.families?.family_name,
+      })
     }
 
     toast.success(`${member.full_name} has been permanently deleted.`)
@@ -435,6 +471,38 @@ export default function MemberDetailPage() {
                   )
                 })}
               </div>
+              {tagHistory.length > 0 && (
+                <>
+                  <Separator className="my-3" />
+                  <button
+                    type="button"
+                    onClick={() => setShowTagHistory((prev) => !prev)}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <History className="size-3" />
+                    {showTagHistory ? "Hide" : "Show"} tag history ({tagHistory.length})
+                  </button>
+                  {showTagHistory && (
+                    <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
+                      {tagHistory.map((entry, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className={entry.action === "tag_added" ? "text-green-600" : "text-red-500"}>
+                            {entry.action === "tag_added" ? "+" : "−"}
+                          </span>
+                          <span className="font-medium">{entry.tag_name}</span>
+                          <span className="text-muted-foreground">
+                            {new Date(entry.created_at).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         )}
@@ -601,7 +669,10 @@ export default function MemberDetailPage() {
               <span className="font-medium text-foreground">
                 {member.full_name}
               </span>{" "}
-              and all their data. This action cannot be undone.
+              and all their data (including tags and mailing list memberships).
+              {anniversary && " The wedding anniversary record will also be removed."}
+              {familyMembers.length === 0 && " Since this is the only member, the family record will also be deleted."}
+              {" "}This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">

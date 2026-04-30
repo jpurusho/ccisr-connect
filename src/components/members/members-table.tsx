@@ -69,6 +69,7 @@ export function MembersTable({
   const [sortAsc, setSortAsc] = useState(true)
   const [availableTags, setAvailableTags] = useState<{ id: string; name: string; color: string }[]>([])
   const [tagPopoverMemberId, setTagPopoverMemberId] = useState<string | null>(null)
+  const [togglingTagId, setTogglingTagId] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchMembers() {
@@ -308,19 +309,25 @@ export function MembersTable({
                     <div className="flex flex-wrap gap-1.5 max-w-xs">
                       {availableTags.map((tag) => {
                         const hasTag = getMemberTags(member).some((t) => t.id === tag.id)
+                        const isToggling = togglingTagId === tag.id
                         return (
                           <button
                             key={tag.id}
                             type="button"
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${hasTag ? "text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                            disabled={isToggling}
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${hasTag ? "text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                             style={hasTag ? { backgroundColor: tag.color } : undefined}
                             onClick={async (e) => {
                               e.stopPropagation()
+                              setTogglingTagId(tag.id)
                               const supabase = createClient()
-                              if (hasTag) {
-                                await supabase.from("member_tags").delete().eq("member_id", member.id).eq("tag_id", tag.id)
-                              } else {
-                                await supabase.from("member_tags").insert({ member_id: member.id, tag_id: tag.id } as never)
+                              const { error } = hasTag
+                                ? await supabase.from("member_tags").delete().eq("member_id", member.id).eq("tag_id", tag.id)
+                                : await supabase.from("member_tags").insert({ member_id: member.id, tag_id: tag.id } as never)
+                              if (error) {
+                                toast.error(`Failed to ${hasTag ? "remove" : "add"} tag: ${error.message}`)
+                                setTogglingTagId(null)
+                                return
                               }
                               logAudit(hasTag ? "tag_removed" : "tag_added", "member_tags", member.id, { tag: tag.name })
                               const { data: updated } = await supabase
@@ -331,6 +338,7 @@ export function MembersTable({
                               if (updated) {
                                 setMembers((prev) => prev.map((m) => m.id === member.id ? updated as MemberWithFamily : m))
                               }
+                              setTogglingTagId(null)
                             }}
                           >
                             {tag.name}

@@ -193,28 +193,32 @@ export function FamilyMergeDialog({ open, onOpenChange, onSuccess }: FamilyMerge
             .eq("family_id", sec.id)
         }
 
-        // Move address if primary doesn't have one
-        if (sec.address && !primary.address) {
+        // Move address: reassign to primary (keep or mark non-current)
+        if (sec.address) {
           await supabase
             .from("addresses")
-            .update({ family_id: primaryId } as never)
+            .update({
+              family_id: primaryId,
+              is_current: !primary.address,
+            } as never)
             .eq("id", sec.address.id)
-          primary.address = sec.address
-        } else if (sec.address) {
-          // Mark secondary address as not current
-          await supabase
-            .from("addresses")
-            .update({ is_current: false } as never)
-            .eq("id", sec.address.id)
+          if (!primary.address) primary.address = sec.address
         }
 
-        // Move anniversary if primary doesn't have one
-        if (sec.anniversary && !primary.anniversary) {
-          await supabase
-            .from("wedding_anniversaries")
-            .update({ family_id: primaryId } as never)
-            .eq("id", sec.anniversary.id)
-          primary.anniversary = sec.anniversary
+        // Move anniversary: reassign to primary family
+        if (sec.anniversary) {
+          if (!primary.anniversary) {
+            await supabase
+              .from("wedding_anniversaries")
+              .update({ family_id: primaryId } as never)
+              .eq("id", sec.anniversary.id)
+            primary.anniversary = sec.anniversary
+          } else {
+            await supabase
+              .from("wedding_anniversaries")
+              .delete()
+              .eq("id", sec.anniversary.id)
+          }
         }
 
         // Move home_phone if primary doesn't have one
@@ -224,6 +228,18 @@ export function FamilyMergeDialog({ open, onOpenChange, onSuccess }: FamilyMerge
             .update({ home_phone: sec.home_phone } as never)
             .eq("id", primaryId)
         }
+
+        // Move any remaining addresses before deleting
+        await supabase
+          .from("addresses")
+          .update({ family_id: primaryId, is_current: false } as never)
+          .eq("family_id", sec.id)
+
+        // Move any remaining anniversaries before deleting
+        await supabase
+          .from("wedding_anniversaries")
+          .delete()
+          .eq("family_id", sec.id)
 
         // Delete the empty secondary family
         await supabase.from("families").delete().eq("id", sec.id)

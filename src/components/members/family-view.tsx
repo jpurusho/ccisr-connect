@@ -172,10 +172,18 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
                         toast.error(`Failed: ${famErr.message}`)
                         return
                       }
-                      await supabase
+                      const { error: memErr } = await supabase
                         .from("members")
                         .update({ is_active: checked } as never)
                         .eq("family_id", family.id)
+                      if (memErr) {
+                        await supabase
+                          .from("families")
+                          .update({ is_active: !checked } as never)
+                          .eq("id", family.id)
+                        toast.error(`Failed to update members: ${memErr.message}`)
+                        return
+                      }
                       setFamilies((prev) =>
                         prev.map((f) =>
                           f.id === family.id
