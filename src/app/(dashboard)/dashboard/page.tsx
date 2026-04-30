@@ -1110,6 +1110,7 @@ export default function DashboardPage() {
       anniversaries: bulletinForm.anniversaries,
       helpers: bulletinForm.helpers,
       events: bulletinForm.events,
+      sectionOrder: bulletinForm.sectionOrder,
       ...interpCommon(bulletinForm, vars),
     })
   }, [bulletinForm, weekLabel])

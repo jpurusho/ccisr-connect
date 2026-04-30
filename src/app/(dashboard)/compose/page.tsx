@@ -235,6 +235,7 @@ function buildPreview(form: FormState): string {
         anniversaries: d.anniversaries,
         helpers: d.helpers,
         events: d.events,
+        sectionOrder: d.sectionOrder,
         ...common,
       })
     }

@@ -530,6 +530,7 @@ export interface BulletinCardData extends BaseCardData {
   anniversaries: { names: string; date: string }[];
   helpers: { role: string; name: string }[];
   events: { title: string; details: string }[];
+  sectionOrder?: string[];
 }
 
 export function buildBulletinCard(data: BulletinCardData): string {
@@ -544,35 +545,31 @@ export function buildBulletinCard(data: BulletinCardData): string {
 <td style="padding:4px 0;font-size:13px;color:${colors.textLight};text-align:right;font-weight:500">${detail}</td>
 </tr>`;
 
-  let sections = "";
-
-  if (data.birthdays.length > 0) {
-    sections += `<table width="100%" cellpadding="0" cellspacing="0">
+  const sectionBuilders: Record<string, () => string> = {
+    birthdays: () => data.birthdays.length === 0 ? "" :
+      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
 ${sectionTitle("🎂", "Birthdays", EVENT_COLORS.birthday.primary)}
 ${data.birthdays.map((b) => itemRow(b.name, b.date)).join("")}
-</table>`;
-  }
-
-  if (data.anniversaries.length > 0) {
-    sections += `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
+</table>`,
+    anniversaries: () => data.anniversaries.length === 0 ? "" :
+      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
 ${sectionTitle("💍", "Anniversaries", EVENT_COLORS.anniversary.primary)}
 ${data.anniversaries.map((a) => itemRow(a.names, a.date)).join("")}
-</table>`;
-  }
-
-  if (data.helpers.length > 0) {
-    sections += `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
+</table>`,
+    helpers: () => data.helpers.length === 0 ? "" :
+      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
 ${sectionTitle("🤝", "Helpers This Month", colors.primary)}
 ${data.helpers.map((h) => itemRow(h.role, h.name)).join("")}
-</table>`;
-  }
-
-  if (data.events.length > 0) {
-    sections += `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
+</table>`,
+    events: () => data.events.length === 0 ? "" :
+      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
 ${sectionTitle("📅", "This Week", EVENT_COLORS.friday_bible_study.primary)}
 ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font-size:14px;color:${colors.textDark}"><strong>${e.title}</strong><br/><span style="font-size:12px;color:${colors.textLight}">${e.details}</span></td></tr>`).join("")}
-</table>`;
-  }
+</table>`,
+  };
+
+  const order = data.sectionOrder ?? ["birthdays", "anniversaries", "helpers", "events"];
+  let sections = order.map((key) => sectionBuilders[key]?.() ?? "").join("");
 
   const messageHtml = data.message
     ? `<div style="margin:16px 0 0;padding:12px 16px;background:${colors.bgLight};border-radius:8px;font-size:14px;color:${colors.textDark};line-height:1.6;white-space:pre-wrap">${data.message}</div>`

@@ -1240,12 +1240,16 @@ export function PrayerMeetingEditForm({
 // Bulletin Edit Form (inline)
 // ---------------------------------------------------------------------------
 
+export const BULLETIN_DEFAULT_SECTION_ORDER = ["birthdays", "anniversaries", "helpers", "events"] as const
+export type BulletinSectionKey = (typeof BULLETIN_DEFAULT_SECTION_ORDER)[number]
+
 export interface BulletinFormData extends BaseFormData {
   weekLabel: string
   birthdays: { name: string; date: string }[]
   anniversaries: { names: string; date: string }[]
   helpers: { role: string; name: string }[]
   events: { title: string; details: string }[]
+  sectionOrder?: BulletinSectionKey[]
   weeksAhead?: number
 }
 
@@ -1363,104 +1367,128 @@ export function BulletinEditForm({
         )}
       </div>
 
-      {/* Birthdays */}
-      <InlineListSection
-        label="Birthdays"
-        items={data.birthdays}
-        fields={[
-          { key: "name", placeholder: "Name", className: "flex-1" },
-          { key: "date", placeholder: "Date", className: "w-24" },
-        ]}
-        onUpdate={updateBday}
-        onRemove={removeBday}
-        onAdd={addBday}
-        addLabel="Add Birthday"
-      />
+      {(() => {
+        const order = data.sectionOrder ?? [...BULLETIN_DEFAULT_SECTION_ORDER]
 
-      {/* Anniversaries */}
-      <InlineListSection
-        label="Anniversaries"
-        items={data.anniversaries}
-        fields={[
-          {
-            key: "names",
-            placeholder: "Names (e.g., John & Jane)",
-            className: "flex-1",
-          },
-          { key: "date", placeholder: "Date", className: "w-24" },
-        ]}
-        onUpdate={updateAnni}
-        onRemove={removeAnni}
-        onAdd={addAnni}
-        addLabel="Add Anniversary"
-      />
+        function moveBuiltinSection(idx: number, dir: -1 | 1) {
+          const target = idx + dir
+          if (target < 0 || target >= order.length) return
+          const updated = [...order]
+          ;[updated[idx], updated[target]] = [updated[target], updated[idx]]
+          onChange({ ...data, sectionOrder: updated })
+        }
 
-      {/* Helpers */}
-      <div className="space-y-2">
-        <Label>Helpers This Month</Label>
-        {data.helpers.map((h, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Input
-              placeholder="Role (e.g., Usher)"
-              value={h.role}
-              onChange={(e) => updateHelper(i, "role", e.target.value)}
-              className="w-36"
+        const SECTION_LABELS: Record<BulletinSectionKey, string> = {
+          birthdays: "Birthdays",
+          anniversaries: "Anniversaries",
+          helpers: "Helpers This Month",
+          events: "Events",
+        }
+
+        const sectionRenderers: Record<BulletinSectionKey, React.ReactNode> = {
+          birthdays: (
+            <InlineListSection
+              label=""
+              items={data.birthdays}
+              fields={[
+                { key: "name", placeholder: "Name", className: "flex-1" },
+                { key: "date", placeholder: "Date", className: "w-24" },
+              ]}
+              onUpdate={updateBday}
+              onRemove={removeBday}
+              onAdd={addBday}
+              addLabel="Add Birthday"
             />
-            <MemberSearchInput
-              value={h.name}
-              onChange={(v) => updateHelper(i, "name", v)}
-              placeholder="Member name"
+          ),
+          anniversaries: (
+            <InlineListSection
+              label=""
+              items={data.anniversaries}
+              fields={[
+                { key: "names", placeholder: "Names (e.g., John & Jane)", className: "flex-1" },
+                { key: "date", placeholder: "Date", className: "w-24" },
+              ]}
+              onUpdate={updateAnni}
+              onRemove={removeAnni}
+              onAdd={addAnni}
+              addLabel="Add Anniversary"
             />
-            <Button variant="ghost" size="icon-sm" onClick={() => removeHelper(i)}>
-              <Trash2 className="size-3.5 text-muted-foreground" />
-            </Button>
-          </div>
-        ))}
-        {data.helpers.length === 0 && (
-          <p className="text-xs text-muted-foreground">None added yet.</p>
-        )}
-        <Button variant="outline" size="sm" onClick={addHelper}>
-          <Plus className="size-3.5" />
-          Add Helper
-        </Button>
-      </div>
-
-      {/* Events */}
-      <div className="space-y-2">
-        <Label>Events</Label>
-        {data.events.map((evt, i) => (
-          <div
-            key={i}
-            className="space-y-1.5 rounded-md border border-border p-2.5"
-          >
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Title"
-                value={evt.title}
-                onChange={(e) => updateEvent(i, "title", e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => removeEvent(i)}
-              >
-                <Trash2 className="size-3.5 text-muted-foreground" />
+          ),
+          helpers: (
+            <div className="space-y-2">
+              {data.helpers.map((h, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    placeholder="Role (e.g., Usher)"
+                    value={h.role}
+                    onChange={(e) => updateHelper(i, "role", e.target.value)}
+                    className="w-36"
+                  />
+                  <MemberSearchInput
+                    value={h.name}
+                    onChange={(v) => updateHelper(i, "name", v)}
+                    placeholder="Member name"
+                  />
+                  <Button variant="ghost" size="icon-sm" onClick={() => removeHelper(i)}>
+                    <Trash2 className="size-3.5 text-muted-foreground" />
+                  </Button>
+                </div>
+              ))}
+              {data.helpers.length === 0 && (
+                <p className="text-xs text-muted-foreground">None added yet.</p>
+              )}
+              <Button variant="outline" size="sm" onClick={addHelper}>
+                <Plus className="size-3.5" />
+                Add Helper
               </Button>
             </div>
-            <Textarea
-              placeholder="Details"
-              value={evt.details}
-              onChange={(e) => updateEvent(i, "details", e.target.value)}
-              className="min-h-10"
-            />
+          ),
+          events: (
+            <div className="space-y-2">
+              {data.events.map((evt, i) => (
+                <div key={i} className="space-y-1.5 rounded-md border border-border p-2.5">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Title"
+                      value={evt.title}
+                      onChange={(e) => updateEvent(i, "title", e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button variant="ghost" size="icon-sm" onClick={() => removeEvent(i)}>
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                  <Textarea
+                    placeholder="Details"
+                    value={evt.details}
+                    onChange={(e) => updateEvent(i, "details", e.target.value)}
+                    className="min-h-10"
+                  />
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={addEvent}>
+                <Plus className="size-3.5" />
+                Add Event
+              </Button>
+            </div>
+          ),
+        }
+
+        return order.map((key, idx) => (
+          <div key={key} className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <Label className="flex-1">{SECTION_LABELS[key]}</Label>
+              <Button variant="ghost" size="icon-sm" onClick={() => moveBuiltinSection(idx, -1)} disabled={idx === 0} title="Move up">
+                <ArrowUp className="size-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon-sm" onClick={() => moveBuiltinSection(idx, 1)} disabled={idx === order.length - 1} title="Move down">
+                <ArrowDown className="size-3.5" />
+              </Button>
+            </div>
+            {sectionRenderers[key]}
           </div>
-        ))}
-        <Button variant="outline" size="sm" onClick={addEvent}>
-          <Plus className="size-3.5" />
-          Add Event
-        </Button>
-      </div>
+        ))
+      })()}
 
       <CommonFieldsEditor data={data} onChange={onChange} idPrefix="bul-i" />
     </div>
