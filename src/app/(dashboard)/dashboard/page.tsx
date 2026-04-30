@@ -441,6 +441,8 @@ export default function DashboardPage() {
   const [customInstanceIds, setCustomInstanceIds] = useState<Record<string, string>>({})
   const [customDispatches, setCustomDispatches] = useState<Record<string, { status: string; count: number }>>({})
   const [customSubjectOverrides, setCustomSubjectOverrides] = useState<Record<string, string>>({})
+  const [customCommOptions, setCustomCommOptions] = useState<Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }>>({})
+  const [customSnapshots, setCustomSnapshots] = useState<Record<string, Record<string, unknown>>>({})
   const [selectedCustomCard, setSelectedCustomCard] = useState<string | null>(null)
 
   // ---- Saved form snapshots for cancel/revert ----
@@ -1112,10 +1114,22 @@ export default function DashboardPage() {
         }
       }
 
+      const customCommOpts: Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }> = {}
+      for (const ct of dashCustom) {
+        const ci = composedMap[`custom:${ct.id}`]
+        customCommOpts[ct.id] = {
+          mailingListId: ci?.mailing_list_id || "",
+          smtpConfigId: ci?.smtp_config_id || "",
+          additionalRecipients: ci?.additional_recipients || "",
+        }
+      }
+
       setCustomDashTemplates(dashCustom)
       setCustomForms(customFormInit)
       setCustomInstanceIds(customInstIds)
       setCustomSubjectOverrides(customSubjOvr)
+      setCustomCommOptions(customCommOpts)
+      setCustomSnapshots(Object.fromEntries(Object.entries(customFormInit).map(([k, v]) => [k, structuredClone(v as unknown as Record<string, unknown>)])))
 
       // ---- Mailing lists + SMTP configs ----
       setMailingLists(mailingListsRes.data ?? [])
@@ -1381,10 +1395,6 @@ export default function DashboardPage() {
   // If dispatched/queued, show the exact HTML that was sent/queued.
   // Otherwise show the live-computed preview for editing.
   function getPreview(type: CommType): string | null {
-    const d = dispatches[type]
-    if (d?.body_html && (d.status === "sent" || d.status === "sending" || d.status === "pending" || d.status === "approved")) {
-      return d.body_html
-    }
     switch (type) {
       case "birthday":       return birthdayPreview
       case "anniversary":    return anniversaryPreview
@@ -2360,15 +2370,20 @@ export default function DashboardPage() {
                   resourceLinks={(form.resourceLinks ?? []).filter((l) => l.url)}
                   mailingLists={mailingLists}
                   smtpConfigs={smtpConfigs}
-                  selectedMailingList={commOptions.bulletin?.mailingListId}
-                  onMailingListChange={() => {}}
-                  selectedSmtpConfig={commOptions.bulletin?.smtpConfigId}
-                  onSmtpConfigChange={() => {}}
+                  selectedMailingList={customCommOptions[ct.id]?.mailingListId}
+                  onMailingListChange={(id) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], mailingListId: id } }))}
+                  selectedSmtpConfig={customCommOptions[ct.id]?.smtpConfigId}
+                  onSmtpConfigChange={(id) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], smtpConfigId: id } }))}
+                  additionalRecipients={customCommOptions[ct.id]?.additionalRecipients}
+                  onAdditionalRecipientsChange={(v) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], additionalRecipients: v } }))}
                   sendCount={di.count}
                   onSchedule={() => {}}
                   onSendNow={async () => {
                     const html = buildCustomDashPreview(form)
                     if (!html) { toast.error("No content"); return }
+                    const opts = customCommOptions[ct.id]
+                    if (!opts?.smtpConfigId) { toast.error("Please select a Send From account first."); return }
+                    if (!opts?.mailingListId && !opts?.additionalRecipients?.trim()) { toast.error("Please select a mailing list or add recipients."); return }
                     setSendingType("bulletin")
                     try {
                       const supabase = createClient()
@@ -2381,6 +2396,9 @@ export default function DashboardPage() {
                         name: ct.name,
                         subject: subj,
                         form_data: form as unknown as Record<string, unknown>,
+                        mailing_list_id: opts.mailingListId || null,
+                        smtp_config_id: opts.smtpConfigId || null,
+                        additional_recipients: opts.additionalRecipients?.trim() || null,
                         is_active: true,
                         week_start: weekStart,
                         is_recurring: false,
@@ -2394,8 +2412,8 @@ export default function DashboardPage() {
                         const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
                         if (newDraft) setCustomInstanceIds((prev) => ({ ...prev, [ct.id]: newDraft.id }))
                       }
+                      setCustomSnapshots((prev) => ({ ...prev, [ct.id]: structuredClone(form as unknown as Record<string, unknown>) }))
 
-                      const opts = commOptions.bulletin
                       const { error } = await supabase.from("dispatch_queue").insert({
                         subject: subj,
                         body_html: html,
@@ -2403,8 +2421,9 @@ export default function DashboardPage() {
                         status: "pending",
                         template_type: ctKey,
                         week_start: weekStart,
-                        mailing_list_id: opts?.mailingListId || null,
-                        smtp_config_id: opts?.smtpConfigId || null,
+                        mailing_list_id: opts.mailingListId || null,
+                        smtp_config_id: opts.smtpConfigId || null,
+                        additional_recipients: opts.additionalRecipients?.trim() || null,
                         created_by: user?.id ?? null,
                       } as never)
                       if (error) toast.error(`Failed: ${error.message}`)
@@ -2420,11 +2439,15 @@ export default function DashboardPage() {
                       const supabase = createClient()
                       const { data: { user } } = await supabase.auth.getUser()
                       const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+                      const opts = customCommOptions[ct.id]
                       const payload = {
                         template_type: ctKey,
                         name: ct.name,
                         subject: subj,
                         form_data: form as unknown as Record<string, unknown>,
+                        mailing_list_id: opts?.mailingListId || null,
+                        smtp_config_id: opts?.smtpConfigId || null,
+                        additional_recipients: opts?.additionalRecipients?.trim() || null,
                         is_active: true,
                         week_start: weekStart,
                         is_recurring: false,
@@ -2444,6 +2467,7 @@ export default function DashboardPage() {
                           if (ins) setCustomInstanceIds((prev) => ({ ...prev, [ct.id]: ins.id }))
                         }
                       }
+                      setCustomSnapshots((prev) => ({ ...prev, [ct.id]: structuredClone(form as unknown as Record<string, unknown>) }))
                     } finally { setSavingInstance(null) }
                   }}
                   onDelete={async () => {
@@ -2455,23 +2479,26 @@ export default function DashboardPage() {
                     toast.success(`${ct.name} draft deleted`)
                   }}
                   onCancel={() => {
-                    const tmpl = customDashTemplates.find((t) => t.id === ct.id)
-                    if (!tmpl) return
-                    const parsed = tmpl.defaults
-                    setCustomForms((prev) => ({
-                      ...prev,
-                      [ct.id]: {
-                        ...EMPTY_CUSTOM_FORM,
-                        title: (parsed.title as string) || ct.name,
-                        subtitle: (parsed.subtitle as string) || "",
-                        emoji: (parsed.emoji as string) || "📋",
-                        body: (parsed.body as string) || "",
-                        footerText: (parsed.footerText as string) || "",
-                        primaryColor: (parsed.primaryColor as string) || "",
-                        resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
-                        customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
-                      },
-                    }))
+                    const snap = customSnapshots[ct.id]
+                    if (snap) {
+                      setCustomForms((prev) => ({ ...prev, [ct.id]: structuredClone(snap) as unknown as CustomDashFormData }))
+                    } else {
+                      const parsed = ct.defaults
+                      setCustomForms((prev) => ({
+                        ...prev,
+                        [ct.id]: {
+                          ...EMPTY_CUSTOM_FORM,
+                          title: (parsed.title as string) || ct.name,
+                          subtitle: (parsed.subtitle as string) || "",
+                          emoji: (parsed.emoji as string) || "📋",
+                          body: (parsed.body as string) || "",
+                          footerText: (parsed.footerText as string) || "",
+                          primaryColor: (parsed.primaryColor as string) || "",
+                          resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
+                          customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
+                        },
+                      }))
+                    }
                   }}
                   saving={savingInstance === "bulletin"}
                   hasInstance={!!customInstanceIds[ct.id]}
