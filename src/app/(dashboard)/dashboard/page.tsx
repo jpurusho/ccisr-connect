@@ -503,6 +503,10 @@ export default function DashboardPage() {
   }>({ open: false, commType: null, dateTime: "" })
   const [sendingType, setSendingType] = useState<CommType | null>(null)
 
+  // ---- Week strip: recurring events + dispatches ----
+  const [weekStripEvents, setWeekStripEvents] = useState<{ title: string; date: Date; color: string }[]>([])
+  const [weekStripDispatches, setWeekStripDispatches] = useState<{ label: string; date: string; color: string; status: string }[]>([])
+
   // ---- Selected communication card (supports ?card= query param from calendar) ----
   const [selectedCard, setSelectedCard] = useState<CommType>("bulletin")
   const [cardParamApplied, setCardParamApplied] = useState(false)
@@ -571,6 +575,7 @@ export default function DashboardPage() {
         templateDefaultsRes,
         eventTypesRes,
         composedInstancesRes,
+        stripDispatchesRes,
       ] = await Promise.all([
         // Stats
         supabase
@@ -657,7 +662,7 @@ export default function DashboardPage() {
             status: string
           }[]>(),
 
-        // This week dispatches
+        // This week dispatches (for card status — matched by target week)
         supabase
           .from("dispatch_queue")
           .select("id, subject, body_html, status, scheduled_at, sent_at, created_at, template_type, week_start, mailing_list_id, smtp_config_id, additional_recipients")
@@ -701,6 +706,15 @@ export default function DashboardPage() {
           .eq("is_active", true)
           .or(`week_start.eq.${wkSunISO},and(is_recurring.eq.true,week_start.lte.${wkSunISO})`)
           .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null; updated_at: string }[]>(),
+
+        // Strip dispatches: anything sent during this week (for the upcoming strip)
+        supabase
+          .from("dispatch_queue")
+          .select("id, template_type, status, sent_at, created_at, week_start")
+          .not("status", "eq", "cancelled")
+          .or(`and(sent_at.gte.${wkSunISO},sent_at.lte.${wkSatISO}T23:59:59),and(status.neq.sent,week_start.eq.${wkSunISO})`)
+          .order("created_at", { ascending: false })
+          .returns<{ id: string; template_type: string | null; status: string; sent_at: string | null; created_at: string; week_start: string | null }[]>(),
       ])
 
       // Check errors
@@ -925,6 +939,26 @@ export default function DashboardPage() {
           return etName === typeName
         })
 
+      // ---- Build week strip events (all recurring events resolved to dates) ----
+      {
+        const etNameToCommColor: Record<string, string> = {}
+        for (const bt of BUILTIN_TEMPLATES) {
+          const etName = COMM_TYPE_TO_ET[bt.type]
+          if (etName) etNameToCommColor[etName] = bt.color
+        }
+        const stripEvts: { title: string; date: Date; color: string }[] = []
+        for (const evt of activeEvents) {
+          if (!evt.recurrence_rule) continue
+          const etName = etIdToName[evt.event_type_id] ?? ""
+          const color = etNameToCommColor[etName] ?? "#6B7280"
+          const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
+          for (const occ of occs) {
+            stripEvts.push({ title: evt.title, date: occ, color })
+          }
+        }
+        setWeekStripEvents(stripEvts)
+      }
+
       // ---- Process Bible Study (recurrence-based) ----
       const hasBsDraft = !!composedMap["bible_study"]
       const bsEvent = findEventByType("friday_bible_study")
@@ -1037,7 +1071,7 @@ export default function DashboardPage() {
       if (hasPmDraft) {
         const fd = composedMap["prayer_meeting"].form_data as Record<string, unknown>
         setPrayerMeetingForm({
-          date: pmDateStr ?? "",
+          date: pmDateStr ?? (pmEvent ? "Not scheduled this week" : (fd.date as string) ?? ""),
           time: pmTimeStr ?? ((fd.time as string) ?? pmDef.time ?? "6:00 PM"),
           hostNames: (fd.hostNames as string) ?? pmDef.hostNames ?? "TBD",
           address: (fd.address as string) ?? pmDef.address ?? "TBD",
@@ -1255,6 +1289,32 @@ export default function DashboardPage() {
 
       setDispatches(matchedDispatches)
       setDispatchCounts(counts)
+
+      // Build strip dispatch indicators (from dedicated strip query — sent during this week + pending for this week)
+      {
+        const commColorMap: Record<string, string> = {}
+        const commLabelMap: Record<string, string> = {}
+        for (const bt of BUILTIN_TEMPLATES) {
+          commColorMap[bt.type] = bt.color
+          commLabelMap[bt.type] = bt.label
+        }
+        const stripDisps: { label: string; date: string; color: string; status: string }[] = []
+        const seen = new Set<string>()
+        for (const d of (stripDispatchesRes.data ?? [])) {
+          const ct = d.template_type ?? ""
+          const key = `${ct}:${d.status}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          const color = commColorMap[ct] ?? "#6B7280"
+          const label = commLabelMap[ct] ?? ct
+          const isSent = d.status === "sent"
+          const dateStr = isSent && d.sent_at
+            ? format(new Date(d.sent_at), "yyyy-MM-dd")
+            : d.week_start ?? format(new Date(d.created_at), "yyyy-MM-dd")
+          stripDisps.push({ label, date: dateStr, color, status: d.status })
+        }
+        setWeekStripDispatches(stripDisps)
+      }
 
       // Fallback: pre-fill mailing list + SMTP from dispatches when no composed instance
       for (const ct of commTypes) {
@@ -2008,7 +2068,7 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {weekOffset === 0 ? "This Week" : weekOffset === 1 ? "Next Week" : `${weekOffset} Weeks Ahead`}
+            {weekOffset === 0 ? "This Week" : weekOffset === 1 ? "Next Week" : weekOffset === -1 ? "Last Week" : weekOffset > 0 ? `${weekOffset} Weeks Ahead` : `${Math.abs(weekOffset)} Weeks Ago`}
           </h1>
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
@@ -2020,8 +2080,7 @@ export default function DashboardPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
-            disabled={weekOffset === 0}
+            onClick={() => setWeekOffset((w) => w - 1)}
           >
             <ChevronLeft className="size-4" />
           </Button>
@@ -2069,20 +2128,34 @@ export default function DashboardPage() {
                     const [m, d] = a.date.split("/").map(Number)
                     return m === day.date.getMonth() + 1 && d === day.date.getDate()
                   })
-                  const isToday = format(day.date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
+                  const dayIso = format(day.date, "yyyy-MM-dd")
+                  const dayEvents = weekStripEvents.filter((e) => format(e.date, "yyyy-MM-dd") === dayIso)
+                  const dayDispatches = weekStripDispatches.filter((d) => d.date === dayIso)
+                  const isToday = dayIso === format(new Date(), "yyyy-MM-dd")
+                  const hasAnything = dayBdays.length > 0 || dayAnnis.length > 0 || dayEvents.length > 0 || dayDispatches.length > 0
                   return (
                     <div
                       key={day.label}
                       className={`flex min-w-[80px] flex-col items-center gap-1 rounded-lg border px-2 py-1.5 text-center ${isToday ? "border-primary bg-primary/5" : ""}`}
                     >
                       <span className={`text-[10px] font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{day.label}</span>
+                      {dayEvents.map((e, i) => (
+                        <span key={`e${i}`} className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white" style={{ backgroundColor: e.color }}>{e.title.replace(/^San Ramon\s*/i, "").split(" ").slice(0, 2).join(" ")}</span>
+                      ))}
                       {dayBdays.map((b, i) => (
                         <span key={`b${i}`} className="w-full truncate rounded-full bg-purple-500 px-1.5 py-0.5 text-[9px] text-white">{b.name.split(" ")[0]}</span>
                       ))}
                       {dayAnnis.map((a, i) => (
                         <span key={`a${i}`} className="w-full truncate rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] text-white">{a.husbandName}</span>
                       ))}
-                      {dayBdays.length === 0 && dayAnnis.length === 0 && (
+                      {dayDispatches.map((d, i) => (
+                        d.status === "sent" ? (
+                          <span key={`d${i}`} className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white" style={{ backgroundColor: d.color }}>{d.label} ✓</span>
+                        ) : (
+                          <span key={`d${i}`} className="w-full truncate rounded-full border border-dashed px-1.5 py-0.5 text-[9px]" style={{ borderColor: d.color, color: d.color }}>{d.label}</span>
+                        )
+                      ))}
+                      {!hasAnything && (
                         <span className="text-[9px] text-muted-foreground/30">—</span>
                       )}
                     </div>
