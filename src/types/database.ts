@@ -82,6 +82,7 @@ export type EventType = {
   color_scheme: JsonColorScheme | null
   icon: string | null
   default_template_id: string | null
+  is_active: boolean
   created_at: string
 }
 
@@ -93,6 +94,8 @@ export type Event = {
   recurrence_rule: string | null
   default_time: string | null
   zoom_link: string | null
+  host_family_id: string | null
+  host_until: string | null
   is_active: boolean
   created_at: string
   updated_at: string

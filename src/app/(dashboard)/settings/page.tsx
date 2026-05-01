@@ -17,7 +17,8 @@ import { ThemeSelector } from "@/components/settings/theme-selector"
 import { SmtpConfigPanel } from "@/components/settings/smtp-config"
 import { UserManagementPanel } from "@/components/settings/user-management"
 import { TagManagementPanel } from "@/components/settings/tag-management"
-import { EventSchedulePanel } from "@/components/settings/event-schedule-panel"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 import { useAppUser } from "@/hooks/use-app-user"
 
 import { APP_VERSION } from "@/lib/version"
@@ -150,7 +151,17 @@ export default function SettingsPage() {
 
           {isAdmin && (
             <TabsContent value="schedules" className="mt-6">
-              <EventSchedulePanel />
+              <Card>
+                <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+                  <CalendarDays className="size-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Event scheduling has moved to the Calendar page.
+                  </p>
+                  <Button variant="outline" render={<Link href="/calendar" />}>
+                    Go to Calendar
+                  </Button>
+                </CardContent>
+              </Card>
             </TabsContent>
           )}
 

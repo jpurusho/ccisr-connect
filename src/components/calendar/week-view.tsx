@@ -2,13 +2,14 @@
 
 import { format, isSameDay, isToday } from "date-fns"
 import { cn } from "@/lib/utils"
-import { Cake, Heart, CalendarDays, Send, Check, Clock } from "lucide-react"
+import { Cake, Heart, CalendarDays, Send, Check, Clock, Plus } from "lucide-react"
 import type { CalendarEvent } from "./types"
 
 interface WeekViewProps {
   days: Date[]
   events: CalendarEvent[]
   onEventClick: (event: CalendarEvent) => void
+  onDayClick?: (day: Date) => void
 }
 
 function EventPill({
@@ -64,7 +65,7 @@ function EventPill({
   )
 }
 
-export function WeekView({ days, events, onEventClick }: WeekViewProps) {
+export function WeekView({ days, events, onEventClick, onDayClick }: WeekViewProps) {
   return (
     <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-border ring-1 ring-border sm:grid-cols-7">
       {days.map((day) => {
@@ -75,7 +76,7 @@ export function WeekView({ days, events, onEventClick }: WeekViewProps) {
           <div
             key={day.toISOString()}
             className={cn(
-              "flex min-h-[140px] flex-col bg-card p-2 sm:min-h-[180px]",
+              "group/day flex min-h-[140px] flex-col bg-card p-2 sm:min-h-[180px]",
               today && "bg-primary/[0.03]"
             )}
           >
@@ -94,6 +95,16 @@ export function WeekView({ days, events, onEventClick }: WeekViewProps) {
               >
                 {format(day, "d")}
               </span>
+              {onDayClick && (
+                <button
+                  type="button"
+                  onClick={() => onDayClick(day)}
+                  className="ml-auto flex size-5 items-center justify-center rounded-full text-muted-foreground/40 opacity-0 transition-opacity hover:bg-primary/10 hover:text-primary group-hover/day:opacity-100"
+                  title="Create event"
+                >
+                  <Plus className="size-3" />
+                </button>
+              )}
             </div>
 
             {/* Events */}

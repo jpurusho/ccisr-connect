@@ -1,9 +1,20 @@
 "use client"
+// @deprecated — scheduling moved to calendar page (src/app/(dashboard)/calendar/page.tsx)
 
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { format, addDays, isAfter } from "date-fns"
 import { logAudit } from "@/lib/audit"
+import {
+  type RecurrenceFields,
+  DAY_MAP,
+  DAY_OPTIONS,
+  NTH_OPTIONS,
+  parseRecurrenceRule,
+  buildRecurrenceRule,
+  describeRule,
+  formatTime,
+} from "@/lib/recurrence"
 import {
   Card,
   CardContent,
@@ -44,97 +55,8 @@ interface EventRow {
   event_type_color: string
 }
 
-interface ParsedRule {
-  freq: string
-  byDay: string
-  nthWeek: string
-  except: string[]
-  until: string
-}
-
-const DAY_MAP: Record<string, number> = {
-  SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6,
-}
-
-const DAY_OPTIONS = [
-  { value: "SU", label: "Sunday" },
-  { value: "MO", label: "Monday" },
-  { value: "TU", label: "Tuesday" },
-  { value: "WE", label: "Wednesday" },
-  { value: "TH", label: "Thursday" },
-  { value: "FR", label: "Friday" },
-  { value: "SA", label: "Saturday" },
-]
-
-const NTH_OPTIONS = [
-  { value: "", label: "Every" },
-  { value: "1", label: "1st" },
-  { value: "2", label: "2nd" },
-  { value: "3", label: "3rd" },
-  { value: "4", label: "4th" },
-]
-
-function parseRecurrenceRule(rule: string | null): ParsedRule {
-  if (!rule) return { freq: "WEEKLY", byDay: "FR", nthWeek: "", except: [], until: "" }
-
-  const parts: Record<string, string> = {}
-  for (const seg of rule.split(";")) {
-    const [k, v] = seg.split("=")
-    if (k && v) parts[k.trim().toUpperCase()] = v.trim()
-  }
-
-  const byDayRaw = parts.BYDAY || "FR"
-  const nthMatch = byDayRaw.match(/^(\d)([A-Z]{2})$/)
-
-  return {
-    freq: parts.FREQ || "WEEKLY",
-    byDay: nthMatch ? nthMatch[2] : byDayRaw,
-    nthWeek: nthMatch ? nthMatch[1] : "",
-    except: parts.EXCEPT ? parts.EXCEPT.split(",").map(d => d.trim()) : [],
-    until: parts.UNTIL || "",
-  }
-}
-
-function buildRecurrenceRule(parsed: ParsedRule): string {
-  const byDay = parsed.freq === "MONTHLY" && parsed.nthWeek
-    ? `${parsed.nthWeek}${parsed.byDay}`
-    : parsed.byDay
-
-  let rule = `FREQ=${parsed.freq};BYDAY=${byDay}`
-  if (parsed.except.length > 0) rule += `;EXCEPT=${parsed.except.join(",")}`
-  if (parsed.until) rule += `;UNTIL=${parsed.until}`
-  return rule
-}
-
-function formatTime(time: string | null): string {
-  if (!time) return ""
-  const [h, m] = time.split(":").map(Number)
-  const ampm = h >= 12 ? "PM" : "AM"
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`
-}
-
-function describeRule(rule: string | null): string {
-  if (!rule) return "No schedule set"
-  const p = parseRecurrenceRule(rule)
-  const dayLabel = DAY_OPTIONS.find(d => d.value === p.byDay)?.label || p.byDay
-  const nthLabel = NTH_OPTIONS.find(n => n.value === p.nthWeek)?.label || ""
-
-  if (p.freq === "WEEKLY") {
-    const desc = `Every ${dayLabel}`
-    const parts = [desc]
-    if (p.except.length > 0) parts.push(`(${p.except.length} exception${p.except.length > 1 ? "s" : ""})`)
-    if (p.until) parts.push(`until ${p.until}`)
-    return parts.join(" ")
-  }
-  if (p.freq === "MONTHLY") {
-    const desc = `${nthLabel} ${dayLabel} of each month`
-    const parts = [desc]
-    if (p.except.length > 0) parts.push(`(${p.except.length} exception${p.except.length > 1 ? "s" : ""})`)
-    if (p.until) parts.push(`until ${p.until}`)
-    return parts.join(" ")
-  }
-  return rule
-}
+// ParsedRule is now RecurrenceFields from @/lib/recurrence
+type ParsedRule = RecurrenceFields
 
 export function EventSchedulePanel() {
   const [events, setEvents] = useState<EventRow[]>([])

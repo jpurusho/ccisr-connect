@@ -147,3 +147,100 @@ export function getNextOccurrence(
   const occurrences = getOccurrences(rule, after, rangeEnd)
   return occurrences.length > 0 ? occurrences[0] : null
 }
+
+// ── UI-layer recurrence helpers (shared by calendar + settings) ──────────────
+
+export interface RecurrenceFields {
+  freq: string
+  byDay: string
+  nthWeek: string
+  except: string[]
+  until: string
+}
+
+export const DAY_OPTIONS = [
+  { value: "SU", label: "Sunday" },
+  { value: "MO", label: "Monday" },
+  { value: "TU", label: "Tuesday" },
+  { value: "WE", label: "Wednesday" },
+  { value: "TH", label: "Thursday" },
+  { value: "FR", label: "Friday" },
+  { value: "SA", label: "Saturday" },
+]
+
+export const NTH_OPTIONS = [
+  { value: "", label: "Every" },
+  { value: "1", label: "1st" },
+  { value: "2", label: "2nd" },
+  { value: "3", label: "3rd" },
+  { value: "4", label: "4th" },
+]
+
+export { DAY_MAP }
+
+export function parseRecurrenceRule(rule: string | null): RecurrenceFields {
+  if (!rule) return { freq: "WEEKLY", byDay: "FR", nthWeek: "", except: [], until: "" }
+
+  const parts: Record<string, string> = {}
+  for (const seg of rule.split(";")) {
+    const [k, v] = seg.split("=")
+    if (k && v) parts[k.trim().toUpperCase()] = v.trim()
+  }
+
+  const byDayRaw = parts.BYDAY || "FR"
+  const nthMatch = byDayRaw.match(/^(\d)([A-Z]{2})$/)
+
+  return {
+    freq: parts.FREQ || "WEEKLY",
+    byDay: nthMatch ? nthMatch[2] : byDayRaw,
+    nthWeek: nthMatch ? nthMatch[1] : "",
+    except: parts.EXCEPT ? parts.EXCEPT.split(",").map(d => d.trim()) : [],
+    until: parts.UNTIL || "",
+  }
+}
+
+export function buildRecurrenceRule(fields: RecurrenceFields): string {
+  const byDay = fields.freq === "MONTHLY" && fields.nthWeek
+    ? `${fields.nthWeek}${fields.byDay}`
+    : fields.byDay
+
+  let rule = `FREQ=${fields.freq};BYDAY=${byDay}`
+  if (fields.except.length > 0) rule += `;EXCEPT=${fields.except.join(",")}`
+  if (fields.until) rule += `;UNTIL=${fields.until}`
+  return rule
+}
+
+export function describeRule(rule: string | null): string {
+  if (!rule) return "No schedule set"
+  const p = parseRecurrenceRule(rule)
+  const dayLabel = DAY_OPTIONS.find(d => d.value === p.byDay)?.label || p.byDay
+  const nthLabel = NTH_OPTIONS.find(n => n.value === p.nthWeek)?.label || ""
+
+  if (p.freq === "WEEKLY") {
+    const desc = `Every ${dayLabel}`
+    const result = [desc]
+    if (p.except.length > 0) result.push(`(${p.except.length} exception${p.except.length > 1 ? "s" : ""})`)
+    if (p.until) result.push(`until ${p.until}`)
+    return result.join(" ")
+  }
+  if (p.freq === "MONTHLY") {
+    const desc = `${nthLabel} ${dayLabel} of each month`
+    const result = [desc]
+    if (p.except.length > 0) result.push(`(${p.except.length} exception${p.except.length > 1 ? "s" : ""})`)
+    if (p.until) result.push(`until ${p.until}`)
+    return result.join(" ")
+  }
+  return rule
+}
+
+export function formatTime(time: string | null): string {
+  if (!time) return ""
+  const [h, m] = time.split(":").map(Number)
+  const ampm = h >= 12 ? "PM" : "AM"
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`
+}
+
+export function dayCodeFromDate(date: Date): string {
+  const codes = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
+  return codes[date.getDay()]
+}

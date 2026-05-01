@@ -503,8 +503,20 @@ export default function DashboardPage() {
   }>({ open: false, commType: null, dateTime: "" })
   const [sendingType, setSendingType] = useState<CommType | null>(null)
 
-  // ---- Selected communication card ----
+  // ---- Selected communication card (supports ?card= query param from calendar) ----
   const [selectedCard, setSelectedCard] = useState<CommType>("bulletin")
+  const [cardParamApplied, setCardParamApplied] = useState(false)
+
+  useEffect(() => {
+    if (cardParamApplied) return
+    const params = new URLSearchParams(window.location.search)
+    const cardParam = params.get("card")
+    const valid: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
+    if (cardParam && valid.includes(cardParam as CommType)) {
+      setSelectedCard(cardParam as CommType)
+    }
+    setCardParamApplied(true)
+  }, [cardParamApplied])
 
   // ---- Week offset for future scheduling (0 = this week, 1 = next week, etc.) ----
   const [weekOffset, setWeekOffset] = useState(0)
@@ -621,12 +633,12 @@ export default function DashboardPage() {
             }[]
           >(),
 
-        // Active events (for recurrence rules)
+        // Active events (for recurrence rules + host family)
         supabase
           .from("events")
-          .select("id, title, event_type_id, recurrence_rule, default_time")
+          .select("*")
           .eq("is_active", true)
-          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null }[]>(),
+          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; is_active: boolean }[]>(),
 
         // Event instances for current week (host/location overrides)
         supabase
@@ -944,6 +956,9 @@ export default function DashboardPage() {
         let bsHostData = { hostName: "TBD", address: "TBD", city: "", phone: "" }
         if (bsInstance?.host_family_id) {
           bsHostData = await resolveHostFamily(bsInstance.host_family_id)
+        } else if (bsEvent?.host_family_id) {
+          const expired = bsEvent.host_until ? new Date(bsEvent.host_until + "T23:59:59") < new Date() : false
+          if (!expired) bsHostData = await resolveHostFamily(bsEvent.host_family_id)
         }
         if (bsInstance?.location_override) bsHostData.address = bsInstance.location_override
         if (bsInstance?.notes) {
@@ -1036,6 +1051,9 @@ export default function DashboardPage() {
         let pmHostData = { hostName: pmDef.hostNames ?? "TBD", address: pmDef.address ?? "TBD", city: pmDef.city ?? "", phone: pmDef.phone ?? "" }
         if (pmInstance?.host_family_id) {
           pmHostData = await resolveHostFamily(pmInstance.host_family_id)
+        } else if (pmEvent?.host_family_id) {
+          const expired = pmEvent.host_until ? new Date(pmEvent.host_until + "T23:59:59") < new Date() : false
+          if (!expired) pmHostData = await resolveHostFamily(pmEvent.host_family_id)
         }
         if (pmInstance?.location_override) pmHostData.address = pmInstance.location_override
 
@@ -2238,7 +2256,7 @@ export default function DashboardPage() {
                       if (modTs && hasDraft) return <p className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-400">Modified {modTs}</p>
                       if (weekOffset < 0 && !hasDraft && status === "draft" && hasData) return <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">Not dispatched</p>
                       if (!hasData && (type === "bible_study" || type === "womens_study" || type === "prayer_meeting")) {
-                        return <Link href="/settings" className="mt-0.5 text-[10px] text-primary hover:underline" onClick={(e) => e.stopPropagation()}>Set up schedule</Link>
+                        return <Link href="/calendar" className="mt-0.5 text-[10px] text-primary hover:underline" onClick={(e) => e.stopPropagation()}>Set up schedule</Link>
                       }
                       return null
                     })()}

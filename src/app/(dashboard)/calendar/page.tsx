@@ -16,12 +16,14 @@ import {
   getMonth,
 } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
-import { getOccurrences } from "@/lib/recurrence"
+import { getOccurrences, formatTime, parseRecurrenceRule } from "@/lib/recurrence"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { WeekView } from "@/components/calendar/week-view"
 import { MonthView, DayDetailPanel } from "@/components/calendar/month-view"
 import { EventDetailDialog } from "@/components/calendar/event-detail-dialog"
+import { EventFormDialog } from "@/components/calendar/event-form-dialog"
+import { EventTypeManager } from "@/components/calendar/event-type-manager"
 import type { CalendarEvent } from "@/components/calendar/types"
 import type {
   EventInstance,
@@ -33,11 +35,14 @@ import type {
   Address,
   DispatchStatus,
 } from "@/types/database"
+import { logAudit } from "@/lib/audit"
+import { toast } from "sonner"
 import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
   Send,
+  Plus,
 } from "lucide-react"
 
 // Default fallback color for events without a color_scheme
@@ -51,6 +56,12 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+
+  // Event form dialog state
+  const [formOpen, setFormOpen] = useState(false)
+  const [formMode, setFormMode] = useState<"create" | "edit">("create")
+  const [formDate, setFormDate] = useState<Date | null>(null)
+  const [formEventId, setFormEventId] = useState<string | null>(null)
 
   // Compute the visible date range based on view
   const visibleRange = useMemo(() => {
@@ -203,6 +214,13 @@ export default function CalendarPage() {
     for (const instance of instances) {
       const event = eventsMap.get(instance.event_id)
       if (!event) continue
+
+      // Skip instances past the recurrence UNTIL date
+      if (event.recurrence_rule) {
+        const parsed = parseRecurrenceRule(event.recurrence_rule)
+        if (parsed.until && instance.instance_date > parsed.until) continue
+      }
+
       const eventType = typesMap.get(event.event_type_id)
       const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
       const hostFam = instance.host_family_id
@@ -218,7 +236,7 @@ export default function CalendarPage() {
         title: event.title,
         date: new Date(instance.instance_date + "T00:00:00"),
         color,
-        time: instance.instance_time ?? event.default_time ?? null,
+        time: formatTime(instance.instance_time ?? event.default_time ?? null) || null,
         status: instance.status,
         eventTypeName: eventType?.name ?? null,
         description: event.description,
@@ -231,18 +249,49 @@ export default function CalendarPage() {
               address: hostAddr?.full_address ?? null,
             }
           : null,
+        eventId: event.id,
+        eventTypeId: event.event_type_id,
+        instanceId: instance.id,
+        recurrenceRule: event.recurrence_rule,
+        hostFamilyId: instance.host_family_id,
+        isRecurrenceGenerated: false,
       })
+    }
+
+    // Collect event-level host family IDs for recurrence-generated events
+    const eventHostFamilyIds = [
+      ...new Set(
+        eventsData
+          .map((e) => (e as Event & { host_family_id?: string | null }).host_family_id)
+          .filter((id): id is string => !!id)
+      ),
+    ].filter((id) => !familiesMap.has(id))
+
+    if (eventHostFamilyIds.length > 0) {
+      const [efRes, eaRes] = await Promise.all([
+        supabase.from("families").select("*").in("id", eventHostFamilyIds),
+        supabase.from("addresses").select("*").in("family_id", eventHostFamilyIds).eq("is_current", true),
+      ])
+      for (const f of (efRes.data ?? []) as Family[]) familiesMap.set(f.id, f)
+      for (const a of (eaRes.data ?? []) as Address[]) addressMap.set(a.family_id, a)
     }
 
     // Build CalendarEvents from recurrence rules (for dates without explicit instances)
     const instanceDates = new Set(
       instances.map((i) => `${i.event_id}:${i.instance_date}`)
     )
+    const today = new Date()
     for (const event of eventsData) {
       if (!event.recurrence_rule) continue
       const eventType = typesMap.get(event.event_type_id)
       const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
       const occurrences = getOccurrences(event.recurrence_rule, visibleRange.start, visibleRange.end)
+
+      const evtAny = event as Event & { host_family_id?: string | null; host_until?: string | null }
+      const hostExpired = evtAny.host_until ? new Date(evtAny.host_until + "T23:59:59") < today : false
+      const hostId = hostExpired ? null : (evtAny.host_family_id ?? null)
+      const hostFam = hostId ? familiesMap.get(hostId) : null
+      const hostAddr = hostId ? addressMap.get(hostId) : null
 
       for (const occ of occurrences) {
         const dateStr = format(occ, "yyyy-MM-dd")
@@ -254,10 +303,19 @@ export default function CalendarPage() {
           title: event.title,
           date: occ,
           color,
-          time: event.default_time ?? null,
+          time: formatTime(event.default_time) || null,
           status: "confirmed",
           eventTypeName: eventType?.name ?? null,
           description: event.description,
+          hostFamily: hostFam
+            ? { name: hostFam.family_name, address: hostAddr?.full_address ?? null }
+            : null,
+          eventId: event.id,
+          eventTypeId: event.event_type_id,
+          recurrenceRule: event.recurrence_rule,
+          hostFamilyId: hostId,
+          hostUntil: evtAny.host_until ?? null,
+          isRecurrenceGenerated: true,
         })
       }
     }
@@ -400,6 +458,34 @@ export default function CalendarPage() {
     setSelectedDay((prev) => (prev && isSameDay(prev, day) ? null : day))
   }
 
+  function openCreateForm(day?: Date) {
+    setFormMode("create")
+    setFormDate(day ?? null)
+    setFormEventId(null)
+    setFormOpen(true)
+  }
+
+  function handleEditEvent(event: CalendarEvent) {
+    if (!event.eventId) return
+    setDialogOpen(false)
+    setFormMode("edit")
+    setFormEventId(event.eventId)
+    setFormDate(null)
+    setFormOpen(true)
+  }
+
+  async function handleDeleteEvent(event: CalendarEvent) {
+    if (!event.eventId) return
+    if (!confirm(`Delete "${event.title}"? This removes the event and all its instances.`)) return
+    const supabase = createClient()
+    const { error } = await supabase.from("events").delete().eq("id", event.eventId)
+    if (error) { toast.error(`Failed: ${error.message}`); return }
+    toast.success(`"${event.title}" deleted`)
+    logAudit("event_deleted", "events", event.eventId, { title: event.title })
+    setDialogOpen(false)
+    fetchData()
+  }
+
   // Title for the header
   const headerTitle = useMemo(() => {
     if (view === "week") {
@@ -446,19 +532,26 @@ export default function CalendarPage() {
           <h2 className="text-lg font-semibold">{headerTitle}</h2>
         </div>
 
-        {/* View toggle */}
-        <Tabs
-          value={view}
-          onValueChange={(val) => {
-            setView(val as "week" | "month")
-            setSelectedDay(null)
-          }}
-        >
-          <TabsList>
-            <TabsTrigger value="week">Week</TabsTrigger>
-            <TabsTrigger value="month">Month</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* View toggle + Create button */}
+        <div className="flex items-center gap-2">
+          <Tabs
+            value={view}
+            onValueChange={(val) => {
+              setView(val as "week" | "month")
+              setSelectedDay(null)
+            }}
+          >
+            <TabsList>
+              <TabsTrigger value="week">Week</TabsTrigger>
+              <TabsTrigger value="month">Month</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <EventTypeManager onTypesChanged={fetchData} />
+          <Button size="sm" onClick={() => openCreateForm()}>
+            <Plus className="size-3.5" />
+            Create Event
+          </Button>
+        </div>
       </div>
 
       {/* Legend */}
@@ -492,6 +585,7 @@ export default function CalendarPage() {
               days={days}
               events={events}
               onEventClick={handleEventClick}
+              onDayClick={(day) => openCreateForm(day)}
             />
           )}
 
@@ -511,6 +605,7 @@ export default function CalendarPage() {
                   events={events}
                   onEventClick={handleEventClick}
                   onClose={() => setSelectedDay(null)}
+                  onCreateEvent={(day) => openCreateForm(day)}
                 />
               )}
             </>
@@ -523,6 +618,21 @@ export default function CalendarPage() {
         event={selectedEvent}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        onEdit={handleEditEvent}
+        onDelete={handleDeleteEvent}
+      />
+
+      {/* Event create/edit form dialog */}
+      <EventFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        mode={formMode}
+        initialDate={formDate}
+        eventId={formEventId}
+        onSuccess={() => {
+          setFormOpen(false)
+          fetchData()
+        }}
       />
     </div>
   )

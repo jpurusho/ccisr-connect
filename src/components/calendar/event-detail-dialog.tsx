@@ -1,9 +1,11 @@
 "use client"
 
+import Link from "next/link"
 import { format } from "date-fns"
 import { statusLabel } from "@/lib/date-utils"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -11,15 +13,19 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   CalendarDays,
   Clock,
   MapPin,
+  Mail,
   StickyNote,
   Video,
   Cake,
   Heart,
   Users,
+  Pencil,
+  Trash2,
 } from "lucide-react"
 import type { CalendarEvent } from "./types"
 
@@ -27,6 +33,17 @@ interface EventDetailDialogProps {
   event: CalendarEvent | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onEdit?: (event: CalendarEvent) => void
+  onDelete?: (event: CalendarEvent) => void
+}
+
+const ET_TO_COMM: Record<string, string> = {
+  birthday: "birthday",
+  anniversary: "anniversary",
+  friday_bible_study: "bible_study",
+  wednesday_womens_study: "womens_study",
+  monthly_prayer: "prayer_meeting",
+  bulletin: "bulletin",
 }
 
 const statusColors: Record<string, string> = {
@@ -39,6 +56,8 @@ export function EventDetailDialog({
   event,
   open,
   onOpenChange,
+  onEdit,
+  onDelete,
 }: EventDetailDialogProps) {
   if (!event) return null
 
@@ -181,7 +200,42 @@ export function EventDetailDialog({
           )}
         </div>
 
-        <DialogFooter showCloseButton />
+        <DialogFooter>
+          {event.kind === "event" && event.eventId && (
+            <>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => onDelete?.(event)}
+                className="sm:mr-auto"
+              >
+                <Trash2 className="size-3.5" />
+                Delete
+              </Button>
+              {event.eventTypeName && ET_TO_COMM[event.eventTypeName] && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  render={<Link href={`/dashboard?card=${ET_TO_COMM[event.eventTypeName]}`} />}
+                >
+                  <Mail className="size-3.5" />
+                  Compose Email
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit?.(event)}
+              >
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+            </>
+          )}
+          <DialogClose render={<Button variant="outline" size="sm" />}>
+            Close
+          </DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

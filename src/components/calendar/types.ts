@@ -21,4 +21,11 @@ export type CalendarEvent = {
   } | null
   dispatchStatus?: DispatchStatus | null
   templateType?: string | null
+  eventId?: string | null
+  eventTypeId?: string | null
+  instanceId?: string | null
+  recurrenceRule?: string | null
+  hostFamilyId?: string | null
+  hostUntil?: string | null
+  isRecurrenceGenerated?: boolean
 }

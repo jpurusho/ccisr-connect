@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
+  CalendarDays,
   Users,
   Mail,
   Settings,
@@ -27,6 +28,7 @@ import { APP_VERSION } from "@/lib/version"
 
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Calendar", href: "/calendar", icon: CalendarDays },
   { title: "Members", href: "/members", icon: Users },
   { title: "Email", href: "/email", icon: Mail },
   { title: "Settings", href: "/settings", icon: Settings },

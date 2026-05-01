@@ -12,6 +12,7 @@ import {
   eachDayOfInterval,
 } from "date-fns"
 import { cn } from "@/lib/utils"
+import { Plus } from "lucide-react"
 import type { CalendarEvent } from "./types"
 
 interface MonthViewProps {
@@ -174,11 +175,13 @@ export function DayDetailPanel({
   events,
   onEventClick,
   onClose,
+  onCreateEvent,
 }: {
   day: Date
   events: CalendarEvent[]
   onEventClick: (event: CalendarEvent) => void
   onClose: () => void
+  onCreateEvent?: (day: Date) => void
 }) {
   const dayEvents = events.filter((e) => isSameDay(e.date, day))
 
@@ -256,6 +259,16 @@ export function DayDetailPanel({
               </button>
             ))}
           </div>
+        )}
+        {onCreateEvent && (
+          <button
+            type="button"
+            onClick={() => onCreateEvent(day)}
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            <Plus className="size-3" />
+            New Event
+          </button>
         )}
       </div>
     </div>
