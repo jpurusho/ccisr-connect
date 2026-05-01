@@ -506,21 +506,30 @@ export function EventSchedulePanel() {
                 {isEditing ? (
                   <div className="flex-1 space-y-2">
                     <div className="grid gap-2 sm:grid-cols-2">
-                      <Input value={editTypeName} onChange={(e) => setEditTypeName(e.target.value)} placeholder="Name" />
-                      <Select value={editTypeTemplateId} onValueChange={(val) => setEditTypeTemplateId(val ?? "")}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="None">{templates.find(t => t.id === editTypeTemplateId)?.name || "None"}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-1.5">
+                        <Label>Name</Label>
+                        <Input value={editTypeName} onChange={(e) => setEditTypeName(e.target.value)} placeholder="Name" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Email Template</Label>
+                        <Select value={editTypeTemplateId} onValueChange={(val) => setEditTypeTemplateId(val ?? "")}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="None">{templates.find(t => t.id === editTypeTemplateId)?.name || "None"}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {["#7C3AED", "#0D9488", "#D97706", "#DB2777", "#059669", "#4F46E5", "#DC2626", "#6B7280"].map(c => (
-                        <button key={c} type="button" className={`size-5 rounded-full border-2 transition-transform hover:scale-110 ${editTypeColor === c ? "border-foreground scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} onClick={() => setEditTypeColor(c)} />
-                      ))}
+                    <div className="space-y-1.5">
+                      <Label>Color</Label>
+                      <div className="flex items-center gap-2">
+                        {["#7C3AED", "#0D9488", "#D97706", "#DB2777", "#059669", "#4F46E5", "#DC2626", "#6B7280"].map(c => (
+                          <button key={c} type="button" className={`size-5 rounded-full border-2 transition-transform hover:scale-110 ${editTypeColor === c ? "border-foreground scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} onClick={() => setEditTypeColor(c)} />
+                        ))}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => handleUpdateType(et.id)} disabled={saving}>

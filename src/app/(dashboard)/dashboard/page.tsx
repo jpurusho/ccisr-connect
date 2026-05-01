@@ -41,6 +41,7 @@ import {
   Pencil,
   Trash2,
   Plus,
+  X,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -2213,8 +2214,16 @@ export default function DashboardPage() {
                         </span>
                       )}
                       {hasDraft && status === "draft" && (
-                        <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                           Draft
+                          <button
+                            type="button"
+                            className="ml-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 p-0.5 -mr-0.5"
+                            title="Clear draft — revert to defaults"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteInstance(type) }}
+                          >
+                            <X className="size-2.5" />
+                          </button>
                         </span>
                       )}
                     </div>
