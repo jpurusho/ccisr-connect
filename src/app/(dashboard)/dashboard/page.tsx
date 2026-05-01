@@ -2108,7 +2108,7 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="py-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Upcoming This Week</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{weekOffset === 0 ? "This Week" : weekOffset > 0 ? "Upcoming" : "Past Week"}</p>
               <Link href="/calendar" className="text-xs text-primary hover:underline">Full Calendar</Link>
             </div>
             <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
