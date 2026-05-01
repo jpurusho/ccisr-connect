@@ -926,12 +926,15 @@ export default function DashboardPage() {
         if (url) bsCommon.resourceLinks = [{ label: (def.resourceLinkLabel as string) || "View Resources", url }]
       }
 
+      const bsDateStr = bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"
+      const bsTimeStr = bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : null
+
       if (hasBsDraft) {
         const fd = composedMap["bible_study"].form_data as Record<string, unknown>
         setBibleStudyForm({
           title: (fd.title as string) ?? bsDef.title ?? "Bible Study This Friday",
-          date: (fd.date as string) ?? (bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"),
-          time: (fd.time as string) ?? bsDef.time ?? "7:30 PM",
+          date: bsDateStr,
+          time: bsTimeStr ?? (fd.time as string) ?? bsDef.time ?? "7:30 PM",
           topic: (fd.topic as string) ?? bsDef.topic ?? "Studying the Book of Acts",
           locations: (fd.locations as BibleStudyFormData["locations"]) ?? bsDef.locations ?? [],
           ...bsCommon,
@@ -974,13 +977,15 @@ export default function DashboardPage() {
       const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, wkSun, wkSat) : []
       const wsDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
 
+      const wsDateStr = wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week"
+
       const wsCommon = extractCommonFields(wsDef)
       if (hasWsDraft) {
         const fd = composedMap["womens_study"].form_data as Record<string, unknown>
         setWomensStudyForm({
           title: (fd.title as string) ?? wsDef.title ?? "Women's Bible Study",
           topic: (fd.topic as string) ?? wsDef.topic ?? "Building a Relationship with God",
-          date: (fd.date as string) ?? (wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week"),
+          date: wsDateStr,
           time: (fd.time as string) ?? wsDef.time ?? "7:00 PM",
           zoomLink: (fd.zoomLink as string) ?? wsDef.zoomLink ?? "",
           zoomMeetingId: (fd.zoomMeetingId as string) ?? wsDef.zoomMeetingId ?? "",
@@ -1009,12 +1014,15 @@ export default function DashboardPage() {
       const pmDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
       const pmInstance = pmDate && pmEvent ? findInstance(pmEvent.id, format(pmDate, "yyyy-MM-dd")) : null
 
+      const pmDateStr = pmDate ? format(pmDate, "EEEE, MMMM do") : null
+      const pmTimeStr = pmInstance?.instance_time ? formatTime(pmInstance.instance_time) : null
+
       const pmCommon = extractCommonFields(pmDef)
       if (hasPmDraft) {
         const fd = composedMap["prayer_meeting"].form_data as Record<string, unknown>
         setPrayerMeetingForm({
-          date: (fd.date as string) ?? pmDef.date ?? "",
-          time: (fd.time as string) ?? pmDef.time ?? "6:00 PM",
+          date: pmDateStr ?? "",
+          time: pmTimeStr ?? ((fd.time as string) ?? pmDef.time ?? "6:00 PM"),
           hostNames: (fd.hostNames as string) ?? pmDef.hostNames ?? "TBD",
           address: (fd.address as string) ?? pmDef.address ?? "TBD",
           city: (fd.city as string) ?? pmDef.city ?? "",
@@ -1031,8 +1039,8 @@ export default function DashboardPage() {
         if (pmInstance?.location_override) pmHostData.address = pmInstance.location_override
 
         setPrayerMeetingForm({
-          date: pmDate ? format(pmDate, "EEEE, MMMM do") : pmDef.date ?? "",
-          time: pmInstance?.instance_time ? formatTime(pmInstance.instance_time) : pmDef.time ?? "6:00 PM",
+          date: pmDateStr ?? pmDef.date ?? "",
+          time: pmTimeStr ?? pmDef.time ?? "6:00 PM",
           hostNames: pmHostData.hostName,
           address: pmHostData.address,
           city: pmHostData.city,
@@ -2220,6 +2228,9 @@ export default function DashboardPage() {
                       if (sentTs) return <p className="mt-0.5 text-[10px] text-green-600 dark:text-green-400">Sent {sentTs}</p>
                       if (modTs && hasDraft) return <p className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-400">Modified {modTs}</p>
                       if (weekOffset < 0 && !hasDraft && status === "draft" && hasData) return <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">Not dispatched</p>
+                      if (!hasData && (type === "bible_study" || type === "womens_study" || type === "prayer_meeting")) {
+                        return <Link href="/settings" className="mt-0.5 text-[10px] text-primary hover:underline" onClick={(e) => e.stopPropagation()}>Set up schedule</Link>
+                      }
                       return null
                     })()}
                   </div>

@@ -138,7 +138,17 @@ function describeRule(rule: string | null): string {
 
 export function EventSchedulePanel() {
   const [events, setEvents] = useState<EventRow[]>([])
+  const [eventTypes, setEventTypes] = useState<{ id: string; name: string; is_active: boolean; default_template_id: string | null; color_scheme: { primary: string } | null }[]>([])
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [creatingType, setCreatingType] = useState(false)
+  const [newTypeName, setNewTypeName] = useState("")
+  const [newTypeTemplateId, setNewTypeTemplateId] = useState("")
+  const [newTypeColor, setNewTypeColor] = useState("#6B7280")
+  const [editingTypeId, setEditingTypeId] = useState<string | null>(null)
+  const [editTypeName, setEditTypeName] = useState("")
+  const [editTypeTemplateId, setEditTypeTemplateId] = useState("")
+  const [editTypeColor, setEditTypeColor] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editRule, setEditRule] = useState<ParsedRule>({ freq: "WEEKLY", byDay: "FR", nthWeek: "", except: [], until: "" })
   const [editTime, setEditTime] = useState("")
@@ -146,20 +156,29 @@ export function EventSchedulePanel() {
   const [newExceptDate, setNewExceptDate] = useState("")
   const [rangeFrom, setRangeFrom] = useState("")
   const [rangeTo, setRangeTo] = useState("")
+  const [creating, setCreating] = useState(false)
+  const [newEvent, setNewEvent] = useState({ title: "", eventTypeId: "", freq: "WEEKLY", byDay: "FR", nthWeek: "", time: "" })
 
   const fetchEvents = useCallback(async () => {
     setLoading(true)
     const supabase = createClient()
 
-    const [eventsRes, typesRes] = await Promise.all([
+    const [eventsRes, typesRes, templatesRes] = await Promise.all([
       supabase.from("events").select("id, title, recurrence_rule, default_time, is_active, event_type_id")
         .order("title")
         .returns<{ id: string; title: string; recurrence_rule: string | null; default_time: string | null; is_active: boolean; event_type_id: string }[]>(),
-      supabase.from("event_types").select("id, name, color_scheme")
-        .returns<{ id: string; name: string; color_scheme: { primary: string } | null }[]>(),
+      supabase.from("event_types").select("id, name, color_scheme, is_active, default_template_id")
+        .order("name")
+        .returns<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null }[]>(),
+      supabase.from("email_templates").select("id, name")
+        .order("name")
+        .returns<{ id: string; name: string }[]>(),
     ])
 
-    const typeMap = new Map((typesRes.data ?? []).map(t => [t.id, t]))
+    const types = typesRes.data ?? []
+    setEventTypes(types)
+    setTemplates(templatesRes.data ?? [])
+    const typeMap = new Map(types.map(t => [t.id, t]))
 
     const rows: EventRow[] = (eventsRes.data ?? []).map(e => {
       const et = typeMap.get(e.event_type_id)
@@ -218,6 +237,108 @@ export function EventSchedulePanel() {
       toast.error("An unexpected error occurred")
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleCreateType() {
+    if (!newTypeName.trim()) { toast.error("Name is required"); return }
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("event_types").insert({
+        name: newTypeName.trim(),
+        default_template_id: newTypeTemplateId || null,
+        color_scheme: { primary: newTypeColor },
+        is_active: true,
+      } as never)
+      if (error) toast.error(`Failed: ${error.message}`)
+      else {
+        toast.success(`Event type "${newTypeName}" created`)
+        logAudit("event_type_created", "event_types", null, { name: newTypeName })
+        setCreatingType(false)
+        setNewTypeName("")
+        setNewTypeTemplateId("")
+        setNewTypeColor("#6B7280")
+        fetchEvents()
+      }
+    } finally { setSaving(false) }
+  }
+
+  async function handleUpdateType(id: string) {
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("event_types").update({
+        name: editTypeName.trim(),
+        default_template_id: editTypeTemplateId || null,
+        color_scheme: { primary: editTypeColor },
+      } as never).eq("id", id)
+      if (error) toast.error(`Failed: ${error.message}`)
+      else {
+        toast.success("Event type updated")
+        logAudit("event_type_updated", "event_types", id, { name: editTypeName })
+        setEditingTypeId(null)
+        fetchEvents()
+      }
+    } finally { setSaving(false) }
+  }
+
+  async function handleToggleType(id: string, currentActive: boolean) {
+    const supabase = createClient()
+    const { error } = await supabase.from("event_types").update({ is_active: !currentActive } as never).eq("id", id)
+    if (error) toast.error(`Failed: ${error.message}`)
+    else {
+      toast.success(`Event type ${currentActive ? "deactivated" : "activated"}`)
+      logAudit("event_type_toggled", "event_types", id, { is_active: !currentActive })
+      fetchEvents()
+    }
+  }
+
+  async function handleCreate() {
+    if (!newEvent.title.trim() || !newEvent.eventTypeId) {
+      toast.error("Title and event type are required")
+      return
+    }
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const byDay = newEvent.freq === "MONTHLY" && newEvent.nthWeek
+        ? `${newEvent.nthWeek}${newEvent.byDay}`
+        : newEvent.byDay
+      const rule = `FREQ=${newEvent.freq};BYDAY=${byDay}`
+
+      const { error } = await supabase.from("events").insert({
+        title: newEvent.title.trim(),
+        event_type_id: newEvent.eventTypeId,
+        recurrence_rule: rule,
+        default_time: newEvent.time || null,
+        is_active: true,
+      } as never)
+
+      if (error) {
+        toast.error(`Failed: ${error.message}`)
+      } else {
+        toast.success(`"${newEvent.title}" created`)
+        logAudit("event_created", "events", null, { title: newEvent.title })
+        setCreating(false)
+        setNewEvent({ title: "", eventTypeId: "", freq: "WEEKLY", byDay: "FR", nthWeek: "", time: "" })
+        fetchEvents()
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(event: EventRow) {
+    if (!confirm(`Delete "${event.title}"? This will remove the event and its schedule.`)) return
+    const supabase = createClient()
+    const { error } = await supabase.from("events").delete().eq("id", event.id)
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+    } else {
+      toast.success(`"${event.title}" deleted`)
+      logAudit("event_deleted", "events", event.id, { title: event.title })
+      fetchEvents()
     }
   }
 
@@ -302,25 +423,275 @@ export function EventSchedulePanel() {
     toast.success(`Added ${newDates.length} skip date${newDates.length > 1 ? "s" : ""}`)
   }
 
+  const activeTypes = eventTypes.filter(t => t.is_active)
+  const inactiveTypes = eventTypes.filter(t => !t.is_active)
+
   return (
     <div className="space-y-6">
       <div>
         <p className="text-muted-foreground">
-          Manage recurring event schedules. Set frequency, day, exceptions (vacation/holidays), and end dates.
+          Manage event types, associate templates, and set recurring schedules.
         </p>
       </div>
 
+      {/* ── Event Types ── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="size-5" />
-            Recurring Events
-          </CardTitle>
-          <CardDescription>
-            {events.length} event{events.length !== 1 ? "s" : ""} configured
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Event Types</CardTitle>
+              <CardDescription>
+                Define event categories and link them to email templates.
+              </CardDescription>
+            </div>
+            {!creatingType && (
+              <Button size="sm" onClick={() => setCreatingType(true)}>
+                <Plus className="size-3.5" />
+                Add Type
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {creatingType && (
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="nt-name">Name *</Label>
+                  <Input
+                    id="nt-name"
+                    value={newTypeName}
+                    onChange={(e) => setNewTypeName(e.target.value)}
+                    placeholder="e.g., Youth Meeting"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email Template</Label>
+                  <Select value={newTypeTemplateId} onValueChange={(val) => setNewTypeTemplateId(val ?? "")}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="None">{templates.find(t => t.id === newTypeTemplateId)?.name || "None"}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Color</Label>
+                <div className="flex items-center gap-2">
+                  {["#7C3AED", "#0D9488", "#D97706", "#DB2777", "#059669", "#4F46E5", "#DC2626", "#6B7280"].map(c => (
+                    <button key={c} type="button" className={`size-6 rounded-full border-2 transition-transform hover:scale-110 ${newTypeColor === c ? "border-foreground scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} onClick={() => setNewTypeColor(c)} />
+                  ))}
+                  <Input type="color" value={newTypeColor} onChange={(e) => setNewTypeColor(e.target.value)} className="h-6 w-8 cursor-pointer rounded border-0 p-0" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleCreateType} disabled={saving || !newTypeName.trim()}>
+                  {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                  Create
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setCreatingType(false)}>Cancel</Button>
+              </div>
+            </div>
+          )}
+
+          {activeTypes.map(et => {
+            const tmpl = templates.find(t => t.id === et.default_template_id)
+            const isEditing = editingTypeId === et.id
+            return (
+              <div key={et.id} className="flex items-center gap-3 rounded-lg border px-3 py-2">
+                <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: et.color_scheme?.primary || "#6B7280" }} />
+                {isEditing ? (
+                  <div className="flex-1 space-y-2">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Input value={editTypeName} onChange={(e) => setEditTypeName(e.target.value)} placeholder="Name" />
+                      <Select value={editTypeTemplateId} onValueChange={(val) => setEditTypeTemplateId(val ?? "")}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="None">{templates.find(t => t.id === editTypeTemplateId)?.name || "None"}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {["#7C3AED", "#0D9488", "#D97706", "#DB2777", "#059669", "#4F46E5", "#DC2626", "#6B7280"].map(c => (
+                        <button key={c} type="button" className={`size-5 rounded-full border-2 transition-transform hover:scale-110 ${editTypeColor === c ? "border-foreground scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} onClick={() => setEditTypeColor(c)} />
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleUpdateType(et.id)} disabled={saving}>
+                        {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingTypeId(null)}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{et.name}</p>
+                      {tmpl && <p className="text-xs text-muted-foreground truncate">Template: {tmpl.name}</p>}
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => { setEditingTypeId(et.id); setEditTypeName(et.name); setEditTypeTemplateId(et.default_template_id || ""); setEditTypeColor(et.color_scheme?.primary || "#6B7280") }}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleToggleType(et.id, true)} className="text-muted-foreground hover:text-destructive" title="Deactivate">
+                      <X className="size-3.5" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            )
+          })}
+
+          {inactiveTypes.length > 0 && (
+            <div className="pt-2 space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Inactive</p>
+              {inactiveTypes.map(et => (
+                <div key={et.id} className="flex items-center gap-3 rounded-lg border border-dashed px-3 py-2 opacity-60">
+                  <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: et.color_scheme?.primary || "#6B7280" }} />
+                  <p className="flex-1 text-sm truncate">{et.name}</p>
+                  <Button variant="outline" size="sm" onClick={() => handleToggleType(et.id, false)}>
+                    Reactivate
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTypes.length === 0 && !creatingType && (
+            <p className="text-sm text-muted-foreground text-center py-4">No event types defined yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Recurring Events ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="size-5" />
+                Recurring Events
+              </CardTitle>
+              <CardDescription>
+                {events.length} event{events.length !== 1 ? "s" : ""} configured
+              </CardDescription>
+            </div>
+            {!creating && (
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus className="size-3.5" />
+                Add Event
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
+          {creating && (
+            <div className="mb-4 rounded-lg border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-semibold">New Event</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ne-title">Title *</Label>
+                  <Input
+                    id="ne-title"
+                    value={newEvent.title}
+                    onChange={(e) => setNewEvent((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="e.g., Youth Bible Study"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ne-type">Event Type *</Label>
+                  <Select
+                    value={newEvent.eventTypeId}
+                    onValueChange={(val) => setNewEvent((prev) => ({ ...prev, eventTypeId: val ?? "" }))}
+                  >
+                    <SelectTrigger id="ne-type" className="w-full">
+                      <SelectValue placeholder="Select type...">{activeTypes.find((t) => t.id === newEvent.eventTypeId)?.name || "Select type..."}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeTypes.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Frequency</Label>
+                  <Select
+                    value={newEvent.freq}
+                    onValueChange={(val) => setNewEvent((prev) => ({ ...prev, freq: val ?? "WEEKLY", nthWeek: val === "WEEKLY" ? "" : prev.nthWeek }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WEEKLY">Weekly</SelectItem>
+                      <SelectItem value="MONTHLY">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Day</Label>
+                  <Select
+                    value={newEvent.byDay}
+                    onValueChange={(val) => setNewEvent((prev) => ({ ...prev, byDay: val ?? "FR" }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAY_OPTIONS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newEvent.freq === "MONTHLY" && (
+                  <div className="space-y-1.5">
+                    <Label>Which</Label>
+                    <Select
+                      value={newEvent.nthWeek}
+                      onValueChange={(val) => setNewEvent((prev) => ({ ...prev, nthWeek: val ?? "" }))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NTH_OPTIONS.map((n) => (
+                          <SelectItem key={n.value || "every"} value={n.value || "every"}>{n.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="ne-time">Default Time</Label>
+                  <Input
+                    id="ne-time"
+                    type="time"
+                    value={newEvent.time}
+                    onChange={(e) => setNewEvent((prev) => ({ ...prev, time: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" onClick={handleCreate} disabled={saving || !newEvent.title.trim() || !newEvent.eventTypeId}>
+                  {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                  Create
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setCreating(false)} disabled={saving}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -362,13 +733,23 @@ export function EventSchedulePanel() {
                         onCheckedChange={() => toggleActive(event)}
                       />
                       {editingId !== event.id ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => startEditing(event)}
-                        >
-                          Edit Schedule
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditing(event)}
+                          >
+                            Edit Schedule
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(event)}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </>
                       ) : (
                         <Button
                           variant="ghost"
