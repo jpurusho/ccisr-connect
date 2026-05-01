@@ -117,6 +117,7 @@ interface DispatchRecord {
   body_html: string | null
   status: string
   scheduled_at: string | null
+  sent_at: string | null
   created_at: string
   template_type: string | null
   week_start: string | null
@@ -191,6 +192,23 @@ const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
   womens_study: (s) => /women.*(?:bible|study)/i.test(s),
   prayer_meeting: (s) => /prayer/i.test(s),
   bulletin: (s) => /bulletin/i.test(s),
+}
+
+// ── Relative time helper ─────────────────────────────────────────────────
+
+function formatRelativeTime(isoStr: string | null | undefined): string | null {
+  if (!isoStr) return null
+  const d = new Date(isoStr)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d ago`
+  return format(d, "MMM d")
 }
 
 // ── Custom dashboard template form data ──────────────────────────────────
@@ -318,6 +336,7 @@ export default function DashboardPage() {
   // ---- Composed instance tracking ----
   const [instanceIds, setInstanceIds] = useState<Partial<Record<CommType, string>>>({})
   const [instanceWeeks, setInstanceWeeks] = useState<Partial<Record<CommType, string>>>({})
+  const [instanceUpdatedAt, setInstanceUpdatedAt] = useState<Partial<Record<CommType, string>>>({})
   const [savingInstance, setSavingInstance] = useState<CommType | null>(null)
 
   const [dispatches, setDispatches] = useState<
@@ -439,7 +458,7 @@ export default function DashboardPage() {
   const [customDashTemplates, setCustomDashTemplates] = useState<DashboardCustomTemplate[]>([])
   const [customForms, setCustomForms] = useState<Record<string, CustomDashFormData>>({})
   const [customInstanceIds, setCustomInstanceIds] = useState<Record<string, string>>({})
-  const [customDispatches, setCustomDispatches] = useState<Record<string, { status: string; count: number }>>({})
+  const [customDispatches, setCustomDispatches] = useState<Record<string, { status: string; count: number; lastSentAt: string | null }>>({})
   const [customSubjectOverrides, setCustomSubjectOverrides] = useState<Record<string, string>>({})
   const [customCommOptions, setCustomCommOptions] = useState<Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }>>({})
   const [customSnapshots, setCustomSnapshots] = useState<Record<string, Record<string, unknown>>>({})
@@ -628,7 +647,7 @@ export default function DashboardPage() {
         // This week dispatches
         supabase
           .from("dispatch_queue")
-          .select("id, subject, body_html, status, scheduled_at, created_at, template_type, week_start, mailing_list_id, smtp_config_id, additional_recipients")
+          .select("id, subject, body_html, status, scheduled_at, sent_at, created_at, template_type, week_start, mailing_list_id, smtp_config_id, additional_recipients")
           .not("status", "eq", "cancelled")
           .or(`week_start.eq.${wkSunISO},and(week_start.is.null,created_at.gte.${wkSunISO},created_at.lte.${wkSatISO}T23:59:59)`)
           .order("created_at", { ascending: false })
@@ -665,10 +684,10 @@ export default function DashboardPage() {
         // Composed instances: match current week, bulletin week, or recurring
         supabase
           .from("composed_instances")
-          .select("id, template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until")
+          .select("id, template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until, updated_at")
           .eq("is_active", true)
           .or(`week_start.eq.${wkSunISO},and(is_recurring.eq.true,week_start.lte.${wkSunISO})`)
-          .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null }[]>(),
+          .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null; updated_at: string }[]>(),
       ])
 
       // Check errors
@@ -726,18 +745,21 @@ export default function DashboardPage() {
         }
       }
 
-      // Track composed instance IDs and week_start for save/delete
+      // Track composed instance IDs, week_start, and updated_at for save/delete
       const resolvedInstanceIds: Partial<Record<CommType, string>> = {}
       const resolvedInstanceWeeks: Partial<Record<CommType, string>> = {}
+      const resolvedInstanceUpdatedAt: Partial<Record<CommType, string>> = {}
       const commTypeKeys: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
       for (const ct of commTypeKeys) {
         if (composedMap[ct]) {
           resolvedInstanceIds[ct] = composedMap[ct].id
           if (composedMap[ct].week_start) resolvedInstanceWeeks[ct] = composedMap[ct].week_start!
+          if (composedMap[ct].updated_at) resolvedInstanceUpdatedAt[ct] = composedMap[ct].updated_at
         }
       }
       setInstanceIds(resolvedInstanceIds)
       setInstanceWeeks(resolvedInstanceWeeks)
+      setInstanceUpdatedAt(resolvedInstanceUpdatedAt)
 
       // Priority: composed instance > template defaults > hardcoded fallbacks
       const resolve = (ciKey: string, etKey: string, fallbackKey?: string): CommonCardFields & Record<string, unknown> =>
@@ -1224,18 +1246,20 @@ export default function DashboardPage() {
       setCustomSubjects(subjectOverrides)
 
       // Match dispatches for custom templates
-      const customDispInfo: Record<string, { status: string; count: number }> = {}
+      const customDispInfo: Record<string, { status: string; count: number; lastSentAt: string | null }> = {}
       for (const ct of dashCustom) {
         const ctKey = `custom:${ct.id}`
         let dCount = 0
         let dStatus = "draft"
+        let lastSent: string | null = null
         for (const d of weekDispatches) {
           if (d.template_type === ctKey) {
             dCount++
             if (dCount === 1) dStatus = mapDispatchStatus(d.status)
+            if (d.sent_at && (!lastSent || d.sent_at > lastSent)) lastSent = d.sent_at
           }
         }
-        customDispInfo[ct.id] = { status: dStatus, count: dCount }
+        customDispInfo[ct.id] = { status: dStatus, count: dCount, lastSentAt: lastSent }
       }
       setCustomDispatches(customDispInfo)
     } catch (err) {
@@ -2189,9 +2213,15 @@ export default function DashboardPage() {
                     <p className="mt-0.5 text-xs text-muted-foreground truncate">
                       {shortSummaries[type]}
                     </p>
-                    {weekOffset < 0 && !hasDraft && status === "draft" && hasData && (
-                      <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">Not dispatched</p>
-                    )}
+                    {(() => {
+                      const d = dispatches[type]
+                      const sentTs = formatRelativeTime(d?.sent_at)
+                      const modTs = formatRelativeTime(instanceUpdatedAt[type])
+                      if (sentTs) return <p className="mt-0.5 text-[10px] text-green-600 dark:text-green-400">Sent {sentTs}</p>
+                      if (modTs && hasDraft) return <p className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-400">Modified {modTs}</p>
+                      if (weekOffset < 0 && !hasDraft && status === "draft" && hasData) return <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">Not dispatched</p>
+                      return null
+                    })()}
                   </div>
 
                   {/* Active dot */}
@@ -2246,17 +2276,17 @@ export default function DashboardPage() {
             const count = dispatchCounts[type]
             const hasDraft = !!instanceIds[type]
 
+            const d = dispatches[type]
+            const sentTs = d?.sent_at ? format(new Date(d.sent_at), "MMM d 'at' h:mm a") : null
             if (status === "sent" && count > 0) {
-              summaries.push(`✅ Email sent${count > 1 ? ` (${count}x)` : ""}`)
+              summaries.push(`✅ Email sent${count > 1 ? ` (${count}x)` : ""}${sentTs ? ` — ${sentTs}` : ""}`)
             } else if (status === "scheduled") {
               summaries.push("⏳ Queued for dispatch")
             }
             if (hasDraft) {
-              const iw = instanceWeeks[type]
-              if (iw) {
-                const weekDate = new Date(iw + "T00:00:00")
-                summaries.push(`📌 Draft saved for week of ${format(weekDate, "MMM d")}`)
-              }
+              const modTs = instanceUpdatedAt[type]
+              const modLabel = modTs ? formatRelativeTime(modTs) : null
+              summaries.push(`📌 Draft${modLabel ? ` — modified ${modLabel}` : ""}`)
             }
 
             return (
@@ -2338,6 +2368,11 @@ export default function DashboardPage() {
                       <p className="mt-0.5 text-xs text-muted-foreground truncate">
                         {customForms[ct.id]?.title || "Custom announcement"}
                       </p>
+                      {di.lastSentAt ? (
+                        <p className="mt-0.5 text-[10px] text-green-600 dark:text-green-400">Sent {formatRelativeTime(di.lastSentAt)}</p>
+                      ) : hasDraft ? (
+                        <p className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-400">Draft saved</p>
+                      ) : null}
                     </div>
                     <span className="absolute right-2 top-2 size-2 rounded-full" style={{ backgroundColor: ct.color }} />
                   </button>
@@ -2429,7 +2464,7 @@ export default function DashboardPage() {
                       if (error) toast.error(`Failed: ${error.message}`)
                       else {
                         toast.success(`"${subj}" queued for dispatch`)
-                        setCustomDispatches((prev) => ({ ...prev, [ct.id]: { status: "scheduled", count: (prev[ct.id]?.count ?? 0) + 1 } }))
+                        setCustomDispatches((prev) => ({ ...prev, [ct.id]: { status: "scheduled", count: (prev[ct.id]?.count ?? 0) + 1, lastSentAt: prev[ct.id]?.lastSentAt ?? null } }))
                       }
                     } finally { setSendingType(null) }
                   }}
