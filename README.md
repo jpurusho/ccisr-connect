@@ -14,14 +14,16 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Dedup Tool** — Find and resolve duplicate members by name, email, or phone
 - **Import/Export** — Import from vCard (.vcf), export filtered lists as styled PDF cards
 
-### Communication Hub
-- **Weekly Cards** — Birthday, Anniversary, Bible Study, Women's Study, Bulletin (inactive families automatically excluded)
+### Communication Hub (Dashboard)
+- **Weekly Cards** — Birthday, Anniversary, Bible Study, Women's Study, Prayer Meeting, Bulletin
+- **Week Strip** — Clickable at-a-glance view of events, birthdays, anniversaries, and dispatches
 - **Multi-Location Bible Study** — San Ramon + Mountain House with vacation mode
-- **Template System** — Persistent defaults with theme colors, footer verses, resource links
-- **Custom Announcements** — Create one-off or reusable custom templates
+- **Template System** — Base type inheritance (`BaseFormData`/`BaseCardData`), custom sections with emoji/color, reorderable
+- **Custom Announcements** — Create one-off or reusable custom templates, appear on dashboard
+- **Draft Lifecycle** — Save drafts, cancel (revert to saved), delete, auto-save before dispatch
 - **Per-Card Options** — Independent mailing list, SMTP account, and additional recipients per card
-- **Future Scheduling** — Navigate weeks ahead to prepare communications in advance
-- **Reminders** — Re-send communications with "Reminder:" prefix
+- **Week Navigation** — Navigate past and future weeks to compose or review communications
+- **Reminders** — Re-send communications with "Reminder:" prefix and count tracking
 - **Download** — PDF and PNG (WhatsApp-ready) exports for every card
 
 ### Email Dispatch
@@ -30,10 +32,15 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Scheduled Sending** — Vercel cron for automatic daily dispatch
 - **Mailing Lists** — To/CC/BCC recipients from members or external emails
 
-### Calendar & Events
-- **Week/Month Views** — Colored pill-style events
-- **Event Types** — Birthdays (purple), Anniversaries (amber), Events (teal)
-- **Event Instances** — Host family, location, status tracking
+### Calendar & Event Scheduling
+- **Calendar-First Scheduling** — Create/edit/delete events by clicking dates (Google Calendar model)
+- **Week/Month Views** — Colored pill-style events, birthdays, anniversaries, dispatches
+- **Recurrence** — Weekly, monthly (nth day), exception dates, end dates
+- **Per-Occurrence Editing** — Change host, time, location for a specific date without touching the series
+- **Host Family Expiration** — Assign a host with an expiration date; auto-clears when expired
+- **Event Type Management** — Create/edit/deactivate event types with template associations
+- **Dispatch Tracking** — Sent emails shown on calendar with actual sent date and target week label
+- **View Sent Email** — Click any sent dispatch to see the exact HTML that was delivered
 
 ### Reports & History
 - **Demographics** — Clickable stat cards linking to filtered member views
@@ -47,9 +54,9 @@ A full-featured church management application built with Next.js, Supabase, and 
 graph TB
     subgraph Client["Browser — Next.js App"]
         Dashboard[Communication Hub]
+        Calendar[Calendar & Scheduling]
         Members[Member Management]
-        Calendar[Calendar View]
-        Compose[Compose / Templates]
+        Templates[Email Templates]
         Dispatch[Dispatch Queue]
         Settings[Settings & Config]
     end
@@ -71,8 +78,9 @@ graph TB
     end
 
     Dashboard --> DB
+    Calendar --> DB
     Members --> DB
-    Compose --> DB
+    Templates --> DB
     Dispatch --> SendAPI
     SendAPI --> SMTP
     SendAPI --> DB
@@ -104,17 +112,30 @@ erDiagram
 
 ```mermaid
 flowchart LR
-    A[Template Defaults] --> B[Communication Hub]
-    B --> C{Edit & Preview}
-    C --> D[Dispatch Queue]
-    D --> E{Approve}
-    E -->|Send Now| F[SMTP Send]
-    E -->|Schedule| G[Vercel Cron]
-    G --> F
-    F --> H[Email Delivered]
-    F --> I[Audit Log]
-    B --> J[Download PNG]
-    B --> K[Download PDF]
+    T[Template Defaults] --> D[Dashboard]
+    C[Calendar] -->|Event dates & hosts| D
+    D --> E{Edit & Preview}
+    E --> Q[Dispatch Queue]
+    Q -->|Send Now| S[SMTP Send]
+    Q -->|Schedule| CR[Vercel Cron]
+    CR --> S
+    S --> H[Email Delivered]
+    S --> A[Audit Log]
+    D --> P[Download PNG/PDF]
+```
+
+### Event Lifecycle
+
+```mermaid
+flowchart TB
+    C[Calendar: Create Event] --> EV[events table]
+    EV -->|Recurrence rule| OCC[getOccurrences resolves dates]
+    EV -->|Per-date override| EI[event_instances table]
+    OCC --> DASH[Dashboard: compose email]
+    EI --> DASH
+    DASH --> CI[composed_instances: draft]
+    CI --> DQ[dispatch_queue: sent]
+    DQ -->|Shown on sent_at date| C
 ```
 
 ## Tech Stack
@@ -158,18 +179,19 @@ ccisr-connect/
 │   │       ├── cards/           # Card preview API
 │   │       └── auth/            # OAuth callback
 │   ├── components/
-│   │   ├── dashboard/           # Communication cards, edit forms
-│   │   ├── calendar/            # Week & month views
+│   │   ├── dashboard/           # Communication cards, edit forms, card export
+│   │   ├── calendar/            # Week/month views, event form, instance editor, event types
 │   │   ├── members/             # Table, cards, family, export, import, dedup
 │   │   ├── settings/            # SMTP, users, tags, themes
 │   │   ├── layout/              # Sidebar, user nav
-│   │   └── ui/                  # shadcn/ui primitives
+│   │   └── ui/                  # shadcn/ui primitives (Base UI + react-day-picker)
 │   ├── lib/
 │   │   ├── email/               # Card builder (HTML email generation)
 │   │   ├── supabase/            # Client & middleware
 │   │   ├── audit.ts             # Audit logging helper
 │   │   ├── city-utils.ts        # City name normalization
 │   │   ├── date-utils.ts        # Bulletin week, date helpers
+│   │   ├── recurrence.ts        # Recurrence engine + UI helpers (parse/build/describe)
 │   │   ├── template-defaults.ts # Template type definitions & fallbacks
 │   │   └── utils.ts             # Phone formatting, cn()
 │   └── types/
@@ -233,9 +255,14 @@ Connected to Vercel via GitHub integration. Every push to `main` triggers auto-d
 
 Run these in order via Supabase SQL Editor:
 
-1. `00001_initial_schema.sql` — Core tables, RLS policies, seed data
+1. `00001_initial_schema.sql` — Core tables, RLS policies, seed data (6 event types)
 2. `00002_member_tags.sql` — Tags system (tags + member_tags tables)
 3. `00003_migrate_newcomers_to_tags.sql` — Migrate is_newcomer flags to tags
+4. `00004_composed_instances.sql` — Draft storage for weekly compositions
+5. `00005_composed_instances_weekly.sql` — week_start, is_recurring columns
+6. `00006` through `00010` — Dispatch and template enhancements
+7. `00011_event_types_soft_delete.sql` — Soft delete (is_active) on event_types
+8. `00012_event_host_family.sql` — Host family with expiration on events table
 
 ## License
 
