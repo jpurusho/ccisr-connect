@@ -2324,13 +2324,15 @@ export default function DashboardPage() {
                             Sent{count > 1 ? ` ${count}x` : ""}
                           </span>
                           {dispatches[type]?.body_html && (
-                            <button
-                              type="button"
-                              className="shrink-0 text-[10px] font-medium text-green-600 hover:text-green-800 hover:underline dark:text-green-400"
+                            <span
+                              role="link"
+                              tabIndex={0}
+                              className="shrink-0 cursor-pointer text-[10px] font-medium text-green-600 hover:text-green-800 hover:underline dark:text-green-400"
                               onClick={(e) => { e.stopPropagation(); setSentEmailPreview({ subject: dispatches[type]!.subject, html: dispatches[type]!.body_html! }) }}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setSentEmailPreview({ subject: dispatches[type]!.subject, html: dispatches[type]!.body_html! }) } }}
                             >
                               View
-                            </button>
+                            </span>
                           )}
                         </>
                       )}
@@ -2342,14 +2344,16 @@ export default function DashboardPage() {
                       {hasDraft && status === "draft" && (
                         <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                           Draft
-                          <button
-                            type="button"
-                            className="ml-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 p-0.5 -mr-0.5"
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="ml-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 p-0.5 -mr-0.5 cursor-pointer"
                             title="Clear draft — revert to defaults"
                             onClick={(e) => { e.stopPropagation(); handleDeleteInstance(type) }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); handleDeleteInstance(type) } }}
                           >
                             <X className="size-2.5" />
-                          </button>
+                          </span>
                         </span>
                       )}
                     </div>
