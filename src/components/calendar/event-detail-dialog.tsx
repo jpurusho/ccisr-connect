@@ -68,7 +68,7 @@ export function EventDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-2">
             {event.kind === "birthday" && (
@@ -205,7 +205,7 @@ export function EventDetailDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-wrap gap-2">
           {event.kind === "event" && event.eventId && (
             <>
               <Button
@@ -224,7 +224,7 @@ export function EventDetailDialog({
                   render={<Link href={`/dashboard?card=${ET_TO_COMM[event.eventTypeName]}`} />}
                 >
                   <Mail className="size-3.5" />
-                  Compose Email
+                  Compose
                 </Button>
               )}
               {event.recurrenceRule && (
@@ -234,7 +234,7 @@ export function EventDetailDialog({
                   onClick={() => onEditInstance?.(event)}
                 >
                   <Pencil className="size-3.5" />
-                  Edit Occurrence
+                  Edit Date
                 </Button>
               )}
               <Button
@@ -254,7 +254,7 @@ export function EventDetailDialog({
               onClick={() => onViewDispatchEmail(event)}
             >
               <Eye className="size-3.5" />
-              View Sent Email
+              View Email
             </Button>
           )}
           <DialogClose render={<Button variant="outline" size="sm" />}>
