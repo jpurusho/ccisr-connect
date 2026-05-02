@@ -505,8 +505,8 @@ export default function DashboardPage() {
   const [sendingType, setSendingType] = useState<CommType | null>(null)
 
   // ---- Week strip: recurring events + dispatches ----
-  const [weekStripEvents, setWeekStripEvents] = useState<{ title: string; date: Date; color: string }[]>([])
-  const [weekStripDispatches, setWeekStripDispatches] = useState<{ label: string; date: string; color: string; status: string; targetLabel: string }[]>([])
+  const [weekStripEvents, setWeekStripEvents] = useState<{ title: string; date: Date; color: string; commType: CommType | null }[]>([])
+  const [weekStripDispatches, setWeekStripDispatches] = useState<{ label: string; date: string; color: string; status: string; targetLabel: string; commType: CommType | null; dispatchId: string }[]>([])
 
   // ---- Sent email preview ----
   const [sentEmailPreview, setSentEmailPreview] = useState<{ subject: string; html: string } | null>(null)
@@ -946,18 +946,23 @@ export default function DashboardPage() {
       // ---- Build week strip events (all recurring events resolved to dates) ----
       {
         const etNameToCommColor: Record<string, string> = {}
+        const etNameToCommType: Record<string, CommType> = {}
         for (const bt of BUILTIN_TEMPLATES) {
           const etName = COMM_TYPE_TO_ET[bt.type]
-          if (etName) etNameToCommColor[etName] = bt.color
+          if (etName) {
+            etNameToCommColor[etName] = bt.color
+            etNameToCommType[etName] = bt.type
+          }
         }
-        const stripEvts: { title: string; date: Date; color: string }[] = []
+        const stripEvts: { title: string; date: Date; color: string; commType: CommType | null }[] = []
         for (const evt of activeEvents) {
           if (!evt.recurrence_rule) continue
           const etName = etIdToName[evt.event_type_id] ?? ""
           const color = etNameToCommColor[etName] ?? "#6B7280"
+          const commType = etNameToCommType[etName] ?? null
           const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
           for (const occ of occs) {
-            stripEvts.push({ title: evt.title, date: occ, color })
+            stripEvts.push({ title: evt.title, date: occ, color, commType })
           }
         }
         setWeekStripEvents(stripEvts)
@@ -1302,7 +1307,7 @@ export default function DashboardPage() {
           commColorMap[bt.type] = bt.color
           commLabelMap[bt.type] = bt.label
         }
-        const stripDisps: { label: string; date: string; color: string; status: string; targetLabel: string }[] = []
+        const stripDisps: { label: string; date: string; color: string; status: string; targetLabel: string; commType: CommType | null; dispatchId: string }[] = []
         const seen = new Set<string>()
         for (const d of (stripDispatchesRes.data ?? [])) {
           const ct = d.template_type ?? ""
@@ -1311,6 +1316,7 @@ export default function DashboardPage() {
           seen.add(key)
           const color = commColorMap[ct] ?? "#6B7280"
           const label = commLabelMap[ct] || d.subject.split("—")[0].trim().split(" ").slice(0, 2).join(" ") || "Email"
+          const commType = ct in commColorMap ? (ct as CommType) : null
           const isSent = d.status === "sent"
           const dateStr = isSent && d.sent_at
             ? format(new Date(d.sent_at), "yyyy-MM-dd")
@@ -1321,7 +1327,7 @@ export default function DashboardPage() {
             const we = addDays(ws, 6)
             targetLabel = `${format(ws, "MMM d")}–${format(we, "d")}`
           }
-          stripDisps.push({ label, date: dateStr, color, status: d.status, targetLabel })
+          stripDisps.push({ label, date: dateStr, color, status: d.status, targetLabel, commType, dispatchId: d.id })
         }
         setWeekStripDispatches(stripDisps)
       }
@@ -2150,23 +2156,27 @@ export default function DashboardPage() {
                     >
                       <span className={`text-[10px] font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{day.label}</span>
                       {dayEvents.map((e, i) => (
-                        <span key={`e${i}`} className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white" style={{ backgroundColor: e.color }}>{e.title.replace(/^San Ramon\s*/i, "").split(" ").slice(0, 2).join(" ")}</span>
+                        <button key={`e${i}`} type="button" className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white transition-opacity hover:opacity-80" style={{ backgroundColor: e.color }} onClick={() => e.commType && setSelectedCard(e.commType)}>{e.title.replace(/^San Ramon\s*/i, "").split(" ").slice(0, 2).join(" ")}</button>
                       ))}
                       {dayBdays.map((b, i) => (
-                        <span key={`b${i}`} className="w-full truncate rounded-full bg-purple-500 px-1.5 py-0.5 text-[9px] text-white">{b.name.split(" ")[0]}</span>
+                        <button key={`b${i}`} type="button" className="w-full truncate rounded-full bg-purple-500 px-1.5 py-0.5 text-[9px] text-white transition-opacity hover:opacity-80" onClick={() => setSelectedCard("birthday")}>{b.name.split(" ")[0]}</button>
                       ))}
                       {dayAnnis.map((a, i) => (
-                        <span key={`a${i}`} className="w-full truncate rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] text-white">{a.husbandName}</span>
+                        <button key={`a${i}`} type="button" className="w-full truncate rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] text-white transition-opacity hover:opacity-80" onClick={() => setSelectedCard("anniversary")}>{a.husbandName}</button>
                       ))}
                       {dayDispatches.map((d, i) => (
                         d.status === "sent" ? (
-                          <span key={`d${i}`} className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white" style={{ backgroundColor: d.color }} title={d.targetLabel ? `For week of ${d.targetLabel}` : undefined}>
+                          <button key={`d${i}`} type="button" className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white transition-opacity hover:opacity-80" style={{ backgroundColor: d.color }} title={d.targetLabel ? `For week of ${d.targetLabel}` : undefined} onClick={async () => {
+                            const supabase = createClient()
+                            const { data } = await supabase.from("dispatch_queue").select("subject, body_html").eq("id", d.dispatchId).returns<{ subject: string; body_html: string }[]>().single()
+                            if (data?.body_html) setSentEmailPreview({ subject: data.subject, html: data.body_html })
+                          }}>
                             {d.label} ✓{d.targetLabel ? ` (${d.targetLabel})` : ""}
-                          </span>
+                          </button>
                         ) : (
-                          <span key={`d${i}`} className="w-full truncate rounded-full border border-dashed px-1.5 py-0.5 text-[9px]" style={{ borderColor: d.color, color: d.color }} title={d.targetLabel ? `For week of ${d.targetLabel}` : undefined}>
+                          <button key={`d${i}`} type="button" className="w-full truncate rounded-full border border-dashed px-1.5 py-0.5 text-[9px] transition-opacity hover:opacity-80" style={{ borderColor: d.color, color: d.color }} title={d.targetLabel ? `For week of ${d.targetLabel}` : undefined} onClick={() => d.commType && setSelectedCard(d.commType)}>
                             {d.label}{d.targetLabel ? ` (${d.targetLabel})` : ""}
-                          </span>
+                          </button>
                         )
                       ))}
                       {!hasAnything && (
