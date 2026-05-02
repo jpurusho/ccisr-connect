@@ -371,45 +371,32 @@ export function EventFormDialog({
                   </SelectContent>
                 </Select>
                 {conflictEvent && mode === "create" && (
-                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 space-y-1.5">
-                    <p className="text-xs text-destructive">
-                      &quot;{conflictEvent.title}&quot; already uses this type.
+                  <div className="rounded-md border border-amber-300/50 bg-amber-50/50 p-2.5 space-y-2 dark:border-amber-800/50 dark:bg-amber-950/20">
+                    <p className="text-xs text-amber-800 dark:text-amber-300">
+                      <strong>&quot;{conflictEvent.title}&quot;</strong> already exists as a recurring event. To change host, time, or location for a specific date, click that occurrence on the calendar and use <strong>Edit Occurrence</strong>.
                     </p>
-                    <div className="flex gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 text-[11px]"
-                        onClick={() => {
-                          setTitle(conflictEvent.title)
-                          // Switch to editing the conflicting event in-place
-                          Object.assign(conflictEvent, { __editing: true })
-                          // We can't change mode/eventId props, so delete + recreate
-                        }}
-                        disabled
-                      >
-                        Edit existing (use calendar)
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-6 text-[11px]"
-                        onClick={async () => {
-                          if (!confirm(`Delete "${conflictEvent.title}" so you can create a new one?`)) return
-                          setSaving(true)
-                          try {
-                            const supabase = createClient()
-                            const { error } = await supabase.from("events").delete().eq("id", conflictEvent.id)
-                            if (error) { toast.error(`Failed: ${error.message}`); return }
-                            toast.success(`"${conflictEvent.title}" deleted`)
-                            logAudit("event_deleted", "events", conflictEvent.id, { title: conflictEvent.title })
-                            setExistingEvents((prev) => prev.filter((e) => e.id !== conflictEvent.id))
-                          } finally { setSaving(false) }
-                        }}
-                      >
-                        Delete &amp; replace
-                      </Button>
-                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Only create a new event if you want to replace the existing series entirely.
+                    </p>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-7 text-xs w-full"
+                      onClick={async () => {
+                        if (!confirm(`Delete "${conflictEvent.title}" and create a new event? This removes all instances and history.`)) return
+                        setSaving(true)
+                        try {
+                          const supabase = createClient()
+                          const { error } = await supabase.from("events").delete().eq("id", conflictEvent.id)
+                          if (error) { toast.error(`Failed: ${error.message}`); return }
+                          toast.success(`"${conflictEvent.title}" deleted`)
+                          logAudit("event_deleted", "events", conflictEvent.id, { title: conflictEvent.title })
+                          setExistingEvents((prev) => prev.filter((e) => e.id !== conflictEvent.id))
+                        } finally { setSaving(false) }
+                      }}
+                    >
+                      Delete existing and replace
+                    </Button>
                   </div>
                 )}
               </div>
