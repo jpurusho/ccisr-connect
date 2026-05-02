@@ -26,6 +26,7 @@ import {
   Users,
   Pencil,
   Trash2,
+  Eye,
 } from "lucide-react"
 import type { CalendarEvent } from "./types"
 
@@ -34,7 +35,9 @@ interface EventDetailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onEdit?: (event: CalendarEvent) => void
+  onEditInstance?: (event: CalendarEvent) => void
   onDelete?: (event: CalendarEvent) => void
+  onViewDispatchEmail?: (event: CalendarEvent) => void
 }
 
 const ET_TO_COMM: Record<string, string> = {
@@ -57,7 +60,9 @@ export function EventDetailDialog({
   open,
   onOpenChange,
   onEdit,
+  onEditInstance,
   onDelete,
+  onViewDispatchEmail,
 }: EventDetailDialogProps) {
   if (!event) return null
 
@@ -222,15 +227,35 @@ export function EventDetailDialog({
                   Compose Email
                 </Button>
               )}
+              {event.recurrenceRule && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEditInstance?.(event)}
+                >
+                  <Pencil className="size-3.5" />
+                  Edit Occurrence
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onEdit?.(event)}
               >
-                <Pencil className="size-3.5" />
-                Edit
+                <CalendarDays className="size-3.5" />
+                {event.recurrenceRule ? "Edit Series" : "Edit"}
               </Button>
             </>
+          )}
+          {event.kind === "dispatch" && event.dispatchStatus === "sent" && onViewDispatchEmail && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onViewDispatchEmail(event)}
+            >
+              <Eye className="size-3.5" />
+              View Sent Email
+            </Button>
           )}
           <DialogClose render={<Button variant="outline" size="sm" />}>
             Close

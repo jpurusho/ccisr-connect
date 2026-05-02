@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
@@ -506,6 +507,9 @@ export default function DashboardPage() {
   // ---- Week strip: recurring events + dispatches ----
   const [weekStripEvents, setWeekStripEvents] = useState<{ title: string; date: Date; color: string }[]>([])
   const [weekStripDispatches, setWeekStripDispatches] = useState<{ label: string; date: string; color: string; status: string }[]>([])
+
+  // ---- Sent email preview ----
+  const [sentEmailPreview, setSentEmailPreview] = useState<{ subject: string; html: string } | null>(null)
 
   // ---- Selected communication card (supports ?card= query param from calendar) ----
   const [selectedCard, setSelectedCard] = useState<CommType>("bulletin")
@@ -2295,9 +2299,20 @@ export default function DashboardPage() {
                       <span className="text-sm font-semibold truncate">{cardTitles[type]}</span>
                       {/* Status badges */}
                       {status === "sent" && count > 0 && (
-                        <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                          Sent{count > 1 ? ` ${count}x` : ""}
-                        </span>
+                        <>
+                          <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            Sent{count > 1 ? ` ${count}x` : ""}
+                          </span>
+                          {dispatches[type]?.body_html && (
+                            <button
+                              type="button"
+                              className="shrink-0 text-[10px] font-medium text-green-600 hover:text-green-800 hover:underline dark:text-green-400"
+                              onClick={(e) => { e.stopPropagation(); setSentEmailPreview({ subject: dispatches[type]!.subject, html: dispatches[type]!.body_html! }) }}
+                            >
+                              View
+                            </button>
+                          )}
+                        </>
                       )}
                       {status === "scheduled" && (
                         <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
@@ -2764,6 +2779,23 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Sent email preview dialog */}
+      <Dialog open={!!sentEmailPreview} onOpenChange={(open) => { if (!open) setSentEmailPreview(null) }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Sent Email</DialogTitle>
+            {sentEmailPreview?.subject && (
+              <DialogDescription>{sentEmailPreview.subject}</DialogDescription>
+            )}
+          </DialogHeader>
+          <div
+            className="rounded-lg border bg-white p-4 dark:bg-slate-900"
+            dangerouslySetInnerHTML={{ __html: sentEmailPreview?.html ?? "" }}
+          />
+          <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

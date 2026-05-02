@@ -23,7 +23,16 @@ import { WeekView } from "@/components/calendar/week-view"
 import { MonthView, DayDetailPanel } from "@/components/calendar/month-view"
 import { EventDetailDialog } from "@/components/calendar/event-detail-dialog"
 import { EventFormDialog } from "@/components/calendar/event-form-dialog"
+import { InstanceEditDialog } from "@/components/calendar/instance-edit-dialog"
 import { EventTypeManager } from "@/components/calendar/event-type-manager"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import type { CalendarEvent } from "@/components/calendar/types"
 import type {
   EventInstance,
@@ -62,6 +71,20 @@ export default function CalendarPage() {
   const [formMode, setFormMode] = useState<"create" | "edit">("create")
   const [formDate, setFormDate] = useState<Date | null>(null)
   const [formEventId, setFormEventId] = useState<string | null>(null)
+
+  // Instance edit dialog state
+  const [instanceDialogOpen, setInstanceDialogOpen] = useState(false)
+  const [instanceTarget, setInstanceTarget] = useState<{
+    eventId: string
+    instanceId: string | null
+    instanceDate: string
+    eventTitle: string
+  } | null>(null)
+
+  // Sent email preview state
+  const [sentEmailHtml, setSentEmailHtml] = useState<string | null>(null)
+  const [sentEmailOpen, setSentEmailOpen] = useState(false)
+  const [sentEmailSubject, setSentEmailSubject] = useState("")
 
   // Compute the visible date range based on view
   const visibleRange = useMemo(() => {
@@ -107,13 +130,12 @@ export default function CalendarPage() {
       anniversariesResult,
       dispatchesResult,
     ] = await Promise.all([
-      // Event instances in date range
+      // Event instances in date range (include cancelled to prevent regeneration)
       supabase
         .from("event_instances")
         .select("*")
         .gte("instance_date", startStr)
-        .lte("instance_date", endStr)
-        .neq("status", "cancelled"),
+        .lte("instance_date", endStr),
 
       // All active events (small table, needed for join data)
       supabase.from("events").select("*").eq("is_active", true),
@@ -220,6 +242,9 @@ export default function CalendarPage() {
         const parsed = parseRecurrenceRule(event.recurrence_rule)
         if (parsed.until && instance.instance_date > parsed.until) continue
       }
+
+      // Skip cancelled instances from display (but they're still in instanceDates to prevent regeneration)
+      if (instance.status === "cancelled") continue
 
       const eventType = typesMap.get(event.event_type_id)
       const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
@@ -486,6 +511,37 @@ export default function CalendarPage() {
     fetchData()
   }
 
+  function handleEditInstance(event: CalendarEvent) {
+    if (!event.eventId) return
+    setDialogOpen(false)
+    setInstanceTarget({
+      eventId: event.eventId,
+      instanceId: event.instanceId ?? null,
+      instanceDate: format(event.date, "yyyy-MM-dd"),
+      eventTitle: event.title,
+    })
+    setInstanceDialogOpen(true)
+  }
+
+  async function handleViewDispatchEmail(event: CalendarEvent) {
+    const dispatchId = event.id.replace("dispatch-", "")
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("dispatch_queue")
+      .select("subject, body_html")
+      .eq("id", dispatchId)
+      .returns<{ subject: string; body_html: string }[]>()
+      .single()
+    if (error || !data?.body_html) {
+      toast.error("Could not load email content")
+      return
+    }
+    setSentEmailSubject(data.subject)
+    setSentEmailHtml(data.body_html)
+    setDialogOpen(false)
+    setSentEmailOpen(true)
+  }
+
   // Title for the header
   const headerTitle = useMemo(() => {
     if (view === "week") {
@@ -619,7 +675,9 @@ export default function CalendarPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onEdit={handleEditEvent}
+        onEditInstance={handleEditInstance}
         onDelete={handleDeleteEvent}
+        onViewDispatchEmail={handleViewDispatchEmail}
       />
 
       {/* Event create/edit form dialog */}
@@ -634,6 +692,40 @@ export default function CalendarPage() {
           fetchData()
         }}
       />
+
+      {/* Instance edit dialog */}
+      {instanceTarget && (
+        <InstanceEditDialog
+          open={instanceDialogOpen}
+          onOpenChange={setInstanceDialogOpen}
+          eventId={instanceTarget.eventId}
+          instanceId={instanceTarget.instanceId}
+          instanceDate={instanceTarget.instanceDate}
+          eventTitle={instanceTarget.eventTitle}
+          onSuccess={() => {
+            setInstanceDialogOpen(false)
+            setInstanceTarget(null)
+            fetchData()
+          }}
+        />
+      )}
+
+      {/* Sent email preview dialog */}
+      <Dialog open={sentEmailOpen} onOpenChange={setSentEmailOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Sent Email</DialogTitle>
+            {sentEmailSubject && (
+              <DialogDescription>{sentEmailSubject}</DialogDescription>
+            )}
+          </DialogHeader>
+          <div
+            className="rounded-lg border bg-white p-4 dark:bg-slate-900"
+            dangerouslySetInnerHTML={{ __html: sentEmailHtml ?? "" }}
+          />
+          <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
