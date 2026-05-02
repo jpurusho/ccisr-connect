@@ -45,6 +45,7 @@ import {
   X,
   Search,
   UserPlus,
+  Inbox,
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -293,6 +294,7 @@ export default function MailingListsPage() {
       setRecipients((prev) =>
         prev.map((r) => r.id === recipientId ? { ...r, recipient_type: newType } : r)
       )
+      toast.success(`Changed to ${newType.toUpperCase()}`)
     }
   }
 
@@ -588,63 +590,54 @@ export default function MailingListsPage() {
                           </div>
                         </div>
 
-                        {/* ── Recipient list grouped by type ── */}
+                        {/* ── Flat recipient list ── */}
                         {recipients.length === 0 ? (
-                          <p className="text-center text-sm text-muted-foreground py-4">
-                            No recipients yet. Search for members or add email addresses above.
-                          </p>
+                          <div className="flex flex-col items-center gap-2 py-6 text-center">
+                            <Inbox className="size-8 text-muted-foreground/30" />
+                            <p className="text-sm text-muted-foreground">
+                              No recipients yet
+                            </p>
+                            <p className="text-xs text-muted-foreground/70">
+                              Search for members or add email addresses above
+                            </p>
+                          </div>
                         ) : (
-                          <div className="space-y-3">
-                            {(["to", "cc", "bcc"] as const).map((type) => {
-                              const typeRecipients = recipients.filter(
-                                (r) => r.recipient_type === type
-                              )
-                              if (typeRecipients.length === 0) return null
-                              return (
-                                <div key={type}>
-                                  <p className="text-[10px] font-semibold uppercase text-muted-foreground mb-1.5 tracking-wider">
-                                    {type} ({typeRecipients.length})
-                                  </p>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {typeRecipients.map((r) => (
-                                      <Badge
-                                        key={r.id}
-                                        variant="secondary"
-                                        className="gap-1 pr-1 font-normal"
-                                      >
-                                        <select
-                                          value={r.recipient_type}
-                                          onChange={(e) =>
-                                            updateRecipientType(r.id, e.target.value as RecipientType)
-                                          }
-                                          className="h-4 border-none bg-transparent text-[10px] font-semibold uppercase outline-none cursor-pointer appearance-none w-7"
-                                          title="Change recipient type"
-                                        >
-                                          <option value="to">TO</option>
-                                          <option value="cc">CC</option>
-                                          <option value="bcc">BCC</option>
-                                        </select>
-                                        <span className="max-w-40 truncate">
-                                          {r.member_name || r.external_email}
-                                        </span>
-                                        {r.member_name && r.member_email && (
-                                          <span className="text-[10px] opacity-60 hidden sm:inline">
-                                            {r.member_email}
-                                          </span>
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={() => removeRecipient(r.id)}
-                                          className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
-                                        >
-                                          <X className="size-3" />
-                                        </button>
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                              )
-                            })}
+                          <div className="flex flex-wrap gap-1.5">
+                            {recipients.map((r) => (
+                              <Badge
+                                key={r.id}
+                                variant="secondary"
+                                className="gap-1 pr-1 font-normal"
+                              >
+                                <select
+                                  value={r.recipient_type}
+                                  onChange={(e) =>
+                                    updateRecipientType(r.id, e.target.value as RecipientType)
+                                  }
+                                  className="h-4 rounded border-none bg-primary/10 text-[10px] font-semibold uppercase text-primary outline-none cursor-pointer px-0.5"
+                                  title="Change recipient type"
+                                >
+                                  <option value="to">TO</option>
+                                  <option value="cc">CC</option>
+                                  <option value="bcc">BCC</option>
+                                </select>
+                                <span className="max-w-40 truncate">
+                                  {r.member_name || r.external_email}
+                                </span>
+                                {r.member_name && r.member_email && (
+                                  <span className="text-[10px] opacity-60 hidden sm:inline">
+                                    {r.member_email}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => removeRecipient(r.id)}
+                                  className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              </Badge>
+                            ))}
                           </div>
                         )}
                       </>
