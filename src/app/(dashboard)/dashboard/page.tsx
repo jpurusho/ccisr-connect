@@ -714,11 +714,11 @@ export default function DashboardPage() {
         // Strip dispatches: anything sent during this week (for the upcoming strip)
         supabase
           .from("dispatch_queue")
-          .select("id, template_type, status, sent_at, created_at, week_start")
+          .select("id, subject, template_type, status, sent_at, created_at, week_start")
           .not("status", "eq", "cancelled")
           .or(`and(sent_at.gte.${wkSunISO},sent_at.lte.${wkSatISO}T23:59:59),and(status.neq.sent,week_start.eq.${wkSunISO})`)
           .order("created_at", { ascending: false })
-          .returns<{ id: string; template_type: string | null; status: string; sent_at: string | null; created_at: string; week_start: string | null }[]>(),
+          .returns<{ id: string; subject: string; template_type: string | null; status: string; sent_at: string | null; created_at: string; week_start: string | null }[]>(),
       ])
 
       // Check errors
@@ -1310,7 +1310,7 @@ export default function DashboardPage() {
           if (seen.has(key)) continue
           seen.add(key)
           const color = commColorMap[ct] ?? "#6B7280"
-          const label = commLabelMap[ct] ?? ct
+          const label = commLabelMap[ct] || d.subject.split("—")[0].trim().split(" ").slice(0, 2).join(" ") || "Email"
           const isSent = d.status === "sent"
           const dateStr = isSent && d.sent_at
             ? format(new Date(d.sent_at), "yyyy-MM-dd")
