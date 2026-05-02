@@ -66,6 +66,15 @@ import {
   addDays,
 } from "date-fns"
 import { getOccurrences } from "@/lib/recurrence"
+import {
+  type CommType,
+  COMM_TYPE_TO_ET,
+  DISPATCH_MATCHERS,
+  formatRelativeTime,
+  getWeekDays,
+  mapDispatchStatus,
+} from "@/lib/dashboard-types"
+import { useCardVisibility } from "@/hooks/dashboard/use-card-visibility"
 
 import {
   WeeklyCommunicationCard,
@@ -133,84 +142,10 @@ interface MailingListOption {
   name: string
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function formatTime(time: string): string {
   const [h, m] = time.split(":").map(Number)
   const ampm = h >= 12 ? "PM" : "AM"
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`
-}
-
-function getWeekDays(monday: Date, sunday: Date) {
-  const days: { month: number; day: number }[] = []
-  for (let d = new Date(monday); d <= sunday; d = addDays(d, 1)) {
-    days.push({ month: d.getMonth() + 1, day: d.getDate() })
-  }
-  return days
-}
-
-/** Map a dispatch_queue status to our card status */
-function mapDispatchStatus(dbStatus: string): CommunicationStatus {
-  switch (dbStatus) {
-    case "sent":
-      return "sent"
-    case "failed":
-      return "failed"
-    case "sending":
-    case "pending":
-    case "previewed":
-    case "approved":
-      return "scheduled"
-    case "cancelled":
-      return "draft"
-    default:
-      return "draft"
-  }
-}
-
-// Communication type keys we track dispatches for
-type CommType =
-  | "birthday"
-  | "anniversary"
-  | "bible_study"
-  | "womens_study"
-  | "prayer_meeting"
-  | "bulletin"
-
-const COMM_TYPE_TO_ET: Record<CommType, string> = {
-  birthday: "birthday",
-  anniversary: "anniversary",
-  bible_study: "friday_bible_study",
-  womens_study: "wednesday_womens_study",
-  prayer_meeting: "monthly_prayer",
-  bulletin: "bulletin",
-}
-
-// Fallback subject-based matching for legacy dispatches without template_type
-const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
-  birthday: (s) => /birthday/i.test(s),
-  anniversary: (s) => /anniversary/i.test(s),
-  bible_study: (s) => /bible.?study/i.test(s) && !/women/i.test(s),
-  womens_study: (s) => /women.*(?:bible|study)/i.test(s),
-  prayer_meeting: (s) => /prayer/i.test(s),
-  bulletin: (s) => /bulletin/i.test(s),
-}
-
-// ── Relative time helper ─────────────────────────────────────────────────
-
-function formatRelativeTime(isoStr: string | null | undefined): string | null {
-  if (!isoStr) return null
-  const d = new Date(isoStr)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const mins = Math.floor(diffMs / 60000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d ago`
-  return format(d, "MMM d")
 }
 
 // ── Custom dashboard template form data ──────────────────────────────────
@@ -263,22 +198,7 @@ const BUILTIN_TEMPLATES: { type: CommType; label: string; color: string; icon: t
   { type: "prayer_meeting", label: "Prayer Meeting", color: "#059669", icon: HandHelping },
 ]
 
-const TEMPLATE_STORAGE_KEY = "ccisr-dashboard-templates"
-
-function loadVisibleTemplates(): CommType[] {
-  if (typeof window === "undefined") return BUILTIN_TEMPLATES.map((t) => t.type)
-  try {
-    const saved = localStorage.getItem(TEMPLATE_STORAGE_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved) as string[]
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed as CommType[]
-    }
-  } catch { /* ignore */ }
-  return BUILTIN_TEMPLATES.map((t) => t.type)
-}
-
-// ── Stat card config type ─────────────────────────────────────────────────
-
+// StatCardConfig kept for potential future use
 interface StatCardConfig {
   title: string
   value: number
@@ -324,16 +244,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [weekLabel, setWeekLabel] = useState("")
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
-  // ---- Template visibility ----
-  const [visibleTemplates, setVisibleTemplates] = useState<CommType[]>(() => loadVisibleTemplates())
-
-  function toggleTemplate(type: CommType) {
-    setVisibleTemplates((prev) => {
-      const next = prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-      localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(next))
-      return next
-    })
-  }
+  // ---- Template visibility (extracted hook) ----
+  const { visibleTemplates, toggleTemplate } = useCardVisibility()
 
   // ---- Composed instance tracking ----
   const [instanceIds, setInstanceIds] = useState<Partial<Record<CommType, string>>>({})
