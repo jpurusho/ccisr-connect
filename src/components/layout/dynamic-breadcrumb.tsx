@@ -10,7 +10,6 @@ const ROUTE_LABELS: Record<string, string> = {
   "/email": "Email",
   "/settings": "Settings",
   "/calendar": "Calendar",
-  "/compose": "Compose",
   "/dispatch": "Dispatch",
   "/mailing-lists": "Mailing Lists",
   "/history": "History",

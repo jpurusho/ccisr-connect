@@ -636,7 +636,7 @@ export default function TemplatesPage() {
                     {tab.label} Template Defaults
                   </CardTitle>
                   <CardDescription>
-                    These values auto-populate the dashboard and compose forms each week.
+                    These values auto-populate the dashboard forms each week.
                     Leave a field empty to exclude it from the email.
                   </CardDescription>
                 </CardHeader>
