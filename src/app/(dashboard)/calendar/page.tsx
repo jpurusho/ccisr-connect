@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react"
 import {
+  addDays,
   addWeeks,
   subWeeks,
   addMonths,
@@ -160,14 +161,14 @@ export default function CalendarPage() {
         )
         .in("anniversary_month", visibleMonths),
 
-      // Dispatches in date range (prefer week_start, fallback to scheduled_at)
+      // Dispatches: target week in range OR sent during range
       supabase
         .from("dispatch_queue")
-        .select("id, subject, status, template_type, scheduled_at, created_at, week_start")
+        .select("id, subject, status, template_type, scheduled_at, sent_at, created_at, week_start")
         .not("status", "eq", "cancelled")
-        .or(`and(week_start.gte.${startStr},week_start.lte.${endStr}),and(week_start.is.null,scheduled_at.gte.${startStr},scheduled_at.lte.${endStr}T23:59:59)`)
+        .or(`and(week_start.gte.${startStr},week_start.lte.${endStr}),and(sent_at.gte.${startStr},sent_at.lte.${endStr}T23:59:59),and(week_start.is.null,scheduled_at.gte.${startStr},scheduled_at.lte.${endStr}T23:59:59)`)
         .order("created_at", { ascending: false })
-        .returns<{ id: string; subject: string; status: DispatchStatus; template_type: string | null; scheduled_at: string | null; created_at: string; week_start: string | null }[]>(),
+        .returns<{ id: string; subject: string; status: DispatchStatus; template_type: string | null; scheduled_at: string | null; sent_at: string | null; created_at: string; week_start: string | null }[]>(),
     ])
 
     const instances = (instancesResult.data ?? []) as EventInstance[]
@@ -415,16 +416,31 @@ export default function CalendarPage() {
       bulletin: "Bulletin Email",
     }
 
+    const seenDispatchIds = new Set<string>()
     for (const d of dispatches) {
-      const dispatchDate = d.week_start ? new Date(d.week_start + "T00:00:00")
+      if (seenDispatchIds.has(d.id)) continue
+      seenDispatchIds.add(d.id)
+
+      const isSent = d.status === "sent"
+      const dispatchDate = isSent && d.sent_at
+        ? new Date(d.sent_at)
+        : d.week_start ? new Date(d.week_start + "T00:00:00")
         : d.scheduled_at ? new Date(d.scheduled_at)
         : new Date(d.created_at)
+
       if (days.some((day) => isSameDay(day, dispatchDate))) {
         const typeLabel = d.template_type ? DISPATCH_LABELS[d.template_type] : null
+        let title = typeLabel || d.subject
+        if (d.week_start) {
+          const ws = new Date(d.week_start + "T00:00:00")
+          const we = addDays(ws, 6)
+          const weekLabel = `${format(ws, "MMM d")}–${format(we, "d")}`
+          title = `${title} (${weekLabel})`
+        }
         calEvents.push({
           id: `dispatch-${d.id}`,
           kind: "dispatch",
-          title: typeLabel || d.subject,
+          title,
           date: dispatchDate,
           color: (d.template_type && DISPATCH_COLORS[d.template_type]) || "#6B7280",
           description: d.subject,

@@ -506,7 +506,7 @@ export default function DashboardPage() {
 
   // ---- Week strip: recurring events + dispatches ----
   const [weekStripEvents, setWeekStripEvents] = useState<{ title: string; date: Date; color: string }[]>([])
-  const [weekStripDispatches, setWeekStripDispatches] = useState<{ label: string; date: string; color: string; status: string }[]>([])
+  const [weekStripDispatches, setWeekStripDispatches] = useState<{ label: string; date: string; color: string; status: string; targetLabel: string }[]>([])
 
   // ---- Sent email preview ----
   const [sentEmailPreview, setSentEmailPreview] = useState<{ subject: string; html: string } | null>(null)
@@ -1302,7 +1302,7 @@ export default function DashboardPage() {
           commColorMap[bt.type] = bt.color
           commLabelMap[bt.type] = bt.label
         }
-        const stripDisps: { label: string; date: string; color: string; status: string }[] = []
+        const stripDisps: { label: string; date: string; color: string; status: string; targetLabel: string }[] = []
         const seen = new Set<string>()
         for (const d of (stripDispatchesRes.data ?? [])) {
           const ct = d.template_type ?? ""
@@ -1315,7 +1315,13 @@ export default function DashboardPage() {
           const dateStr = isSent && d.sent_at
             ? format(new Date(d.sent_at), "yyyy-MM-dd")
             : d.week_start ?? format(new Date(d.created_at), "yyyy-MM-dd")
-          stripDisps.push({ label, date: dateStr, color, status: d.status })
+          let targetLabel = ""
+          if (d.week_start && d.week_start !== wkSunISO) {
+            const ws = new Date(d.week_start + "T00:00:00")
+            const we = addDays(ws, 6)
+            targetLabel = `${format(ws, "MMM d")}–${format(we, "d")}`
+          }
+          stripDisps.push({ label, date: dateStr, color, status: d.status, targetLabel })
         }
         setWeekStripDispatches(stripDisps)
       }
@@ -2154,9 +2160,13 @@ export default function DashboardPage() {
                       ))}
                       {dayDispatches.map((d, i) => (
                         d.status === "sent" ? (
-                          <span key={`d${i}`} className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white" style={{ backgroundColor: d.color }}>{d.label} ✓</span>
+                          <span key={`d${i}`} className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white" style={{ backgroundColor: d.color }} title={d.targetLabel ? `For week of ${d.targetLabel}` : undefined}>
+                            {d.label} ✓{d.targetLabel ? ` (${d.targetLabel})` : ""}
+                          </span>
                         ) : (
-                          <span key={`d${i}`} className="w-full truncate rounded-full border border-dashed px-1.5 py-0.5 text-[9px]" style={{ borderColor: d.color, color: d.color }}>{d.label}</span>
+                          <span key={`d${i}`} className="w-full truncate rounded-full border border-dashed px-1.5 py-0.5 text-[9px]" style={{ borderColor: d.color, color: d.color }} title={d.targetLabel ? `For week of ${d.targetLabel}` : undefined}>
+                            {d.label}{d.targetLabel ? ` (${d.targetLabel})` : ""}
+                          </span>
                         )
                       ))}
                       {!hasAnything && (
