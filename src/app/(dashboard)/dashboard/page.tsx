@@ -496,6 +496,9 @@ export default function DashboardPage() {
     bulletin: 0,
   })
 
+  // ---- Multi-event count per comm type ----
+  const [eventCounts, setEventCounts] = useState<Partial<Record<CommType, number>>>({})
+
   // ---- Schedule dialog state ----
   const [scheduleDialog, setScheduleDialog] = useState<{
     open: boolean
@@ -936,12 +939,19 @@ export default function DashboardPage() {
         }
       }
 
-      // Find events by type name
-      const findEventByType = (typeName: string) =>
-        activeEvents.find((e) => {
-          const etName = etIdToName[e.event_type_id]
-          return etName === typeName
-        })
+      // Find events by type name (first match used for dashboard card, count for indicator)
+      const findEventsByType = (typeName: string) =>
+        activeEvents.filter((e) => etIdToName[e.event_type_id] === typeName)
+      const findEventByType = (typeName: string) => findEventsByType(typeName)[0] ?? undefined
+
+      // Track event counts per comm type for multi-event indicator
+      {
+        const counts: Partial<Record<CommType, number>> = {}
+        for (const [ct, etName] of Object.entries(COMM_TYPE_TO_ET)) {
+          counts[ct as CommType] = findEventsByType(etName).length
+        }
+        setEventCounts(counts)
+      }
 
       // ---- Build week strip events (all recurring events resolved to dates) ----
       {
@@ -2317,6 +2327,11 @@ export default function DashboardPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold truncate">{cardTitles[type]}</span>
+                      {(eventCounts[type] ?? 0) > 1 && (
+                        <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {eventCounts[type]} events
+                        </span>
+                      )}
                       {/* Status badges */}
                       {status === "sent" && count > 0 && (
                         <>

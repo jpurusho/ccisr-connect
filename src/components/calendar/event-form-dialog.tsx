@@ -84,7 +84,6 @@ export function EventFormDialog({
 
   const [eventTypes, setEventTypes] = useState<EventTypeOption[]>([])
   const [families, setFamilies] = useState<FamilyOption[]>([])
-  const [existingEvents, setExistingEvents] = useState<{ id: string; event_type_id: string; title: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
@@ -118,7 +117,7 @@ export function EventFormDialog({
     const supabase = createClient()
 
     async function loadData() {
-      const [typesRes, familiesRes, eventsRes] = await Promise.all([
+      const [typesRes, familiesRes] = await Promise.all([
         supabase
           .from("event_types")
           .select("id, name, color_scheme, is_active")
@@ -131,11 +130,6 @@ export function EventFormDialog({
           .eq("is_active", true)
           .order("family_name")
           .returns<FamilyOption[]>(),
-        supabase
-          .from("events")
-          .select("id, event_type_id, title")
-          .eq("is_active", true)
-          .returns<{ id: string; event_type_id: string; title: string }[]>(),
       ])
 
       setEventTypes(
@@ -146,7 +140,6 @@ export function EventFormDialog({
         }))
       )
       setFamilies(familiesRes.data ?? [])
-      setExistingEvents(eventsRes.data ?? [])
 
       if (mode === "edit" && eventId) {
         type EventRow = {
@@ -303,10 +296,6 @@ export function EventFormDialog({
     toast.success(`Added ${newDates.length} skip date${newDates.length > 1 ? "s" : ""}`)
   }
 
-  const conflictEvent = eventTypeId
-    ? existingEvents.find((e) => e.event_type_id === eventTypeId && e.id !== eventId)
-    : null
-
   const previewRule = recurrenceFreq !== "NONE"
     ? describeRule(buildRecurrenceRule({ freq: recurrenceFreq, byDay: recurrenceDay, nthWeek: recurrenceNth, except: exceptDates, until: untilDate }))
     : "One-time event (no recurrence)"
@@ -356,49 +345,16 @@ export function EventFormDialog({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {eventTypes.map((t) => {
-                      const taken = existingEvents.some((e) => e.event_type_id === t.id && e.id !== eventId)
-                      return (
-                        <SelectItem key={t.id} value={t.id}>
-                          <span className="flex items-center gap-2">
-                            <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
-                            {t.name}
-                            {taken && <span className="text-[10px] text-muted-foreground">(in use)</span>}
-                          </span>
-                        </SelectItem>
-                      )
-                    })}
+                    {eventTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        <span className="flex items-center gap-2">
+                          <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
+                          {t.name}
+                        </span>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                {conflictEvent && mode === "create" && (
-                  <div className="rounded-md border border-amber-300/50 bg-amber-50/50 p-2.5 space-y-2 dark:border-amber-800/50 dark:bg-amber-950/20">
-                    <p className="text-xs text-amber-800 dark:text-amber-300">
-                      <strong>&quot;{conflictEvent.title}&quot;</strong> already exists as a recurring event. To change host, time, or location for a specific date, click that occurrence on the calendar and use <strong>Edit Occurrence</strong>.
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Only create a new event if you want to replace the existing series entirely.
-                    </p>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="h-7 text-xs w-full"
-                      onClick={async () => {
-                        if (!confirm(`Delete "${conflictEvent.title}" and create a new event? This removes all instances and history.`)) return
-                        setSaving(true)
-                        try {
-                          const supabase = createClient()
-                          const { error } = await supabase.from("events").delete().eq("id", conflictEvent.id)
-                          if (error) { toast.error(`Failed: ${error.message}`); return }
-                          toast.success(`"${conflictEvent.title}" deleted`)
-                          logAudit("event_deleted", "events", conflictEvent.id, { title: conflictEvent.title })
-                          setExistingEvents((prev) => prev.filter((e) => e.id !== conflictEvent.id))
-                        } finally { setSaving(false) }
-                      }}
-                    >
-                      Delete existing and replace
-                    </Button>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -600,7 +556,7 @@ export function EventFormDialog({
             </Button>
           )}
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-          <Button onClick={handleSave} disabled={saving || !title.trim() || !eventTypeId || !!conflictEvent}>
+          <Button onClick={handleSave} disabled={saving || !title.trim() || !eventTypeId}>
             {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
             {mode === "create" ? "Create" : "Save Changes"}
           </Button>
