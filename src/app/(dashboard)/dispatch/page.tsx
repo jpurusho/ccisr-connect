@@ -888,14 +888,14 @@ export default function DispatchQueuePage() {
           if (!open) setRescheduleTarget(null)
         }}
       >
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reschedule Dispatch</DialogTitle>
             <DialogDescription>
               Set a new send date and time for &quot;{rescheduleTarget?.subject}&quot;.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="resched-date">Date</Label>
               <Input
