@@ -585,7 +585,7 @@ export default function DashboardPage() {
           .from("events")
           .select("*")
           .eq("is_active", true)
-          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; is_active: boolean }[]>(),
+          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean }[]>(),
 
         // Event instances for current week (host/location overrides)
         supabase
@@ -907,13 +907,25 @@ export default function DashboardPage() {
 
         const stripEvts: { title: string; date: Date; color: string; commType: CommType | null }[] = []
         for (const evt of activeEvents) {
-          if (!evt.recurrence_rule) continue
           const etName = etIdToName[evt.event_type_id] ?? ""
           const color = etNameToCommColor[etName] ?? etIdToColor[evt.event_type_id] ?? "#6B7280"
           const commType = etNameToCommType[etName] ?? null
-          const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
-          for (const occ of occs) {
-            stripEvts.push({ title: evt.title, date: occ, color, commType })
+
+          if (evt.recurrence_rule) {
+            const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
+            for (const occ of occs) {
+              stripEvts.push({ title: evt.title, date: occ, color, commType })
+            }
+          } else if ((evt as { start_date?: string }).start_date) {
+            const sd = new Date((evt as { start_date: string }).start_date + "T00:00:00")
+            const ed = (evt as { end_date?: string }).end_date ? new Date((evt as { end_date: string }).end_date + "T00:00:00") : sd
+            let d = new Date(sd)
+            while (d <= ed) {
+              if (d >= wkSun && d <= wkSat) {
+                stripEvts.push({ title: evt.title, date: new Date(d), color, commType })
+              }
+              d = addDays(d, 1)
+            }
           }
         }
         setWeekStripEvents(stripEvts)

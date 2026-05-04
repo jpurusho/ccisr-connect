@@ -77,6 +77,8 @@ export function EventFormDialog({
   const [recurrenceNth, setRecurrenceNth] = useState("")
   const [exceptDates, setExceptDates] = useState<string[]>([])
   const [untilDate, setUntilDate] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
   const [hostFamilyId, setHostFamilyId] = useState("")
   const [hostUntil, setHostUntil] = useState("")
   const [description, setDescription] = useState("")
@@ -100,6 +102,8 @@ export function EventFormDialog({
     setRecurrenceNth("")
     setExceptDates([])
     setUntilDate("")
+    setStartDate(initialDate ? format(initialDate, "yyyy-MM-dd") : "")
+    setEndDate("")
     setHostFamilyId("")
     setHostUntil("")
     setDescription("")
@@ -145,7 +149,8 @@ export function EventFormDialog({
         type EventRow = {
           id: string; title: string; event_type_id: string; description: string | null
           recurrence_rule: string | null; default_time: string | null; zoom_link: string | null
-          host_family_id: string | null; host_until: string | null; is_active: boolean
+          host_family_id: string | null; host_until: string | null
+          start_date: string | null; end_date: string | null; is_active: boolean
         }
         const { data: event } = await supabase
           .from("events")
@@ -162,6 +167,8 @@ export function EventFormDialog({
           setZoomLink(event.zoom_link ?? "")
           setHostFamilyId(event.host_family_id ?? "")
           setHostUntil(event.host_until ?? "")
+          setStartDate(event.start_date ?? "")
+          setEndDate(event.end_date ?? "")
 
           if (event.recurrence_rule) {
             const parsed = parseRecurrenceRule(event.recurrence_rule)
@@ -210,8 +217,10 @@ export function EventFormDialog({
         default_time: time || null,
         description: description.trim() || null,
         zoom_link: zoomLink.trim() || null,
-        host_family_id: hostFamilyId || null,
-        host_until: hostFamilyId && hostUntil ? hostUntil : null,
+        host_family_id: recurrenceFreq !== "NONE" ? (hostFamilyId || null) : null,
+        host_until: recurrenceFreq !== "NONE" && hostFamilyId && hostUntil ? hostUntil : null,
+        start_date: recurrenceFreq === "NONE" && startDate ? startDate : null,
+        end_date: recurrenceFreq === "NONE" && endDate ? endDate : null,
         is_active: true,
       }
 
@@ -425,6 +434,30 @@ export function EventFormDialog({
                 )}
               </div>
 
+              {recurrenceFreq === "NONE" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Start Date</Label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">End Date (optional)</Label>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Leave blank for a single-day event.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {recurrenceFreq !== "NONE" && (
                 <>
                   <div className="space-y-1.5">
@@ -493,38 +526,40 @@ export function EventFormDialog({
               </p>
             </div>
 
-            {/* Host Family */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>Host Family</Label>
-                <Select value={hostFamilyId} onValueChange={(v) => setHostFamilyId(v ?? "")}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="None">
-                      {families.find((f) => f.id === hostFamilyId)?.family_name || "None"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {families.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>{f.family_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {hostFamilyId && hostFamilyId !== "none" && (
+            {/* Host Family — only for recurring events */}
+            {recurrenceFreq !== "NONE" && (
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Host Until</Label>
-                  <Input
-                    type="date"
-                    value={hostUntil}
-                    onChange={(e) => setHostUntil(e.target.value)}
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    After this date, hosting clears automatically.
-                  </p>
+                  <Label>Host Family</Label>
+                  <Select value={hostFamilyId} onValueChange={(v) => setHostFamilyId(v ?? "")}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="None">
+                        {families.find((f) => f.id === hostFamilyId)?.family_name || "None"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {families.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>{f.family_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-            </div>
+                {hostFamilyId && hostFamilyId !== "none" && (
+                  <div className="space-y-1.5">
+                    <Label>Host Until</Label>
+                    <Input
+                      type="date"
+                      value={hostUntil}
+                      onChange={(e) => setHostUntil(e.target.value)}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      After this date, hosting clears automatically.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Description + Zoom */}
             <div className="space-y-1.5">

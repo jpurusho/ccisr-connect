@@ -354,6 +354,40 @@ export default function CalendarPage() {
       }
     }
 
+    // Build CalendarEvents from date-range events (no recurrence, start_date/end_date set)
+    for (const event of eventsData) {
+      if (event.recurrence_rule) continue
+      const evtAny = event as Event & { start_date?: string | null; end_date?: string | null }
+      if (!evtAny.start_date) continue
+      const eventType = typesMap.get(event.event_type_id)
+      const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
+      const rangeStart = new Date(evtAny.start_date + "T00:00:00")
+      const rangeEnd = evtAny.end_date ? new Date(evtAny.end_date + "T00:00:00") : rangeStart
+      let d = new Date(rangeStart)
+      while (d <= rangeEnd) {
+        if (d >= visibleRange.start && d <= visibleRange.end) {
+          const dateStr = format(d, "yyyy-MM-dd")
+          if (!instanceDates.has(`${event.id}:${dateStr}`)) {
+            calEvents.push({
+              id: `range-${event.id}-${dateStr}`,
+              kind: "event",
+              title: event.title,
+              date: new Date(d),
+              color,
+              time: event.default_time ? formatTime(event.default_time) : null,
+              status: "confirmed",
+              eventTypeName: eventType?.name ?? null,
+              description: event.description,
+              eventId: event.id,
+              eventTypeId: event.event_type_id,
+              isRecurrenceGenerated: true,
+            })
+          }
+        }
+        d = addDays(d, 1)
+      }
+    }
+
     // Build CalendarEvents from birthdays
     const currentYear = currentDate.getFullYear()
     for (const member of birthdays) {

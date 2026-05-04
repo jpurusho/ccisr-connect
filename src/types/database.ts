@@ -96,6 +96,8 @@ export type Event = {
   zoom_link: string | null
   host_family_id: string | null
   host_until: string | null
+  start_date: string | null
+  end_date: string | null
   is_active: boolean
   created_at: string
   updated_at: string
