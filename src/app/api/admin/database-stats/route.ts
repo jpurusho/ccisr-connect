@@ -102,16 +102,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Table name required" }, { status: 400 })
     }
 
-    // Get column info from information_schema
     const { data: columns, error } = await adminClient
-      .from("information_schema.columns" as never)
-      .select("column_name, data_type, is_nullable, column_default, character_maximum_length")
-      .eq("table_schema", "public")
-      .eq("table_name", table)
-      .order("ordinal_position")
+      .rpc("get_table_schema", { p_table_name: table })
 
     if (error) {
-      // Fallback: use raw SQL via RPC
       return NextResponse.json({ columns: [], error: error.message })
     }
 
