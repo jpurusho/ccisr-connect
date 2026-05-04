@@ -307,7 +307,7 @@ export function EventFormDialog({
 
   const previewRule = recurrenceFreq !== "NONE"
     ? describeRule(buildRecurrenceRule({ freq: recurrenceFreq, byDay: recurrenceDay, nthWeek: recurrenceNth, except: exceptDates, until: untilDate }))
-    : "One-time event (no recurrence)"
+    : startDate && endDate ? `${startDate} to ${endDate}` : startDate ? `Single day: ${startDate}` : "Set a date"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -398,7 +398,7 @@ export function EventFormDialog({
                   >
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="NONE">None (one-time)</SelectItem>
+                      <SelectItem value="NONE">One-time / Date Range</SelectItem>
                       <SelectItem value="WEEKLY">Weekly</SelectItem>
                       <SelectItem value="MONTHLY">Monthly</SelectItem>
                     </SelectContent>
