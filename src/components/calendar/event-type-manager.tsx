@@ -90,7 +90,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
       const supabase = createClient()
       const { error } = await supabase.from("event_types").insert({
         name: newName.trim(),
-        default_template_id: newTemplateId || null,
+        default_template_id: newTemplateId && newTemplateId !== "none" ? newTemplateId : null,
         color_scheme: { primary: newColor },
         is_active: true,
       } as never)
@@ -112,7 +112,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
       const supabase = createClient()
       const { error } = await supabase.from("event_types").update({
         name: editName.trim(),
-        default_template_id: editTemplateId || null,
+        default_template_id: editTemplateId && editTemplateId !== "none" ? editTemplateId : null,
         color_scheme: { primary: editColor },
       } as never).eq("id", id)
       if (error) { toast.error(`Failed: ${error.message}`); return }
