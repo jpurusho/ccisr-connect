@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 import { formatPhone } from "@/lib/utils"
 import type { BirthdayEntry, AnniversaryEntry } from "@/lib/email/card-builder"
@@ -205,8 +206,8 @@ export interface CustomSection {
 
 const EMOJI_PRESETS = [
   "📋", "🤝", "🍪", "🍽️", "🎵", "🙏", "📖", "⛪", "🎶", "🎤",
-  "🕊️", "💒", "🎂", "💍", "📅", "🔔", "✝️", "❤️", "🌿", "☀️",
-  "🎉", "🏠", "👨‍👩‍👧‍👦", "🧒", "👶", "🎓", "🎁", "🎈", "💐", "🕯️",
+  "🕊️", "💒", "🎂", "💍", "📅", "📆", "🗓️", "🔔", "✝️", "❤️",
+  "🌿", "☀️", "🎉", "🏠", "👨‍👩‍👧‍👦", "🧒", "👶", "🎓", "🎁", "🎈", "💐", "🕯️",
 ]
 
 const SECTION_COLOR_PRESETS = [
@@ -233,37 +234,33 @@ function EmojiPickerInput({
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="relative">
-      <button
-        type="button"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
         className="flex size-10 items-center justify-center rounded-md border text-lg hover:bg-accent transition-colors"
-        onClick={() => setOpen((prev) => !prev)}
       >
         {value || "📋"}
-      </button>
-      {open && (
-        <div className="absolute z-20 mt-1 rounded-lg border bg-popover p-2 shadow-lg">
-          <div className="grid grid-cols-6 gap-1">
-            {EMOJI_PRESETS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                className={`size-8 rounded text-lg hover:bg-accent transition-colors ${value === e ? "bg-accent ring-1 ring-primary" : ""}`}
-                onClick={() => { onChange(e); setOpen(false) }}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-          <Input
-            placeholder="Or type any emoji"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="mt-2 w-full text-center text-lg"
-          />
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="start">
+        <div className="grid grid-cols-6 gap-1">
+          {EMOJI_PRESETS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              className={`size-9 rounded text-xl hover:bg-accent transition-colors ${value === e ? "bg-accent ring-1 ring-primary" : ""}`}
+              onClick={() => { onChange(e); setOpen(false) }}
+            >
+              {e}
+            </button>
+          ))}
         </div>
-      )}
-    </div>
+        <Input
+          placeholder="Or type any emoji"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="mt-2 w-full text-center text-lg"
+        />
+      </PopoverContent>
+    </Popover>
   )
 }
 

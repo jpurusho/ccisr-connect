@@ -1116,8 +1116,8 @@ export default function DashboardPage() {
             headerEmoji: (fd.headerEmoji as string) ?? "",
             primaryColor: (fd.primaryColor as string) ?? (parsed.primaryColor as string) ?? "",
             resourceLinks: (fd.resourceLinks as BaseFormData["resourceLinks"]) ?? (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
-            customSections: (fd.customSections as BaseFormData["customSections"]) ?? (parsed.customSections as BaseFormData["customSections"]) ?? [],
-            flyerSections: (fd.flyerSections as FlyerSectionItem[]) ?? (parsed.flyerSections as FlyerSectionItem[]) ?? [],
+            customSections: ((fd.customSections as BaseFormData["customSections"])?.length ? (fd.customSections as BaseFormData["customSections"]) : (parsed.customSections as BaseFormData["customSections"])) ?? [],
+            flyerSections: ((fd.flyerSections as FlyerSectionItem[])?.length ? (fd.flyerSections as FlyerSectionItem[]) : (parsed.flyerSections as FlyerSectionItem[])) ?? [],
           }
           customInstIds[ct.id] = ci.id
           if (ci.subject) customSubjOvr[ct.id] = ci.subject

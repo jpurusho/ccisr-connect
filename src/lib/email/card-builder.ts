@@ -126,7 +126,7 @@ export interface BaseCardData {
 function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: CardColors): string {
   if (!sections || sections.length === 0) return "";
   return sections
-    .filter((s) => s.title && s.entries.some((e) => e.label || e.name))
+    .filter((s) => s.title)
     .map((s) => {
       const sColor = s.color || colors.primary;
       const sBg = s.color ? deriveColorsFromPrimary(s.color).bgLight : "";
