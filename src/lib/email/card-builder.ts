@@ -106,6 +106,12 @@ export interface CardCustomSection {
   entries: { label: string; name: string }[];
 }
 
+export interface CardFlyerSection {
+  imageUrl: string;
+  caption?: string;
+  resourceLinks?: ResourceLink[];
+}
+
 export interface BaseCardData {
   message?: string;
   headerTitle?: string;
@@ -134,6 +140,17 @@ function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: C
       const bgStyle = sBg ? `background:${sBg};border-radius:8px;padding:4px 16px;` : "";
       return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr><td style="padding:16px 0 8px;font-size:13px;font-weight:700;color:${sColor};text-transform:uppercase;letter-spacing:0.5px">${s.emoji || "📋"} ${s.title}</td></tr>${rows}</table>`;
     })
+    .join("");
+}
+
+function flyerSectionsHtml(sections: CardFlyerSection[] | undefined, colors: CardColors): string {
+  if (!sections || sections.length === 0) return "";
+  return sections
+    .filter((s) => s.imageUrl)
+    .map(
+      (s) =>
+        `<div style="border-top:1px solid ${colors.border};margin:16px 0"></div><img src="${s.imageUrl}" alt="Event Flyer" style="width:100%;display:block;border-radius:8px;margin-bottom:10px" />${s.caption ? `<p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#374151">${s.caption}</p>` : ""}${resourceLinksHtml(s.resourceLinks, colors)}`
+    )
     .join("");
 }
 
@@ -606,7 +623,7 @@ export interface CustomCardData extends BaseCardData {
   emoji?: string;
   bannerImageUrl?: string;
   bodyHtml: string;
-  footerText?: string;
+  flyerSections?: CardFlyerSection[];
   colorScheme?: string;
 }
 
@@ -626,9 +643,10 @@ ${data.subtitle ? `<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,25
   const content =
     header +
     contentRow(`${data.bodyHtml}
+${flyerSectionsHtml(data.flyerSections, colors)}
 ${commonTrailingHtml(data, colors)}`, colors) +
     footerRow(
-      data.footerText || "Christ Church of India, San Ramon — CCISR Connect",
+      data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect",
       colors
     );
 

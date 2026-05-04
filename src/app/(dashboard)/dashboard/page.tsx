@@ -111,6 +111,8 @@ import {
   CustomSectionsEditor,
   ResourceLinksEditor,
   CardStyleFields,
+  FlyerSectionsEditor,
+  type FlyerSectionItem,
 } from "@/components/dashboard/communication-edit-forms"
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -155,7 +157,7 @@ interface CustomDashFormData extends BaseFormData {
   subtitle: string
   emoji: string
   body: string
-  footerText: string
+  flyerSections: FlyerSectionItem[]
 }
 
 function buildCustomDashPreview(form: CustomDashFormData): string {
@@ -164,9 +166,15 @@ function buildCustomDashPreview(form: CustomDashFormData): string {
     subtitle: form.subtitle || undefined,
     emoji: form.emoji || undefined,
     bodyHtml: form.body
-      ? `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap">${form.body}</p>`
+      ? `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;color:#374151">${form.body}</p>`
       : "",
-    footerText: form.footerText || undefined,
+    flyerSections: (form.flyerSections ?? [])
+      .filter((s) => s.imageUrl)
+      .map((s) => ({
+        imageUrl: s.imageUrl,
+        caption: s.caption || undefined,
+        resourceLinks: s.resourceLinks.filter((l) => l.url),
+      })),
     ...extractCommonCardData(form),
   })
 }
@@ -176,7 +184,7 @@ const EMPTY_CUSTOM_FORM: CustomDashFormData = {
   subtitle: "",
   emoji: "📋",
   body: "",
-  footerText: "",
+  flyerSections: [],
   message: "",
   headerTitle: "",
   headerSubtitle: "",
@@ -1101,7 +1109,7 @@ export default function DashboardPage() {
             subtitle: (fd.subtitle as string) ?? (parsed.subtitle as string) ?? "",
             emoji: (fd.emoji as string) ?? (parsed.emoji as string) ?? "📋",
             body: (fd.body as string) ?? (parsed.body as string) ?? "",
-            footerText: (fd.footerText as string) ?? (parsed.footerText as string) ?? "",
+            footerVerse: (fd.footerVerse as string) ?? (parsed.footerVerse as string) ?? "",
             message: (fd.message as string) ?? "",
             headerTitle: (fd.headerTitle as string) ?? "",
             headerSubtitle: (fd.headerSubtitle as string) ?? "",
@@ -1110,6 +1118,7 @@ export default function DashboardPage() {
             footerVerse: (fd.footerVerse as string) ?? "",
             resourceLinks: (fd.resourceLinks as BaseFormData["resourceLinks"]) ?? (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
             customSections: (fd.customSections as BaseFormData["customSections"]) ?? (parsed.customSections as BaseFormData["customSections"]) ?? [],
+            flyerSections: (fd.flyerSections as FlyerSectionItem[]) ?? (parsed.flyerSections as FlyerSectionItem[]) ?? [],
           }
           customInstIds[ct.id] = ci.id
           if (ci.subject) customSubjOvr[ct.id] = ci.subject
@@ -1120,10 +1129,11 @@ export default function DashboardPage() {
             subtitle: (parsed.subtitle as string) || "",
             emoji: (parsed.emoji as string) || "📋",
             body: (parsed.body as string) || "",
-            footerText: (parsed.footerText as string) || "",
+            footerVerse: (parsed.footerVerse as string) || "",
             primaryColor: (parsed.primaryColor as string) || "",
             resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
             customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
+            flyerSections: (parsed.flyerSections as FlyerSectionItem[]) ?? [],
           }
         }
       }
@@ -1389,7 +1399,7 @@ export default function DashboardPage() {
       time: prayerMeetingForm.time,
       dinnerNote: prayerMeetingForm.dinnerNote || undefined,
       signupLink: prayerMeetingForm.signupLink || undefined,
-      ...extractCommonCardData(prayerMeetingForm),
+      ...interpCommon(prayerMeetingForm, {}),
     })
   }, [prayerMeetingForm])
 
@@ -2604,10 +2614,11 @@ export default function DashboardPage() {
                           subtitle: (parsed.subtitle as string) || "",
                           emoji: (parsed.emoji as string) || "📋",
                           body: (parsed.body as string) || "",
-                          footerText: (parsed.footerText as string) || "",
+                          footerVerse: (parsed.footerVerse as string) || "",
                           primaryColor: (parsed.primaryColor as string) || "",
                           resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
                           customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
+                          flyerSections: (parsed.flyerSections as FlyerSectionItem[]) ?? [],
                         },
                       }))
                     }
@@ -2633,6 +2644,15 @@ export default function DashboardPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
+                      <Label htmlFor={`ct-${ct.id}-emoji`}>Header Emoji</Label>
+                      <Input
+                        id={`ct-${ct.id}-emoji`}
+                        value={form.emoji}
+                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], emoji: e.target.value } }))}
+                        className="w-24 text-2xl text-center"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
                       <Label htmlFor={`ct-${ct.id}-body`}>Message Body</Label>
                       <textarea
                         id={`ct-${ct.id}-body`}
@@ -2643,13 +2663,38 @@ export default function DashboardPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor={`ct-${ct.id}-footer`}>Footer Text</Label>
+                      <Label>Theme Color</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={form.primaryColor || "#6B7280"}
+                          onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], primaryColor: e.target.value } }))}
+                          className="h-8 w-12 cursor-pointer rounded border p-0.5"
+                        />
+                        <span className="text-sm text-muted-foreground">{form.primaryColor || "Default"}</span>
+                        {form.primaryColor && (
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground underline"
+                            onClick={() => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], primaryColor: "" } }))}
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`ct-${ct.id}-footer`}>Footer Verse</Label>
                       <Input
                         id={`ct-${ct.id}-footer`}
-                        value={form.footerText}
-                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], footerText: e.target.value } }))}
+                        value={form.footerVerse}
+                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], footerVerse: e.target.value } }))}
                       />
                     </div>
+                    <FlyerSectionsEditor
+                      sections={form.flyerSections ?? []}
+                      onChange={(flyerSections) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], flyerSections } }))}
+                    />
                     <CustomSectionsEditor
                       sections={form.customSections ?? []}
                       onChange={(sections) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], customSections: sections } }))}

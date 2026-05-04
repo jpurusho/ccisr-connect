@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { formatPhone } from "@/lib/utils"
 import type { BirthdayEntry, AnniversaryEntry } from "@/lib/email/card-builder"
 
@@ -535,6 +536,139 @@ export function ResourceLinksEditor({
       <Button variant="outline" size="sm" onClick={() => onChange([...links, { label: "", url: "" }])}>
         <Plus className="size-3.5" />
         Add Link
+      </Button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Flyer Sections Editor (custom cards only)
+// ---------------------------------------------------------------------------
+
+export interface FlyerSectionItem {
+  imageUrl: string
+  caption: string
+  resourceLinks: { label: string; url: string }[]
+}
+
+export function FlyerSectionsEditor({
+  sections,
+  onChange,
+}: {
+  sections: FlyerSectionItem[]
+  onChange: (sections: FlyerSectionItem[]) => void
+}) {
+  const [uploading, setUploading] = useState<Record<number, boolean>>({})
+
+  async function handleUpload(idx: number, file: File) {
+    setUploading((prev) => ({ ...prev, [idx]: true }))
+    try {
+      const supabase = createClient()
+      const ext = file.name.split(".").pop() || "jpg"
+      const path = `flyers/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from("card-images").upload(path, file, { upsert: true })
+      if (error) { toast.error(`Upload failed: ${error.message}`); return }
+      const { data: urlData } = supabase.storage.from("card-images").getPublicUrl(path)
+      const updated = [...sections]
+      updated[idx] = { ...updated[idx], imageUrl: urlData.publicUrl }
+      onChange(updated)
+      toast.success("Flyer uploaded")
+    } catch {
+      toast.error("Upload failed")
+    } finally {
+      setUploading((prev) => ({ ...prev, [idx]: false }))
+    }
+  }
+
+  function move(idx: number, dir: -1 | 1) {
+    const target = idx + dir
+    if (target < 0 || target >= sections.length) return
+    const updated = [...sections]
+    ;[updated[idx], updated[target]] = [updated[target], updated[idx]]
+    onChange(updated)
+  }
+
+  return (
+    <div className="space-y-3">
+      <Label>Flyer Sections</Label>
+      {sections.map((sec, idx) => (
+        <div key={idx} className="rounded-md border border-border p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Flyer {idx + 1}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon-sm" onClick={() => move(idx, -1)} disabled={idx === 0} title="Move up">
+                <ArrowUp className="size-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon-sm" onClick={() => move(idx, 1)} disabled={idx === sections.length - 1} title="Move down">
+                <ArrowDown className="size-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon-sm" onClick={() => onChange(sections.filter((_, i) => i !== idx))}>
+                <Trash2 className="size-3.5 text-muted-foreground" />
+              </Button>
+            </div>
+          </div>
+
+          {sec.imageUrl ? (
+            <div className="relative rounded-lg border overflow-hidden">
+              <img src={sec.imageUrl} alt="Flyer preview" className="w-full max-h-48 object-cover" />
+              <Button
+                variant="destructive"
+                size="sm"
+                className="absolute top-2 right-2"
+                onClick={() => { const u = [...sections]; u[idx] = { ...u[idx], imageUrl: "" }; onChange(u) }}
+              >
+                <Trash2 className="size-3.5" /> Remove
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-sm text-muted-foreground hover:border-primary/50 hover:bg-muted/30 transition-colors">
+                {uploading[idx] ? (
+                  <><Loader2 className="size-4 animate-spin" /> Uploading...</>
+                ) : (
+                  <><ImagePlus className="size-5" /><span>Click to upload flyer (JPG / PNG, max 5 MB)</span></>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  disabled={!!uploading[idx]}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(idx, f) }}
+                />
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">or paste URL</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <Input
+                placeholder="https://..."
+                defaultValue=""
+                onBlur={(e) => { const v = e.target.value.trim(); if (v) { const u = [...sections]; u[idx] = { ...u[idx], imageUrl: v }; onChange(u) } }}
+              />
+            </div>
+          )}
+
+          <Field label="Caption (optional)">
+            <Textarea
+              value={sec.caption}
+              onChange={(e) => { const u = [...sections]; u[idx] = { ...u[idx], caption: e.target.value }; onChange(u) }}
+              placeholder="Text shown below the flyer image..."
+              className="min-h-14"
+            />
+          </Field>
+
+          <ResourceLinksEditor
+            links={sec.resourceLinks}
+            onChange={(links) => { const u = [...sections]; u[idx] = { ...u[idx], resourceLinks: links }; onChange(u) }}
+          />
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={() => onChange([...sections, { imageUrl: "", caption: "", resourceLinks: [] }])}>
+        <Plus className="size-3.5" />
+        Add Flyer
       </Button>
     </div>
   )

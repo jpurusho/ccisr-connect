@@ -57,7 +57,7 @@ import {
   TEMPLATE_PLACEHOLDERS,
 } from "@/lib/template-defaults"
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
-import { HostFamilyInput, CustomSectionsEditor } from "@/components/dashboard/communication-edit-forms"
+import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
 import { formatPhone } from "@/lib/utils"
 import {
   Dialog,
@@ -136,58 +136,6 @@ function ColorPickerField({ value, onChange, defaultColor }: { value: string | u
   )
 }
 
-function ResourceLinksEditor({
-  links,
-  onChange,
-}: {
-  links: { label: string; url: string }[]
-  onChange: (links: { label: string; url: string }[]) => void
-}) {
-  return (
-    <div className="space-y-2">
-      <Label>Resource Links</Label>
-      {links.map((link, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <Input
-            placeholder="Label (e.g., Study Materials)"
-            value={link.label}
-            onChange={(e) => {
-              const updated = [...links]
-              updated[i] = { ...updated[i], label: e.target.value }
-              onChange(updated)
-            }}
-            className="flex-1"
-          />
-          <Input
-            placeholder="https://..."
-            value={link.url}
-            onChange={(e) => {
-              const updated = [...links]
-              updated[i] = { ...updated[i], url: e.target.value }
-              onChange(updated)
-            }}
-            className="flex-1"
-          />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onChange(links.filter((_, j) => j !== i))}
-          >
-            <Trash2 className="size-3.5 text-muted-foreground" />
-          </Button>
-        </div>
-      ))}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onChange([...links, { label: "", url: "" }])}
-      >
-        <Plus className="size-3.5" />
-        Add Link
-      </Button>
-    </div>
-  )
-}
 
 function CommonTemplateFields<T extends CommonCardFields>({
   data,
@@ -250,7 +198,7 @@ export default function TemplatesPage() {
   const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string }[]>([])
   const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown> } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
-  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", body: "", footerText: "", resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[] })
+  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", footerVerse: "", resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
 
   // Per-type form state
   const [subjects, setSubjects] = useState<Record<string, string>>({})
@@ -1141,7 +1089,7 @@ export default function TemplatesPage() {
                 {!creatingCustom && !editingCustom && (
                   <Button
                     onClick={() => {
-                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", body: "", footerText: "", resourceLinks: [], customSections: [] })
+                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", footerVerse: "", resourceLinks: [], customSections: [], flyerSections: [] })
                       setCreatingCustom(true)
                     }}
                   >
@@ -1186,6 +1134,19 @@ export default function TemplatesPage() {
                       onChange={(e) => setNewCustom({ ...newCustom, subtitle: e.target.value })}
                     />
                   </Field>
+                  <Field label="Header Emoji" htmlFor="nc-emoji" hint="Paste an emoji (e.g. 🤝 🙌 ⛪)">
+                    <Input
+                      id="nc-emoji"
+                      value={newCustom.emoji}
+                      onChange={(e) => setNewCustom({ ...newCustom, emoji: e.target.value })}
+                      className="w-24 text-2xl text-center"
+                    />
+                  </Field>
+                  <ColorPickerField
+                    value={newCustom.primaryColor}
+                    defaultColor="#6B7280"
+                    onChange={(color) => setNewCustom({ ...newCustom, primaryColor: color })}
+                  />
                   <Field label="Message Body" htmlFor="nc-body">
                     <Textarea
                       id="nc-body"
@@ -1195,14 +1156,18 @@ export default function TemplatesPage() {
                       placeholder="Write the main content of the announcement..."
                     />
                   </Field>
-                  <Field label="Footer Text" htmlFor="nc-foot">
+                  <Field label="Footer Verse" htmlFor="nc-foot">
                     <Input
                       id="nc-foot"
-                      value={newCustom.footerText}
-                      onChange={(e) => setNewCustom({ ...newCustom, footerText: e.target.value })}
-                      placeholder="e.g., a Bible verse or closing note"
+                      value={newCustom.footerVerse}
+                      onChange={(e) => setNewCustom({ ...newCustom, footerVerse: e.target.value })}
+                      placeholder="e.g., For God so loved the world... — John 3:16"
                     />
                   </Field>
+                  <FlyerSectionsEditor
+                    sections={newCustom.flyerSections}
+                    onChange={(flyerSections) => setNewCustom({ ...newCustom, flyerSections })}
+                  />
                   <CustomSectionsEditor
                     sections={newCustom.customSections}
                     onChange={(sections) => setNewCustom({ ...newCustom, customSections: sections })}
@@ -1223,8 +1188,11 @@ export default function TemplatesPage() {
                         const bodyData = {
                           title: newCustom.title,
                           subtitle: newCustom.subtitle,
+                          emoji: newCustom.emoji || "📋",
+                          primaryColor: newCustom.primaryColor || undefined,
                           body: newCustom.body,
-                          footerText: newCustom.footerText,
+                          footerVerse: newCustom.footerVerse,
+                          flyerSections: newCustom.flyerSections.filter((s) => s.imageUrl),
                           resourceLinks: newCustom.resourceLinks.filter((l) => l.url),
                           customSections: newCustom.customSections.filter((s) => s.title && s.entries.some((e) => e.name)),
                         }
@@ -1294,6 +1262,19 @@ export default function TemplatesPage() {
                       onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, subtitle: e.target.value } })}
                     />
                   </Field>
+                  <Field label="Header Emoji" htmlFor="ct-emoji" hint="Paste an emoji (e.g. 🤝 🙌 ⛪)">
+                    <Input
+                      id="ct-emoji"
+                      value={(editingCustom.data.emoji as string) || "📋"}
+                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, emoji: e.target.value } })}
+                      className="w-24 text-2xl text-center"
+                    />
+                  </Field>
+                  <ColorPickerField
+                    value={(editingCustom.data.primaryColor as string) || ""}
+                    defaultColor="#6B7280"
+                    onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, primaryColor: color } })}
+                  />
                   <Field label="Message Body" htmlFor="ct-body">
                     <Textarea
                       id="ct-body"
@@ -1302,13 +1283,17 @@ export default function TemplatesPage() {
                       className="min-h-24"
                     />
                   </Field>
-                  <Field label="Footer Text" htmlFor="ct-foot">
+                  <Field label="Footer Verse" htmlFor="ct-foot">
                     <Input
                       id="ct-foot"
-                      value={(editingCustom.data.footerText as string) || ""}
-                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerText: e.target.value } })}
+                      value={(editingCustom.data.footerVerse as string) || ""}
+                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerVerse: e.target.value } })}
                     />
                   </Field>
+                  <FlyerSectionsEditor
+                    sections={(editingCustom.data.flyerSections as FlyerSectionItem[]) ?? []}
+                    onChange={(flyerSections) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, flyerSections } })}
+                  />
                   <CustomSectionsEditor
                     sections={(editingCustom.data.customSections as { title: string; emoji: string; entries: { label: string; name: string }[] }[]) ?? []}
                     onChange={(sections) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, customSections: sections } })}
