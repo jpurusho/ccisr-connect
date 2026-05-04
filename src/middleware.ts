@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-const PUBLIC_ROUTES = ['/login', '/unauthorized', '/api/auth/callback', '/api/cards/preview']
+const PUBLIC_ROUTES = ['/login', '/unauthorized', '/api/auth/callback', '/api/cards/preview', '/api/dispatch/cron', '/api/dispatch/send']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
