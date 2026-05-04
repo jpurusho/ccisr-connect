@@ -1467,6 +1467,10 @@ export default function DashboardPage() {
   // If dispatched/queued, show the exact HTML that was sent/queued.
   // Otherwise show the live-computed preview for editing.
   function getPreview(type: CommType): string | null {
+    const d = dispatches[type]
+    if (d?.body_html && (d.status === "pending" || d.status === "previewed" || d.status === "approved" || d.status === "sending" || d.status === "sent")) {
+      return d.body_html
+    }
     switch (type) {
       case "birthday":       return birthdayPreview
       case "anniversary":    return anniversaryPreview
