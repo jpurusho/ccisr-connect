@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import type {
@@ -44,6 +44,7 @@ import {
   Eye,
   CheckCircle,
   XCircle,
+  X,
   RotateCcw,
   ChevronLeft,
   ChevronRight,
@@ -128,7 +129,17 @@ export default function DispatchQueuePage() {
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
-  const [activeTab, setActiveTab] = useState<StatusTab>("all")
+  const [activeTab, setActiveTab] = useState<StatusTab>(() => {
+    if (typeof window === "undefined") return "all"
+    const params = new URLSearchParams(window.location.search)
+    const s = params.get("status")
+    if (s && ["all", "pending", "approved", "sent", "failed", "cancelled"].includes(s)) return s as StatusTab
+    return "all"
+  })
+  const [typeFilter, setTypeFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return ""
+    return new URLSearchParams(window.location.search).get("type") ?? ""
+  })
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -162,6 +173,9 @@ export default function DispatchQueuePage() {
     if (activeTab !== "all") {
       query = query.eq("status", activeTab)
     }
+    if (typeFilter) {
+      query = query.eq("template_type", typeFilter)
+    }
 
     const { data, count, error } = await query
 
@@ -175,7 +189,7 @@ export default function DispatchQueuePage() {
     }
 
     setLoading(false)
-  }, [page, activeTab])
+  }, [page, activeTab, typeFilter])
 
   const fetchFormData = useCallback(async () => {
     const supabase = createClient()
@@ -489,11 +503,17 @@ export default function DispatchQueuePage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dispatch Queue</h1>
-        <p className="text-muted-foreground">
-          Preview, approve, and send queued emails. Create dispatches from the Dashboard.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dispatch Queue</h1>
+          <p className="text-muted-foreground">
+            Preview, approve, and send queued emails. Create dispatches from the Dashboard.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.history.back()}>
+          <ChevronLeft className="size-3.5" />
+          Back
+        </Button>
       </div>
 
       {/* Tabs + Table */}
@@ -509,6 +529,23 @@ export default function DispatchQueuePage() {
               </TabsTrigger>
             ))}
           </TabsList>
+
+          {/* Type filter indicator */}
+          {typeFilter && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Filtered:</span>
+              <Badge variant="secondary" className="gap-1 pr-1">
+                {typeFilter.startsWith("custom:") ? typeFilter.replace("custom:", "Custom: ") : typeFilter.replace("_", " ")}
+                <button
+                  type="button"
+                  onClick={() => { setTypeFilter(""); setPage(0) }}
+                  className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            </div>
+          )}
 
           {/* Batch actions */}
           {selectedIds.size > 0 && (

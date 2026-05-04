@@ -2346,7 +2346,13 @@ export default function DashboardPage() {
                       {/* Status badges */}
                       {status === "sent" && count > 0 && (
                         <>
-                          <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            className="shrink-0 cursor-pointer rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                            onClick={(e) => { e.stopPropagation(); window.location.href = `/dispatch?status=sent&type=${type}` }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); window.location.href = `/dispatch?status=sent&type=${type}` } }}
+                          >
                             Sent{count > 1 ? ` ${count}x` : ""}
                           </span>
                           {dispatches[type]?.body_html && (
@@ -2363,7 +2369,13 @@ export default function DashboardPage() {
                         </>
                       )}
                       {status === "scheduled" && (
-                        <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        <span
+                          role="link"
+                          tabIndex={0}
+                          className="shrink-0 cursor-pointer rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
+                          onClick={(e) => { e.stopPropagation(); window.location.href = `/dispatch?status=pending&type=${type}` }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); window.location.href = `/dispatch?status=pending&type=${type}` } }}
+                        >
                           Queued
                         </span>
                       )}
