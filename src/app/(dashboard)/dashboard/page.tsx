@@ -262,7 +262,7 @@ export default function DashboardPage() {
   const [weekLabel, setWeekLabel] = useState("")
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
   // ---- Template visibility (extracted hook) ----
-  const { visibleTemplates, toggleTemplate } = useCardVisibility()
+  const { visibleTemplates, toggleTemplate, isCustomVisible, toggleCustomTemplate } = useCardVisibility()
 
   // ---- Composed instance tracking ----
   const [instanceIds, setInstanceIds] = useState<Partial<Record<CommType, string>>>({})
@@ -2364,6 +2364,26 @@ export default function DashboardPage() {
                       />
                     </div>
                   ))}
+                  {customDashTemplates.length > 0 && (
+                    <>
+                      <div className="border-t pt-2 mt-2">
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Custom Templates</p>
+                      </div>
+                      {customDashTemplates.map((ct) => (
+                        <div key={ct.id} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{ct.emoji}</span>
+                            <span className="text-sm truncate max-w-36">{ct.name}</span>
+                          </div>
+                          <Switch
+                            size="sm"
+                            checked={isCustomVisible(ct.id)}
+                            onCheckedChange={() => toggleCustomTemplate(ct.id)}
+                          />
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
@@ -2428,14 +2448,14 @@ export default function DashboardPage() {
             )
           })()}
         {/* ── Custom Template Cards ── */}
-        {customDashTemplates.length > 0 && (
+        {customDashTemplates.some((ct) => isCustomVisible(ct.id)) && (
           <>
             <div className="flex items-center gap-2 pt-2">
               <Send className="size-4 text-muted-foreground" />
               <h3 className="text-sm font-semibold text-muted-foreground">Custom Templates</h3>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {customDashTemplates.map((ct) => {
+              {customDashTemplates.filter((ct) => isCustomVisible(ct.id)).map((ct) => {
                 const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
                 const hasDraft = !!customInstanceIds[ct.id]
                 const isSelected = selectedCustomCard === ct.id
