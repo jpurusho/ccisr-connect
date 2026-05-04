@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover"
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -142,24 +144,26 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
     onTypesChanged?.()
   }
 
+  const [dialogOpen, setDialogOpen] = useState(false)
   const active = types.filter((t) => t.is_active)
   const inactive = types.filter((t) => !t.is_active)
 
   return (
-    <Popover>
-      <PopoverTrigger render={<Button variant="outline" size="sm" />}>
+    <>
+      <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
         <Settings2 className="size-3.5" />
         Event Types
-      </PopoverTrigger>
-      <PopoverContent className="w-80 max-h-[70vh] overflow-y-auto p-0" sideOffset={8}>
-        <div className="border-b p-3 pb-2">
-          <p className="text-sm font-semibold">Event Types</p>
-          <p className="text-xs text-muted-foreground">
-            Manage categories and template associations.
-          </p>
-        </div>
+      </Button>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Event Types</DialogTitle>
+            <DialogDescription>
+              Manage categories, template associations, and info sections.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="p-3 space-y-2">
+          <div className="space-y-3">
           {loading ? (
             <p className="text-xs text-muted-foreground text-center py-4">Loading...</p>
           ) : (
@@ -319,7 +323,8 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
             </>
           )}
         </div>
-      </PopoverContent>
-    </Popover>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
