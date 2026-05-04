@@ -273,6 +273,7 @@ export default function CalendarPage() {
         time: formatTime(instance.instance_time ?? event.default_time ?? null) || null,
         status: instance.status,
         eventTypeName: eventType?.name ?? null,
+        infoSections: (eventType as EventType & { info_sections?: unknown })?.info_sections as CalendarEvent["infoSections"] ?? undefined,
         description: event.description,
         notes: instance.notes,
         zoomLink: event.zoom_link,
@@ -340,6 +341,7 @@ export default function CalendarPage() {
           time: formatTime(event.default_time) || null,
           status: "confirmed",
           eventTypeName: eventType?.name ?? null,
+          infoSections: (eventType as EventType & { info_sections?: unknown })?.info_sections as CalendarEvent["infoSections"] ?? undefined,
           description: event.description,
           hostFamily: hostFam
             ? { name: hostFam.family_name, address: hostAddr?.full_address ?? null }
@@ -377,6 +379,7 @@ export default function CalendarPage() {
               time: event.default_time ? formatTime(event.default_time) : null,
               status: "confirmed",
               eventTypeName: eventType?.name ?? null,
+              infoSections: (eventType as EventType & { info_sections?: unknown })?.info_sections as CalendarEvent["infoSections"] ?? undefined,
               description: event.description,
               eventId: event.id,
               eventTypeId: event.event_type_id,

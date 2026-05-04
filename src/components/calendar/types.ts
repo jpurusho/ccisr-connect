@@ -28,4 +28,5 @@ export type CalendarEvent = {
   hostFamilyId?: string | null
   hostUntil?: string | null
   isRecurrenceGenerated?: boolean
+  infoSections?: { title: string; emoji: string; color?: string; entries: { label: string; name: string }[] }[]
 }

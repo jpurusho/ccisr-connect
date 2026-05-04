@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Settings2, Plus, Save, Loader2, X } from "lucide-react"
+import { CustomSectionsEditor, type CustomSection } from "@/components/dashboard/communication-edit-forms"
 
 interface TypeRow {
   id: string
@@ -27,6 +28,7 @@ interface TypeRow {
   is_active: boolean
   default_template_id: string | null
   color: string
+  info_sections: CustomSection[]
 }
 
 interface TemplateOption {
@@ -52,6 +54,8 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
   const [editName, setEditName] = useState("")
   const [editTemplateId, setEditTemplateId] = useState("")
   const [editColor, setEditColor] = useState("")
+  const [editSections, setEditSections] = useState<CustomSection[]>([])
+  const [newSections, setNewSections] = useState<CustomSection[]>([])
 
   const fetchTypes = useCallback(async () => {
     setLoading(true)
@@ -59,9 +63,9 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
     const [typesRes, templatesRes] = await Promise.all([
       supabase
         .from("event_types")
-        .select("id, name, color_scheme, is_active, default_template_id")
+        .select("id, name, color_scheme, is_active, default_template_id, info_sections")
         .order("name")
-        .returns<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null }[]>(),
+        .returns<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; info_sections: CustomSection[] | null }[]>(),
       supabase
         .from("email_templates")
         .select("id, name, is_default")
@@ -75,6 +79,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
         is_active: t.is_active,
         default_template_id: t.default_template_id,
         color: t.color_scheme?.primary ?? "#6B7280",
+        info_sections: t.info_sections ?? [],
       }))
     )
     setTemplates(templatesRes.data ?? [])
@@ -92,6 +97,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
         name: newName.trim(),
         default_template_id: newTemplateId && newTemplateId !== "none" ? newTemplateId : null,
         color_scheme: { primary: newColor },
+        info_sections: newSections.length > 0 ? newSections : null,
         is_active: true,
       } as never)
       if (error) { toast.error(`Failed: ${error.message}`); return }
@@ -101,6 +107,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
       setNewName("")
       setNewTemplateId("")
       setNewColor("#6B7280")
+      setNewSections([])
       fetchTypes()
       onTypesChanged?.()
     } finally { setSaving(false) }
@@ -114,6 +121,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
         name: editName.trim(),
         default_template_id: editTemplateId && editTemplateId !== "none" ? editTemplateId : null,
         color_scheme: { primary: editColor },
+        info_sections: editSections.length > 0 ? editSections : null,
       } as never).eq("id", id)
       if (error) { toast.error(`Failed: ${error.message}`); return }
       toast.success("Updated")
@@ -193,6 +201,10 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                           />
                         ))}
                       </div>
+                      <CustomSectionsEditor
+                        sections={editSections}
+                        onChange={setEditSections}
+                      />
                       <div className="flex gap-1.5">
                         <Button size="sm" className="h-7 text-xs" onClick={() => handleUpdate(t.id)} disabled={saving}>
                           {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
@@ -214,7 +226,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                     <button
                       type="button"
                       className="text-[10px] text-muted-foreground hover:text-foreground"
-                      onClick={() => { setEditId(t.id); setEditName(t.name); setEditTemplateId(t.default_template_id || ""); setEditColor(t.color) }}
+                      onClick={() => { setEditId(t.id); setEditName(t.name); setEditTemplateId(t.default_template_id || ""); setEditColor(t.color); setEditSections(t.info_sections ?? []) }}
                     >
                       Edit
                     </button>
@@ -282,6 +294,10 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                       />
                     ))}
                   </div>
+                  <CustomSectionsEditor
+                    sections={newSections}
+                    onChange={setNewSections}
+                  />
                   <div className="flex gap-1.5">
                     <Button size="sm" className="h-7 text-xs" onClick={handleCreate} disabled={saving || !newName.trim()}>
                       {saving ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}

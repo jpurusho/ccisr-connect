@@ -172,6 +172,30 @@ export function EventDetailDialog({
             </div>
           )}
 
+          {/* Info sections from event type */}
+          {event.infoSections && event.infoSections.length > 0 && (
+            <div className="space-y-2">
+              {event.infoSections.map((section, si) => (
+                <div
+                  key={si}
+                  className="rounded-lg border p-3 space-y-1.5"
+                  style={section.color ? { borderColor: section.color + "40", backgroundColor: section.color + "08" } : undefined}
+                >
+                  <p className="text-sm font-medium">
+                    {section.emoji && <span className="mr-1.5">{section.emoji}</span>}
+                    {section.title}
+                  </p>
+                  {section.entries.filter((e) => e.label || e.name).map((entry, ei) => (
+                    <div key={ei} className="flex text-sm gap-2">
+                      {entry.label && <span className="text-muted-foreground shrink-0">{entry.label}:</span>}
+                      <span>{entry.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Notes */}
           {event.notes && (
             <div className="flex items-start gap-3 text-sm">
