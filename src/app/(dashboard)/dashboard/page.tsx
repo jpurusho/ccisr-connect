@@ -56,6 +56,8 @@ import {
   type BirthdayEntry,
   type AnniversaryEntry,
   extractCommonCardData,
+  pastelBoxHtml,
+  PASTEL_BORDER_MAP,
   type BaseCardData,
 } from "@/lib/email/card-builder"
 import { toast } from "sonner"
@@ -112,6 +114,7 @@ import {
   ResourceLinksEditor,
   CardStyleFields,
   FlyerSectionsEditor,
+  PastelColorPicker,
   type FlyerSectionItem,
 } from "@/components/dashboard/communication-edit-forms"
 
@@ -157,22 +160,25 @@ interface CustomDashFormData extends BaseFormData {
   subtitle: string
   emoji: string
   body: string
+  bodyBgColor?: string
   flyerSections: FlyerSectionItem[]
 }
 
 function buildCustomDashPreview(form: CustomDashFormData): string {
+  const rawBodyHtml = form.body
+    ? `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;color:#374151">${form.body}</p>`
+    : ""
   return buildCustomCard({
     title: form.title || "Announcement",
     subtitle: form.subtitle || undefined,
     emoji: form.emoji || undefined,
-    bodyHtml: form.body
-      ? `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;color:#374151">${form.body}</p>`
-      : "",
+    bodyHtml: rawBodyHtml ? pastelBoxHtml(rawBodyHtml, form.bodyBgColor) : "",
     flyerSections: (form.flyerSections ?? [])
       .filter((s) => s.imageUrl)
       .map((s) => ({
         imageUrl: s.imageUrl,
         caption: s.caption || undefined,
+        captionBgColor: s.captionBgColor || undefined,
         resourceLinks: s.resourceLinks.filter((l) => l.url),
       })),
     ...extractCommonCardData(form),
@@ -184,13 +190,16 @@ const EMPTY_CUSTOM_FORM: CustomDashFormData = {
   subtitle: "",
   emoji: "📋",
   body: "",
+  bodyBgColor: undefined,
   flyerSections: [],
   message: "",
+  messageBgColor: undefined,
   headerTitle: "",
   headerSubtitle: "",
   headerEmoji: "",
   primaryColor: "",
   footerVerse: "",
+  footerVerseBgColor: undefined,
   resourceLinks: [],
   customSections: [],
 }
@@ -1109,8 +1118,11 @@ export default function DashboardPage() {
             subtitle: (fd.subtitle as string) ?? (parsed.subtitle as string) ?? "",
             emoji: (fd.emoji as string) ?? (parsed.emoji as string) ?? "📋",
             body: (fd.body as string) ?? (parsed.body as string) ?? "",
+            bodyBgColor: (fd.bodyBgColor as string) ?? (parsed.bodyBgColor as string) ?? undefined,
             footerVerse: (fd.footerVerse as string) ?? (parsed.footerVerse as string) ?? "",
+            footerVerseBgColor: (fd.footerVerseBgColor as string) ?? (parsed.footerVerseBgColor as string) ?? undefined,
             message: (fd.message as string) ?? "",
+            messageBgColor: (fd.messageBgColor as string) ?? undefined,
             headerTitle: (fd.headerTitle as string) ?? "",
             headerSubtitle: (fd.headerSubtitle as string) ?? "",
             headerEmoji: (fd.headerEmoji as string) ?? "",
@@ -1128,7 +1140,9 @@ export default function DashboardPage() {
             subtitle: (parsed.subtitle as string) || "",
             emoji: (parsed.emoji as string) || "📋",
             body: (parsed.body as string) || "",
+            bodyBgColor: (parsed.bodyBgColor as string) || undefined,
             footerVerse: (parsed.footerVerse as string) || "",
+            footerVerseBgColor: (parsed.footerVerseBgColor as string) || undefined,
             primaryColor: (parsed.primaryColor as string) || "",
             resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
             customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
@@ -2613,7 +2627,9 @@ export default function DashboardPage() {
                           subtitle: (parsed.subtitle as string) || "",
                           emoji: (parsed.emoji as string) || "📋",
                           body: (parsed.body as string) || "",
+                          bodyBgColor: (parsed.bodyBgColor as string) || undefined,
                           footerVerse: (parsed.footerVerse as string) || "",
+                          footerVerseBgColor: (parsed.footerVerseBgColor as string) || undefined,
                           primaryColor: (parsed.primaryColor as string) || "",
                           resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
                           customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
@@ -2657,8 +2673,17 @@ export default function DashboardPage() {
                         id={`ct-${ct.id}-body`}
                         value={form.body}
                         onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], body: e.target.value } }))}
-                        className="w-full min-h-24 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                        className="w-full min-h-24 rounded-md border border-input px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors"
                         placeholder="Write your message..."
+                        style={form.bodyBgColor ? {
+                          backgroundColor: form.bodyBgColor,
+                          borderColor: PASTEL_BORDER_MAP[form.bodyBgColor],
+                          boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[form.bodyBgColor]}50`,
+                        } : undefined}
+                      />
+                      <PastelColorPicker
+                        value={form.bodyBgColor}
+                        onChange={(color) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], bodyBgColor: color } }))}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -2688,6 +2713,15 @@ export default function DashboardPage() {
                         id={`ct-${ct.id}-footer`}
                         value={form.footerVerse}
                         onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], footerVerse: e.target.value } }))}
+                        style={form.footerVerseBgColor ? {
+                          backgroundColor: form.footerVerseBgColor,
+                          borderColor: PASTEL_BORDER_MAP[form.footerVerseBgColor],
+                          boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[form.footerVerseBgColor]}50`,
+                        } : undefined}
+                      />
+                      <PastelColorPicker
+                        value={form.footerVerseBgColor}
+                        onChange={(color) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], footerVerseBgColor: color } }))}
                       />
                     </div>
                     <FlyerSectionsEditor

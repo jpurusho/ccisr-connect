@@ -42,6 +42,32 @@ export function deriveColorsFromPrimary(hex: string): CardColors {
   }
 }
 
+export const PASTEL_BORDER_MAP: Record<string, string> = {
+  "#FFE4E4": "#F87171",
+  "#FFE8D6": "#FB923C",
+  "#FFFBD6": "#EAB308",
+  "#D6F5E0": "#34D399",
+  "#D6F0FF": "#38BDF8",
+  "#E4DEFF": "#A78BFA",
+  "#FFD6F5": "#F472B6",
+  "#DBEAFE": "#60A5FA",
+};
+
+export function pastelBoxHtml(content: string, bgColor: string | undefined, outerStyle?: string): string {
+  if (!bgColor) return content;
+  const border = PASTEL_BORDER_MAP[bgColor];
+  if (!border) return content;
+  const extra = outerStyle ? `;${outerStyle}` : "";
+  return `<div style="background:${bgColor};border:1.5px solid ${border};border-radius:8px;padding:12px 16px;box-shadow:0 0 8px ${border}50${extra}">${content}</div>`;
+}
+
+function msgBlock(message: string, bgColor: string | undefined, colors: CardColors, margin = "0 0 16px"): string {
+  const p = `<p style="margin:0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6;white-space:pre-wrap">${message}</p>`;
+  return bgColor
+    ? pastelBoxHtml(p, bgColor, `margin:${margin}`)
+    : `<p style="margin:${margin};font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6;white-space:pre-wrap">${message}</p>`;
+}
+
 export const EVENT_COLORS: Record<string, CardColors> = {
   birthday: {
     primary: "#7C3AED",
@@ -109,15 +135,18 @@ export interface CardCustomSection {
 export interface CardFlyerSection {
   imageUrl: string;
   caption?: string;
+  captionBgColor?: string;
   resourceLinks?: ResourceLink[];
 }
 
 export interface BaseCardData {
   message?: string;
+  messageBgColor?: string;
   headerTitle?: string;
   headerSubtitle?: string;
   headerEmoji?: string;
   footerVerse?: string;
+  footerVerseBgColor?: string;
   primaryColor?: string;
   resourceLinks?: ResourceLink[];
   customSections?: CardCustomSection[];
@@ -147,10 +176,14 @@ function flyerSectionsHtml(sections: CardFlyerSection[] | undefined, colors: Car
   if (!sections || sections.length === 0) return "";
   return sections
     .filter((s) => s.imageUrl)
-    .map(
-      (s) =>
-        `<div style="border-top:1px solid ${colors.border};margin:16px 0"></div><img src="${s.imageUrl}" alt="Event Flyer" style="width:100%;display:block;border-radius:8px;margin-bottom:10px" />${s.caption ? `<p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#374151">${s.caption}</p>` : ""}${resourceLinksHtml(s.resourceLinks, colors)}`
-    )
+    .map((s) => {
+      const captionHtml = s.caption
+        ? (s.captionBgColor
+          ? pastelBoxHtml(`<p style="margin:0;font-size:14px;line-height:1.6;color:#374151">${s.caption}</p>`, s.captionBgColor, "margin-bottom:8px")
+          : `<p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#374151">${s.caption}</p>`)
+        : "";
+      return `<div style="border-top:1px solid ${colors.border};margin:16px 0"></div><img src="${s.imageUrl}" alt="Event Flyer" style="width:100%;display:block;border-radius:8px;margin-bottom:10px" />${captionHtml}${resourceLinksHtml(s.resourceLinks, colors)}`;
+    })
     .join("");
 }
 
@@ -162,21 +195,25 @@ ${resourceLinksHtml(allLinks, colors)}`;
 
 export function extractCommonCardData(form: {
   message?: string;
+  messageBgColor?: string;
   headerTitle?: string;
   headerSubtitle?: string;
   headerEmoji?: string;
   primaryColor?: string;
   footerVerse?: string;
+  footerVerseBgColor?: string;
   resourceLinks?: { label: string; url: string }[];
   customSections?: CardCustomSection[];
 }): BaseCardData {
   return {
     message: form.message || undefined,
+    messageBgColor: form.messageBgColor || undefined,
     headerTitle: form.headerTitle || undefined,
     headerSubtitle: form.headerSubtitle || undefined,
     headerEmoji: form.headerEmoji || undefined,
     primaryColor: form.primaryColor || undefined,
     footerVerse: form.footerVerse || undefined,
+    footerVerseBgColor: form.footerVerseBgColor || undefined,
     resourceLinks: (form.resourceLinks ?? []).filter((l) => l.url),
     customSections: form.customSections,
   };
@@ -217,8 +254,11 @@ function resourceLinksHtml(links: ResourceLink[] | undefined, colors: CardColors
   ).join("")}</div>`;
 }
 
-function footerRow(text: string, colors: CardColors): string {
-  return `<tr><td style="background:${colors.bgLight};padding:14px 28px;text-align:center;border-top:1px solid ${colors.border}">
+function footerRow(text: string, colors: CardColors, bgColor?: string): string {
+  const bg = bgColor || colors.bgLight;
+  const border = bgColor ? (PASTEL_BORDER_MAP[bgColor] ?? colors.border) : colors.border;
+  const glow = bgColor && PASTEL_BORDER_MAP[bgColor] ? `;box-shadow:0 0 8px ${PASTEL_BORDER_MAP[bgColor]}50` : "";
+  return `<tr><td style="background:${bg};padding:14px 28px;text-align:center;border-top:1.5px solid ${border}${glow}">
 <p style="margin:0;font-size:11px;color:${colors.textLight}">${text}</p>
 </td></tr>`;
 }
@@ -250,7 +290,7 @@ export function buildBirthdayCard(data: BirthdayCardData): string {
 
   const messageHtml = data.message
     ? `<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
-<p style="margin:0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${data.message}</p>`
+${msgBlock(data.message, data.messageBgColor, colors, "0")}`
     : "";
 
   const content =
@@ -269,7 +309,7 @@ ${messageHtml}
 ${commonTrailingHtml(data, colors)}`,
       colors
     ) +
-    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor);
 
   return wrapCard(content, colors);
 }
@@ -303,7 +343,7 @@ export function buildAnniversaryCard(data: AnniversaryCardData): string {
 
   const messageHtml = data.message
     ? `<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
-<p style="margin:0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${data.message}</p>`
+${msgBlock(data.message, data.messageBgColor, colors, "0")}`
     : "";
 
   const content =
@@ -322,7 +362,7 @@ ${messageHtml}
 ${commonTrailingHtml(data, colors)}`,
       colors
     ) +
-    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor);
 
   return wrapCard(content, colors);
 }
@@ -401,7 +441,7 @@ ${details}
       colors
     ) +
     contentRow(
-      `${data.message ? `<p style="margin:0 0 16px;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${data.message}</p>` : ""}
+      `${data.message ? msgBlock(data.message, data.messageBgColor, colors) : ""}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
 ${sharedDetails}
 </table>
@@ -409,7 +449,7 @@ ${locationBlocks}
 ${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined)}`,
       colors
     ) +
-    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor);
 
   return wrapCard(content, colors);
 }
@@ -458,14 +498,14 @@ export function buildWomensStudyCard(data: WomensStudyCardData): string {
       colors
     ) +
     contentRow(
-      `${data.message ? `<p style="margin:0 0 16px;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${data.message}</p>` : ""}
+      `${data.message ? msgBlock(data.message, data.messageBgColor, colors) : ""}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
 ${details}
 </table>
 ${commonTrailingHtml(data, colors)}`,
       colors
     ) +
-    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors);
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor);
 
   return wrapCard(content, colors);
 }
@@ -517,7 +557,7 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
       colors
     ) +
     contentRow(
-      `<p style="margin:0 0 16px;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6">${message}</p>
+      `${msgBlock(message, data.messageBgColor, colors)}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
 ${details}
 </table>
@@ -527,7 +567,8 @@ ${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : und
     ) +
     footerRow(
       data.footerVerse || '"For where two or three gather in my name, there am I with them." — Matthew 18:20',
-      colors
+      colors,
+      data.footerVerseBgColor
     );
 
   return wrapCard(content, colors);
@@ -588,8 +629,11 @@ ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font
   const order = data.sectionOrder ?? ["birthdays", "anniversaries", "helpers", "events"];
   let sections = order.map((key) => sectionBuilders[key]?.() ?? "").join("");
 
+  const messageBg = data.messageBgColor || colors.bgLight;
+  const messageBc = data.messageBgColor ? (PASTEL_BORDER_MAP[data.messageBgColor] ?? colors.border) : colors.border;
+  const messageGlow = data.messageBgColor && PASTEL_BORDER_MAP[data.messageBgColor] ? `;box-shadow:0 0 8px ${PASTEL_BORDER_MAP[data.messageBgColor]}50` : "";
   const messageHtml = data.message
-    ? `<div style="margin:16px 0 0;padding:12px 16px;background:${colors.bgLight};border-radius:8px;font-size:14px;color:${colors.textDark};line-height:1.6;white-space:pre-wrap">${data.message}</div>`
+    ? `<div style="margin:16px 0 0;padding:12px 16px;background:${messageBg};border:1.5px solid ${messageBc};border-radius:8px;font-size:14px;color:${colors.textDark};line-height:1.6;white-space:pre-wrap${messageGlow}">${data.message}</div>`
     : "";
 
   const churchName = data.headerSubtitle || "Christ Church of India, San Ramon";
@@ -645,7 +689,7 @@ ${effectiveSubtitle ? `<p style="margin:4px 0 0;font-size:12px;color:rgba(255,25
     : headerRow(effectiveTitle, effectiveSubtitle || "Christ Church of India, San Ramon", effectiveEmoji || "📋", colors);
 
   const messageHtml = data.message
-    ? `<p style="margin:16px 0 0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6;white-space:pre-wrap">${data.message}</p>`
+    ? msgBlock(data.message, data.messageBgColor, colors, "16px 0 0")
     : "";
 
   const content =

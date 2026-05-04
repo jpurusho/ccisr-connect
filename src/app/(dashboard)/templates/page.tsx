@@ -40,6 +40,7 @@ import {
   buildPrayerMeetingCard,
   buildBulletinCard,
   extractCommonCardData,
+  PASTEL_BORDER_MAP,
 } from "@/lib/email/card-builder"
 import {
   type BibleStudyDefaults,
@@ -57,7 +58,7 @@ import {
   TEMPLATE_PLACEHOLDERS,
 } from "@/lib/template-defaults"
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
-import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
+import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, PastelColorPicker, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
 import { formatPhone } from "@/lib/utils"
 import {
   Dialog,
@@ -198,7 +199,7 @@ export default function TemplatesPage() {
   const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string }[]>([])
   const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown> } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
-  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", footerVerse: "", resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
+  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
 
   // Per-type form state
   const [subjects, setSubjects] = useState<Record<string, string>>({})
@@ -1089,7 +1090,7 @@ export default function TemplatesPage() {
                 {!creatingCustom && !editingCustom && (
                   <Button
                     onClick={() => {
-                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", footerVerse: "", resourceLinks: [], customSections: [], flyerSections: [] })
+                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined, footerVerse: "", footerVerseBgColor: undefined, resourceLinks: [], customSections: [], flyerSections: [] })
                       setCreatingCustom(true)
                     }}
                   >
@@ -1152,8 +1153,17 @@ export default function TemplatesPage() {
                       id="nc-body"
                       value={newCustom.body}
                       onChange={(e) => setNewCustom({ ...newCustom, body: e.target.value })}
-                      className="min-h-24"
+                      className="min-h-24 transition-colors"
                       placeholder="Write the main content of the announcement..."
+                      style={newCustom.bodyBgColor ? {
+                        backgroundColor: newCustom.bodyBgColor,
+                        borderColor: PASTEL_BORDER_MAP[newCustom.bodyBgColor],
+                        boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.bodyBgColor]}50`,
+                      } : undefined}
+                    />
+                    <PastelColorPicker
+                      value={newCustom.bodyBgColor}
+                      onChange={(color) => setNewCustom({ ...newCustom, bodyBgColor: color })}
                     />
                   </Field>
                   <Field label="Footer Verse" htmlFor="nc-foot">
@@ -1162,6 +1172,15 @@ export default function TemplatesPage() {
                       value={newCustom.footerVerse}
                       onChange={(e) => setNewCustom({ ...newCustom, footerVerse: e.target.value })}
                       placeholder="e.g., For God so loved the world... — John 3:16"
+                      style={newCustom.footerVerseBgColor ? {
+                        backgroundColor: newCustom.footerVerseBgColor,
+                        borderColor: PASTEL_BORDER_MAP[newCustom.footerVerseBgColor],
+                        boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.footerVerseBgColor]}50`,
+                      } : undefined}
+                    />
+                    <PastelColorPicker
+                      value={newCustom.footerVerseBgColor}
+                      onChange={(color) => setNewCustom({ ...newCustom, footerVerseBgColor: color })}
                     />
                   </Field>
                   <FlyerSectionsEditor
@@ -1191,7 +1210,9 @@ export default function TemplatesPage() {
                           emoji: newCustom.emoji || "📋",
                           primaryColor: newCustom.primaryColor || undefined,
                           body: newCustom.body,
+                          bodyBgColor: newCustom.bodyBgColor || undefined,
                           footerVerse: newCustom.footerVerse,
+                          footerVerseBgColor: newCustom.footerVerseBgColor || undefined,
                           flyerSections: newCustom.flyerSections.filter((s) => s.imageUrl),
                           resourceLinks: newCustom.resourceLinks.filter((l) => l.url),
                           customSections: newCustom.customSections.filter((s) => s.title && s.entries.some((e) => e.name)),
@@ -1280,7 +1301,16 @@ export default function TemplatesPage() {
                       id="ct-body"
                       value={(editingCustom.data.body as string) || ""}
                       onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, body: e.target.value } })}
-                      className="min-h-24"
+                      className="min-h-24 transition-colors"
+                      style={(editingCustom.data.bodyBgColor as string) ? {
+                        backgroundColor: editingCustom.data.bodyBgColor as string,
+                        borderColor: PASTEL_BORDER_MAP[editingCustom.data.bodyBgColor as string],
+                        boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[editingCustom.data.bodyBgColor as string]}50`,
+                      } : undefined}
+                    />
+                    <PastelColorPicker
+                      value={editingCustom.data.bodyBgColor as string | undefined}
+                      onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, bodyBgColor: color } })}
                     />
                   </Field>
                   <Field label="Footer Verse" htmlFor="ct-foot">
@@ -1288,6 +1318,15 @@ export default function TemplatesPage() {
                       id="ct-foot"
                       value={(editingCustom.data.footerVerse as string) || ""}
                       onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerVerse: e.target.value } })}
+                      style={(editingCustom.data.footerVerseBgColor as string) ? {
+                        backgroundColor: editingCustom.data.footerVerseBgColor as string,
+                        borderColor: PASTEL_BORDER_MAP[editingCustom.data.footerVerseBgColor as string],
+                        boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[editingCustom.data.footerVerseBgColor as string]}50`,
+                      } : undefined}
+                    />
+                    <PastelColorPicker
+                      value={editingCustom.data.footerVerseBgColor as string | undefined}
+                      onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerVerseBgColor: color } })}
                     />
                   </Field>
                   <FlyerSectionsEditor

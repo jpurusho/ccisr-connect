@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner"
 import { formatPhone } from "@/lib/utils"
 import type { BirthdayEntry, AnniversaryEntry } from "@/lib/email/card-builder"
+import { PASTEL_BORDER_MAP } from "@/lib/email/card-builder"
 
 interface FamilySearchResult {
   id: string
@@ -202,6 +203,50 @@ export interface CustomSection {
   emoji: string
   color?: string
   entries: { label: string; name: string }[]
+}
+
+export const PASTEL_COLORS: { bg: string; border: string; label: string }[] = [
+  { bg: "#FFE4E4", border: PASTEL_BORDER_MAP["#FFE4E4"], label: "Rose" },
+  { bg: "#FFE8D6", border: PASTEL_BORDER_MAP["#FFE8D6"], label: "Peach" },
+  { bg: "#FFFBD6", border: PASTEL_BORDER_MAP["#FFFBD6"], label: "Yellow" },
+  { bg: "#D6F5E0", border: PASTEL_BORDER_MAP["#D6F5E0"], label: "Green" },
+  { bg: "#D6F0FF", border: PASTEL_BORDER_MAP["#D6F0FF"], label: "Sky" },
+  { bg: "#E4DEFF", border: PASTEL_BORDER_MAP["#E4DEFF"], label: "Purple" },
+  { bg: "#FFD6F5", border: PASTEL_BORDER_MAP["#FFD6F5"], label: "Pink" },
+  { bg: "#DBEAFE", border: PASTEL_BORDER_MAP["#DBEAFE"], label: "Blue" },
+]
+
+export function PastelColorPicker({
+  value,
+  onChange,
+}: {
+  value?: string
+  onChange: (color: string | undefined) => void
+}) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+      <button
+        type="button"
+        className={`size-5 rounded-full border-2 bg-white transition-all ${!value ? "border-primary ring-1 ring-primary/40" : "border-border hover:border-muted-foreground"}`}
+        onClick={() => onChange(undefined)}
+        title="No background"
+      />
+      {PASTEL_COLORS.map((c) => (
+        <button
+          key={c.bg}
+          type="button"
+          className="size-5 rounded-full transition-all hover:scale-110"
+          style={{
+            backgroundColor: c.bg,
+            border: `2px solid ${value === c.bg ? c.border : "transparent"}`,
+            boxShadow: value === c.bg ? `0 0 6px ${c.border}` : undefined,
+          }}
+          onClick={() => onChange(value === c.bg ? undefined : c.bg)}
+          title={c.label}
+        />
+      ))}
+    </div>
+  )
 }
 
 const EMOJI_PRESETS = [
@@ -545,6 +590,7 @@ export function ResourceLinksEditor({
 export interface FlyerSectionItem {
   imageUrl: string
   caption: string
+  captionBgColor?: string
   resourceLinks: { label: string; url: string }[]
 }
 
@@ -653,7 +699,16 @@ export function FlyerSectionsEditor({
               value={sec.caption}
               onChange={(e) => { const u = [...sections]; u[idx] = { ...u[idx], caption: e.target.value }; onChange(u) }}
               placeholder="Text shown below the flyer image..."
-              className="min-h-14"
+              className="min-h-14 transition-colors"
+              style={sec.captionBgColor ? {
+                backgroundColor: sec.captionBgColor,
+                borderColor: PASTEL_BORDER_MAP[sec.captionBgColor],
+                boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[sec.captionBgColor]}50`,
+              } : undefined}
+            />
+            <PastelColorPicker
+              value={sec.captionBgColor}
+              onChange={(color) => { const u = [...sections]; u[idx] = { ...u[idx], captionBgColor: color }; onChange(u) }}
             />
           </Field>
 
@@ -677,11 +732,13 @@ export function FlyerSectionsEditor({
 
 interface CardStyleFieldsData {
   message: string
+  messageBgColor?: string
   headerTitle: string
   headerSubtitle: string
   headerEmoji: string
   primaryColor: string
   footerVerse: string
+  footerVerseBgColor?: string
 }
 
 export function CardStyleFields<T extends CardStyleFieldsData>({
@@ -701,7 +758,16 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           placeholder="Leave blank for default"
           value={data.message}
           onChange={(e) => onChange({ ...data, message: e.target.value })}
-          className="min-h-12"
+          className="min-h-12 transition-colors"
+          style={data.messageBgColor ? {
+            backgroundColor: data.messageBgColor,
+            borderColor: PASTEL_BORDER_MAP[data.messageBgColor],
+            boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[data.messageBgColor]}50`,
+          } : undefined}
+        />
+        <PastelColorPicker
+          value={data.messageBgColor}
+          onChange={(color) => onChange({ ...data, messageBgColor: color })}
         />
       </Field>
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
@@ -728,30 +794,37 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           placeholder="Christ Church of India, San Ramon"
         />
       </Field>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Field label="Footer Verse / Text" htmlFor={`${idPrefix}-fv`}>
+      <Field label="Footer Verse / Text" htmlFor={`${idPrefix}-fv`}>
+        <Input
+          id={`${idPrefix}-fv`}
+          value={data.footerVerse}
+          onChange={(e) => onChange({ ...data, footerVerse: e.target.value })}
+          placeholder="Christ Church of India, San Ramon"
+          style={data.footerVerseBgColor ? {
+            backgroundColor: data.footerVerseBgColor,
+            borderColor: PASTEL_BORDER_MAP[data.footerVerseBgColor],
+            boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[data.footerVerseBgColor]}50`,
+          } : undefined}
+        />
+        <PastelColorPicker
+          value={data.footerVerseBgColor}
+          onChange={(color) => onChange({ ...data, footerVerseBgColor: color })}
+        />
+      </Field>
+      <Field label="Primary Color" htmlFor={`${idPrefix}-color`}>
+        <div className="flex items-center gap-2">
           <Input
-            id={`${idPrefix}-fv`}
-            value={data.footerVerse}
-            onChange={(e) => onChange({ ...data, footerVerse: e.target.value })}
-            placeholder="Christ Church of India, San Ramon"
+            id={`${idPrefix}-color`}
+            value={data.primaryColor}
+            onChange={(e) => onChange({ ...data, primaryColor: e.target.value })}
+            placeholder="#4F46E5"
+            className="flex-1"
           />
-        </Field>
-        <Field label="Primary Color" htmlFor={`${idPrefix}-color`}>
-          <div className="flex items-center gap-2">
-            <Input
-              id={`${idPrefix}-color`}
-              value={data.primaryColor}
-              onChange={(e) => onChange({ ...data, primaryColor: e.target.value })}
-              placeholder="#4F46E5"
-              className="flex-1"
-            />
-            {data.primaryColor && (
-              <span className="size-6 rounded-md border" style={{ backgroundColor: data.primaryColor }} />
-            )}
-          </div>
-        </Field>
-      </div>
+          {data.primaryColor && (
+            <span className="size-6 rounded-md border" style={{ backgroundColor: data.primaryColor }} />
+          )}
+        </div>
+      </Field>
     </>
   )
 }
@@ -762,11 +835,13 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
 
 export interface BaseFormData {
   message: string
+  messageBgColor?: string
   headerTitle: string
   headerSubtitle: string
   headerEmoji: string
   primaryColor: string
   footerVerse: string
+  footerVerseBgColor?: string
   resourceLinks: { label: string; url: string }[]
   customSections?: CustomSection[]
 }
