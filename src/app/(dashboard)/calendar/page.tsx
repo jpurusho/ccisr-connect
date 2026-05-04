@@ -130,6 +130,7 @@ export default function CalendarPage() {
       birthdaysResult,
       anniversariesResult,
       dispatchesResult,
+      customTemplatesResult,
     ] = await Promise.all([
       // Event instances in date range (include cancelled to prevent regeneration)
       supabase
@@ -169,6 +170,13 @@ export default function CalendarPage() {
         .or(`and(week_start.gte.${startStr},week_start.lte.${endStr}),and(sent_at.gte.${startStr},sent_at.lte.${endStr}T23:59:59),and(week_start.is.null,scheduled_at.gte.${startStr},scheduled_at.lte.${endStr}T23:59:59)`)
         .order("created_at", { ascending: false })
         .returns<{ id: string; subject: string; status: DispatchStatus; template_type: string | null; scheduled_at: string | null; sent_at: string | null; created_at: string; week_start: string | null }[]>(),
+
+      // Custom templates (for dispatch label/color mapping)
+      supabase
+        .from("email_templates")
+        .select("id, name, body_template")
+        .eq("is_default", false)
+        .returns<{ id: string; name: string; body_template: string }[]>(),
     ])
 
     const instances = (instancesResult.data ?? []) as EventInstance[]
@@ -414,6 +422,14 @@ export default function CalendarPage() {
       womens_study: "Women's Study Email",
       prayer_meeting: "Prayer Meeting Email",
       bulletin: "Bulletin Email",
+    }
+    for (const ct of customTemplatesResult.data ?? []) {
+      const ctKey = `custom:${ct.id}`
+      let parsed: Record<string, unknown> = {}
+      try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+      const linkedEt = eventTypes.find((et) => (et as EventType & { default_template_id?: string }).default_template_id === ct.id)
+      DISPATCH_COLORS[ctKey] = (linkedEt?.color_scheme as { primary?: string })?.primary ?? (parsed.primaryColor as string) ?? "#6B7280"
+      DISPATCH_LABELS[ctKey] = `${ct.name} Email`
     }
 
     const seenDispatchIds = new Set<string>()
@@ -728,7 +744,7 @@ export default function CalendarPage() {
 
       {/* Sent email preview dialog */}
       <Dialog open={sentEmailOpen} onOpenChange={setSentEmailOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg lg:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Sent Email</DialogTitle>
             {sentEmailSubject && (

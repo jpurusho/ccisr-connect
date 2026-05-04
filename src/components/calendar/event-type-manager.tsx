@@ -32,6 +32,7 @@ interface TypeRow {
 interface TemplateOption {
   id: string
   name: string
+  is_default?: boolean
 }
 
 const COLOR_PRESETS = ["#7C3AED", "#0D9488", "#D97706", "#DB2777", "#059669", "#4F46E5", "#DC2626", "#6B7280"]
@@ -63,7 +64,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
         .returns<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null }[]>(),
       supabase
         .from("email_templates")
-        .select("id, name")
+        .select("id, name, is_default")
         .order("name")
         .returns<TemplateOption[]>(),
     ])
@@ -177,7 +178,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                         <SelectContent>
                           <SelectItem value="none">None</SelectItem>
                           {templates.map((tp) => (
-                            <SelectItem key={tp.id} value={tp.id}>{tp.name}</SelectItem>
+                            <SelectItem key={tp.id} value={tp.id}>{tp.name}{tp.is_default === false ? " (custom)" : ""}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -266,7 +267,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {templates.map((tp) => (
-                        <SelectItem key={tp.id} value={tp.id}>{tp.name}</SelectItem>
+                        <SelectItem key={tp.id} value={tp.id}>{tp.name}{tp.is_default === false ? " (custom)" : ""}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

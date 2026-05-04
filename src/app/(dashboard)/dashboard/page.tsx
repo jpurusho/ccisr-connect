@@ -384,6 +384,12 @@ export default function DashboardPage() {
     color: string
     emoji: string
     defaults: Record<string, unknown>
+    eventInfo?: {
+      eventTypeName: string
+      eventDate: string | null
+      eventTime: string | null
+      hostName: string | null
+    }
   }
 
   const [customDashTemplates, setCustomDashTemplates] = useState<DashboardCustomTemplate[]>([])
@@ -629,11 +635,11 @@ export default function DashboardPage() {
           .eq("is_default", true)
           .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string }[]>(),
 
-        // Event type id-to-name map
+        // Event type id-to-name map (+ template link and color for custom card enrichment)
         supabase
           .from("event_types")
-          .select("id, name")
-          .returns<{ id: string; name: string }[]>(),
+          .select("id, name, default_template_id, color_scheme")
+          .returns<{ id: string; name: string; default_template_id: string | null; color_scheme: { primary: string } | null }[]>(),
 
         // Composed instances: match current week, bulletin week, or recurring
         supabase
@@ -893,11 +899,17 @@ export default function DashboardPage() {
             etNameToCommType[etName] = bt.type
           }
         }
+        // Build event type → color map from event_types (for custom template events)
+        const etIdToColor: Record<string, string> = {}
+        for (const et of eventTypesRes.data ?? []) {
+          if (et.color_scheme?.primary) etIdToColor[et.id] = et.color_scheme.primary
+        }
+
         const stripEvts: { title: string; date: Date; color: string; commType: CommType | null }[] = []
         for (const evt of activeEvents) {
           if (!evt.recurrence_rule) continue
           const etName = etIdToName[evt.event_type_id] ?? ""
-          const color = etNameToCommColor[etName] ?? "#6B7280"
+          const color = etNameToCommColor[etName] ?? etIdToColor[evt.event_type_id] ?? "#6B7280"
           const commType = etNameToCommType[etName] ?? null
           const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
           for (const occ of occs) {
@@ -1161,6 +1173,46 @@ export default function DashboardPage() {
         }
       }
 
+      // ---- Enrich custom templates with linked event data ----
+      for (const ct of dashCustom) {
+        const linkedEt = (eventTypesRes.data ?? []).find((et) => et.default_template_id === ct.id)
+        if (!linkedEt) continue
+        const linkedEvents = activeEvents.filter((e) => e.event_type_id === linkedEt.id)
+        const linkedColor = linkedEt.color_scheme?.primary
+        if (linkedColor) ct.color = linkedColor
+
+        for (const evt of linkedEvents) {
+          if (!evt.recurrence_rule) continue
+          const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
+          if (occs.length > 0) {
+            const occ = occs[0]
+            const dateStr = format(occ, "yyyy-MM-dd")
+            const inst = weekInstances.find((i) => i.event_id === evt.id && i.instance_date === dateStr)
+            let hostName: string | null = null
+            if (inst?.host_family_id) {
+              const hf = await resolveHostFamily(inst.host_family_id)
+              hostName = hf.hostName !== "TBD" ? hf.hostName : null
+            } else if (evt.host_family_id) {
+              const expired = evt.host_until ? new Date(evt.host_until + "T23:59:59") < new Date() : false
+              if (!expired) {
+                const hf = await resolveHostFamily(evt.host_family_id)
+                hostName = hf.hostName !== "TBD" ? hf.hostName : null
+              }
+            }
+            ct.eventInfo = {
+              eventTypeName: linkedEt.name,
+              eventDate: format(occ, "EEEE, MMMM do"),
+              eventTime: inst?.instance_time ? formatTime(inst.instance_time) : (evt.default_time ? formatTime(evt.default_time) : null),
+              hostName,
+            }
+            break
+          }
+        }
+        if (!ct.eventInfo) {
+          ct.eventInfo = { eventTypeName: linkedEt.name, eventDate: null, eventTime: null, hostName: null }
+        }
+      }
+
       setCustomDashTemplates(dashCustom)
       setCustomForms(customFormInit)
       setCustomInstanceIds(customInstIds)
@@ -1251,6 +1303,14 @@ export default function DashboardPage() {
         for (const bt of BUILTIN_TEMPLATES) {
           commColorMap[bt.type] = bt.color
           commLabelMap[bt.type] = bt.label
+        }
+        for (const ct of customTmpls ?? []) {
+          const ctKey = `custom:${ct.id}`
+          let parsed: Record<string, unknown> = {}
+          try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+          const linkedEt = (eventTypesRes.data ?? []).find((et) => et.default_template_id === ct.id)
+          commColorMap[ctKey] = linkedEt?.color_scheme?.primary ?? (parsed.primaryColor as string) ?? "#6B7280"
+          commLabelMap[ctKey] = ct.name
         }
         const stripDisps: { label: string; date: string; color: string; status: string; targetLabel: string; commType: CommType | null; dispatchId: string }[] = []
         const seen = new Set<string>()
@@ -2490,7 +2550,9 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                        {customForms[ct.id]?.title || "Custom announcement"}
+                        {ct.eventInfo?.eventDate
+                          ? `${ct.eventInfo.eventDate}${ct.eventInfo.eventTime ? ` at ${ct.eventInfo.eventTime}` : ""}`
+                          : customForms[ct.id]?.title || "Custom announcement"}
                       </p>
                       {di.lastSentAt ? (
                         <p className="mt-0.5 text-[10px] text-green-600 dark:text-green-400">Sent {formatRelativeTime(di.lastSentAt)}</p>
@@ -2835,7 +2897,7 @@ export default function DashboardPage() {
 
       {/* Sent email preview dialog */}
       <Dialog open={!!sentEmailPreview} onOpenChange={(open) => { if (!open) setSentEmailPreview(null) }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg lg:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Sent Email</DialogTitle>
             {sentEmailPreview?.subject && (
