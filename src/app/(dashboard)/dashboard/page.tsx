@@ -1115,7 +1115,6 @@ export default function DashboardPage() {
             headerSubtitle: (fd.headerSubtitle as string) ?? "",
             headerEmoji: (fd.headerEmoji as string) ?? "",
             primaryColor: (fd.primaryColor as string) ?? (parsed.primaryColor as string) ?? "",
-            footerVerse: (fd.footerVerse as string) ?? "",
             resourceLinks: (fd.resourceLinks as BaseFormData["resourceLinks"]) ?? (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
             customSections: (fd.customSections as BaseFormData["customSections"]) ?? (parsed.customSections as BaseFormData["customSections"]) ?? [],
             flyerSections: (fd.flyerSections as FlyerSectionItem[]) ?? (parsed.flyerSections as FlyerSectionItem[]) ?? [],

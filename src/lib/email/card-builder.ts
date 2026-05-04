@@ -632,17 +632,26 @@ export function buildCustomCard(data: CustomCardData): string {
     ? deriveColorsFromPrimary(data.primaryColor)
     : EVENT_COLORS[data.colorScheme ?? "bulletin"] || EVENT_COLORS.bulletin;
 
+  const effectiveTitle = data.headerTitle || data.title;
+  const effectiveSubtitle = data.headerSubtitle || data.subtitle;
+  const effectiveEmoji = data.headerEmoji || data.emoji;
+
   const header = data.bannerImageUrl
-    ? `<tr><td style="padding:0;line-height:0"><img src="${data.bannerImageUrl}" alt="${data.title}" style="width:100%;display:block;border-radius:12px 12px 0 0" /></td></tr>
+    ? `<tr><td style="padding:0;line-height:0"><img src="${data.bannerImageUrl}" alt="${effectiveTitle}" style="width:100%;display:block;border-radius:12px 12px 0 0" /></td></tr>
 <tr><td style="background:${colors.primary};padding:12px 28px;text-align:center">
-<p style="margin:0;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${data.title}</p>
-${data.subtitle ? `<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.85);font-weight:500">${data.subtitle}</p>` : ""}
+<p style="margin:0;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${effectiveTitle}</p>
+${effectiveSubtitle ? `<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.85);font-weight:500">${effectiveSubtitle}</p>` : ""}
 </td></tr>`
-    : headerRow(data.title, data.subtitle || "Christ Church of India, San Ramon", data.emoji || "📋", colors);
+    : headerRow(effectiveTitle, effectiveSubtitle || "Christ Church of India, San Ramon", effectiveEmoji || "📋", colors);
+
+  const messageHtml = data.message
+    ? `<p style="margin:16px 0 0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6;white-space:pre-wrap">${data.message}</p>`
+    : "";
 
   const content =
     header +
     contentRow(`${data.bodyHtml}
+${messageHtml}
 ${flyerSectionsHtml(data.flyerSections, colors)}
 ${commonTrailingHtml(data, colors)}`, colors) +
     footerRow(
