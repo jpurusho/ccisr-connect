@@ -1,6 +1,6 @@
 "use client"
 
-import { Settings, Palette, Server, UserCog, Info, Church, Tag, Activity } from "lucide-react"
+import { Settings, Palette, Server, UserCog, Info, Church, Tag, Activity, Database } from "lucide-react"
 import dynamic from "next/dynamic"
 const ActivityLogPanel = dynamic(() => import("@/components/settings/activity-log-panel"), { ssr: false })
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -17,6 +17,7 @@ import { ThemeSelector } from "@/components/settings/theme-selector"
 import { SmtpConfigPanel } from "@/components/settings/smtp-config"
 import { UserManagementPanel } from "@/components/settings/user-management"
 import { TagManagementPanel } from "@/components/settings/tag-management"
+import { DatabaseStatsPanel } from "@/components/settings/database-stats-panel"
 import { useAppUser } from "@/hooks/use-app-user"
 
 import { APP_VERSION } from "@/lib/version"
@@ -69,6 +70,7 @@ function AboutPanel() {
 export default function SettingsPage() {
   const { appUser, loading } = useAppUser()
   const isAdmin = appUser?.role === "admin" || appUser?.role === "super_admin"
+  const isSuperAdmin = appUser?.role === "super_admin"
 
   return (
     <div className="space-y-6">
@@ -119,6 +121,12 @@ export default function SettingsPage() {
               <Activity className="size-4" />
               <span className="hidden sm:inline">Activity Log</span>
             </TabsTrigger>
+            {isSuperAdmin && (
+              <TabsTrigger value="database">
+                <Database className="size-4" />
+                <span className="hidden sm:inline">Database</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="about">
               <Info className="size-4" />
               <span className="hidden sm:inline">About</span>
@@ -148,6 +156,12 @@ export default function SettingsPage() {
           <TabsContent value="activity" className="mt-6">
             <ActivityLogPanel />
           </TabsContent>
+
+          {isSuperAdmin && (
+            <TabsContent value="database" className="mt-6">
+              <DatabaseStatsPanel />
+            </TabsContent>
+          )}
 
           <TabsContent value="about" className="mt-6">
             <AboutPanel />
