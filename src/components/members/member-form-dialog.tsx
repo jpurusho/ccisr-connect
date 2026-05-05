@@ -306,9 +306,52 @@ export function MemberFormDialog({
             .select("*", { count: "exact", head: true })
             .eq("family_id", member.family_id)
           if (count === 0) {
+            // Migrate address and home_phone to new family before deleting old one
+            const { data: oldAddr } = await supabase
+              .from("addresses")
+              .select("id")
+              .eq("family_id", member.family_id)
+              .eq("is_current", true)
+              .limit(1)
+              .maybeSingle()
+            if (oldAddr) {
+              const { data: newAddr } = await supabase
+                .from("addresses")
+                .select("id")
+                .eq("family_id", resolvedFamilyId!)
+                .eq("is_current", true)
+                .limit(1)
+                .maybeSingle()
+              if (!newAddr) {
+                await supabase
+                  .from("addresses")
+                  .update({ family_id: resolvedFamilyId } as never)
+                  .eq("id", (oldAddr as { id: string }).id)
+              }
+            }
+            const { data: oldFam } = await supabase
+              .from("families")
+              .select("home_phone")
+              .eq("id", member.family_id)
+              .single()
+            const oldPhone = (oldFam as unknown as { home_phone: string | null } | null)?.home_phone
+            if (oldPhone) {
+              const { data: newFam } = await supabase
+                .from("families")
+                .select("home_phone")
+                .eq("id", resolvedFamilyId!)
+                .single()
+              if (!(newFam as unknown as { home_phone: string | null } | null)?.home_phone) {
+                await supabase
+                  .from("families")
+                  .update({ home_phone: oldPhone } as never)
+                  .eq("id", resolvedFamilyId!)
+              }
+            }
             await supabase.from("families").delete().eq("id", member.family_id)
             logAudit("family_auto_deleted", "families", member.family_id, {
               reason: "last_member_moved",
+              address_migrated: !!oldAddr,
             })
           }
         }
