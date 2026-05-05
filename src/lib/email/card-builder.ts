@@ -23,6 +23,60 @@ export interface CardColors {
   bgLight: string;
 }
 
+// ── Style Settings Types ────────────────────────────────────────────────────
+
+export type FontFamily = "sans-serif" | "serif" | "rounded" | "monospace"
+export type FontSizeScale = "compact" | "default" | "large"
+export type HeaderStyle = "band" | "top-border" | "side-accent"
+export type SectionLayout = "table" | "paragraph" | "list"
+
+export interface TemplateStyleSettings {
+  fontFamily?: FontFamily
+  fontSizeScale?: FontSizeScale
+  headerColor?: string
+  customPastels?: { bg: string; border: string; label: string }[]
+  sectionLayout?: SectionLayout
+  headerStyle?: HeaderStyle
+  darkModeEnabled?: boolean
+  footerText?: string
+}
+
+export interface StyleContext {
+  fontStack: string
+  sizes: { header: number; body: number; label: number; footer: number }
+  headerStyle: HeaderStyle
+  sectionLayout: SectionLayout
+  darkMode: boolean
+  footerText?: string
+  customPastels?: { bg: string; border: string }[]
+}
+
+export const FONT_STACKS: Record<FontFamily, string> = {
+  "sans-serif": "'Segoe UI', system-ui, -apple-system, sans-serif",
+  "serif": "Georgia, 'Times New Roman', serif",
+  "rounded": "'Nunito', 'Segoe UI', system-ui, sans-serif",
+  "monospace": "'Courier New', Courier, monospace",
+}
+
+export const SIZE_SCALES: Record<FontSizeScale, { header: number; body: number; label: number; footer: number }> = {
+  compact: { header: 20, body: 13, label: 11, footer: 10 },
+  default: { header: 22, body: 14, label: 12, footer: 11 },
+  large: { header: 26, body: 16, label: 13, footer: 12 },
+}
+
+export function buildStyleContext(settings?: TemplateStyleSettings): StyleContext {
+  const s = settings ?? {}
+  return {
+    fontStack: FONT_STACKS[s.fontFamily ?? "sans-serif"],
+    sizes: SIZE_SCALES[s.fontSizeScale ?? "default"],
+    headerStyle: s.headerStyle ?? "band",
+    sectionLayout: s.sectionLayout ?? "table",
+    darkMode: s.darkModeEnabled ?? false,
+    footerText: s.footerText,
+    customPastels: s.customPastels,
+  }
+}
+
 export function deriveColorsFromPrimary(hex: string): CardColors {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
@@ -53,19 +107,29 @@ export const PASTEL_BORDER_MAP: Record<string, string> = {
   "#DBEAFE": "#60A5FA",
 };
 
-export function pastelBoxHtml(content: string, bgColor: string | undefined, outerStyle?: string): string {
+export function getPastelBorderMap(customPastels?: { bg: string; border: string }[]): Record<string, string> {
+  const map = { ...PASTEL_BORDER_MAP };
+  if (customPastels) {
+    for (const p of customPastels) map[p.bg] = p.border;
+  }
+  return map;
+}
+
+export function pastelBoxHtml(content: string, bgColor: string | undefined, outerStyle?: string, customPastels?: { bg: string; border: string }[]): string {
   if (!bgColor) return content;
-  const border = PASTEL_BORDER_MAP[bgColor];
+  const map = customPastels ? getPastelBorderMap(customPastels) : PASTEL_BORDER_MAP;
+  const border = map[bgColor];
   if (!border) return content;
   const extra = outerStyle ? `;${outerStyle}` : "";
   return `<div style="background:${bgColor};border:1.5px solid ${border};border-radius:8px;padding:12px 16px;box-shadow:0 0 8px ${border}50${extra}">${content}</div>`;
 }
 
-function msgBlock(message: string, bgColor: string | undefined, colors: CardColors, margin = "0 0 16px"): string {
-  const p = `<p style="margin:0;font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6;white-space:pre-wrap">${message}</p>`;
+function msgBlock(message: string, bgColor: string | undefined, colors: CardColors, margin = "0 0 16px", style?: StyleContext): string {
+  const sz = style?.sizes.body ?? 14;
+  const p = `<p style="margin:0;font-size:${sz}px;color:${colors.textDark};text-align:center;line-height:1.6;white-space:pre-wrap">${message}</p>`;
   return bgColor
-    ? pastelBoxHtml(p, bgColor, `margin:${margin}`)
-    : `<p style="margin:${margin};font-size:14px;color:${colors.textDark};text-align:center;line-height:1.6;white-space:pre-wrap">${message}</p>`;
+    ? pastelBoxHtml(p, bgColor, `margin:${margin}`, style?.customPastels)
+    : `<p style="margin:${margin};font-size:${sz}px;color:${colors.textDark};text-align:center;line-height:1.6;white-space:pre-wrap">${message}</p>`;
 }
 
 export const EVENT_COLORS: Record<string, CardColors> = {
@@ -152,22 +216,37 @@ export interface BaseCardData {
   customSections?: CardCustomSection[];
 }
 
-function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: CardColors): string {
+function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: CardColors, style?: StyleContext): string {
   if (!sections || sections.length === 0) return "";
+  const layout = style?.sectionLayout ?? "table";
+  const sz = style?.sizes ?? SIZE_SCALES.default;
+
   return sections
     .filter((s) => s.title)
     .map((s) => {
       const sColor = s.color || colors.primary;
       const sBg = s.color ? deriveColorsFromPrimary(s.color).bgLight : "";
-      const rows = s.entries
-        .filter((e) => e.label || e.name)
+      const bgStyle = sBg ? `background:${sBg};border-radius:8px;padding:4px 16px;` : "";
+      const validEntries = s.entries.filter((e) => e.label || e.name);
+      const headerHtml = `<td style="padding:16px 0 8px;font-size:${sz.label + 1}px;font-weight:700;color:${sColor};text-transform:uppercase;letter-spacing:0.5px">${s.emoji || "📋"} ${s.title}</td>`;
+
+      if (layout === "paragraph") {
+        const text = validEntries.map((e) => e.label ? `${e.label}: ${e.name}` : e.name).join(", ");
+        return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr><tr><td style="padding:4px 12px 12px;font-size:${sz.body}px;color:${colors.textDark};line-height:1.6">${text}</td></tr></table>`;
+      }
+
+      if (layout === "list") {
+        const items = validEntries.map((e) => `<li style="padding:2px 0;font-size:${sz.body}px;color:${colors.textDark}">${e.label ? `<strong>${e.label}:</strong> ` : ""}${e.name}</li>`).join("");
+        return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr><tr><td style="padding:4px 12px 12px"><ul style="margin:0;padding-left:20px;color:${colors.textDark}">${items}</ul></td></tr></table>`;
+      }
+
+      const rows = validEntries
         .map(
           (e) =>
-            `<tr><td style="padding:4px 0 4px 12px;font-size:14px;color:${colors.textDark}">${e.label || ""}</td><td style="padding:4px 12px 4px 0;font-size:13px;color:${colors.textLight};text-align:right;font-weight:500">${e.name || ""}</td></tr>`
+            `<tr><td style="padding:4px 0 4px 12px;font-size:${sz.body}px;color:${colors.textDark}">${e.label || ""}</td><td style="padding:4px 12px 4px 0;font-size:${sz.body - 1}px;color:${colors.textLight};text-align:right;font-weight:500">${e.name || ""}</td></tr>`
         )
         .join("");
-      const bgStyle = sBg ? `background:${sBg};border-radius:8px;padding:4px 16px;` : "";
-      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr><td style="padding:16px 0 8px;font-size:13px;font-weight:700;color:${sColor};text-transform:uppercase;letter-spacing:0.5px">${s.emoji || "📋"} ${s.title}</td></tr>${rows}</table>`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr>${rows}</table>`;
     })
     .join("");
 }
@@ -187,9 +266,9 @@ function flyerSectionsHtml(sections: CardFlyerSection[] | undefined, colors: Car
     .join("");
 }
 
-function commonTrailingHtml(data: BaseCardData, colors: CardColors, extraResourceLinks?: ResourceLink[]): string {
+function commonTrailingHtml(data: BaseCardData, colors: CardColors, extraResourceLinks?: ResourceLink[], style?: StyleContext): string {
   const allLinks = [...(data.resourceLinks ?? []), ...(extraResourceLinks ?? [])];
-  return `${customSectionsHtml(data.customSections, colors)}
+  return `${customSectionsHtml(data.customSections, colors, style)}
 ${resourceLinksHtml(allLinks, colors)}`;
 }
 
@@ -219,8 +298,12 @@ export function extractCommonCardData(form: {
   };
 }
 
-function wrapCard(content: string, colors: CardColors): string {
-  return `<div style="max-width:480px;margin:0 auto;font-family:'Segoe UI',system-ui,-apple-system,sans-serif">
+function wrapCard(content: string, colors: CardColors, style?: StyleContext): string {
+  const font = style?.fontStack ?? FONT_STACKS["sans-serif"];
+  const darkBlock = style?.darkMode
+    ? `<style>@media(prefers-color-scheme:dark){.card-outer{background:#1e293b!important}.card-content td{background:#0f172a!important}}</style>`
+    : "";
+  return `${darkBlock}<div class="card-outer" style="max-width:480px;margin:0 auto;font-family:${font}">
 <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${colors.border};border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
 ${content}
 </table>
@@ -231,12 +314,35 @@ function headerRow(
   title: string,
   subtitle: string,
   emoji: string,
-  colors: CardColors
+  colors: CardColors,
+  style?: StyleContext
 ): string {
+  const sz = style?.sizes ?? SIZE_SCALES.default;
+  const variant = style?.headerStyle ?? "band";
+
+  if (variant === "top-border") {
+    return `<tr><td style="border-top:4px solid ${colors.primary};padding:24px 28px;text-align:center;background:#ffffff">
+<p style="margin:0;font-size:32px;line-height:1">${emoji}</p>
+<p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:${colors.textDark};letter-spacing:-0.3px">${title}</p>
+<p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:${colors.textLight};font-weight:500">${subtitle}</p>
+</td></tr>`;
+  }
+
+  if (variant === "side-accent") {
+    return `<tr><td style="border-left:6px solid ${colors.primary};padding:20px 24px;background:#ffffff">
+<table cellpadding="0" cellspacing="0"><tr>
+<td style="padding-right:14px;vertical-align:middle"><span style="font-size:28px">${emoji}</span></td>
+<td style="vertical-align:middle">
+<p style="margin:0;font-size:${sz.header - 2}px;font-weight:700;color:${colors.textDark};letter-spacing:-0.3px">${title}</p>
+<p style="margin:4px 0 0;font-size:${sz.label + 1}px;color:${colors.textLight};font-weight:500">${subtitle}</p>
+</td></tr></table>
+</td></tr>`;
+  }
+
   return `<tr><td style="background:${colors.primary};padding:24px 28px;text-align:center">
 <p style="margin:0;font-size:32px;line-height:1">${emoji}</p>
-<p style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${title}</p>
-<p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.85);font-weight:500">${subtitle}</p>
+<p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${title}</p>
+<p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:rgba(255,255,255,0.85);font-weight:500">${subtitle}</p>
 </td></tr>`;
 }
 
@@ -254,12 +360,15 @@ function resourceLinksHtml(links: ResourceLink[] | undefined, colors: CardColors
   ).join("")}</div>`;
 }
 
-function footerRow(text: string, colors: CardColors, bgColor?: string): string {
+function footerRow(text: string, colors: CardColors, bgColor?: string, style?: StyleContext): string {
+  const footerText = style?.footerText || text;
+  const sz = style?.sizes.footer ?? 11;
   const bg = bgColor || colors.bgLight;
-  const border = bgColor ? (PASTEL_BORDER_MAP[bgColor] ?? colors.border) : colors.border;
-  const glow = bgColor && PASTEL_BORDER_MAP[bgColor] ? `;box-shadow:0 0 8px ${PASTEL_BORDER_MAP[bgColor]}50` : "";
+  const map = style?.customPastels ? getPastelBorderMap(style.customPastels) : PASTEL_BORDER_MAP;
+  const border = bgColor ? (map[bgColor] ?? colors.border) : colors.border;
+  const glow = bgColor && map[bgColor] ? `;box-shadow:0 0 8px ${map[bgColor]}50` : "";
   return `<tr><td style="background:${bg};padding:14px 28px;text-align:center;border-top:1.5px solid ${border}${glow}">
-<p style="margin:0;font-size:11px;color:${colors.textLight}">${text}</p>
+<p style="margin:0;font-size:${sz}px;color:${colors.textLight}">${footerText}</p>
 </td></tr>`;
 }
 
@@ -275,22 +384,23 @@ export interface BirthdayCardData extends BaseCardData {
   birthdays: BirthdayEntry[];
 }
 
-export function buildBirthdayCard(data: BirthdayCardData): string {
+export function buildBirthdayCard(data: BirthdayCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.birthday;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const personRows = data.birthdays
     .map(
       (b) =>
         `<tr>
-<td style="padding:10px 16px;font-size:16px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border}">${b.name}</td>
-<td style="padding:10px 16px;font-size:14px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-weight:500">${b.date}</td>
+<td style="padding:10px 16px;font-size:${sz.body + 2}px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border}">${b.name}</td>
+<td style="padding:10px 16px;font-size:${sz.body}px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-weight:500">${b.date}</td>
 </tr>`
     )
     .join("");
 
   const messageHtml = data.message
     ? `<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
-${msgBlock(data.message, data.messageBgColor, colors, "0")}`
+${msgBlock(data.message, data.messageBgColor, colors, "0", style)}`
     : "";
 
   const content =
@@ -298,20 +408,21 @@ ${msgBlock(data.message, data.messageBgColor, colors, "0")}`
       data.headerTitle || "Happy Birthday!",
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "🎂",
-      colors
+      colors,
+      style
     ) +
     contentRow(
-      `<p style="margin:0 0 4px;font-size:12px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Birthdays this week &bull; ${data.weekLabel}</p>
+      `<p style="margin:0 0 4px;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Birthdays this week &bull; ${data.weekLabel}</p>
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;overflow:hidden;margin-top:8px">
 ${personRows}
 </table>
 ${messageHtml}
-${commonTrailingHtml(data, colors)}`,
+${commonTrailingHtml(data, colors, undefined, style)}`,
       colors
     ) +
-    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor);
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor, style);
 
-  return wrapCard(content, colors);
+  return wrapCard(content, colors, style);
 }
 
 // ---------- Anniversary Card (Multiple Couples) ----------
@@ -328,22 +439,23 @@ export interface AnniversaryCardData extends BaseCardData {
   anniversaries: AnniversaryEntry[];
 }
 
-export function buildAnniversaryCard(data: AnniversaryCardData): string {
+export function buildAnniversaryCard(data: AnniversaryCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.anniversary;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const coupleRows = data.anniversaries
     .map((a) => {
       const yearsText = a.years ? ` (${a.years} yrs)` : "";
       return `<tr>
-<td style="padding:10px 16px;font-size:16px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border}">${a.husbandName} & ${a.wifeName}</td>
-<td style="padding:10px 16px;font-size:14px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-weight:500;white-space:nowrap">${a.date}${yearsText}</td>
+<td style="padding:10px 16px;font-size:${sz.body + 2}px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border}">${a.husbandName} & ${a.wifeName}</td>
+<td style="padding:10px 16px;font-size:${sz.body}px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-weight:500;white-space:nowrap">${a.date}${yearsText}</td>
 </tr>`;
     })
     .join("");
 
   const messageHtml = data.message
     ? `<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
-${msgBlock(data.message, data.messageBgColor, colors, "0")}`
+${msgBlock(data.message, data.messageBgColor, colors, "0", style)}`
     : "";
 
   const content =
@@ -351,20 +463,21 @@ ${msgBlock(data.message, data.messageBgColor, colors, "0")}`
       data.headerTitle || "Happy Anniversary!",
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "💍",
-      colors
+      colors,
+      style
     ) +
     contentRow(
-      `<p style="margin:0 0 4px;font-size:12px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Anniversaries this week &bull; ${data.weekLabel}</p>
+      `<p style="margin:0 0 4px;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Anniversaries this week &bull; ${data.weekLabel}</p>
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;overflow:hidden;margin-top:8px">
 ${coupleRows}
 </table>
 ${messageHtml}
-${commonTrailingHtml(data, colors)}`,
+${commonTrailingHtml(data, colors, undefined, style)}`,
       colors
     ) +
-    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor);
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor, style);
 
-  return wrapCard(content, colors);
+  return wrapCard(content, colors, style);
 }
 
 // ---------- Bible Study Invite (multi-location) ----------
@@ -393,25 +506,26 @@ export interface BibleStudyCardData extends BaseCardData {
   locations: BibleStudyLocation[];
 }
 
-export function buildBibleStudyCard(data: BibleStudyCardData): string {
+export function buildBibleStudyCard(data: BibleStudyCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.friday_bible_study;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const detailRow = (label: string, value: string) =>
     `<tr>
-<td style="padding:6px 0;font-size:12px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
-<td style="padding:6px 0 6px 12px;font-size:14px;color:${colors.textDark};font-weight:500">${value}</td>
+<td style="padding:6px 0;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
+<td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
 </tr>`;
 
   const locationBlocks = data.locations
     .map((loc) => {
       const locationHeader = data.locations.length > 1
-        ? `<p style="margin:0 0 8px;font-size:14px;font-weight:700;color:${colors.primary}">${loc.label}</p>`
+        ? `<p style="margin:0 0 8px;font-size:${sz.body}px;font-weight:700;color:${colors.primary}">${loc.label}</p>`
         : "";
 
       if (loc.onVacation) {
         const msg = loc.vacationMessage || `${loc.label} Bible Study is on break`;
         return `${locationHeader}<div style="background:${colors.bgLight};border-radius:8px;padding:12px 16px;text-align:center">
-<p style="margin:0;font-size:13px;color:${colors.textLight};font-style:italic">${msg}</p>
+<p style="margin:0;font-size:${sz.label + 1}px;color:${colors.textLight};font-style:italic">${msg}</p>
 </div>`;
       }
 
@@ -438,20 +552,21 @@ ${details}
       data.title || "Bible Study This Friday",
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "📖",
-      colors
+      colors,
+      style
     ) +
     contentRow(
-      `${data.message ? msgBlock(data.message, data.messageBgColor, colors) : ""}
+      `${data.message ? msgBlock(data.message, data.messageBgColor, colors, "0 0 16px", style) : ""}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
 ${sharedDetails}
 </table>
 ${locationBlocks}
-${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined)}`,
+${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined, style)}`,
       colors
     ) +
-    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor);
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor, style);
 
-  return wrapCard(content, colors);
+  return wrapCard(content, colors, style);
 }
 
 // ---------- Women's Bible Study ----------
@@ -467,13 +582,14 @@ export interface WomensStudyCardData extends BaseCardData {
   location?: string;
 }
 
-export function buildWomensStudyCard(data: WomensStudyCardData): string {
+export function buildWomensStudyCard(data: WomensStudyCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.wednesday_womens_study;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const detailRow = (label: string, value: string) =>
     `<tr>
-<td style="padding:6px 0;font-size:12px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
-<td style="padding:6px 0 6px 12px;font-size:14px;color:${colors.textDark};font-weight:500">${value}</td>
+<td style="padding:6px 0;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
+<td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
 </tr>`;
 
   let details = detailRow("When", `${data.date} at ${data.time}`);
@@ -495,19 +611,20 @@ export function buildWomensStudyCard(data: WomensStudyCardData): string {
       data.title || "Women's Bible Study",
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "🕊️",
-      colors
+      colors,
+      style
     ) +
     contentRow(
-      `${data.message ? msgBlock(data.message, data.messageBgColor, colors) : ""}
+      `${data.message ? msgBlock(data.message, data.messageBgColor, colors, "0 0 16px", style) : ""}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
 ${details}
 </table>
-${commonTrailingHtml(data, colors)}`,
+${commonTrailingHtml(data, colors, undefined, style)}`,
       colors
     ) +
-    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor);
+    footerRow(data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect", colors, data.footerVerseBgColor, style);
 
-  return wrapCard(content, colors);
+  return wrapCard(content, colors, style);
 }
 
 // ---------- Monthly Prayer Meeting ----------
@@ -524,16 +641,17 @@ export interface PrayerMeetingCardData extends BaseCardData {
   resourceLink?: ResourceLink;
 }
 
-export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
+export function buildPrayerMeetingCard(data: PrayerMeetingCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.monthly_prayer;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
   const message =
     data.message ||
     "Please join us for a time of prayer and worship, followed by a fellowship dinner.";
 
   const detailRow = (label: string, value: string) =>
     `<tr>
-<td style="padding:6px 0;font-size:12px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
-<td style="padding:6px 0 6px 12px;font-size:14px;color:${colors.textDark};font-weight:500">${value}</td>
+<td style="padding:6px 0;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
+<td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
 </tr>`;
 
   let details = detailRow("When", `${data.date} at ${data.time}`);
@@ -545,7 +663,7 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
   let signupHtml = "";
   if (data.signupLink) {
     signupHtml = `<div style="text-align:center;margin-top:16px">
-<a href="${data.signupLink}" style="display:inline-block;background:${colors.primary};color:#ffffff;padding:10px 28px;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none">Sign Up for Planning</a>
+<a href="${data.signupLink}" style="display:inline-block;background:${colors.primary};color:#ffffff;padding:10px 28px;border-radius:6px;font-size:${sz.body}px;font-weight:600;text-decoration:none">Sign Up for Planning</a>
 </div>`;
   }
 
@@ -554,24 +672,26 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData): string {
       data.headerTitle || "Monthly Prayer Meeting",
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "🙏",
-      colors
+      colors,
+      style
     ) +
     contentRow(
-      `${msgBlock(message, data.messageBgColor, colors)}
+      `${msgBlock(message, data.messageBgColor, colors, "0 0 16px", style)}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
 ${details}
 </table>
 ${signupHtml}
-${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined)}`,
+${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined, style)}`,
       colors
     ) +
     footerRow(
       data.footerVerse || '"For where two or three gather in my name, there am I with them." — Matthew 18:20',
       colors,
-      data.footerVerseBgColor
+      data.footerVerseBgColor,
+      style
     );
 
-  return wrapCard(content, colors);
+  return wrapCard(content, colors, style);
 }
 
 // ---------- Weekly Bulletin ----------
@@ -591,16 +711,17 @@ export interface BulletinCardData extends BaseCardData {
   sectionOrder?: string[];
 }
 
-export function buildBulletinCard(data: BulletinCardData): string {
+export function buildBulletinCard(data: BulletinCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.bulletin;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const sectionTitle = (icon: string, title: string, sectionColor: string) =>
-    `<tr><td style="padding:16px 0 8px;font-size:13px;font-weight:700;color:${sectionColor};text-transform:uppercase;letter-spacing:0.5px">${icon} ${title}</td></tr>`;
+    `<tr><td style="padding:16px 0 8px;font-size:${sz.label + 1}px;font-weight:700;color:${sectionColor};text-transform:uppercase;letter-spacing:0.5px">${icon} ${title}</td></tr>`;
 
   const itemRow = (name: string, detail: string) =>
     `<tr>
-<td style="padding:4px 0 4px 12px;font-size:14px;color:${colors.textDark}">${name}</td>
-<td style="padding:4px 0;font-size:13px;color:${colors.textLight};text-align:right;font-weight:500">${detail}</td>
+<td style="padding:4px 0 4px 12px;font-size:${sz.body}px;color:${colors.textDark}">${name}</td>
+<td style="padding:4px 0;font-size:${sz.body - 1}px;color:${colors.textLight};text-align:right;font-weight:500">${detail}</td>
 </tr>`;
 
   const sectionBuilders: Record<string, () => string> = {
@@ -622,7 +743,7 @@ ${data.helpers.map((h) => itemRow(h.role, h.name)).join("")}
     events: () => data.events.length === 0 ? "" :
       `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
 ${sectionTitle("📅", "This Week", EVENT_COLORS.friday_bible_study.primary)}
-${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font-size:14px;color:${colors.textDark}"><strong>${e.title}</strong><br/><span style="font-size:12px;color:${colors.textLight}">${e.details}</span></td></tr>`).join("")}
+${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font-size:${sz.body}px;color:${colors.textDark}"><strong>${e.title}</strong><br/><span style="font-size:${sz.label}px;color:${colors.textLight}">${e.details}</span></td></tr>`).join("")}
 </table>`,
   };
 
@@ -633,30 +754,32 @@ ${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font
   const messageBc = data.messageBgColor ? (PASTEL_BORDER_MAP[data.messageBgColor] ?? colors.border) : colors.border;
   const messageGlow = data.messageBgColor && PASTEL_BORDER_MAP[data.messageBgColor] ? `;box-shadow:0 0 8px ${PASTEL_BORDER_MAP[data.messageBgColor]}50` : "";
   const messageHtml = data.message
-    ? `<div style="margin:16px 0 0;padding:12px 16px;background:${messageBg};border:1.5px solid ${messageBc};border-radius:8px;font-size:14px;color:${colors.textDark};line-height:1.6;white-space:pre-wrap${messageGlow}">${data.message}</div>`
+    ? `<div style="margin:16px 0 0;padding:12px 16px;background:${messageBg};border:1.5px solid ${messageBc};border-radius:8px;font-size:${sz.body}px;color:${colors.textDark};line-height:1.6;white-space:pre-wrap${messageGlow}">${data.message}</div>`
     : "";
 
   const churchName = data.headerSubtitle || "Christ Church of India, San Ramon";
-  const churchLine = `<p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.75);font-weight:500;text-transform:uppercase;letter-spacing:1px">${churchName}</p>`;
+  const churchLine = `<p style="margin:0 0 4px;font-size:${sz.label}px;color:rgba(255,255,255,0.75);font-weight:500;text-transform:uppercase;letter-spacing:1px">${churchName}</p>`;
 
   const bulletinEmoji = data.headerEmoji || "⛪";
   const bulletinTitle = data.headerTitle || "Weekly Bulletin";
   const bulletinHeader = `<tr><td style="background:${colors.primary};padding:24px 28px;text-align:center">
 <p style="margin:0;font-size:32px;line-height:1">${bulletinEmoji}</p>
-${churchLine}<p style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${bulletinTitle}</p>
-<p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.85);font-weight:500">${data.weekLabel}</p>
+${churchLine}<p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${bulletinTitle}</p>
+<p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:rgba(255,255,255,0.85);font-weight:500">${data.weekLabel}</p>
 </td></tr>`;
 
   const content =
     bulletinHeader +
     contentRow(`${sections}${messageHtml}
-${commonTrailingHtml(data, colors)}`, colors) +
+${commonTrailingHtml(data, colors, undefined, style)}`, colors) +
     footerRow(
       data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect",
-      colors
+      colors,
+      undefined,
+      style
     );
 
-  return wrapCard(content, colors);
+  return wrapCard(content, colors, style);
 }
 
 // ---------- Generic / Custom Card ----------
@@ -671,10 +794,11 @@ export interface CustomCardData extends BaseCardData {
   colorScheme?: string;
 }
 
-export function buildCustomCard(data: CustomCardData): string {
+export function buildCustomCard(data: CustomCardData, style?: StyleContext): string {
   const colors = data.primaryColor
     ? deriveColorsFromPrimary(data.primaryColor)
     : EVENT_COLORS[data.colorScheme ?? "bulletin"] || EVENT_COLORS.bulletin;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const effectiveTitle = data.headerTitle || data.title;
   const effectiveSubtitle = data.headerSubtitle || data.subtitle;
@@ -683,13 +807,13 @@ export function buildCustomCard(data: CustomCardData): string {
   const header = data.bannerImageUrl
     ? `<tr><td style="padding:0;line-height:0"><img src="${data.bannerImageUrl}" alt="${effectiveTitle}" style="width:100%;display:block;border-radius:12px 12px 0 0" /></td></tr>
 <tr><td style="background:${colors.primary};padding:12px 28px;text-align:center">
-<p style="margin:0;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${effectiveTitle}</p>
-${effectiveSubtitle ? `<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.85);font-weight:500">${effectiveSubtitle}</p>` : ""}
+<p style="margin:0;font-size:${sz.header - 2}px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${effectiveTitle}</p>
+${effectiveSubtitle ? `<p style="margin:4px 0 0;font-size:${sz.label}px;color:rgba(255,255,255,0.85);font-weight:500">${effectiveSubtitle}</p>` : ""}
 </td></tr>`
-    : headerRow(effectiveTitle, effectiveSubtitle || "Christ Church of India, San Ramon", effectiveEmoji || "📋", colors);
+    : headerRow(effectiveTitle, effectiveSubtitle || "Christ Church of India, San Ramon", effectiveEmoji || "📋", colors, style);
 
   const messageHtml = data.message
-    ? msgBlock(data.message, data.messageBgColor, colors, "16px 0 0")
+    ? msgBlock(data.message, data.messageBgColor, colors, "16px 0 0", style)
     : "";
 
   const content =
@@ -697,11 +821,13 @@ ${effectiveSubtitle ? `<p style="margin:4px 0 0;font-size:12px;color:rgba(255,25
     contentRow(`${data.bodyHtml}
 ${messageHtml}
 ${flyerSectionsHtml(data.flyerSections, colors)}
-${commonTrailingHtml(data, colors)}`, colors) +
+${commonTrailingHtml(data, colors, undefined, style)}`, colors) +
     footerRow(
       data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect",
-      colors
+      colors,
+      undefined,
+      style
     );
 
-  return wrapCard(content, colors);
+  return wrapCard(content, colors, style);
 }

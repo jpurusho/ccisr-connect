@@ -59,6 +59,8 @@ import {
 } from "@/lib/template-defaults"
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
 import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, PastelColorPicker, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
+import { TemplateStyleEditor } from "@/components/dashboard/template-style-editor"
+import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-builder"
 import { formatPhone } from "@/lib/utils"
 import {
   Dialog,
@@ -73,6 +75,7 @@ interface SavedTemplate {
   event_type_name: string
   subject_template: string
   body_template: string
+  style_settings?: Record<string, unknown>
 }
 
 const EVENT_TYPE_TABS = [
@@ -201,6 +204,9 @@ export default function TemplatesPage() {
   const [creatingCustom, setCreatingCustom] = useState(false)
   const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
 
+  // Style settings per template type
+  const [styleSettings, setStyleSettings] = useState<Record<string, TemplateStyleSettings>>({})
+
   // Per-type form state
   const [subjects, setSubjects] = useState<Record<string, string>>({})
   const [birthdayData, setBirthdayData] = useState<BirthdayDefaults>({})
@@ -225,9 +231,9 @@ export default function TemplatesPage() {
       supabase.from("event_types").select("id, name").order("name").returns<{ id: string; name: string }[]>(),
       supabase
         .from("email_templates")
-        .select("id, event_type_id, subject_template, body_template")
+        .select("id, event_type_id, subject_template, body_template, style_settings")
         .eq("is_default", true)
-        .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string }[]>(),
+        .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
       supabase
         .from("email_templates")
         .select("id, name, subject_template, body_template")
@@ -271,8 +277,12 @@ export default function TemplatesPage() {
           event_type_name: etName,
           subject_template: t.subject_template,
           body_template: t.body_template,
+          style_settings: t.style_settings ?? undefined,
         })
         subjs[etName] = t.subject_template
+        if (t.style_settings) {
+          setStyleSettings((prev) => ({ ...prev, [etName]: t.style_settings as TemplateStyleSettings }))
+        }
 
         const parsed = parseBodyTemplate(etName, t.body_template)
         if (parsed) {
@@ -392,6 +402,7 @@ export default function TemplatesPage() {
           .update({
             subject_template: subjectTmpl,
             body_template: bodyJson,
+            style_settings: styleSettings[typeName] ?? {},
           } as never)
           .eq("id", existing.id)
 
@@ -411,6 +422,7 @@ export default function TemplatesPage() {
             event_type_id: etId,
             subject_template: subjectTmpl,
             body_template: bodyJson,
+            style_settings: styleSettings[typeName] ?? {},
             is_default: true,
           } as never)
           .select("id")
@@ -435,6 +447,7 @@ export default function TemplatesPage() {
   // Live preview
   const previewHtml = useMemo(() => {
     const sampleWeek = "Apr 26 – May 2"
+    const sc = buildStyleContext(styleSettings[activeTab])
     switch (activeTab) {
       case "birthday": {
         const vars = makeBirthdayVars(sampleWeek, ["John", "Mary"])
@@ -445,7 +458,7 @@ export default function TemplatesPage() {
           message: interp(birthdayData.message, vars) || undefined,
           footerVerse: interp(birthdayData.footerVerse, vars) || undefined,
           headerSubtitle: interp(birthdayData.headerSubtitle, vars) || undefined,
-        })
+        }, sc)
       }
       case "anniversary": {
         const vars = makeAnniversaryVars(sampleWeek, ["John & Mary"])
@@ -456,7 +469,7 @@ export default function TemplatesPage() {
           message: interp(anniversaryData.message, vars) || undefined,
           footerVerse: interp(anniversaryData.footerVerse, vars) || undefined,
           headerSubtitle: interp(anniversaryData.headerSubtitle, vars) || undefined,
-        })
+        }, sc)
       }
       case "friday_bible_study": {
         const vars = makeEventVars(sampleWeek, "Friday, May 1st", bibleStudyData.time || "7:30 PM", bibleStudyData.topic || "Book of Acts")
@@ -475,7 +488,7 @@ export default function TemplatesPage() {
           ...extractCommonCardData(bibleStudyData),
           message: interp(bibleStudyData.message, vars) || undefined,
           footerVerse: interp(bibleStudyData.footerVerse, vars) || undefined,
-        })
+        }, sc)
       }
       case "wednesday_womens_study": {
         const vars = makeEventVars(sampleWeek, "Wednesday, Apr 29th", womensStudyData.time || "7:00 PM", womensStudyData.topic || "Building a Relationship with God")
@@ -491,7 +504,7 @@ export default function TemplatesPage() {
           ...extractCommonCardData(womensStudyData),
           message: interp(womensStudyData.message, vars) || undefined,
           footerVerse: interp(womensStudyData.footerVerse, vars) || undefined,
-        })
+        }, sc)
       }
       case "monthly_prayer": {
         return buildPrayerMeetingCard({
@@ -504,7 +517,7 @@ export default function TemplatesPage() {
           dinnerNote: prayerMeetingData.dinnerNote || "Potluck dinner — please bring a dish to share",
           signupLink: prayerMeetingData.signupLink || undefined,
           ...extractCommonCardData(prayerMeetingData),
-        })
+        }, sc)
       }
       case "bulletin": {
         const vars = makeBulletinVars(sampleWeek, "April 27, 2026")
@@ -517,12 +530,12 @@ export default function TemplatesPage() {
           ...extractCommonCardData(bulletinData),
           message: interp(bulletinData.message, vars) || undefined,
           footerVerse: interp(bulletinData.footerVerse, vars) || undefined,
-        })
+        }, sc)
       }
       default:
         return ""
     }
-  }, [activeTab, birthdayData, anniversaryData, bibleStudyData, womensStudyData, prayerMeetingData, bulletinData])
+  }, [activeTab, birthdayData, anniversaryData, bibleStudyData, womensStudyData, prayerMeetingData, bulletinData, styleSettings])
 
   if (loading) {
     return (
@@ -621,6 +634,11 @@ export default function TemplatesPage() {
                         case "bulletin": setBulletinData((p) => ({ ...p, primaryColor: color })); break
                       }
                     }}
+                  />
+
+                  <TemplateStyleEditor
+                    value={styleSettings[tab.name] ?? {}}
+                    onChange={(s) => setStyleSettings((prev) => ({ ...prev, [tab.name]: s }))}
                   />
 
                   {/* Birthday fields */}
