@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import {
@@ -79,11 +79,47 @@ const ACTION_COLORS: Record<string, string> = {
   email_sent: "default",
 }
 
-const ENTITY_TYPES = ["all", "dispatch_queue", "members", "families", "smtp_configs", "app_users", "mailing_lists", "email_templates", "composed_instances"]
+const ENTITY_TYPES = ["all", "dispatch_queue", "members", "families", "addresses", "smtp_configs", "app_users", "mailing_lists", "email_templates", "composed_instances", "events", "event_types", "event_instances", "tags", "member_tags", "mailing_list_members"]
 const ENTITY_LABELS: Record<string, string> = {
   all: "All", dispatch_queue: "Dispatches", members: "Members", families: "Families",
-  smtp_configs: "SMTP", app_users: "Users", mailing_lists: "Mailing Lists",
+  addresses: "Addresses", smtp_configs: "SMTP", app_users: "Users", mailing_lists: "Mailing Lists",
   email_templates: "Templates", composed_instances: "Instances",
+  events: "Events", event_types: "Event Types", event_instances: "Instances",
+  tags: "Tags", member_tags: "Tags", mailing_list_members: "List Members",
+}
+
+function formatAuditDetails(action: string, changes: Record<string, unknown> | null): string {
+  if (!changes) return "—"
+  const parts: string[] = []
+
+  const name = changes.name || changes.member || changes.family || changes.subject || changes.email
+  if (name) parts.push(String(name))
+
+  for (const [key, val] of Object.entries(changes)) {
+    if (["name", "member", "family", "subject", "email"].includes(key) && parts.length > 0 && parts[0] === String(val)) continue
+    if (val && typeof val === "object" && "from" in (val as Record<string, unknown>) && "to" in (val as Record<string, unknown>)) {
+      const obj = val as { from: unknown; to: unknown }
+      parts.push(`${key}: ${obj.from ?? "empty"} → ${obj.to ?? "empty"}`)
+    } else if (key === "address_updated" && val) {
+      parts.push("address updated")
+    } else if (key === "notes_changed" && val) {
+      parts.push("notes changed")
+    } else if (key === "family_changed" && val) {
+      parts.push("family reassigned")
+    } else if (key === "is_active" && typeof val === "boolean") {
+      parts.push(val ? "activated" : "deactivated")
+    } else if (key === "count" && typeof val === "number") {
+      parts.push(`${val} item${val !== 1 ? "s" : ""}`)
+    } else if (key === "scheduledAt" && typeof val === "string") {
+      try { parts.push(`at ${format(new Date(val), "MMM d, h:mm a")}`) } catch { parts.push(`at ${val}`) }
+    } else if (key === "commType" || key === "type" || key === "role" || key === "list" || key === "tag_name" || key === "color" || key === "from" || key === "to") {
+      if (typeof val === "string" && val) parts.push(`${key}: ${val}`)
+    } else if (typeof val === "string" && val && !["isReminder", "weekStart"].includes(key)) {
+      parts.push(`${key}: ${val}`)
+    }
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : "—"
 }
 
 export default function ActivityLogPanel() {
@@ -97,6 +133,7 @@ export default function ActivityLogPanel() {
   const [dateTo, setDateTo] = useState("")
   const [sortAsc, setSortAsc] = useState(false)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [purgeOpen, setPurgeOpen] = useState(false)
   const [purging, setPurging] = useState(false)
 
@@ -217,19 +254,41 @@ export default function ActivityLogPanel() {
                 </TableHeader>
                 <TableBody>
                   {logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{format(new Date(log.created_at), "MMM d, h:mm a")}</TableCell>
-                      <TableCell className="hidden sm:table-cell text-sm">{log.user_id ? userNames[log.user_id] ?? "..." : "System"}</TableCell>
-                      <TableCell>
-                        <Badge variant={(ACTION_COLORS[log.action] as "default" | "secondary" | "outline" | "destructive") || "secondary"}>
-                          {log.action.replace(/_/g, " ")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{ENTITY_LABELS[log.entity_type] || log.entity_type}</TableCell>
-                      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground max-w-xs truncate">
-                        {log.changes ? Object.entries(log.changes).filter(([, v]) => typeof v === "string" || typeof v === "boolean").map(([k, v]) => `${k}: ${v}`).join(", ") : "—"}
-                      </TableCell>
-                    </TableRow>
+                    <React.Fragment key={log.id}>
+                      <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{format(new Date(log.created_at), "MMM d, h:mm a")}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-sm">{log.user_id ? userNames[log.user_id] ?? "..." : "System"}</TableCell>
+                        <TableCell>
+                          <Badge variant={(ACTION_COLORS[log.action] as "default" | "secondary" | "outline" | "destructive") || "secondary"}>
+                            {log.action.replace(/_/g, " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{ENTITY_LABELS[log.entity_type] || log.entity_type}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm text-muted-foreground max-w-sm truncate" title={log.changes ? formatAuditDetails(log.action, log.changes) : undefined}>
+                          {formatAuditDetails(log.action, log.changes)}
+                        </TableCell>
+                      </TableRow>
+                      {expandedId === log.id && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="bg-muted/30 p-3">
+                            <div className="space-y-1 text-xs">
+                              <p><span className="font-medium">Action:</span> {log.action}</p>
+                              <p><span className="font-medium">Entity:</span> {log.entity_type}{log.entity_id ? ` (${log.entity_id})` : ""}</p>
+                              <p><span className="font-medium">Time:</span> {format(new Date(log.created_at), "PPpp")}</p>
+                              {log.user_id && <p><span className="font-medium">User:</span> {userNames[log.user_id] ?? log.user_id}</p>}
+                              {log.changes && (
+                                <div className="mt-2">
+                                  <p className="font-medium mb-1">Changes:</p>
+                                  <pre className="rounded bg-background border p-2 text-xs overflow-x-auto whitespace-pre-wrap">
+                                    {JSON.stringify(log.changes, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>

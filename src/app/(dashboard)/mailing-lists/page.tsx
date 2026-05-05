@@ -212,8 +212,10 @@ export default function MailingListsPage() {
         : `Failed: ${error.message}`)
     } else {
       toast.success("Member added")
+      const memberName = searchResults.find((m) => m.id === memberId)?.full_name
+      const listName = lists.find((l) => l.id === expandedListId)?.name
       logAudit("mailing_list_member_added", "mailing_list_members", expandedListId, {
-        memberId, type: addType,
+        member: memberName, list: listName, type: addType,
       })
       setAddSearch("")
       setSearchResults([])
@@ -255,8 +257,9 @@ export default function MailingListsPage() {
         : `Failed: ${error.message}`)
     } else {
       toast.success(`${emails.length} recipient${emails.length > 1 ? "s" : ""} added`)
+      const bulkListName = lists.find((l) => l.id === expandedListId)?.name
       logAudit("mailing_list_members_bulk_added", "mailing_list_members", expandedListId, {
-        count: emails.length, type: addType,
+        count: emails.length, list: bulkListName, type: addType,
       })
       setAddEmails("")
       fetchRecipients(expandedListId)
@@ -277,7 +280,10 @@ export default function MailingListsPage() {
       toast.error(`Failed: ${error.message}`)
     } else {
       setRecipients((prev) => prev.filter((r) => r.id !== recipientId))
-      logAudit("mailing_list_member_removed", "mailing_list_members", expandedListId, { recipientId })
+      const removed = recipients.find((r) => r.id === recipientId)
+      const removedName = removed?.member_name || removed?.external_email || recipientId
+      const removeListName = lists.find((l) => l.id === expandedListId)?.name
+      logAudit("mailing_list_member_removed", "mailing_list_members", expandedListId, { member: removedName, list: removeListName })
       fetchLists()
     }
   }

@@ -1639,7 +1639,7 @@ export default function DashboardPage() {
         } else {
           toast.success(`${templateName} draft saved`)
           snapshotForm(type)
-          logAudit("composed_instance_updated", "composed_instances", existingId, { type, weekStart })
+          logAudit("composed_instance_updated", "composed_instances", existingId, { name: templateName, type, weekStart })
         }
       } else {
         const { data: inserted, error } = await supabase
@@ -1653,7 +1653,7 @@ export default function DashboardPage() {
           toast.success(`${templateName} draft saved`)
           setInstanceIds((prev) => ({ ...prev, [type]: inserted?.id ?? undefined }))
           snapshotForm(type)
-          logAudit("composed_instance_created", "composed_instances", inserted?.id, { type, weekStart })
+          logAudit("composed_instance_created", "composed_instances", inserted?.id, { name: templateName, type, weekStart })
         }
       }
     } catch {
@@ -1680,7 +1680,7 @@ export default function DashboardPage() {
         delete next[type]
         return next
       })
-      logAudit("composed_instance_deleted", "composed_instances", id, { type })
+      logAudit("composed_instance_deleted", "composed_instances", id, { name: label, type })
       fetchAll()
     }
   }

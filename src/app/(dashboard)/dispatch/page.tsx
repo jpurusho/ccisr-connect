@@ -252,7 +252,7 @@ export default function DispatchQueuePage() {
     const ok = await updateStatus(item.id, "approved")
     if (ok) {
       toast.success("Dispatch approved")
-      logAudit("dispatch_approved", "dispatch_queue", item.id)
+      logAudit("dispatch_approved", "dispatch_queue", item.id, { subject: item.subject })
       fetchDispatches()
     }
   }
@@ -261,7 +261,7 @@ export default function DispatchQueuePage() {
     const ok = await updateStatus(item.id, "cancelled")
     if (ok) {
       toast.success("Dispatch cancelled")
-      logAudit("dispatch_cancelled", "dispatch_queue", item.id)
+      logAudit("dispatch_cancelled", "dispatch_queue", item.id, { subject: item.subject })
       setCancelTarget(null)
       fetchDispatches()
     }
@@ -337,7 +337,7 @@ export default function DispatchQueuePage() {
       toast.error(`Failed: ${error.message}`)
     } else {
       toast.success(`Rescheduled to ${format(new Date(scheduledAt), "MMM d, yyyy h:mm a")}`)
-      logAudit("dispatch_rescheduled", "dispatch_queue", rescheduleTarget.id, { scheduledAt })
+      logAudit("dispatch_rescheduled", "dispatch_queue", rescheduleTarget.id, { subject: rescheduleTarget.subject, scheduledAt })
       setRescheduleTarget(null)
       fetchDispatches()
     }

@@ -139,7 +139,8 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
     const { error } = await supabase.from("event_types").update({ is_active: !currentActive } as never).eq("id", id)
     if (error) { toast.error(`Failed: ${error.message}`); return }
     toast.success(currentActive ? "Deactivated" : "Activated")
-    logAudit("event_type_toggled", "event_types", id, { is_active: !currentActive })
+    const typeName = types.find((t) => t.id === id)?.name
+    logAudit("event_type_toggled", "event_types", id, { name: typeName, is_active: !currentActive })
     fetchTypes()
     onTypesChanged?.()
   }

@@ -286,7 +286,18 @@ export function MemberFormDialog({
           return
         }
         toast.success("Member updated successfully.")
-        logAudit("member_updated", "members", member.id, { name: fullName })
+        const changedFields: Record<string, unknown> = { name: fullName }
+        if (member.first_name !== firstName.trim()) changedFields.first_name = { from: member.first_name, to: firstName.trim() }
+        if (member.last_name !== lastName.trim()) changedFields.last_name = { from: member.last_name, to: lastName.trim() }
+        if (member.email !== (email.trim() || null)) changedFields.email = { from: member.email, to: email.trim() || null }
+        if (member.cell_phone !== (cellPhone.trim() || null)) changedFields.cell_phone = { from: member.cell_phone, to: cellPhone.trim() || null }
+        if (member.role_in_family !== roleInFamily) changedFields.role_in_family = { from: member.role_in_family, to: roleInFamily }
+        if (member.family_id !== resolvedFamilyId) changedFields.family_changed = true
+        if (member.is_active !== isActive) changedFields.is_active = { from: member.is_active, to: isActive }
+        if (member.is_newcomer !== isNewcomer) changedFields.is_newcomer = { from: member.is_newcomer, to: isNewcomer }
+        if ((member.notes ?? "") !== notes.trim()) changedFields.notes_changed = true
+        if (addressDirty) changedFields.address_updated = true
+        logAudit("member_updated", "members", member.id, changedFields)
 
         // Clean up orphaned old family if member was moved
         if (member.family_id !== resolvedFamilyId) {
@@ -315,7 +326,8 @@ export function MemberFormDialog({
         }
         resolvedMemberId = (created as { id: string }).id
         toast.success("Member created successfully.")
-        logAudit("member_created", "members", resolvedMemberId, { name: fullName })
+        const familyName = isNewFamily ? newFamilyName.trim() : families.find((f) => f.id === resolvedFamilyId)?.family_name
+        logAudit("member_created", "members", resolvedMemberId, { name: fullName, family: familyName, role: roleInFamily, email: email.trim() || undefined })
       }
 
       // Save address and home phone for the family
@@ -325,7 +337,7 @@ export function MemberFormDialog({
           const fullAddress = [street.trim(), city.trim(), addrState.trim(), zip.trim()].filter(Boolean).join(", ")
           const { data: existingAddr } = await supabase
             .from("addresses")
-            .select("id")
+            .select("id, full_address")
             .eq("family_id", resolvedFamilyId)
             .eq("is_current", true)
             .limit(1)
@@ -340,10 +352,13 @@ export function MemberFormDialog({
           }
 
           if (existingAddr) {
+            const prev = (existingAddr as { id: string; full_address: string | null })
             await supabase
               .from("addresses")
               .update(addrPayload as never)
-              .eq("id", (existingAddr as { id: string }).id)
+              .eq("id", prev.id)
+            const familyName = families.find((f) => f.id === resolvedFamilyId)?.family_name
+            logAudit("address_updated", "addresses", prev.id, { family: familyName, from: prev.full_address, to: fullAddress })
           } else {
             await supabase
               .from("addresses")
@@ -352,6 +367,8 @@ export function MemberFormDialog({
                 ...addrPayload,
                 is_current: true,
               } as never)
+            const familyName = families.find((f) => f.id === resolvedFamilyId)?.family_name
+            logAudit("address_created", "addresses", null, { family: familyName, address: fullAddress })
           }
         }
 

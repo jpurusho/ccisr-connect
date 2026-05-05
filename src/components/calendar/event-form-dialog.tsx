@@ -232,7 +232,8 @@ export function EventFormDialog({
 
         if (error) { toast.error(`Failed: ${error.message}`); return }
         toast.success(`"${title}" updated`)
-        logAudit("event_updated", "events", eventId, { title: title.trim() })
+        const etName = eventTypes.find((t) => t.id === eventTypeId)?.name
+        logAudit("event_updated", "events", eventId, { title: title.trim(), event_type: etName, recurrence: recurrenceFreq !== "NONE" ? recurrenceFreq : undefined })
       } else {
         const { data, error } = await supabase
           .from("events")
@@ -243,7 +244,8 @@ export function EventFormDialog({
 
         if (error) { toast.error(`Failed: ${error.message}`); return }
         toast.success(`"${title}" created`)
-        logAudit("event_created", "events", data?.id ?? null, { title: title.trim() })
+        const etName = eventTypes.find((t) => t.id === eventTypeId)?.name
+        logAudit("event_created", "events", data?.id ?? null, { title: title.trim(), event_type: etName, recurrence: recurrenceFreq !== "NONE" ? recurrenceFreq : undefined })
       }
 
       onSuccess?.()

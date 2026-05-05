@@ -159,7 +159,7 @@ export function UserManagementPanel() {
       toast.error(`Failed to update: ${error.message}`)
     } else {
       toast.success(`${user.email} ${user.is_active ? "deactivated" : "activated"}`)
-      logAudit("user_toggled_active", "app_users", user.id, { is_active: !user.is_active })
+      logAudit("user_toggled_active", "app_users", user.id, { email: user.email, is_active: !user.is_active })
       fetchUsers()
     }
   }
@@ -175,7 +175,7 @@ export function UserManagementPanel() {
       toast.error(`Failed to update role: ${error.message}`)
     } else {
       toast.success(`${user.email} role updated to ${newRole}`)
-      logAudit("user_role_changed", "app_users", user.id, { role: newRole })
+      logAudit("user_role_changed", "app_users", user.id, { email: user.email, from: user.role, to: newRole })
       fetchUsers()
     }
   }
