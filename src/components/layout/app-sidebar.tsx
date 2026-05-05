@@ -87,7 +87,7 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <UserNav />
-        <p className="px-3 pb-2 text-[10px] text-muted-foreground/50">v{APP_VERSION}</p>
+        <p className="px-3 pb-2 text-[10px] text-muted-foreground">v{APP_VERSION}</p>
       </SidebarFooter>
     </Sidebar>
   )
