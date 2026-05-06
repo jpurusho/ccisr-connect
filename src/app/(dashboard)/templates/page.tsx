@@ -199,9 +199,10 @@ export default function TemplatesPage() {
   const [previewing, setPreviewing] = useState(false)
 
   // Custom templates
-  const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string }[]>([])
-  const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown> } | null>(null)
+  const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string; style_settings?: Record<string, unknown> }[]>([])
+  const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown>; styleSettings: TemplateStyleSettings } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
+  const [newCustomStyleSettings, setNewCustomStyleSettings] = useState<TemplateStyleSettings>({})
   const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
 
   // Style settings per template type
@@ -236,13 +237,13 @@ export default function TemplatesPage() {
         .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
       supabase
         .from("email_templates")
-        .select("id, name, subject_template, body_template")
+        .select("id, name, subject_template, body_template, style_settings")
         .eq("is_default", false)
         .order("name")
-        .returns<{ id: string; name: string; subject_template: string; body_template: string }[]>(),
+        .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
     ])
 
-    if (customRes.data) setCustomTemplates(customRes.data)
+    if (customRes.data) setCustomTemplates(customRes.data.map((ct) => ({ ...ct, style_settings: ct.style_settings ?? undefined })))
 
     // Build event type maps
     const idToName: Record<string, string> = {}
@@ -1177,6 +1178,7 @@ export default function TemplatesPage() {
                   <Button
                     onClick={() => {
                       setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined, footerVerse: "", footerVerseBgColor: undefined, resourceLinks: [], customSections: [], flyerSections: [] })
+                      setNewCustomStyleSettings({})
                       setCreatingCustom(true)
                     }}
                   >
@@ -1234,6 +1236,10 @@ export default function TemplatesPage() {
                     defaultColor="#6B7280"
                     onChange={(color) => setNewCustom({ ...newCustom, primaryColor: color })}
                   />
+                  <TemplateStyleEditor
+                    value={newCustomStyleSettings}
+                    onChange={setNewCustomStyleSettings}
+                  />
                   <Field label="Message Body" htmlFor="nc-body">
                     <Textarea
                       id="nc-body"
@@ -1250,6 +1256,7 @@ export default function TemplatesPage() {
                     <PastelColorPicker
                       value={newCustom.bodyBgColor}
                       onChange={(color) => setNewCustom({ ...newCustom, bodyBgColor: color })}
+                      extraPastels={newCustomStyleSettings.customPastels}
                     />
                   </Field>
                   <Field label="Footer Verse" htmlFor="nc-foot">
@@ -1267,6 +1274,7 @@ export default function TemplatesPage() {
                     <PastelColorPicker
                       value={newCustom.footerVerseBgColor}
                       onChange={(color) => setNewCustom({ ...newCustom, footerVerseBgColor: color })}
+                      extraPastels={newCustomStyleSettings.customPastels}
                     />
                   </Field>
                   <FlyerSectionsEditor
@@ -1309,6 +1317,7 @@ export default function TemplatesPage() {
                             name: newCustom.name.trim(),
                             subject_template: newCustom.subject.trim(),
                             body_template: JSON.stringify(bodyData),
+                            style_settings: newCustomStyleSettings,
                             is_default: false,
                           } as never)
                           .select("id")
@@ -1382,6 +1391,10 @@ export default function TemplatesPage() {
                     defaultColor="#6B7280"
                     onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, primaryColor: color } })}
                   />
+                  <TemplateStyleEditor
+                    value={editingCustom.styleSettings}
+                    onChange={(s) => setEditingCustom({ ...editingCustom, styleSettings: s })}
+                  />
                   <Field label="Message Body" htmlFor="ct-body">
                     <Textarea
                       id="ct-body"
@@ -1397,6 +1410,7 @@ export default function TemplatesPage() {
                     <PastelColorPicker
                       value={editingCustom.data.bodyBgColor as string | undefined}
                       onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, bodyBgColor: color } })}
+                      extraPastels={editingCustom.styleSettings.customPastels}
                     />
                   </Field>
                   <Field label="Footer Verse" htmlFor="ct-foot">
@@ -1413,6 +1427,7 @@ export default function TemplatesPage() {
                     <PastelColorPicker
                       value={editingCustom.data.footerVerseBgColor as string | undefined}
                       onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerVerseBgColor: color } })}
+                      extraPastels={editingCustom.styleSettings.customPastels}
                     />
                   </Field>
                   <FlyerSectionsEditor
@@ -1438,6 +1453,7 @@ export default function TemplatesPage() {
                             name: editingCustom.name,
                             subject_template: editingCustom.subject,
                             body_template: JSON.stringify(editingCustom.data),
+                            style_settings: editingCustom.styleSettings,
                           } as never)
                           .eq("id", editingCustom.id)
                         if (error) {
@@ -1498,6 +1514,7 @@ export default function TemplatesPage() {
                                     name: ct.name,
                                     subject: ct.subject_template,
                                     data: parsed,
+                                    styleSettings: (ct.style_settings as TemplateStyleSettings) ?? {},
                                   })
                                 }}
                               >
