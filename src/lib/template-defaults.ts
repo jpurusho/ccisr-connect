@@ -75,21 +75,25 @@ export interface PrayerMeetingDefaults extends CommonCardFields {
  */
 export function extractCommonFields(def: CommonCardFields): {
   message: string
+  messageBgColor: string | undefined
   headerTitle: string
   headerSubtitle: string
   headerEmoji: string
   primaryColor: string
   footerVerse: string
+  footerVerseBgColor: string | undefined
   resourceLinks: ResourceLinkDefault[]
   customSections: CustomSectionDefault[]
 } {
   return {
     message: def.message ?? "",
+    messageBgColor: def.messageBgColor,
     headerTitle: def.headerTitle ?? "",
     headerSubtitle: def.headerSubtitle ?? "",
     headerEmoji: def.headerEmoji ?? "",
     primaryColor: def.primaryColor ?? "",
     footerVerse: def.footerVerse ?? "",
+    footerVerseBgColor: def.footerVerseBgColor,
     resourceLinks: (def.resourceLinks ?? []) as ResourceLinkDefault[],
     customSections: (def.customSections ?? []) as CustomSectionDefault[],
   }
