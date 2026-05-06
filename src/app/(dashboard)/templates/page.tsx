@@ -651,12 +651,22 @@ export default function TemplatesPage() {
                           onChange={(e) => setBirthdayData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <PastelColorPicker
+                          value={birthdayData.messageBgColor}
+                          onChange={(color) => setBirthdayData((prev) => ({ ...prev, messageBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
+                        />
                       </Field>
                       <Field label="Footer Bible Verse" htmlFor="bd-verse" hint="Leave empty for no footer">
                         <Input
                           id="bd-verse"
                           value={birthdayData.footerVerse || ""}
                           onChange={(e) => setBirthdayData((prev) => ({ ...prev, footerVerse: e.target.value }))}
+                        />
+                        <PastelColorPicker
+                          value={birthdayData.footerVerseBgColor}
+                          onChange={(color) => setBirthdayData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
                         />
                       </Field>
                       <CommonTemplateFields data={birthdayData} onChange={setBirthdayData} />
@@ -673,12 +683,22 @@ export default function TemplatesPage() {
                           onChange={(e) => setAnniversaryData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <PastelColorPicker
+                          value={anniversaryData.messageBgColor}
+                          onChange={(color) => setAnniversaryData((prev) => ({ ...prev, messageBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
+                        />
                       </Field>
                       <Field label="Footer Bible Verse" htmlFor="an-verse" hint="Leave empty for no footer">
                         <Input
                           id="an-verse"
                           value={anniversaryData.footerVerse || ""}
                           onChange={(e) => setAnniversaryData((prev) => ({ ...prev, footerVerse: e.target.value }))}
+                        />
+                        <PastelColorPicker
+                          value={anniversaryData.footerVerseBgColor}
+                          onChange={(color) => setAnniversaryData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
                         />
                       </Field>
                       <CommonTemplateFields data={anniversaryData} onChange={setAnniversaryData} />

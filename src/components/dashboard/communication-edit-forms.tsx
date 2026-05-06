@@ -219,10 +219,13 @@ export const PASTEL_COLORS: { bg: string; border: string; label: string }[] = [
 export function PastelColorPicker({
   value,
   onChange,
+  extraPastels,
 }: {
   value?: string
   onChange: (color: string | undefined) => void
+  extraPastels?: { bg: string; border: string; label: string }[]
 }) {
+  const allPastels = [...PASTEL_COLORS, ...(extraPastels ?? [])]
   return (
     <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
       <button
@@ -231,7 +234,7 @@ export function PastelColorPicker({
         onClick={() => onChange(undefined)}
         title="No background"
       />
-      {PASTEL_COLORS.map((c) => (
+      {allPastels.map((c) => (
         <button
           key={c.bg}
           type="button"

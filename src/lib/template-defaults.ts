@@ -22,10 +22,12 @@ export interface CustomSectionDefault {
 
 export interface CommonCardFields {
   message?: string
+  messageBgColor?: string
   headerTitle?: string
   headerSubtitle?: string
   headerEmoji?: string
   footerVerse?: string
+  footerVerseBgColor?: string
   primaryColor?: string
   resourceLinks?: ResourceLinkDefault[]
   customSections?: CustomSectionDefault[]
