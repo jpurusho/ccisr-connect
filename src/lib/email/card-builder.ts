@@ -266,6 +266,33 @@ function flyerSectionsHtml(sections: CardFlyerSection[] | undefined, colors: Car
     .join("");
 }
 
+function dataListHtml(
+  entries: { primary: string; secondary: string }[],
+  colors: CardColors,
+  style?: StyleContext
+): string {
+  const layout = style?.sectionLayout ?? "table";
+  const sz = style?.sizes ?? SIZE_SCALES.default;
+
+  if (layout === "paragraph") {
+    const text = entries.map((e) => `<strong>${e.primary}</strong> (${e.secondary})`).join(", ");
+    return `<div style="background:${colors.bgLight};border-radius:8px;padding:14px 16px;margin-top:8px;font-size:${sz.body}px;color:${colors.textDark};line-height:1.8">${text}</div>`;
+  }
+
+  if (layout === "list") {
+    const items = entries.map((e) => `<li style="padding:4px 0;font-size:${sz.body}px;color:${colors.textDark}"><strong>${e.primary}</strong> <span style="color:${colors.accent}">${e.secondary}</span></li>`).join("");
+    return `<ul style="margin:8px 0 0;padding-left:20px;list-style:disc;color:${colors.textDark}">${items}</ul>`;
+  }
+
+  const rows = entries.map((e) =>
+    `<tr>
+<td style="padding:10px 16px;font-size:${sz.body + 2}px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border}">${e.primary}</td>
+<td style="padding:10px 16px;font-size:${sz.body}px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-weight:500">${e.secondary}</td>
+</tr>`
+  ).join("");
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;overflow:hidden;margin-top:8px">${rows}</table>`;
+}
+
 function commonTrailingHtml(data: BaseCardData, colors: CardColors, extraResourceLinks?: ResourceLink[], style?: StyleContext): string {
   const allLinks = [...(data.resourceLinks ?? []), ...(extraResourceLinks ?? [])];
   return `${customSectionsHtml(data.customSections, colors, style)}
@@ -388,15 +415,7 @@ export function buildBirthdayCard(data: BirthdayCardData, style?: StyleContext):
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.birthday;
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
-  const personRows = data.birthdays
-    .map(
-      (b) =>
-        `<tr>
-<td style="padding:10px 16px;font-size:${sz.body + 2}px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border}">${b.name}</td>
-<td style="padding:10px 16px;font-size:${sz.body}px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-weight:500">${b.date}</td>
-</tr>`
-    )
-    .join("");
+  const entries = data.birthdays.map((b) => ({ primary: b.name, secondary: b.date }));
 
   const messageHtml = data.message
     ? `<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
@@ -413,9 +432,7 @@ ${msgBlock(data.message, data.messageBgColor, colors, "0", style)}`
     ) +
     contentRow(
       `<p style="margin:0 0 4px;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Birthdays this week &bull; ${data.weekLabel}</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;overflow:hidden;margin-top:8px">
-${personRows}
-</table>
+${dataListHtml(entries, colors, style)}
 ${messageHtml}
 ${commonTrailingHtml(data, colors, undefined, style)}`,
       colors
@@ -443,15 +460,10 @@ export function buildAnniversaryCard(data: AnniversaryCardData, style?: StyleCon
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.anniversary;
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
-  const coupleRows = data.anniversaries
-    .map((a) => {
-      const yearsText = a.years ? ` (${a.years} yrs)` : "";
-      return `<tr>
-<td style="padding:10px 16px;font-size:${sz.body + 2}px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border}">${a.husbandName} & ${a.wifeName}</td>
-<td style="padding:10px 16px;font-size:${sz.body}px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-weight:500;white-space:nowrap">${a.date}${yearsText}</td>
-</tr>`;
-    })
-    .join("");
+  const entries = data.anniversaries.map((a) => {
+    const yearsText = a.years ? ` (${a.years} yrs)` : "";
+    return { primary: `${a.husbandName} & ${a.wifeName}`, secondary: `${a.date}${yearsText}` };
+  });
 
   const messageHtml = data.message
     ? `<div style="margin:20px auto;width:60px;height:3px;background:${colors.border};border-radius:2px"></div>
@@ -468,9 +480,7 @@ ${msgBlock(data.message, data.messageBgColor, colors, "0", style)}`
     ) +
     contentRow(
       `<p style="margin:0 0 4px;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Anniversaries this week &bull; ${data.weekLabel}</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;overflow:hidden;margin-top:8px">
-${coupleRows}
-</table>
+${dataListHtml(entries, colors, style)}
 ${messageHtml}
 ${commonTrailingHtml(data, colors, undefined, style)}`,
       colors
@@ -715,36 +725,22 @@ export function buildBulletinCard(data: BulletinCardData, style?: StyleContext):
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.bulletin;
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
-  const sectionTitle = (icon: string, title: string, sectionColor: string) =>
-    `<tr><td style="padding:16px 0 8px;font-size:${sz.label + 1}px;font-weight:700;color:${sectionColor};text-transform:uppercase;letter-spacing:0.5px">${icon} ${title}</td></tr>`;
-
-  const itemRow = (name: string, detail: string) =>
-    `<tr>
-<td style="padding:4px 0 4px 12px;font-size:${sz.body}px;color:${colors.textDark}">${name}</td>
-<td style="padding:4px 0;font-size:${sz.body - 1}px;color:${colors.textLight};text-align:right;font-weight:500">${detail}</td>
-</tr>`;
+  const sectionLabel = (icon: string, title: string, sectionColor: string) =>
+    `<p style="margin:16px 0 4px;font-size:${sz.label + 1}px;font-weight:700;color:${sectionColor};text-transform:uppercase;letter-spacing:0.5px">${icon} ${title}</p>`;
 
   const sectionBuilders: Record<string, () => string> = {
     birthdays: () => data.birthdays.length === 0 ? "" :
-      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
-${sectionTitle("🎂", "Birthdays", EVENT_COLORS.birthday.primary)}
-${data.birthdays.map((b) => itemRow(b.name, b.date)).join("")}
-</table>`,
+      sectionLabel("🎂", "Birthdays", EVENT_COLORS.birthday.primary) +
+      dataListHtml(data.birthdays.map((b) => ({ primary: b.name, secondary: b.date })), colors, style),
     anniversaries: () => data.anniversaries.length === 0 ? "" :
-      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
-${sectionTitle("💍", "Anniversaries", EVENT_COLORS.anniversary.primary)}
-${data.anniversaries.map((a) => itemRow(a.names, a.date)).join("")}
-</table>`,
+      sectionLabel("💍", "Anniversaries", EVENT_COLORS.anniversary.primary) +
+      dataListHtml(data.anniversaries.map((a) => ({ primary: a.names, secondary: a.date })), colors, style),
     helpers: () => data.helpers.length === 0 ? "" :
-      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
-${sectionTitle("🤝", "Helpers This Month", colors.primary)}
-${data.helpers.map((h) => itemRow(h.role, h.name)).join("")}
-</table>`,
+      sectionLabel("🤝", "Helpers This Month", colors.primary) +
+      dataListHtml(data.helpers.map((h) => ({ primary: h.role, secondary: h.name })), colors, style),
     events: () => data.events.length === 0 ? "" :
-      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px">
-${sectionTitle("📅", "This Week", EVENT_COLORS.friday_bible_study.primary)}
-${data.events.map((e) => `<tr><td colspan="2" style="padding:4px 0 4px 12px;font-size:${sz.body}px;color:${colors.textDark}"><strong>${e.title}</strong><br/><span style="font-size:${sz.label}px;color:${colors.textLight}">${e.details}</span></td></tr>`).join("")}
-</table>`,
+      sectionLabel("📅", "This Week", EVENT_COLORS.friday_bible_study.primary) +
+      dataListHtml(data.events.map((e) => ({ primary: e.title, secondary: e.details })), colors, style),
   };
 
   const order = data.sectionOrder ?? ["birthdays", "anniversaries", "helpers", "events"];
