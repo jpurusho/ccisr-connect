@@ -740,12 +740,22 @@ export default function TemplatesPage() {
                           onChange={(e) => setBibleStudyData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <PastelColorPicker
+                          value={bibleStudyData.messageBgColor}
+                          onChange={(color) => setBibleStudyData((prev) => ({ ...prev, messageBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
+                        />
                       </Field>
                       <Field label="Footer Bible Verse" htmlFor="bs-verse" hint="Leave empty for no footer">
                         <Input
                           id="bs-verse"
                           value={bibleStudyData.footerVerse || ""}
                           onChange={(e) => setBibleStudyData((prev) => ({ ...prev, footerVerse: e.target.value }))}
+                        />
+                        <PastelColorPicker
+                          value={bibleStudyData.footerVerseBgColor}
+                          onChange={(color) => setBibleStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
                         />
                       </Field>
 
@@ -914,12 +924,22 @@ export default function TemplatesPage() {
                           onChange={(e) => setWomensStudyData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <PastelColorPicker
+                          value={womensStudyData.messageBgColor}
+                          onChange={(color) => setWomensStudyData((prev) => ({ ...prev, messageBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
+                        />
                       </Field>
                       <Field label="Footer Bible Verse" htmlFor="ws-verse" hint="Leave empty for no footer">
                         <Input
                           id="ws-verse"
                           value={womensStudyData.footerVerse || ""}
                           onChange={(e) => setWomensStudyData((prev) => ({ ...prev, footerVerse: e.target.value }))}
+                        />
+                        <PastelColorPicker
+                          value={womensStudyData.footerVerseBgColor}
+                          onChange={(color) => setWomensStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
                         />
                       </Field>
 
@@ -1002,12 +1022,22 @@ export default function TemplatesPage() {
                           onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <PastelColorPicker
+                          value={prayerMeetingData.messageBgColor}
+                          onChange={(color) => setPrayerMeetingData((prev) => ({ ...prev, messageBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
+                        />
                       </Field>
                       <Field label="Footer Bible Verse" htmlFor="pm-verse" hint="Leave empty for default">
                         <Input
                           id="pm-verse"
                           value={prayerMeetingData.footerVerse || ""}
                           onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, footerVerse: e.target.value }))}
+                        />
+                        <PastelColorPicker
+                          value={prayerMeetingData.footerVerseBgColor}
+                          onChange={(color) => setPrayerMeetingData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
                         />
                       </Field>
                       <CommonTemplateFields data={prayerMeetingData} onChange={setPrayerMeetingData} />
@@ -1065,11 +1095,29 @@ export default function TemplatesPage() {
                         <Plus className="size-3.5" />
                         Add Event
                       </Button>
+                      <Field label="Bulletin Message" htmlFor="bul-msg" hint="Leave empty to exclude">
+                        <Textarea
+                          id="bul-msg"
+                          value={bulletinData.message || ""}
+                          onChange={(e) => setBulletinData((prev) => ({ ...prev, message: e.target.value }))}
+                          className="min-h-16"
+                        />
+                        <PastelColorPicker
+                          value={bulletinData.messageBgColor}
+                          onChange={(color) => setBulletinData((prev) => ({ ...prev, messageBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
+                        />
+                      </Field>
                       <Field label="Footer Bible Verse" htmlFor="bul-verse" hint="Leave empty for default footer">
                         <Input
                           id="bul-verse"
                           value={bulletinData.footerVerse || ""}
                           onChange={(e) => setBulletinData((prev) => ({ ...prev, footerVerse: e.target.value }))}
+                        />
+                        <PastelColorPicker
+                          value={bulletinData.footerVerseBgColor}
+                          onChange={(color) => setBulletinData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                          extraPastels={styleSettings[tab.name]?.customPastels}
                         />
                       </Field>
                       <CommonTemplateFields data={bulletinData} onChange={setBulletinData} />
