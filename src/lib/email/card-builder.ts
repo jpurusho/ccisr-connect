@@ -193,6 +193,7 @@ export interface CardCustomSection {
   title: string;
   emoji: string;
   color?: string;
+  layout?: SectionLayout;
   entries: { label: string; name: string }[];
 }
 
@@ -218,7 +219,7 @@ export interface BaseCardData {
 
 function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: CardColors, style?: StyleContext): string {
   if (!sections || sections.length === 0) return "";
-  const layout = style?.sectionLayout ?? "table";
+  const defaultLayout = style?.sectionLayout ?? "table";
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
   return sections
@@ -229,6 +230,7 @@ function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: C
       const bgStyle = sBg ? `background:${sBg};border-radius:8px;padding:4px 16px;` : "";
       const validEntries = s.entries.filter((e) => e.label || e.name);
       const headerHtml = `<td style="padding:16px 0 8px;font-size:${sz.label + 1}px;font-weight:700;color:${sColor};text-transform:uppercase;letter-spacing:0.5px">${s.emoji || "📋"} ${s.title}</td>`;
+      const layout = s.layout || defaultLayout;
 
       if (layout === "paragraph") {
         const text = validEntries.map((e) => e.label ? `${e.label}: ${e.name}` : e.name).join(", ");

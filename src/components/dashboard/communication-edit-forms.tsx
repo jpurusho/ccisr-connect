@@ -202,6 +202,7 @@ export interface CustomSection {
   title: string
   emoji: string
   color?: string
+  layout?: "table" | "paragraph" | "list"
   entries: { label: string; name: string }[]
 }
 
@@ -427,6 +428,23 @@ export function CustomSectionsEditor({
           </div>
           {!collapsed[sIdx] && (
             <div className="space-y-1.5 pl-1">
+              <div className="flex items-center gap-1 pb-1">
+                <span className="text-[10px] text-muted-foreground mr-1">Layout:</span>
+                {(["table", "paragraph", "list"] as const).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${(sec.layout || "table") === l ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => {
+                      const updated = [...sections]
+                      updated[sIdx] = { ...updated[sIdx], layout: l === "table" ? undefined : l }
+                      onChange(updated)
+                    }}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
               {sec.entries.map((entry, eIdx) => (
                 <div key={eIdx} className="flex items-center gap-2">
                   <Input
