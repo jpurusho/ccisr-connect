@@ -166,15 +166,17 @@ interface CustomDashFormData extends BaseFormData {
   flyerSections: FlyerSectionItem[]
 }
 
-function buildCustomDashPreview(form: CustomDashFormData): string {
+function buildCustomDashPreview(form: CustomDashFormData, styleSettings?: TemplateStyleSettings): string {
+  const style = buildStyleContext(styleSettings)
+  const sz = style.sizes
   const rawBodyHtml = form.body
-    ? `<p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;color:#374151">${form.body}</p>`
+    ? `<p style="margin:0;font-size:${sz.body}px;line-height:1.6;white-space:pre-wrap;color:#374151">${form.body}</p>`
     : ""
   return buildCustomCard({
     title: form.title || "Announcement",
     subtitle: form.subtitle || undefined,
     emoji: form.emoji || undefined,
-    bodyHtml: rawBodyHtml ? pastelBoxHtml(rawBodyHtml, form.bodyBgColor) : "",
+    bodyHtml: rawBodyHtml ? pastelBoxHtml(rawBodyHtml, form.bodyBgColor, undefined, style.customPastels) : "",
     flyerSections: (form.flyerSections ?? [])
       .filter((s) => s.imageUrl)
       .map((s) => ({
@@ -184,7 +186,7 @@ function buildCustomDashPreview(form: CustomDashFormData): string {
         resourceLinks: s.resourceLinks.filter((l) => l.url),
       })),
     ...extractCommonCardData(form),
-  })
+  }, style)
 }
 
 const EMPTY_CUSTOM_FORM: CustomDashFormData = {
@@ -397,6 +399,7 @@ export default function DashboardPage() {
 
   const [customDashTemplates, setCustomDashTemplates] = useState<DashboardCustomTemplate[]>([])
   const [customForms, setCustomForms] = useState<Record<string, CustomDashFormData>>({})
+  const [customTemplateStyles, setCustomTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
   const [customInstanceIds, setCustomInstanceIds] = useState<Record<string, string>>({})
   const [customDispatches, setCustomDispatches] = useState<Record<string, { status: string; count: number; lastSentAt: string | null }>>({})
   const [customSubjectOverrides, setCustomSubjectOverrides] = useState<Record<string, string>>({})
@@ -1116,15 +1119,16 @@ export default function DashboardPage() {
       // ---- Custom dashboard templates ----
       const { data: customTmpls } = await supabase
         .from("email_templates")
-        .select("id, name, subject_template, body_template")
+        .select("id, name, subject_template, body_template, style_settings")
         .eq("is_default", false)
         .order("name")
-        .returns<{ id: string; name: string; subject_template: string; body_template: string }[]>()
+        .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>()
 
       const dashCustom: DashboardCustomTemplate[] = []
       const customFormInit: Record<string, CustomDashFormData> = {}
       const customInstIds: Record<string, string> = {}
       const customSubjOvr: Record<string, string> = {}
+      const loadedCustomStyles: Record<string, TemplateStyleSettings> = {}
 
       for (const ct of customTmpls ?? []) {
         const ctKey = `custom:${ct.id}`
@@ -1139,6 +1143,7 @@ export default function DashboardPage() {
           emoji: (parsed.emoji as string) || "📋",
           defaults: parsed,
         })
+        if (ct.style_settings) loadedCustomStyles[ct.id] = ct.style_settings as TemplateStyleSettings
 
         const ci = composedMap[ctKey]
         if (ci) {
@@ -1236,6 +1241,7 @@ export default function DashboardPage() {
       setCustomInstanceIds(customInstIds)
       setCustomSubjectOverrides(customSubjOvr)
       setCustomCommOptions(customCommOpts)
+      setCustomTemplateStyles(loadedCustomStyles)
       setCustomSnapshots(Object.fromEntries(Object.entries(customFormInit).map(([k, v]) => [k, structuredClone(v as unknown as Record<string, unknown>)])))
 
       // ---- Mailing lists + SMTP configs ----
@@ -2604,7 +2610,7 @@ export default function DashboardPage() {
               if (!form) return null
               const ctKey = `custom:${ct.id}`
               const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
-              const preview = buildCustomDashPreview(form)
+              const preview = buildCustomDashPreview(form, customTemplateStyles[ct.id])
               const subj = customSubjectOverrides[ct.id] || ct.subject_template || ct.name
 
               return (
@@ -2630,7 +2636,7 @@ export default function DashboardPage() {
                   sendCount={di.count}
                   onSchedule={() => {}}
                   onSendNow={async () => {
-                    const html = buildCustomDashPreview(form)
+                    const html = buildCustomDashPreview(form, customTemplateStyles[ct.id])
                     if (!html) { toast.error("No content"); return }
                     const opts = customCommOptions[ct.id]
                     if (!opts?.smtpConfigId) { toast.error("Please select a Send From account first."); return }
