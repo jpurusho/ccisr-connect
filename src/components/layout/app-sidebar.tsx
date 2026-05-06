@@ -10,6 +10,7 @@ import {
   Mail,
   Settings,
   Church,
+  ClipboardList,
 } from "lucide-react"
 
 import {
@@ -31,6 +32,7 @@ const navItems = [
   { title: "Calendar", href: "/calendar", icon: CalendarDays },
   { title: "Members", href: "/members", icon: Users },
   { title: "Email", href: "/email", icon: Mail },
+  { title: "Signups", href: "/signups", icon: ClipboardList },
   { title: "Settings", href: "/settings", icon: Settings },
 ]
 
