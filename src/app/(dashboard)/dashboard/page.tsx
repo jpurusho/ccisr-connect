@@ -53,8 +53,10 @@ import {
   buildPrayerMeetingCard,
   buildBulletinCard,
   buildCustomCard,
+  buildStyleContext,
   type BirthdayEntry,
   type AnniversaryEntry,
+  type TemplateStyleSettings,
   extractCommonCardData,
   pastelBoxHtml,
   PASTEL_BORDER_MAP,
@@ -261,6 +263,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [weekLabel, setWeekLabel] = useState("")
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
+  const [templateStyles, setTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
   // ---- Template visibility (extracted hook) ----
   const { visibleTemplates, toggleTemplate, isCustomVisible, toggleCustomTemplate } = useCardVisibility()
 
@@ -631,9 +634,9 @@ export default function DashboardPage() {
         // Saved template defaults (no FK join — resolve event type name in JS)
         supabase
           .from("email_templates")
-          .select("id, event_type_id, subject_template, body_template")
+          .select("id, event_type_id, subject_template, body_template, style_settings")
           .eq("is_default", true)
-          .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string }[]>(),
+          .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
 
         // Event type id-to-name map (+ template link and color for custom card enrichment)
         supabase
@@ -680,6 +683,7 @@ export default function DashboardPage() {
 
       // Use the last template per event type (in case of duplicates)
       const savedDefaults: Record<string, { subject: string; data: Record<string, unknown> }> = {}
+      const loadedStyles: Record<string, TemplateStyleSettings> = {}
       if (templateDefaultsRes.data) {
         for (const t of templateDefaultsRes.data) {
           const etName = etIdToName[t.event_type_id]
@@ -691,8 +695,10 @@ export default function DashboardPage() {
               data: parsed.data as Record<string, unknown>,
             }
           }
+          if (t.style_settings) loadedStyles[etName] = t.style_settings as TemplateStyleSettings
         }
       }
+      setTemplateStyles(loadedStyles)
 
       setSavedSubjectTemplates(
         Object.fromEntries(Object.entries(savedDefaults).map(([k, v]) => [k, v.subject]))
@@ -1428,8 +1434,8 @@ export default function DashboardPage() {
       weekLabel: birthdayForm.weekLabel,
       birthdays: birthdayForm.birthdays,
       ...interpCommon(birthdayForm, vars),
-    })
-  }, [birthdayForm])
+    }, buildStyleContext(templateStyles.birthday))
+  }, [birthdayForm, templateStyles])
 
   const anniversaryPreview = useMemo(() => {
     if (anniversaryForm.anniversaries.length === 0) return null
@@ -1438,8 +1444,8 @@ export default function DashboardPage() {
       weekLabel: anniversaryForm.weekLabel,
       anniversaries: anniversaryForm.anniversaries,
       ...interpCommon(anniversaryForm, vars),
-    })
-  }, [anniversaryForm])
+    }, buildStyleContext(templateStyles.anniversary))
+  }, [anniversaryForm, templateStyles])
 
   const bibleStudyPreview = useMemo(() => {
     const vars = makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
@@ -1456,8 +1462,8 @@ export default function DashboardPage() {
         phone: loc.phone || undefined,
       })),
       ...interpCommon(bibleStudyForm, vars),
-    })
-  }, [bibleStudyForm, weekLabel])
+    }, buildStyleContext(templateStyles.friday_bible_study))
+  }, [bibleStudyForm, weekLabel, templateStyles])
 
   const womensStudyPreview = useMemo(() => {
     const vars = makeEventVars(weekLabel, womensStudyForm.date, womensStudyForm.time, womensStudyForm.topic || "")
@@ -1471,8 +1477,8 @@ export default function DashboardPage() {
       zoomPasscode: womensStudyForm.zoomPasscode || undefined,
       location: womensStudyForm.location || undefined,
       ...interpCommon(womensStudyForm, vars),
-    })
-  }, [womensStudyForm, weekLabel])
+    }, buildStyleContext(templateStyles.wednesday_womens_study))
+  }, [womensStudyForm, weekLabel, templateStyles])
 
   const prayerMeetingPreview = useMemo(() => {
     return buildPrayerMeetingCard({
@@ -1485,8 +1491,8 @@ export default function DashboardPage() {
       dinnerNote: prayerMeetingForm.dinnerNote || undefined,
       signupLink: prayerMeetingForm.signupLink || undefined,
       ...interpCommon(prayerMeetingForm, {}),
-    })
-  }, [prayerMeetingForm])
+    }, buildStyleContext(templateStyles.monthly_prayer))
+  }, [prayerMeetingForm, templateStyles])
 
   const bulletinPreview = useMemo(() => {
     const vars = makeBulletinVars(weekLabel, weekLabel)
@@ -1498,8 +1504,8 @@ export default function DashboardPage() {
       events: bulletinForm.events,
       sectionOrder: bulletinForm.sectionOrder,
       ...interpCommon(bulletinForm, vars),
-    })
-  }, [bulletinForm, weekLabel])
+    }, buildStyleContext(templateStyles.bulletin))
+  }, [bulletinForm, weekLabel, templateStyles])
 
   // ---- Subject lines (custom override or auto-generated) ----
   function getSubjectVars(type: CommType) {
