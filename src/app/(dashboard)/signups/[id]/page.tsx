@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   ArrowLeft,
+  ArrowUpDown,
   Download,
   Search,
   Trash2,
@@ -63,6 +64,8 @@ export default function SignupResponsesPage() {
   const [responses, setResponses] = useState<ResponseRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [sortField, setSortField] = useState<string | null>(null)
+  const [sortAsc, setSortAsc] = useState(true)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -142,13 +145,41 @@ export default function SignupResponsesPage() {
     return String(val)
   }
 
-  const filtered = search.trim()
+  function toggleSort(fieldId: string) {
+    if (sortField === fieldId) {
+      setSortAsc(!sortAsc)
+    } else {
+      setSortField(fieldId)
+      setSortAsc(true)
+    }
+  }
+
+  function getSortValue(r: ResponseRow, fieldId: string): string | number {
+    if (fieldId === "_submitted") return r.created_at
+    const val = r.data[fieldId]
+    if (typeof val === "number") return val
+    if (typeof val === "string") return val.toLowerCase()
+    if (typeof val === "object" && val) return JSON.stringify(val).toLowerCase()
+    return ""
+  }
+
+  let filtered = search.trim()
     ? responses.filter((r) =>
         Object.values(r.data).some((v) =>
           String(v ?? "").toLowerCase().includes(search.toLowerCase())
         )
       )
-    : responses
+    : [...responses]
+
+  if (sortField) {
+    filtered = [...filtered].sort((a, b) => {
+      const av = getSortValue(a, sortField)
+      const bv = getSortValue(b, sortField)
+      if (av < bv) return sortAsc ? -1 : 1
+      if (av > bv) return sortAsc ? 1 : -1
+      return 0
+    })
+  }
 
   if (loading) {
     return (
@@ -258,9 +289,19 @@ export default function SignupResponsesPage() {
                   <TableRow>
                     <TableHead className="w-10">#</TableHead>
                     {form.fields.map((f) => (
-                      <TableHead key={f.id} className="min-w-[120px]">{f.label}</TableHead>
+                      <TableHead key={f.id} className="min-w-[120px] cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort(f.id)}>
+                        <span className="flex items-center gap-1">
+                          {f.label}
+                          {sortField === f.id && <ArrowUpDown className="size-3" />}
+                        </span>
+                      </TableHead>
                     ))}
-                    <TableHead className="min-w-[140px]">Submitted</TableHead>
+                    <TableHead className="min-w-[140px] cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort("_submitted")}>
+                      <span className="flex items-center gap-1">
+                        Submitted
+                        {sortField === "_submitted" && <ArrowUpDown className="size-3" />}
+                      </span>
+                    </TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
