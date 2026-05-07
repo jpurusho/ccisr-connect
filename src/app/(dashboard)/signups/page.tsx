@@ -167,6 +167,10 @@ export default function SignupsPage() {
     toast.success("Link copied to clipboard")
   }
 
+  function previewForm(slug: string) {
+    window.open(`/signup/${slug}?preview=1`, "_blank")
+  }
+
   return (
     <div className="space-y-4 p-4 sm:p-6">
       {/* Header */}
@@ -255,6 +259,9 @@ export default function SignupsPage() {
                   <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => router.push(`/signups/${form.id}`)}>
                     <Eye className="size-3" />
                     Responses
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => previewForm(form.slug)} title="Preview">
+                    <ExternalLink className="size-3" />
                   </Button>
                   <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => copyLink(form.slug)} title="Copy link">
                     <Copy className="size-3" />

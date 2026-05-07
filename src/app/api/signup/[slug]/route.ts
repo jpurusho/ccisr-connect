@@ -5,7 +5,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params
@@ -13,6 +13,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
+  const isPreview = req.nextUrl.searchParams.get("preview") === "1"
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   const { data: form } = await supabase
@@ -21,8 +22,8 @@ export async function GET(
     .eq("slug", slug)
     .single()
 
-  // Same 404 for not found AND non-active (slug enumeration protection)
-  if (!form || form.status !== "active") {
+  // Allow preview of draft/closed forms with ?preview=1
+  if (!form || (!isPreview && form.status !== "active")) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 

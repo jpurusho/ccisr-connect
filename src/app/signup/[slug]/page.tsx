@@ -66,7 +66,8 @@ export default function PublicSignupPage() {
 
   const fetchForm = useCallback(async () => {
     try {
-      const res = await fetch(`/api/signup/${slug}`)
+      const previewParam = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1" ? "?preview=1" : ""
+      const res = await fetch(`/api/signup/${slug}${previewParam}`)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setError(data.error || "Form not found")
