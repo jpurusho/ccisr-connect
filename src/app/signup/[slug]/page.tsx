@@ -257,6 +257,7 @@ export default function PublicSignupPage() {
                 field={field}
                 value={values[field.id]}
                 onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
+                responses={responses}
                 formId={form.id}
                 memberAutocomplete={form.member_autocomplete}
                 lookupQuery={lookupQuery}
@@ -343,6 +344,7 @@ function FieldRenderer({
   onLookupSearch,
   onMemberSelect,
   selectedMember,
+  responses,
 }: {
   field: SignupFieldConfig
   value: unknown
@@ -355,6 +357,7 @@ function FieldRenderer({
   onLookupSearch: (q: string) => void
   onMemberSelect: (m: MemberResult) => void
   selectedMember: MemberResult | null
+  responses: ResponseEntry[]
 }) {
   const labelEl = (
     <Label className="text-sm font-medium">
@@ -491,22 +494,61 @@ function FieldRenderer({
 
     case "month_picker": {
       const excluded = new Set(field.excludeMonths ?? [])
+      const currentMonth = new Date().getMonth() + 1
+      const takenMonths = new Set(
+        responses
+          .map((r) => r.data[field.id] as number)
+          .filter((m) => typeof m === "number" && m > 0)
+      )
+
       return (
         <div className="space-y-1.5">
           {labelEl}
-          <Select value={(value as number) ? String(value) : ""} onValueChange={(v) => onChange(parseInt(v ?? "0", 10))}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select month..." />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => (
-                <SelectItem key={i + 1} value={String(i + 1)} disabled={excluded.has(i + 1)}>
-                  {m}{excluded.has(i + 1) ? " (unavailable)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {field.helpText && <p className="text-xs text-muted-foreground">{field.helpText}</p>}
+          <div className="grid grid-cols-3 gap-2">
+            {MONTHS.map((m, i) => {
+              const month = i + 1
+              const isExcluded = excluded.has(month)
+              const isPast = month < currentMonth
+              const isTaken = takenMonths.has(month)
+              const isSelected = (value as number) === month
+              const isDisabled = isExcluded || isPast || isTaken
+
+              let className = "rounded-lg border px-3 py-2 text-sm text-center transition-all "
+              let statusText = ""
+
+              if (isSelected) {
+                className += "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold ring-2 ring-emerald-200"
+              } else if (isExcluded) {
+                className += "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                statusText = "Break"
+              } else if (isPast) {
+                className += "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                statusText = "Past"
+              } else if (isTaken) {
+                className += "border-blue-200 bg-blue-50 text-blue-400 cursor-not-allowed"
+                statusText = "Taken"
+              } else {
+                className += "border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
+                statusText = "Open"
+              }
+
+              return (
+                <button
+                  key={month}
+                  type="button"
+                  disabled={isDisabled}
+                  className={className}
+                  onClick={() => !isDisabled && onChange(isSelected ? 0 : month)}
+                >
+                  <span className="block font-medium">{m.slice(0, 3)}</span>
+                  <span className={`block text-[10px] mt-0.5 ${isSelected ? "text-emerald-600" : ""}`}>
+                    {isSelected ? "Selected" : statusText}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {field.helpText && <p className="text-xs text-muted-foreground mt-1">{field.helpText}</p>}
         </div>
       )
     }
