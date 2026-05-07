@@ -68,6 +68,7 @@ import {
   endOfWeek,
   format,
   addDays,
+  parse,
 } from "date-fns"
 import { getOccurrences } from "@/lib/recurrence"
 import {
@@ -1593,6 +1594,27 @@ export default function DashboardPage() {
     }
   }
 
+  const EVENT_BASED_TYPES: CommType[] = ["bible_study", "womens_study", "prayer_meeting"]
+
+  function getWeekStartForSave(type: CommType): string {
+    if (EVENT_BASED_TYPES.includes(type)) {
+      const formData = getFormData(type)
+      const dateStr = formData.date as string | undefined
+      if (dateStr && !dateStr.toLowerCase().includes("no ") && !dateStr.toLowerCase().includes("not ")) {
+        try {
+          const baseDate = addDays(new Date(), weekOffset * 7)
+          const currentYear = baseDate.getFullYear()
+          const parsed = parse(`${dateStr} ${currentYear}`, "EEEE, MMMM do yyyy", baseDate)
+          if (!isNaN(parsed.getTime())) {
+            return format(startOfWeek(parsed, { weekStartsOn: 0 }), "yyyy-MM-dd")
+          }
+        } catch { /* fall through */ }
+      }
+    }
+    const base = addDays(new Date(), weekOffset * 7)
+    return format(startOfWeek(base, { weekStartsOn: 0 }), "yyyy-MM-dd")
+  }
+
   function snapshotForm(type: CommType) {
     setSavedSnapshots((prev) => ({ ...prev, [type]: structuredClone(getFormData(type)) }))
   }
@@ -1625,8 +1647,7 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      const base = addDays(new Date(), weekOffset * 7)
-      const weekStart = format(startOfWeek(base, { weekStartsOn: 0 }), "yyyy-MM-dd")
+      const weekStart = getWeekStartForSave(type)
       const templateName = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
 
       const payload = {
@@ -1761,7 +1782,7 @@ export default function DashboardPage() {
           data: { user },
         } = await supabase.auth.getUser()
 
-        const dispatchWeekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+        const dispatchWeekStart = getWeekStartForSave(type)
 
         // Auto-save draft before dispatching so form data persists
         const templateName = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
@@ -1924,7 +1945,7 @@ export default function DashboardPage() {
         data: { user },
       } = await supabase.auth.getUser()
 
-      const schedWeekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+      const schedWeekStart = getWeekStartForSave(type)
 
       const { data: inserted, error } = await supabase
         .from("dispatch_queue")
