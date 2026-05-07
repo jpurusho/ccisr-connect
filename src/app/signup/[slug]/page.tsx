@@ -265,21 +265,46 @@ export default function PublicSignupPage() {
           </Button>
         </form>
 
-        {/* Public responses list */}
+        {/* Public responses list — collapsible */}
         {form.visibility === "public_link" && responses.length > 0 && (
-          <div className="mt-6 rounded-xl border bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="size-4 text-muted-foreground" />
-              <h3 className="text-sm font-semibold">{responses.length} signed up</h3>
-            </div>
-            <div className="space-y-2">
-              {responses.map((r) => (
-                <ResponseRow key={r.id} data={r.data} fields={form.fields} colors={colors} />
-              ))}
-            </div>
-          </div>
+          <SignupList responses={responses} fields={form.fields} colors={colors} />
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Collapsible Signup List ──────────────────────────────────────────────────
+
+function SignupList({ responses, fields, colors }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors> }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="mt-6">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-center gap-2 rounded-xl border bg-white px-4 py-3 shadow-sm transition-colors hover:bg-slate-50"
+      >
+        <Users className="size-4" style={{ color: colors.primary }} />
+        <span className="text-sm font-semibold">{responses.length} signed up</span>
+        <svg
+          className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {responses.map((r) => (
+            <ResponseRow key={r.id} data={r.data} fields={fields} colors={colors} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
