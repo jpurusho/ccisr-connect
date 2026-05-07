@@ -535,7 +535,7 @@ function FieldRenderer({
         const m = r.data[field.id] as number
         if (typeof m === "number" && m > 0) {
           const who = nameField ? (r.data[nameField.id] as string) : ""
-          takenMap.set(m, who ? who.split(" ")[0] : "Taken")
+          takenMap.set(m, who || "Taken")
         }
       }
 
@@ -560,6 +560,9 @@ function FieldRenderer({
               } else if (isExcluded) {
                 className += "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
                 statusText = "Break"
+              } else if (isPast && isTaken) {
+                className += "border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed"
+                statusText = takenBy || "Done"
               } else if (isPast) {
                 className += "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
                 statusText = "Past"
