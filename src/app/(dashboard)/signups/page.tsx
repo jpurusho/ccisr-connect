@@ -75,6 +75,7 @@ interface FormRow {
   member_autocomplete: boolean
   max_submissions: number | null
   allow_duplicates: boolean
+  rate_limit_per_hour: number | null
   created_at: string
   response_count?: number
 }
@@ -107,7 +108,7 @@ export default function SignupsPage() {
     const supabase = createClient()
     const { data: formsData } = await supabase
       .from("signup_forms")
-      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, created_at")
+      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, rate_limit_per_hour, created_at")
       .order("created_at", { ascending: false })
 
     if (formsData) {
@@ -341,6 +342,7 @@ function FormDialog({
   const [memberAutocomplete, setMemberAutocomplete] = useState(false)
   const [maxSubmissions, setMaxSubmissions] = useState<string>("")
   const [allowDuplicates, setAllowDuplicates] = useState(false)
+  const [rateLimitPerHour, setRateLimitPerHour] = useState<string>("10")
   const [primaryColor, setPrimaryColor] = useState("#7C3AED")
   const [emoji, setEmoji] = useState("")
   const [verse, setVerse] = useState("")
@@ -365,6 +367,7 @@ function FormDialog({
       setMemberAutocomplete(editForm.member_autocomplete)
       setMaxSubmissions(editForm.max_submissions ? String(editForm.max_submissions) : "")
       setAllowDuplicates(editForm.allow_duplicates)
+      setRateLimitPerHour(editForm.rate_limit_per_hour ? String(editForm.rate_limit_per_hour) : "10")
       setPrimaryColor(editForm.theme.primaryColor || "#7C3AED")
       setEmoji(editForm.theme.emoji || "")
       setVerse(editForm.theme.verse || "")
@@ -423,6 +426,7 @@ function FormDialog({
         member_autocomplete: memberAutocomplete,
         max_submissions: maxSubmissions ? parseInt(maxSubmissions, 10) : null,
         allow_duplicates: allowDuplicates,
+        rate_limit_per_hour: rateLimitPerHour ? parseInt(rateLimitPerHour, 10) : 10,
       }
 
       if (isEdit) {
@@ -599,7 +603,7 @@ function FormDialog({
           </div>
 
           {/* Toggles */}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex items-center gap-2">
               <Switch checked={memberAutocomplete} onCheckedChange={setMemberAutocomplete} id="member-auto" />
               <Label htmlFor="member-auto" className="text-xs">Member Autocomplete</Label>
@@ -615,6 +619,17 @@ function FormDialog({
                 value={maxSubmissions}
                 onChange={(e) => setMaxSubmissions(e.target.value)}
                 placeholder="Unlimited"
+                className="h-8 text-xs"
+                min={1}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Rate Limit / hr</Label>
+              <Input
+                type="number"
+                value={rateLimitPerHour}
+                onChange={(e) => setRateLimitPerHour(e.target.value)}
+                placeholder="10"
                 className="h-8 text-xs"
                 min={1}
               />

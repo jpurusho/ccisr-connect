@@ -289,8 +289,11 @@ export default function PublicSignupPage() {
           )}
 
           {submitError && (
-            <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-              {submitError}
+            <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 flex items-center justify-between gap-2">
+              <span className="text-sm text-red-700">{submitError}</span>
+              <button type="button" onClick={() => setSubmitError(null)} className="text-red-400 hover:text-red-600 shrink-0">
+                <span className="text-lg leading-none">×</span>
+              </button>
             </div>
           )}
 

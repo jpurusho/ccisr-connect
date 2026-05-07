@@ -39,21 +39,6 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
   const ipHash = hashIp(ip)
 
-  // Rate limiting: count actual submissions (not lookups) — max 10 per form per hour
-  try {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-    const { count: recentSubmissions } = await supabase
-      .from("signup_responses")
-      .select("*", { count: "exact", head: true })
-      .eq("form_id", formId)
-      .eq("ip_hash", ipHash)
-      .gte("created_at", oneHourAgo)
-
-    if ((recentSubmissions ?? 0) >= 10) {
-      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
-    }
-  } catch { /* rate limit check failed — proceed */ }
-
   // Fetch form
   const { data: form, error: formErr } = await supabase
     .from("signup_forms")
@@ -68,6 +53,22 @@ export async function POST(req: NextRequest) {
   if (form.status !== "active") {
     return NextResponse.json({ error: "This form is no longer accepting responses" }, { status: 410 })
   }
+
+  // Rate limiting: per-form configurable limit
+  const rateLimit = (form.rate_limit_per_hour as number) || 10
+  try {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { count: recentSubmissions } = await supabase
+      .from("signup_responses")
+      .select("*", { count: "exact", head: true })
+      .eq("form_id", formId)
+      .eq("ip_hash", ipHash)
+      .gte("created_at", oneHourAgo)
+
+    if ((recentSubmissions ?? 0) >= rateLimit) {
+      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
+    }
+  } catch { /* proceed if check fails */ }
 
   // Check max submissions
   if (form.max_submissions) {
