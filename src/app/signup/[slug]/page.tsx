@@ -261,6 +261,7 @@ export default function PublicSignupPage() {
               <FieldRenderer
                 key={field.id}
                 field={field}
+                allFields={form.fields}
                 value={values[field.id]}
                 onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
                 responses={responses}
@@ -364,6 +365,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
 
 function FieldRenderer({
   field,
+  allFields,
   value,
   onChange,
   formId,
@@ -377,6 +379,7 @@ function FieldRenderer({
   responses,
 }: {
   field: SignupFieldConfig
+  allFields: SignupFieldConfig[]
   value: unknown
   onChange: (v: unknown) => void
   formId: string
@@ -526,11 +529,15 @@ function FieldRenderer({
     case "month_picker": {
       const excluded = new Set(field.excludeMonths ?? [])
       const currentMonth = new Date().getMonth() + 1
-      const takenMonths = new Set(
-        responses
-          .map((r) => r.data[field.id] as number)
-          .filter((m) => typeof m === "number" && m > 0)
-      )
+      const nameField = allFields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
+      const takenMap = new Map<number, string>()
+      for (const r of responses) {
+        const m = r.data[field.id] as number
+        if (typeof m === "number" && m > 0) {
+          const who = nameField ? (r.data[nameField.id] as string) : ""
+          takenMap.set(m, who ? who.split(" ")[0] : "Taken")
+        }
+      }
 
       return (
         <div className="space-y-1.5">
@@ -540,7 +547,8 @@ function FieldRenderer({
               const month = i + 1
               const isExcluded = excluded.has(month)
               const isPast = month < currentMonth
-              const isTaken = takenMonths.has(month)
+              const isTaken = takenMap.has(month)
+              const takenBy = takenMap.get(month)
               const isSelected = (value as number) === month
               const isDisabled = isExcluded || isPast || isTaken
 
@@ -556,8 +564,8 @@ function FieldRenderer({
                 className += "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
                 statusText = "Past"
               } else if (isTaken) {
-                className += "border-blue-200 bg-blue-50 text-blue-400 cursor-not-allowed"
-                statusText = "Taken"
+                className += "border-blue-200 bg-blue-50 text-blue-600 cursor-not-allowed"
+                statusText = takenBy || "Taken"
               } else {
                 className += "border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
                 statusText = "Open"
