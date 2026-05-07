@@ -42,10 +42,29 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Dispatch Tracking** — Sent emails shown on calendar with actual sent date and target week label
 - **View Sent Email** — Click any sent dispatch to see the exact HTML that was delivered
 
+### Public Signup Forms
+- **Form Builder** — Create flexible signup forms with 12 field types (text, email, phone, address, date, month picker, select, multi-select, number, checkbox, textarea, member lookup)
+- **Public Links** — Share `/signup/[slug]` links via email; no login required to submit
+- **Member Auto-Complete** — Type name to auto-fill address/phone from member directory
+- **Visual Month Picker** — Color-coded grid showing Open/Taken/Past/Break with host names
+- **Phone Verification** — Server-side verification required to remove a signup
+- **Rate Limiting** — Per-form configurable rate limits to prevent abuse
+- **Response Viewer** — Admin table with search, sort, CSV export, delete
+- **Theming** — Custom colors, emoji, bible verse with pastel background per form
+
+### Template Style Customization
+- **Font Family** — Sans-serif, serif, rounded, monospace
+- **Font Size Scale** — Compact, default, large
+- **Header Variants** — Full color band, top border, side accent
+- **Section Layouts** — Table, paragraph, or list (per-section override)
+- **Custom Pastels** — Create your own background/border color pairs
+- **Dark Mode** — `@media (prefers-color-scheme: dark)` for Apple Mail/Outlook
+- **Custom Footer** — Override default footer text per template
+
 ### Reports & History
 - **Demographics** — Clickable stat cards linking to filtered member views
 - **City Distribution** — Bar chart with click-through to city-filtered members
-- **Activity Log** — Full audit trail with date range, entity filter, and purge
+- **Activity Log** — Field-level diffs, expandable rows, detailed before/after values
 - **Dispatch History** — Search, filter by status/date, preview sent cards
 
 ## Architecture
@@ -65,6 +84,11 @@ graph TB
         SendAPI["/api/dispatch/send"]
         CronAPI["/api/dispatch/cron"]
         PreviewAPI["/api/cards/preview"]
+        SignupAPI["/api/signup/*"]
+    end
+
+    subgraph Public["Public Pages"]
+        SignupPage["/signup/[slug]"]
     end
 
     subgraph Supabase["Supabase — PostgreSQL + Auth"]
@@ -86,6 +110,8 @@ graph TB
     SendAPI --> DB
     Vercel --> CronAPI
     CronAPI --> SendAPI
+    SignupPage --> SignupAPI
+    SignupAPI --> DB
     Client --> Auth
 ```
 
@@ -106,6 +132,9 @@ erDiagram
     MAILING_LISTS ||--o{ DISPATCH_QUEUE : targets
     DISPATCH_QUEUE ||--o{ DISPATCH_HISTORY : records
     APP_USERS ||--o{ AUDIT_LOG : performs
+    SIGNUP_FORMS ||--o{ SIGNUP_RESPONSES : collects
+    SIGNUP_FORMS }o--|| EVENT_TYPES : linked_to
+    SIGNUP_FORMS }o--|| MAILING_LISTS : auto_adds
 ```
 
 ### Communication Flow
@@ -138,6 +167,23 @@ flowchart TB
     DQ -->|Shown on sent_at date| C
 ```
 
+### Signup Form Flow
+
+```mermaid
+flowchart LR
+    A[Admin: Create Form] --> F[signup_forms]
+    F -->|Generate slug| L["/signup/slug" Link]
+    L -->|Share via email| U[User opens link]
+    U --> PF[Public Form Page]
+    PF -->|Member lookup| ML["/api/signup/member-lookup"]
+    ML -->|Auto-fill| PF
+    PF -->|Submit| S["/api/signup/submit"]
+    S -->|Rate limit check| S
+    S -->|Validate + sanitize| R[signup_responses]
+    R -->|Admin views| RV[Response Viewer]
+    RV -->|Export| CSV[CSV Download]
+```
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -168,14 +214,17 @@ ccisr-connect/
 │   │   │   ├── dashboard/       # Communication Hub
 │   │   │   ├── members/         # Member management
 │   │   │   ├── calendar/        # Calendar views
-│   │   │   ├── compose/         # Email composer + custom templates
+│   │   │   ├── signups/         # Signup form builder & responses
+│   │   │   ├── templates/       # Email template editor
 │   │   │   ├── dispatch/        # Dispatch queue
 │   │   │   ├── history/         # Dispatch & activity history
 │   │   │   ├── mailing-lists/   # Recipient management
 │   │   │   ├── reports/         # Demographics & stats
-│   │   │   └── settings/        # Config, SMTP, tags, templates
+│   │   │   └── settings/        # Config, SMTP, tags, database
+│   │   ├── signup/[slug]/       # Public signup form page
 │   │   └── api/
 │   │       ├── dispatch/        # Send & cron endpoints
+│   │       ├── signup/          # Submit, member-lookup, remove APIs
 │   │       ├── cards/           # Card preview API
 │   │       └── auth/            # OAuth callback
 │   ├── components/
@@ -187,6 +236,7 @@ ccisr-connect/
 │   │   └── ui/                  # shadcn/ui primitives (Base UI + react-day-picker)
 │   ├── lib/
 │   │   ├── email/               # Card builder (HTML email generation)
+│   │   ├── signup/              # Field registry, sanitization, slug, theme
 │   │   ├── supabase/            # Client & middleware
 │   │   ├── audit.ts             # Audit logging helper
 │   │   ├── city-utils.ts        # City name normalization
