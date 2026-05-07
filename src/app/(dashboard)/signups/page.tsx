@@ -425,13 +425,11 @@ function FormDialog({
   }
 
   function moveField(index: number, direction: -1 | 1) {
-    const newIndex = index + direction
-    if (newIndex < 0 || newIndex >= fields.length) return
     setFields((prev) => {
+      const newIndex = index + direction
+      if (newIndex < 0 || newIndex >= prev.length) return prev
       const arr = [...prev]
-      const temp = arr[index]
-      arr[index] = arr[newIndex]
-      arr[newIndex] = temp
+      ;[arr[index], arr[newIndex]] = [arr[newIndex], arr[index]]
       return arr.map((f, i) => ({ ...f, order: i }))
     })
   }

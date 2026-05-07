@@ -449,7 +449,7 @@ function FieldRenderer({
       return (
         <div className="space-y-1.5">
           {labelEl}
-          <Select value={String((value as number) || 0)} onValueChange={(v) => onChange(parseInt(v ?? "0", 10))}>
+          <Select value={(value as number) ? String(value) : ""} onValueChange={(v) => onChange(parseInt(v ?? "0", 10))}>
             <SelectTrigger>
               <SelectValue placeholder="Select month..." />
             </SelectTrigger>

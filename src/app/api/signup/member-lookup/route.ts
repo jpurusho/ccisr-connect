@@ -34,20 +34,21 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
   const ipHash = hashIp(ip)
 
-  // Rate limit: max 10 lookups per form per minute
-  const oneMinAgo = new Date(Date.now() - 60 * 1000).toISOString()
-  const { count } = await supabase
-    .from("signup_rate_limits")
-    .select("*", { count: "exact", head: true })
-    .eq("ip_hash", ipHash)
-    .eq("form_id", formId)
-    .gte("attempt_at", oneMinAgo)
+  // Rate limit: max 10 lookups per form per minute (best effort — table may not exist yet)
+  try {
+    const oneMinAgo = new Date(Date.now() - 60 * 1000).toISOString()
+    const { count } = await supabase
+      .from("signup_rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("ip_hash", ipHash)
+      .eq("form_id", formId)
+      .gte("attempt_at", oneMinAgo)
 
-  if ((count ?? 0) >= 10) {
-    return NextResponse.json({ results: [] })
-  }
-
-  await supabase.from("signup_rate_limits").insert({ ip_hash: ipHash, form_id: formId })
+    if ((count ?? 0) >= 10) {
+      return NextResponse.json({ results: [] })
+    }
+    await supabase.from("signup_rate_limits").insert({ ip_hash: ipHash, form_id: formId })
+  } catch { /* rate limit table may not exist — proceed without limiting */ }
 
   // Verify form exists and has member_autocomplete enabled
   const { data: form } = await supabase
@@ -56,7 +57,11 @@ export async function POST(req: NextRequest) {
     .eq("id", formId)
     .single()
 
-  if (!form || form.status !== "active" || !form.member_autocomplete) {
+  if (!form || !form.member_autocomplete) {
+    return NextResponse.json({ results: [] })
+  }
+
+  if (form.status !== "active" && form.status !== "draft") {
     return NextResponse.json({ results: [] })
   }
 
