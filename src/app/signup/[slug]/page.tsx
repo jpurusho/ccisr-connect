@@ -294,7 +294,13 @@ export default function PublicSignupPage() {
 
         {/* Public responses list — collapsible */}
         {form.visibility === "public_link" && responses.length > 0 && (
-          <SignupList responses={responses} fields={form.fields} colors={colors} />
+          <SignupList
+            responses={responses}
+            fields={form.fields}
+            colors={colors}
+            formId={form.id}
+            onRemoved={(id) => setResponses((prev) => prev.filter((r) => r.id !== id))}
+          />
         )}
       </div>
     </div>
@@ -303,8 +309,26 @@ export default function PublicSignupPage() {
 
 // ── Collapsible Signup List ──────────────────────────────────────────────────
 
-function SignupList({ responses, fields, colors }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors> }) {
+function SignupList({ responses, fields, colors, formId, onRemoved }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; onRemoved: (id: string) => void }) {
   const [open, setOpen] = useState(false)
+  const [removing, setRemoving] = useState<string | null>(null)
+
+  async function handleRemove(responseId: string) {
+    if (!confirm("Remove this signup?")) return
+    setRemoving(responseId)
+    try {
+      const res = await fetch("/api/signup/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responseId, formId }),
+      })
+      if (res.ok) {
+        onRemoved(responseId)
+      }
+    } finally {
+      setRemoving(null)
+    }
+  }
 
   return (
     <div className="mt-6">
@@ -314,9 +338,9 @@ function SignupList({ responses, fields, colors }: { responses: ResponseEntry[];
         className="w-full flex items-center justify-center gap-2 rounded-xl border bg-white px-4 py-3 shadow-sm transition-colors hover:bg-slate-50"
       >
         <Users className="size-4" style={{ color: colors.primary }} />
-        <span className="text-sm font-semibold">{responses.length} signed up</span>
+        <span className="text-sm font-semibold text-gray-900">{responses.length} signed up</span>
         <svg
-          className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          className={`size-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -328,7 +352,7 @@ function SignupList({ responses, fields, colors }: { responses: ResponseEntry[];
       {open && (
         <div className="mt-2 space-y-2">
           {responses.map((r) => (
-            <ResponseRow key={r.id} data={r.data} fields={fields} colors={colors} />
+            <ResponseRow key={r.id} data={r.data} fields={fields} colors={colors} removing={removing === r.id} onRemove={() => handleRemove(r.id)} />
           ))}
         </div>
       )}
@@ -677,7 +701,7 @@ function FieldRenderer({
 
 // ── Response Row (public view) ──────────────────────────────────────────────
 
-function ResponseRow({ data, fields, colors }: { data: Record<string, unknown>; fields: SignupFieldConfig[]; colors: { primary: string; bgLight: string; border: string; textDark: string; textLight: string } }) {
+function ResponseRow({ data, fields, colors, removing, onRemove }: { data: Record<string, unknown>; fields: SignupFieldConfig[]; colors: { primary: string; bgLight: string; border: string; textDark: string; textLight: string }; removing: boolean; onRemove: () => void }) {
   const nameField = fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
   const name = nameField ? (data[nameField.id] as string) : "Anonymous"
   const monthField = fields.find((f) => f.type === "month_picker")
@@ -692,11 +716,22 @@ function ResponseRow({ data, fields, colors }: { data: Record<string, unknown>; 
     <div className="rounded-lg border px-4 py-3" style={{ borderColor: colors.border, backgroundColor: colors.bgLight }}>
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold text-sm" style={{ color: colors.textDark }}>{name}</span>
-        {month && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.primary, color: "#fff" }}>
-            {month}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {month && (
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.primary, color: "#fff" }}>
+              {month}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={removing}
+            className="text-gray-400 hover:text-red-500 transition-colors p-0.5"
+            title="Remove signup"
+          >
+            {removing ? <Loader2 className="size-3.5 animate-spin" /> : <span className="text-xs">✕</span>}
+          </button>
+        </div>
       </div>
       {(addrStr || phone) && (
         <div className="mt-1.5 space-y-0.5">
