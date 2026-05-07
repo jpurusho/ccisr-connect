@@ -39,31 +39,20 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
   const ipHash = hashIp(ip)
 
-  // Rate limiting: max 5 per form per hour, max 20 total per hour
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-  const { count: formAttempts } = await supabase
-    .from("signup_rate_limits")
-    .select("*", { count: "exact", head: true })
-    .eq("ip_hash", ipHash)
-    .eq("form_id", formId)
-    .gte("attempt_at", oneHourAgo)
+  // Rate limiting: count actual submissions (not lookups) — max 10 per form per hour
+  try {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { count: recentSubmissions } = await supabase
+      .from("signup_responses")
+      .select("*", { count: "exact", head: true })
+      .eq("form_id", formId)
+      .eq("ip_hash", ipHash)
+      .gte("created_at", oneHourAgo)
 
-  if ((formAttempts ?? 0) >= 5) {
-    return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
-  }
-
-  const { count: totalAttempts } = await supabase
-    .from("signup_rate_limits")
-    .select("*", { count: "exact", head: true })
-    .eq("ip_hash", ipHash)
-    .gte("attempt_at", oneHourAgo)
-
-  if ((totalAttempts ?? 0) >= 20) {
-    return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
-  }
-
-  // Record attempt
-  await supabase.from("signup_rate_limits").insert({ ip_hash: ipHash, form_id: formId })
+    if ((recentSubmissions ?? 0) >= 10) {
+      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
+    }
+  } catch { /* rate limit check failed — proceed */ }
 
   // Fetch form
   const { data: form, error: formErr } = await supabase
