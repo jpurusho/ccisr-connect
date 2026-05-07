@@ -596,16 +596,16 @@ function FieldRenderer({
               <Loader2 className="absolute right-2 top-2.5 size-4 animate-spin text-muted-foreground" />
             )}
             {memberAutocomplete && lookupResults.length > 0 && !selectedMember && (
-              <div className="absolute z-10 mt-1 w-full rounded-md border bg-white shadow-lg">
+              <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
                 {lookupResults.map((m) => (
                   <button
                     key={m.id}
                     type="button"
-                    className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-muted/50 text-left"
+                    className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-slate-100 text-left border-b border-gray-100 last:border-b-0"
                     onClick={() => onMemberSelect(m)}
                   >
-                    <span className="font-medium">{m.name}</span>
-                    {m.city && <span className="text-xs text-muted-foreground">{m.city}</span>}
+                    <span className="font-medium text-gray-900">{m.name}</span>
+                    {m.city && <span className="text-xs text-gray-500">{m.city}</span>}
                   </button>
                 ))}
               </div>
