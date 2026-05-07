@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import { generateSlug } from "@/lib/signup/slug"
+import { VerseLookup } from "@/components/shared/verse-lookup"
 import {
   FIELD_TYPE_META,
   createFieldConfig,
@@ -685,6 +686,7 @@ function FormDialog({
                 title="Verse background color"
               />
             </div>
+            <VerseLookup onSelect={(text, ref) => { setVerse(text); setVerseRef(ref) }} />
           </div>
 
           {/* Fields Builder */}

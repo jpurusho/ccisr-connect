@@ -60,6 +60,7 @@ import {
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
 import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, PastelColorPicker, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
 import { TemplateStyleEditor } from "@/components/dashboard/template-style-editor"
+import { VerseLookup } from "@/components/shared/verse-lookup"
 import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-builder"
 import { formatPhone } from "@/lib/utils"
 import {
@@ -669,6 +670,7 @@ export default function TemplatesPage() {
                           onChange={(color) => setBirthdayData((prev) => ({ ...prev, footerVerseBgColor: color }))}
                           extraPastels={styleSettings[tab.name]?.customPastels}
                         />
+                        <VerseLookup onSelect={(text, ref) => setBirthdayData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
                       <CommonTemplateFields data={birthdayData} onChange={setBirthdayData} />
                     </>
@@ -701,6 +703,7 @@ export default function TemplatesPage() {
                           onChange={(color) => setAnniversaryData((prev) => ({ ...prev, footerVerseBgColor: color }))}
                           extraPastels={styleSettings[tab.name]?.customPastels}
                         />
+                        <VerseLookup onSelect={(text, ref) => setAnniversaryData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
                       <CommonTemplateFields data={anniversaryData} onChange={setAnniversaryData} />
                     </>
@@ -758,6 +761,7 @@ export default function TemplatesPage() {
                           onChange={(color) => setBibleStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
                           extraPastels={styleSettings[tab.name]?.customPastels}
                         />
+                        <VerseLookup onSelect={(text, ref) => setBibleStudyData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
 
                       <CommonTemplateFields data={bibleStudyData} onChange={setBibleStudyData} />
@@ -942,6 +946,7 @@ export default function TemplatesPage() {
                           onChange={(color) => setWomensStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
                           extraPastels={styleSettings[tab.name]?.customPastels}
                         />
+                        <VerseLookup onSelect={(text, ref) => setWomensStudyData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
 
                       <CommonTemplateFields data={womensStudyData} onChange={setWomensStudyData} />
@@ -1040,6 +1045,7 @@ export default function TemplatesPage() {
                           onChange={(color) => setPrayerMeetingData((prev) => ({ ...prev, footerVerseBgColor: color }))}
                           extraPastels={styleSettings[tab.name]?.customPastels}
                         />
+                        <VerseLookup onSelect={(text, ref) => setPrayerMeetingData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
                       <CommonTemplateFields data={prayerMeetingData} onChange={setPrayerMeetingData} />
                     </>
@@ -1120,6 +1126,7 @@ export default function TemplatesPage() {
                           onChange={(color) => setBulletinData((prev) => ({ ...prev, footerVerseBgColor: color }))}
                           extraPastels={styleSettings[tab.name]?.customPastels}
                         />
+                        <VerseLookup onSelect={(text, ref) => setBulletinData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
                       <CommonTemplateFields data={bulletinData} onChange={setBulletinData} />
                     </div>
