@@ -579,16 +579,33 @@ function FieldRenderer({
 
 // ── Response Row (public view) ──────────────────────────────────────────────
 
-function ResponseRow({ data, fields, colors }: { data: Record<string, unknown>; fields: SignupFieldConfig[]; colors: { primary: string; bgLight: string; border: string } }) {
-  const nameField = fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 1))
+function ResponseRow({ data, fields, colors }: { data: Record<string, unknown>; fields: SignupFieldConfig[]; colors: { primary: string; bgLight: string; border: string; textDark: string; textLight: string } }) {
+  const nameField = fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
   const name = nameField ? (data[nameField.id] as string) : "Anonymous"
   const monthField = fields.find((f) => f.type === "month_picker")
   const month = monthField ? MONTHS[(data[monthField.id] as number) - 1] : undefined
+  const addrField = fields.find((f) => f.type === "address")
+  const addr = addrField ? (data[addrField.id] as { street?: string; city?: string; state?: string; zip?: string } | null) : null
+  const addrStr = addr ? [addr.street, addr.city, [addr.state, addr.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") : undefined
+  const phoneField = fields.find((f) => f.type === "phone")
+  const phone = phoneField ? (data[phoneField.id] as string) : undefined
 
   return (
-    <div className="flex items-center justify-between rounded-md px-3 py-2 text-sm" style={{ backgroundColor: colors.bgLight }}>
-      <span className="font-medium">{name}</span>
-      {month && <span className="text-xs" style={{ color: colors.primary }}>{month}</span>}
+    <div className="rounded-lg border px-4 py-3" style={{ borderColor: colors.border, backgroundColor: colors.bgLight }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-sm" style={{ color: colors.textDark }}>{name}</span>
+        {month && (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.primary, color: "#fff" }}>
+            {month}
+          </span>
+        )}
+      </div>
+      {(addrStr || phone) && (
+        <div className="mt-1.5 space-y-0.5">
+          {addrStr && <p className="text-xs" style={{ color: colors.textLight }}>{addrStr}</p>}
+          {phone && <p className="text-xs" style={{ color: colors.textLight }}>{phone}</p>}
+        </div>
+      )}
     </div>
   )
 }
