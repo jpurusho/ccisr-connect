@@ -313,30 +313,56 @@ export default function PublicSignupPage() {
 function SignupList({ responses, fields, colors, formId, onRemoved }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; onRemoved: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [verifyPhone, setVerifyPhone] = useState("")
+  const [verifyTarget, setVerifyTarget] = useState<{ id: string; phone: string } | null>(null)
 
-  async function handleRemove(responseId: string) {
-    if (!confirm("Remove this signup?")) return
+  const phoneField = fields.find((f) => f.type === "phone")
+  const monthField = fields.find((f) => f.type === "month_picker")
+  const currentMonth = new Date().getMonth() + 1
+
+  function initiateRemove(responseId: string, data: Record<string, unknown>) {
+    const phone = phoneField ? (data[phoneField.id] as string) : ""
+    const month = monthField ? (data[monthField.id] as number) : 0
+    if (month > 0 && month < currentMonth) return // can't remove past months
+    if (phone) {
+      setVerifyTarget({ id: responseId, phone })
+      setVerifyPhone("")
+    } else {
+      doRemove(responseId)
+    }
+  }
+
+  async function doRemove(responseId: string) {
     setRemoving(responseId)
+    setVerifyTarget(null)
     try {
       const res = await fetch("/api/signup/remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ responseId, formId }),
       })
-      if (res.ok) {
-        onRemoved(responseId)
-      }
+      if (res.ok) onRemoved(responseId)
     } finally {
       setRemoving(null)
     }
   }
 
+  function confirmVerify() {
+    if (!verifyTarget) return
+    const clean = (s: string) => s.replace(/\D/g, "").slice(-4)
+    if (clean(verifyPhone) === clean(verifyTarget.phone)) {
+      doRemove(verifyTarget.id)
+    } else {
+      alert("Phone number doesn't match. Please enter the last 4 digits of the phone used to sign up.")
+    }
+  }
+
   return (
-    <div className="mt-6">
+    <div className="mt-6 rounded-xl border bg-white shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-center gap-2 rounded-xl border bg-white px-4 py-3 shadow-sm transition-colors hover:bg-slate-50"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 transition-colors hover:bg-slate-50"
       >
         <Users className="size-4" style={{ color: colors.primary }} />
         <span className="text-sm font-semibold text-gray-900">{responses.length} signed up</span>
@@ -351,10 +377,54 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
         </svg>
       </button>
       {open && (
-        <div className="mt-2 space-y-2">
-          {responses.map((r) => (
-            <ResponseRow key={r.id} data={r.data} fields={fields} colors={colors} removing={removing === r.id} onRemove={() => handleRemove(r.id)} />
-          ))}
+        <div className="border-t max-h-64 overflow-y-auto">
+          <div className="p-2 space-y-1.5">
+            {responses.map((r) => {
+              const month = monthField ? (r.data[monthField.id] as number) : 0
+              const isPast = month > 0 && month < currentMonth
+              return (
+                <ResponseRow
+                  key={r.id}
+                  data={r.data}
+                  fields={fields}
+                  colors={colors}
+                  removing={removing === r.id}
+                  canRemove={!isPast}
+                  onRemove={() => initiateRemove(r.id, r.data)}
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
+      {/* Phone verification dialog */}
+      {verifyTarget && (
+        <div className="border-t bg-amber-50 p-3 space-y-2">
+          <p className="text-xs text-amber-800 font-medium">Enter the last 4 digits of your phone to confirm removal:</p>
+          <div className="flex gap-2">
+            <input
+              type="tel"
+              value={verifyPhone}
+              onChange={(e) => setVerifyPhone(e.target.value)}
+              placeholder="Last 4 digits"
+              maxLength={4}
+              className="flex-1 rounded-md border border-amber-200 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-amber-400"
+            />
+            <button
+              type="button"
+              onClick={confirmVerify}
+              className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              onClick={() => setVerifyTarget(null)}
+              className="rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -712,7 +782,7 @@ function FieldRenderer({
 
 // ── Response Row (public view) ──────────────────────────────────────────────
 
-function ResponseRow({ data, fields, colors, removing, onRemove }: { data: Record<string, unknown>; fields: SignupFieldConfig[]; colors: { primary: string; bgLight: string; border: string; textDark: string; textLight: string }; removing: boolean; onRemove: () => void }) {
+function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { data: Record<string, unknown>; fields: SignupFieldConfig[]; colors: { primary: string; bgLight: string; border: string; textDark: string; textLight: string }; removing: boolean; canRemove: boolean; onRemove: () => void }) {
   const nameField = fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
   const name = nameField ? (data[nameField.id] as string) : "Anonymous"
   const monthField = fields.find((f) => f.type === "month_picker")
@@ -733,15 +803,17 @@ function ResponseRow({ data, fields, colors, removing, onRemove }: { data: Recor
               {month}
             </span>
           )}
-          <button
-            type="button"
-            onClick={onRemove}
-            disabled={removing}
-            className="text-gray-400 hover:text-red-500 transition-colors p-0.5"
-            title="Remove signup"
-          >
-            {removing ? <Loader2 className="size-3.5 animate-spin" /> : <span className="text-xs">✕</span>}
-          </button>
+          {canRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              disabled={removing}
+              className="text-gray-400 hover:text-red-500 transition-colors p-0.5"
+              title="Remove signup"
+            >
+              {removing ? <Loader2 className="size-3.5 animate-spin" /> : <span className="text-xs">✕</span>}
+            </button>
+          )}
         </div>
       </div>
       {(addrStr || phone) && (
