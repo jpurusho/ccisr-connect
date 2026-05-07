@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
       maskedPhone: maskPhone(m.cell_phone),
       city: addr?.city || undefined,
       address: addr ? [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(", ") : undefined,
+      addressParts: addr ? { street: addr.street || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" } : undefined,
       phone: m.cell_phone || undefined,
     }
   })

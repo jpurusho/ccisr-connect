@@ -34,6 +34,7 @@ interface MemberResult {
   maskedPhone?: string
   city?: string
   address?: string
+  addressParts?: { street: string; city: string; state: string; zip: string }
   phone?: string
 }
 
@@ -125,6 +126,8 @@ export default function PublicSignupPage() {
     for (const field of fields) {
       if (field.type === "member_lookup") {
         updated[field.id] = member.name
+      } else if (field.type === "address" && member.addressParts) {
+        updated[field.id] = member.addressParts
       } else if (field.type === "address" && member.address) {
         const parts = member.address.split(", ")
         updated[field.id] = {
@@ -209,7 +212,7 @@ export default function PublicSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4">
+    <div className="min-h-screen bg-slate-50 py-8 px-4 text-gray-900">
       <div className="mx-auto w-full max-w-lg">
         {/* Header */}
         <div
@@ -406,6 +409,7 @@ function FieldRenderer({
             onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder || "(555) 123-4567"}
             required={field.required}
+            className="text-gray-900"
           />
         </div>
       )
@@ -590,6 +594,7 @@ function FieldRenderer({
             value={addr.street}
             onChange={(e) => onChange({ ...addr, street: e.target.value })}
             required={field.required}
+            className="text-gray-900"
           />
           <div className="grid grid-cols-3 gap-2">
             <Input
@@ -597,19 +602,21 @@ function FieldRenderer({
               value={addr.city}
               onChange={(e) => onChange({ ...addr, city: e.target.value })}
               required={field.required}
-              className="col-span-1"
+              className="text-gray-900"
             />
             <Input
               placeholder="State"
               value={addr.state}
               onChange={(e) => onChange({ ...addr, state: e.target.value })}
               required={field.required}
+              className="text-gray-900"
             />
             <Input
               placeholder="ZIP"
               value={addr.zip}
               onChange={(e) => onChange({ ...addr, zip: e.target.value })}
               required={field.required}
+              className="text-gray-900"
             />
           </div>
         </div>
@@ -633,6 +640,7 @@ function FieldRenderer({
               }}
               placeholder={field.placeholder || "Start typing your name..."}
               required={field.required}
+              className="text-gray-900"
             />
             {lookupLoading && (
               <Loader2 className="absolute right-2 top-2.5 size-4 animate-spin text-muted-foreground" />
