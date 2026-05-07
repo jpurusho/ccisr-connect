@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { BookOpen, Save, Loader2, CheckCircle } from "lucide-react"
+import { BookOpen, Save, Loader2, CheckCircle, Eye, EyeOff } from "lucide-react"
 
 interface Setting {
   key: string
@@ -26,6 +26,7 @@ export function IntegrationsPanel() {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
+  const [showKey, setShowKey] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -98,12 +99,22 @@ export function IntegrationsPanel() {
         <CardContent className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-sm">API Token</Label>
-            <Input
-              type="password"
-              value={esvKey}
-              onChange={(e) => setEsvKey(e.target.value)}
-              placeholder="Enter your ESV API token"
-            />
+            <div className="relative">
+              <Input
+                type={showKey ? "text" : "password"}
+                value={esvKey}
+                onChange={(e) => setEsvKey(e.target.value)}
+                placeholder="Enter your ESV API token"
+                className="pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={handleSave} disabled={saving}>
