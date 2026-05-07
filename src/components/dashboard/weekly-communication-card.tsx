@@ -85,6 +85,7 @@ export interface WeeklyCommunicationCardProps {
   onSave?: () => void
   onDelete?: () => void
   onCancel?: () => void
+  onRefresh?: () => void
   saving?: boolean
   hasInstance?: boolean
   children?: ReactNode
@@ -135,6 +136,7 @@ export function WeeklyCommunicationCard({
   onSave,
   onDelete,
   onCancel,
+  onRefresh,
   saving = false,
   hasInstance = false,
   children,
@@ -488,6 +490,17 @@ export function WeeklyCommunicationCard({
                 >
                   <Undo2 className="size-3.5" data-icon="inline-start" />
                   Cancel
+                </Button>
+              )}
+              {onRefresh && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onRefresh}
+                  title="Refresh fields from template defaults"
+                >
+                  <RefreshCw className="size-3.5" data-icon="inline-start" />
+                  From Template
                 </Button>
               )}
               <div className="flex-1" />

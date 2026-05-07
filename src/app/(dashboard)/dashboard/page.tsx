@@ -265,6 +265,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [weekLabel, setWeekLabel] = useState("")
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
+  const [savedTemplateData, setSavedTemplateData] = useState<Record<string, Record<string, unknown>>>({})
   const [templateStyles, setTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
   // ---- Template visibility (extracted hook) ----
   const { visibleTemplates, toggleTemplate, isCustomVisible, toggleCustomTemplate } = useCardVisibility()
@@ -705,6 +706,9 @@ export default function DashboardPage() {
 
       setSavedSubjectTemplates(
         Object.fromEntries(Object.entries(savedDefaults).map(([k, v]) => [k, v.subject]))
+      )
+      setSavedTemplateData(
+        Object.fromEntries(Object.entries(savedDefaults).map(([k, v]) => [k, v.data]))
       )
 
       // Build composed instances map (template_type → data)
@@ -1697,6 +1701,33 @@ export default function DashboardPage() {
     }
   }
 
+  function handleRefreshFromTemplate(type: CommType) {
+    const etKeyMap: Record<CommType, string> = {
+      birthday: "birthday",
+      anniversary: "anniversary",
+      bible_study: "friday_bible_study",
+      womens_study: "wednesday_womens_study",
+      prayer_meeting: "monthly_prayer",
+      bulletin: "bulletin",
+    }
+    const etKey = etKeyMap[type]
+    const tmplData = savedTemplateData[etKey]
+    if (!tmplData) {
+      toast.error("No template defaults found")
+      return
+    }
+    const common = extractCommonFields(tmplData as CommonCardFields)
+    switch (type) {
+      case "birthday": setBirthdayForm((prev) => ({ ...prev, ...common })); break
+      case "anniversary": setAnniversaryForm((prev) => ({ ...prev, ...common })); break
+      case "bible_study": setBibleStudyForm((prev) => ({ ...prev, ...(tmplData as unknown as BibleStudyFormData) })); break
+      case "womens_study": setWomensStudyForm((prev) => ({ ...prev, ...(tmplData as unknown as WomensStudyFormData) })); break
+      case "prayer_meeting": setPrayerMeetingForm((prev) => ({ ...prev, ...(tmplData as unknown as PrayerMeetingFormData) })); break
+      case "bulletin": setBulletinForm((prev) => ({ ...prev, ...common })); break
+    }
+    toast.success("Refreshed from template defaults")
+  }
+
   // ---- Queue / Send ----
   const handleSendNow = useCallback(
     async (type: CommType) => {
@@ -2527,6 +2558,7 @@ export default function DashboardPage() {
                 onSave={() => handleSaveInstance(type)}
                 onDelete={() => handleDeleteInstance(type)}
                 onCancel={() => handleCancelEdit(type)}
+                onRefresh={() => handleRefreshFromTemplate(type)}
                 saving={savingInstance === type}
                 hasInstance={!!instanceIds[type]}
                 mailingLists={mailingLists}
