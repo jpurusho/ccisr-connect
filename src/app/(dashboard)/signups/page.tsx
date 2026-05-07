@@ -68,7 +68,7 @@ interface FormRow {
   target_year: number | null
   start_date: string | null
   end_date: string | null
-  theme: { primaryColor?: string; emoji?: string }
+  theme: { primaryColor?: string; emoji?: string; verse?: string; verseRef?: string; verseBgColor?: string }
   fields: SignupFieldConfig[]
   status: "draft" | "active" | "closed" | "archived"
   visibility: "public_link" | "admin_only"
@@ -343,6 +343,9 @@ function FormDialog({
   const [allowDuplicates, setAllowDuplicates] = useState(false)
   const [primaryColor, setPrimaryColor] = useState("#7C3AED")
   const [emoji, setEmoji] = useState("")
+  const [verse, setVerse] = useState("")
+  const [verseRef, setVerseRef] = useState("")
+  const [verseBgColor, setVerseBgColor] = useState("")
   const [fields, setFields] = useState<SignupFieldConfig[]>([])
 
   // Populate form when editForm changes
@@ -364,6 +367,9 @@ function FormDialog({
       setAllowDuplicates(editForm.allow_duplicates)
       setPrimaryColor(editForm.theme.primaryColor || "#7C3AED")
       setEmoji(editForm.theme.emoji || "")
+      setVerse(editForm.theme.verse || "")
+      setVerseRef(editForm.theme.verseRef || "")
+      setVerseBgColor(editForm.theme.verseBgColor || "")
       setFields(editForm.fields || [])
     } else {
       setTitle("")
@@ -410,7 +416,7 @@ function FormDialog({
         target_year: durationType === "month" ? targetYear : null,
         start_date: durationType === "date_range" ? startDate || null : null,
         end_date: durationType === "date_range" ? endDate || null : null,
-        theme: { primaryColor, emoji: emoji || undefined },
+        theme: { primaryColor, emoji: emoji || undefined, verse: verse || undefined, verseRef: verseRef || undefined, verseBgColor: verseBgColor || undefined },
         fields,
         status,
         visibility,
@@ -636,6 +642,32 @@ function FormDialog({
                 placeholder="Emoji"
                 className="h-8 text-sm w-16"
                 maxLength={2}
+              />
+            </div>
+          </div>
+
+          {/* Bible Verse / Quote */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Verse / Quote (optional)</Label>
+            <Input
+              value={verse}
+              onChange={(e) => setVerse(e.target.value)}
+              placeholder="e.g., Do not neglect to show hospitality..."
+              className="h-8 text-xs"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                value={verseRef}
+                onChange={(e) => setVerseRef(e.target.value)}
+                placeholder="Reference (e.g., Hebrews 13:2)"
+                className="h-8 text-xs"
+              />
+              <Input
+                type="color"
+                value={verseBgColor || "#D6F5E0"}
+                onChange={(e) => setVerseBgColor(e.target.value)}
+                className="h-8 w-full"
+                title="Verse background color"
               />
             </div>
           </div>

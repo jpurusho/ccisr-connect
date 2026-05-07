@@ -277,6 +277,17 @@ export default function PublicSignupPage() {
             ))}
           </div>
 
+          {/* Signed up list — inline within form */}
+          {form.visibility === "public_link" && responses.length > 0 && (
+            <SignupList
+              responses={responses}
+              fields={form.fields}
+              colors={colors}
+              formId={form.id}
+              onRemoved={(id) => setResponses((prev) => prev.filter((r) => r.id !== id))}
+            />
+          )}
+
           {submitError && (
             <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
               {submitError}
@@ -293,16 +304,6 @@ export default function PublicSignupPage() {
           </Button>
         </form>
 
-        {/* Public responses list — collapsible */}
-        {form.visibility === "public_link" && responses.length > 0 && (
-          <SignupList
-            responses={responses}
-            fields={form.fields}
-            colors={colors}
-            formId={form.id}
-            onRemoved={(id) => setResponses((prev) => prev.filter((r) => r.id !== id))}
-          />
-        )}
       </div>
     </div>
   )
