@@ -1,6 +1,6 @@
 "use client"
 
-import { Settings, Palette, Server, UserCog, Info, Church, Tag, Activity, Database } from "lucide-react"
+import { Settings, Palette, Server, UserCog, Info, Church, Tag, Activity, Database, Plug } from "lucide-react"
 import dynamic from "next/dynamic"
 const ActivityLogPanel = dynamic(() => import("@/components/settings/activity-log-panel"), { ssr: false })
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -18,6 +18,7 @@ import { SmtpConfigPanel } from "@/components/settings/smtp-config"
 import { UserManagementPanel } from "@/components/settings/user-management"
 import { TagManagementPanel } from "@/components/settings/tag-management"
 import { DatabaseStatsPanel } from "@/components/settings/database-stats-panel"
+import { IntegrationsPanel } from "@/components/settings/integrations-panel"
 import { useAppUser } from "@/hooks/use-app-user"
 
 import { APP_VERSION } from "@/lib/version"
@@ -117,6 +118,12 @@ export default function SettingsPage() {
               <Tag className="size-4" />
               <span className="hidden sm:inline">Tags</span>
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="integrations">
+                <Plug className="size-4" />
+                <span className="hidden sm:inline">Integrations</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="activity">
               <Activity className="size-4" />
               <span className="hidden sm:inline">Activity Log</span>
@@ -152,6 +159,12 @@ export default function SettingsPage() {
           <TabsContent value="tags" className="mt-6">
             <TagManagementPanel />
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="integrations" className="mt-6">
+              <IntegrationsPanel />
+            </TabsContent>
+          )}
 
           <TabsContent value="activity" className="mt-6">
             <ActivityLogPanel />

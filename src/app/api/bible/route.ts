@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-const ESV_API_KEY = process.env.ESV_API_KEY || ""
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 interface VerseResult {
   text: string
@@ -8,12 +10,27 @@ interface VerseResult {
   translation: string
 }
 
+async function getEsvApiKey(): Promise<string> {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "esv_api_key")
+      .single()
+    return (data?.value as string) || process.env.ESV_API_KEY || ""
+  } catch {
+    return process.env.ESV_API_KEY || ""
+  }
+}
+
 async function fetchESV(reference: string): Promise<VerseResult | null> {
-  if (!ESV_API_KEY) return null
+  const apiKey = await getEsvApiKey()
+  if (!apiKey) return null
   try {
     const url = `https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(reference)}&include-headings=false&include-footnotes=false&include-verse-numbers=false&include-short-copyright=false&include-passage-references=false&indent-paragraphs=0`
     const res = await fetch(url, {
-      headers: { Authorization: `Token ${ESV_API_KEY}` },
+      headers: { Authorization: `Token ${apiKey}` },
     })
     if (!res.ok) return null
     const data = await res.json()
