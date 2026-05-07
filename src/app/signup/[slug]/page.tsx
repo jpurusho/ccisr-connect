@@ -96,6 +96,9 @@ export default function PublicSignupPage() {
 
   async function handleMemberSearch(query: string, formId: string) {
     setLookupQuery(query)
+    if (selectedMember && query !== selectedMember.name) {
+      setSelectedMember(null)
+    }
     if (query.length < 3) {
       setLookupResults([])
       return
@@ -645,7 +648,7 @@ function FieldRenderer({
             {lookupLoading && (
               <Loader2 className="absolute right-2 top-2.5 size-4 animate-spin text-muted-foreground" />
             )}
-            {memberAutocomplete && lookupResults.length > 0 && !selectedMember && (
+            {memberAutocomplete && lookupResults.length > 0 && (!selectedMember || lookupQuery !== selectedMember.name) && (
               <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
                 {lookupResults.map((m) => (
                   <button
