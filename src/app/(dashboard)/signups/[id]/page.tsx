@@ -217,6 +217,18 @@ export default function SignupResponsesPage() {
             className="pl-9"
           />
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            const supabase = createClient()
+            await supabase.from("signup_rate_limits").delete().eq("form_id", formId)
+            toast.success("Rate limits cleared")
+          }}
+          title="Clear rate limit counters for this form"
+        >
+          Reset Limits
+        </Button>
         {responses.length > 0 && (
           <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download className="size-3.5" />
