@@ -171,6 +171,22 @@ export default function SignupsPage() {
     window.open(`/signup/${slug}?preview=1`, "_blank")
   }
 
+  async function toggleStatus(form: FormRow) {
+    const newStatus = form.status === "active" ? "closed" : "active"
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("signup_forms")
+      .update({ status: newStatus } as never)
+      .eq("id", form.id)
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+      return
+    }
+    toast.success(newStatus === "active" ? "Form activated" : "Form deactivated")
+    logAudit("signup_form_status_changed", "signup_forms", form.id, { title: form.title, from: form.status, to: newStatus })
+    setForms((prev) => prev.map((f) => f.id === form.id ? { ...f, status: newStatus } : f))
+  }
+
   return (
     <div className="space-y-4 p-4 sm:p-6">
       {/* Header */}
@@ -252,11 +268,19 @@ export default function SignupsPage() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 pt-1 border-t">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => handleEdit(form)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`h-7 text-xs ${form.status === "active" ? "text-amber-600" : "text-emerald-600"}`}
+                    onClick={() => toggleStatus(form)}
+                  >
+                    {form.status === "active" ? "Deactivate" : "Activate"}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleEdit(form)}>
                     <Pencil className="size-3" />
                     Edit
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => router.push(`/signups/${form.id}`)}>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.push(`/signups/${form.id}`)}>
                     <Eye className="size-3" />
                     Responses
                   </Button>
