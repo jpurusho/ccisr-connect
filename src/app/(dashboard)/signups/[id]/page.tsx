@@ -13,6 +13,14 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Table,
   TableBody,
   TableCell,
@@ -66,6 +74,7 @@ export default function SignupResponsesPage() {
   const [search, setSearch] = useState("")
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortAsc, setSortAsc] = useState(true)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -92,17 +101,18 @@ export default function SignupResponsesPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  async function handleDelete(responseId: string) {
-    if (!confirm("Delete this response?")) return
+  async function confirmDelete() {
+    if (!deleteTarget) return
     const supabase = createClient()
-    const { error } = await supabase.from("signup_responses").delete().eq("id", responseId)
+    const { error } = await supabase.from("signup_responses").delete().eq("id", deleteTarget)
     if (error) {
       toast.error(`Failed: ${error.message}`)
     } else {
       toast.success("Response deleted")
-      logAudit("signup_response_deleted", "signup_responses", responseId, { formId })
-      setResponses((prev) => prev.filter((r) => r.id !== responseId))
+      logAudit("signup_response_deleted", "signup_responses", deleteTarget, { formId })
+      setResponses((prev) => prev.filter((r) => r.id !== deleteTarget))
     }
+    setDeleteTarget(null)
   }
 
   function exportCsv() {
@@ -321,7 +331,7 @@ export default function SignupResponsesPage() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => handleDelete(r.id)}
+                          onClick={() => setDeleteTarget(r.id)}
                           title="Delete"
                         >
                           <Trash2 className="size-3.5 text-muted-foreground hover:text-destructive" />
@@ -335,6 +345,20 @@ export default function SignupResponsesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Response</DialogTitle>
+            <DialogDescription>Are you sure you want to delete this signup response? This cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

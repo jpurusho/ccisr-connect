@@ -204,11 +204,36 @@ export default function PublicSignupPage() {
 
   if (submitted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 text-gray-900">
         <div className="w-full max-w-md rounded-xl border bg-white p-8 text-center shadow-sm">
           <CheckCircle className="size-12 mx-auto mb-4" style={{ color: colors.primary }} />
-          <h2 className="text-xl font-bold">Thank you!</h2>
-          <p className="mt-2 text-muted-foreground">Your response has been recorded.</p>
+          <h2 className="text-xl font-bold text-gray-900">Thank you!</h2>
+          <p className="mt-2 text-gray-600">Your response has been recorded.</p>
+          <div className="mt-6 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSubmitted(false)
+                setSelectedMember(null)
+                setLookupQuery("")
+                const initial: Record<string, unknown> = {}
+                for (const field of form.fields) initial[field.id] = getDefaultValue(field)
+                setValues(initial)
+                fetchForm()
+              }}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: colors.primary }}
+            >
+              Submit Another Response
+            </button>
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -301,7 +326,15 @@ export default function PublicSignupPage() {
             type="submit"
             className="mt-6 w-full"
             style={{ backgroundColor: colors.primary }}
-            disabled={submitting}
+            disabled={submitting || (() => {
+              const monthField = form.fields.find((f) => f.type === "month_picker")
+              if (!monthField || !monthField.required) return false
+              const excluded = new Set((monthField as { excludeMonths?: number[] }).excludeMonths ?? [])
+              const currentMonth = new Date().getMonth() + 1
+              const takenMonths = new Set(responses.map((r) => r.data[monthField.id] as number).filter((m) => typeof m === "number" && m > 0))
+              const hasOpen = Array.from({ length: 12 }, (_, i) => i + 1).some((m) => m >= currentMonth && !excluded.has(m) && !takenMonths.has(m))
+              return !hasOpen
+            })()}
           >
             {submitting ? <Loader2 className="size-4 animate-spin" /> : "Submit"}
           </Button>
@@ -319,6 +352,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
   const [removing, setRemoving] = useState<string | null>(null)
   const [verifyPhone, setVerifyPhone] = useState("")
   const [verifyTarget, setVerifyTarget] = useState<{ id: string; phone: string } | null>(null)
+  const [removeError, setRemoveError] = useState("")
 
   const phoneField = fields.find((f) => f.type === "phone")
   const monthField = fields.find((f) => f.type === "month_picker")
@@ -347,9 +381,10 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
       })
       if (res.ok) {
         onRemoved(responseId)
+        setRemoveError("")
       } else {
         const data = await res.json().catch(() => ({}))
-        alert(data.error || "Failed to remove")
+        setRemoveError(data.error || "Failed to remove")
       }
     } finally {
       setRemoving(null)
@@ -360,9 +395,10 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
     if (!verifyTarget) return
     const clean = (s: string) => s.replace(/\D/g, "").slice(-4)
     if (clean(verifyPhone) === clean(verifyTarget.phone)) {
+      setRemoveError("")
       doRemove(verifyTarget.id, clean(verifyPhone))
     } else {
-      alert("Phone number doesn't match. Please enter the last 4 digits of the phone used to sign up.")
+      setRemoveError("Phone number doesn't match. Enter the last 4 digits.")
     }
   }
 
@@ -434,6 +470,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
               Cancel
             </button>
           </div>
+          {removeError && <p className="text-xs text-red-600 mt-1">{removeError}</p>}
         </div>
       )}
     </div>
