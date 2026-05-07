@@ -35,6 +35,7 @@ import {
   Trash2,
   Loader2,
   Undo2,
+  Link2,
   type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -98,6 +99,7 @@ export interface WeeklyCommunicationCardProps {
   sendCount?: number
   additionalRecipients?: string
   onAdditionalRecipientsChange?: (value: string) => void
+  autoFilledFrom?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +152,7 @@ export function WeeklyCommunicationCard({
   resourceLinks,
   additionalRecipients,
   onAdditionalRecipientsChange,
+  autoFilledFrom,
 }: WeeklyCommunicationCardProps) {
   const [editing, setEditing] = useState(false)
   const [previewing, setPreviewing] = useState(false)
@@ -216,6 +219,12 @@ export function WeeklyCommunicationCard({
             {title}
           </h3>
           <div className="flex items-center gap-1.5">
+            {autoFilledFrom && (
+              <Badge variant="outline" className="shrink-0 text-[10px] gap-0.5 text-primary border-primary/30">
+                <Link2 className="size-2.5" />
+                {autoFilledFrom}
+              </Badge>
+            )}
             <Badge variant={sc.variant} className="shrink-0">
               <StatusIcon className="size-3" />
               {sc.label}

@@ -80,6 +80,7 @@ import {
   mapDispatchStatus,
 } from "@/lib/dashboard-types"
 import { useCardVisibility } from "@/hooks/dashboard/use-card-visibility"
+import { resolveSignupAutoFill, type SignupFieldMap, type AutoFillResult } from "@/lib/signup/auto-fill"
 
 import {
   WeeklyCommunicationCard,
@@ -276,6 +277,10 @@ export default function DashboardPage() {
   const [instanceWeeks, setInstanceWeeks] = useState<Partial<Record<CommType, string>>>({})
   const [instanceUpdatedAt, setInstanceUpdatedAt] = useState<Partial<Record<CommType, string>>>({})
   const [savingInstance, setSavingInstance] = useState<CommType | null>(null)
+
+  // ---- Signup auto-fill tracking ----
+  const [signupAutoFills, setSignupAutoFills] = useState<Partial<Record<CommType, AutoFillResult>>>({})
+
 
   const [dispatches, setDispatches] = useState<
     Record<CommType, DispatchRecord | null>
@@ -643,11 +648,11 @@ export default function DashboardPage() {
           .eq("is_default", true)
           .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
 
-        // Event type id-to-name map (+ template link and color for custom card enrichment)
+        // Event type id-to-name map (+ template link, color, signup link for auto-fill)
         supabase
           .from("event_types")
-          .select("id, name, default_template_id, color_scheme")
-          .returns<{ id: string; name: string; default_template_id: string | null; color_scheme: { primary: string } | null }[]>(),
+          .select("id, name, default_template_id, color_scheme, linked_signup_form_id, signup_field_map")
+          .returns<{ id: string; name: string; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null }[]>(),
 
         // Composed instances: match current week, bulletin week, or recurring
         supabase
@@ -682,8 +687,14 @@ export default function DashboardPage() {
 
       // ---- Parse saved template defaults (no FK join, resolve in JS) ----
       const etIdToName: Record<string, string> = {}
+      const etSignupLinks: Record<string, { formId: string; fieldMap: SignupFieldMap }> = {}
       if (eventTypesRes.data) {
-        for (const et of eventTypesRes.data) etIdToName[et.id] = et.name
+        for (const et of eventTypesRes.data) {
+          etIdToName[et.id] = et.name
+          if (et.linked_signup_form_id && et.signup_field_map) {
+            etSignupLinks[et.name] = { formId: et.linked_signup_form_id, fieldMap: et.signup_field_map }
+          }
+        }
       }
 
       // Use the last template per event type (in case of duplicates)
@@ -945,6 +956,9 @@ export default function DashboardPage() {
         setWeekStripEvents(stripEvts)
       }
 
+      // ---- Signup auto-fill accumulator ----
+      const autoFills: Partial<Record<CommType, AutoFillResult>> = {}
+
       // ---- Process Bible Study (recurrence-based) ----
       const hasBsDraft = !!composedMap["bible_study"]
       const bsEvent = findEventByType("friday_bible_study")
@@ -974,11 +988,30 @@ export default function DashboardPage() {
         })
       } else {
         let bsHostData = { hostName: "TBD", address: "TBD", city: "", phone: "" }
-        if (bsInstance?.host_family_id) {
-          bsHostData = await resolveHostFamily(bsInstance.host_family_id)
-        } else if (bsEvent?.host_family_id) {
-          const expired = bsEvent.host_until ? new Date(bsEvent.host_until + "T23:59:59") < new Date() : false
-          if (!expired) bsHostData = await resolveHostFamily(bsEvent.host_family_id)
+
+        // Try signup auto-fill first (most specific — user signed up for this month)
+        const bsSignup = etSignupLinks["friday_bible_study"]
+        let bsAutoFill: AutoFillResult | null = null
+        if (bsSignup && bsDate) {
+          bsAutoFill = await resolveSignupAutoFill(bsSignup.formId, bsSignup.fieldMap, bsDate)
+          if (bsAutoFill.source === "signup") {
+            bsHostData = {
+              hostName: bsAutoFill.hostName ?? "TBD",
+              address: bsAutoFill.address ?? "TBD",
+              city: bsAutoFill.city ?? "",
+              phone: bsAutoFill.phone ?? "",
+            }
+          }
+        }
+
+        // Fall back to event/instance host assignment if no signup match
+        if (bsHostData.hostName === "TBD") {
+          if (bsInstance?.host_family_id) {
+            bsHostData = await resolveHostFamily(bsInstance.host_family_id)
+          } else if (bsEvent?.host_family_id) {
+            const expired = bsEvent.host_until ? new Date(bsEvent.host_until + "T23:59:59") < new Date() : false
+            if (!expired) bsHostData = await resolveHostFamily(bsEvent.host_family_id)
+          }
         }
         if (bsInstance?.location_override) bsHostData.address = bsInstance.location_override
         if (bsInstance?.notes) {
@@ -986,10 +1019,15 @@ export default function DashboardPage() {
           if (contactMatch) bsHostData.phone = contactMatch[1].trim()
         }
 
+        if (bsAutoFill?.source === "signup") {
+          autoFills["bible_study"] = bsAutoFill
+        }
+
         const savedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
+        const locIdx = bsSignup?.fieldMap.location_index ?? 0
         const mergedLocs = savedLocs.map((loc, i) => {
           const base = { onVacation: false, vacationMessage: "", ...loc }
-          if (i === 0 && bsHostData.hostName !== "TBD" && !base.onVacation) {
+          if (i === locIdx && bsHostData.hostName !== "TBD" && !base.onVacation) {
             return { ...base, hostNames: bsHostData.hostName, address: bsHostData.address, city: bsHostData.city, phone: bsHostData.phone }
           }
           return base
@@ -1069,11 +1107,30 @@ export default function DashboardPage() {
         })
       } else {
         let pmHostData = { hostName: pmDef.hostNames ?? "TBD", address: pmDef.address ?? "TBD", city: pmDef.city ?? "", phone: pmDef.phone ?? "" }
-        if (pmInstance?.host_family_id) {
-          pmHostData = await resolveHostFamily(pmInstance.host_family_id)
-        } else if (pmEvent?.host_family_id) {
-          const expired = pmEvent.host_until ? new Date(pmEvent.host_until + "T23:59:59") < new Date() : false
-          if (!expired) pmHostData = await resolveHostFamily(pmEvent.host_family_id)
+
+        // Try signup auto-fill first
+        const pmSignup = etSignupLinks["monthly_prayer"]
+        if (pmSignup && pmDate) {
+          const pmAutoFill = await resolveSignupAutoFill(pmSignup.formId, pmSignup.fieldMap, pmDate)
+          if (pmAutoFill.source === "signup") {
+            pmHostData = {
+              hostName: pmAutoFill.hostName ?? "TBD",
+              address: pmAutoFill.address ?? "TBD",
+              city: pmAutoFill.city ?? "",
+              phone: pmAutoFill.phone ?? "",
+            }
+            autoFills["prayer_meeting"] = pmAutoFill
+          }
+        }
+
+        // Fall back to event/instance host
+        if (pmHostData.hostName === "TBD") {
+          if (pmInstance?.host_family_id) {
+            pmHostData = await resolveHostFamily(pmInstance.host_family_id)
+          } else if (pmEvent?.host_family_id) {
+            const expired = pmEvent.host_until ? new Date(pmEvent.host_until + "T23:59:59") < new Date() : false
+            if (!expired) pmHostData = await resolveHostFamily(pmEvent.host_family_id)
+          }
         }
         if (pmInstance?.location_override) pmHostData.address = pmInstance.location_override
 
@@ -1399,6 +1456,7 @@ export default function DashboardPage() {
         customDispInfo[ct.id] = { status: dStatus, count: dCount, lastSentAt: lastSent }
       }
       setCustomDispatches(customDispInfo)
+      setSignupAutoFills(autoFills)
     } catch (err) {
       console.error("Dashboard fetch error:", err)
       setError(
@@ -2593,6 +2651,7 @@ export default function DashboardPage() {
                 sendCount={dispatchCounts[type]}
                 additionalRecipients={commOptions[type].additionalRecipients}
                 onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, [type]: { ...prev[type], additionalRecipients: v } }))}
+                autoFilledFrom={signupAutoFills[type]?.formTitle ?? null}
               >
                 {editForms[type]}
               </WeeklyCommunicationCard>
