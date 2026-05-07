@@ -1556,8 +1556,10 @@ export default function DashboardPage() {
   // If dispatched/queued, show the exact HTML that was sent/queued.
   // Otherwise show the live-computed preview for editing.
   function getPreview(type: CommType): string | null {
+    // Always show live preview from current form state — dispatch HTML is only for "View Sent Email"
     const d = dispatches[type]
-    if (d?.body_html && (d.status === "pending" || d.status === "previewed" || d.status === "approved" || d.status === "sending" || d.status === "sent")) {
+    if (d?.body_html && (d.status === "pending" || d.status === "previewed" || d.status === "approved" || d.status === "sending")) {
+      // Only use dispatch HTML for queued/pending items (not yet sent, form isn't editable)
       return d.body_html
     }
     switch (type) {
