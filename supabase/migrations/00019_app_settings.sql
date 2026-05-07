@@ -11,5 +11,5 @@ CREATE POLICY app_settings_admin ON app_settings
     FOR ALL USING (get_user_role() IN ('super_admin', 'admin'))
     WITH CHECK (get_user_role() IN ('super_admin', 'admin'));
 
--- Seed the ESV API key
-INSERT INTO app_settings (key, value) VALUES ('esv_api_key', '268ce61e1bd8de2663e580630ea42225b5d46348');
+-- ESV API key should be set via Settings → Integrations
+INSERT INTO app_settings (key, value) VALUES ('esv_api_key', '');
