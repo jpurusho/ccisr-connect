@@ -7,6 +7,9 @@ export interface SignupFormTheme {
   emoji?: string
   headerTitle?: string
   headerSubtitle?: string
+  verse?: string
+  verseRef?: string
+  verseBgColor?: string
 }
 
 export function getThemeColors(theme: SignupFormTheme): CardColors {

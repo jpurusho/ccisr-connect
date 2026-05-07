@@ -223,8 +223,28 @@ export default function PublicSignupPage() {
           )}
         </div>
 
+        {/* Bible verse / quote */}
+        {form.theme.verse && (
+          <div
+            className="border border-t-0 px-5 py-4 text-center"
+            style={{
+              backgroundColor: form.theme.verseBgColor || colors.bgLight,
+              borderColor: colors.border,
+            }}
+          >
+            <p className="text-sm italic leading-relaxed" style={{ color: colors.textDark }}>
+              &ldquo;{form.theme.verse}&rdquo;
+            </p>
+            {form.theme.verseRef && (
+              <p className="mt-1.5 text-xs font-medium" style={{ color: colors.primary }}>
+                — {form.theme.verseRef}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Form */}
-        <form onSubmit={handleSubmit} className="rounded-b-xl border border-t-0 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className={`${form.theme.verse ? "border border-t-0" : "rounded-b-xl border border-t-0"} bg-white p-6 shadow-sm rounded-b-xl`}>
           {/* Honeypot - hidden from humans */}
           <div className="absolute -left-[9999px]" aria-hidden="true">
             <input type="text" id="__hp_website" name="website" tabIndex={-1} autoComplete="off" />
