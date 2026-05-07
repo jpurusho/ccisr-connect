@@ -99,38 +99,28 @@ export async function POST(req: NextRequest) {
     if (nameField) {
       const nameVal = sanitized[nameField.id]
       if (typeof nameVal === "string" && nameVal) {
-        const { data: existing } = await supabase
-          .from("signup_responses")
-          .select("id")
-          .eq("form_id", formId)
-          .limit(1)
-
-        const isDup = (existing ?? []).some((r) => {
-          const rData = r as unknown as { id: string }
-          return rData.id
-        })
-
-        // Check by querying with the name hash in data
         const { count: dupCount } = await supabase
           .from("signup_responses")
           .select("*", { count: "exact", head: true })
           .eq("form_id", formId)
           .contains("data", { [nameField.id]: nameVal })
 
-        if ((dupCount ?? 0) > 0 && !isDup) {
+        if ((dupCount ?? 0) > 0) {
           return NextResponse.json({ error: "You have already signed up for this event" }, { status: 409 })
         }
       }
     }
   }
 
-  // Insert response
+  // Insert response — use validated data + preserve member ID
+  const memberId = (sanitized._memberId as string) || null
+  const validatedData = { ...result.data, _memberId: memberId ? memberId : undefined }
   const { error: insertErr } = await supabase
     .from("signup_responses")
     .insert({
       form_id: formId,
-      member_id: (sanitized._memberId as string) || null,
-      data: sanitized,
+      member_id: memberId,
+      data: validatedData,
       ip_hash: ipHash,
     })
 

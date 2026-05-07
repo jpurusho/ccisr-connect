@@ -336,16 +336,21 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
     }
   }
 
-  async function doRemove(responseId: string) {
+  async function doRemove(responseId: string, phoneLast4?: string) {
     setRemoving(responseId)
     setVerifyTarget(null)
     try {
       const res = await fetch("/api/signup/remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ responseId, formId }),
+        body: JSON.stringify({ responseId, formId, phoneLast4 }),
       })
-      if (res.ok) onRemoved(responseId)
+      if (res.ok) {
+        onRemoved(responseId)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || "Failed to remove")
+      }
     } finally {
       setRemoving(null)
     }
@@ -355,7 +360,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
     if (!verifyTarget) return
     const clean = (s: string) => s.replace(/\D/g, "").slice(-4)
     if (clean(verifyPhone) === clean(verifyTarget.phone)) {
-      doRemove(verifyTarget.id)
+      doRemove(verifyTarget.id, clean(verifyPhone))
     } else {
       alert("Phone number doesn't match. Please enter the last 4 digits of the phone used to sign up.")
     }
