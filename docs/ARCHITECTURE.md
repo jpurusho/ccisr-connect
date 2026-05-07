@@ -1,8 +1,85 @@
-# CCISR Connect — Architecture Assessment
+# CCISR Connect — Architecture
 
-**Version:** 1.35.2
-**Date:** 2026-05-01
+**Version:** 1.43.1
+**Date:** 2026-05-07
 **Status:** Production (single-church deployment)
+
+---
+
+## End-to-End Stack
+
+CCISR Connect is a 2-tier web application: a React client running on Vercel that talks directly to a Supabase (Postgres) backend. Next.js serverless functions act as a lightweight API gateway for operations that require server trust or secrets.
+
+### Layer 1: Browser (React 19 + Next.js Client Components)
+
+- Renders all UI (dashboard, calendar, forms, settings)
+- Holds application state (card form data, navigation, editing)
+- Runs business logic (card HTML builders, interpolation, recurrence calculations)
+- Talks directly to Supabase for most CRUD (members, families, events, templates)
+- Uses Supabase auth session (JWT in cookie)
+
+### Layer 2: Vercel (Next.js 16 on Edge/Serverless)
+
+**a) Static hosting + CDN** — serves built JS/CSS/HTML bundles globally. Pages like `/login`, `/signups`, `/members` are pre-rendered shells that hydrate on the client.
+
+**b) Middleware** (runs at the edge on every request):
+- Refreshes the Supabase auth session (cookie → JWT)
+- Redirects unauthenticated users away from protected routes
+- Allows PUBLIC_ROUTES (`/signup/*`, `/api/signup/*`) through without auth
+
+**c) API Routes** (serverless functions, `/api/*`):
+
+| Route | Purpose |
+|-------|---------|
+| `/api/signup/submit` | Validates + rate-limits public form submissions (uses service role to bypass RLS) |
+| `/api/signup/member-lookup` | Exposes member autocomplete to public forms (masked data) |
+| `/api/signup/remove` | Phone verification for self-removal |
+| `/api/bible` | Proxies ESV API (keeps the key server-side) |
+| `/api/cron/send-scheduled` | Daily cron that fires queued emails via SMTP |
+
+These exist because the client either lacks permission (no service role key in browser) or the logic needs secrets/server trust.
+
+### Layer 3: Supabase (Postgres + Auth)
+
+**Auth** — handles login/signup, issues JWTs, manages sessions. Vercel middleware refreshes these.
+
+**Database (Postgres)** — all persistent state:
+
+| Domain | Tables |
+|--------|--------|
+| People | `families`, `members`, `addresses` |
+| Scheduling | `events`, `event_instances`, `event_types` |
+| Email | `email_templates`, `composed_instances`, `dispatch_queue` |
+| Signup forms | `signup_forms`, `signup_responses`, `signup_rate_limits` |
+| System | `audit_log`, `app_settings`, `mailing_lists`, `smtp_configs` |
+
+**RLS (Row Level Security)** — every table has policies like "only admin/super_admin can read/write". The browser's JWT carries the user role, and Postgres enforces it. The client queries tables directly without needing a backend to gatekeep.
+
+**`get_user_role()` function** — a Postgres function that extracts role from the JWT claims, used in all RLS policies.
+
+### Layer 4: External Services
+
+| Service | Purpose |
+|---------|---------|
+| SMTP servers (configured in `smtp_configs` table) | Nodemailer sends emails from the cron API route |
+| ESV API (api.esv.org) | Bible verse lookup, proxied through `/api/bible` |
+
+### Typical Request Flows
+
+| Action | Flow |
+|--------|------|
+| Admin loads dashboard | Browser → Supabase (direct, with JWT) |
+| Admin sends email | Browser → `/api/dispatch` or cron → SMTP server |
+| Public user submits signup | Browser → `/api/signup/submit` → Supabase (service role) |
+| Auth check on page load | Browser → Vercel middleware → Supabase Auth (session refresh) |
+| Verse lookup | Browser → `/api/bible` → ESV API |
+
+### Key Architectural Consequences
+
+- **Business logic lives in the client** (card builders, compose logic, form validation) rather than in a server layer
+- **The DB is mostly a dumb store** with RLS as the security boundary
+- **No dedicated backend service** — Next.js edge/serverless functions fill that role only when needed
+- **Client bundle carries more weight** since it handles rendering, state, and logic
 
 ---
 
@@ -19,13 +96,15 @@ CCISR Connect is a church membership management and communication platform servi
 | **Members** | Member/family CRUD, tags, import/export, demographics | `members/` |
 | **Templates** | Base email template defaults (body, subject, theme) | `templates/page.tsx` |
 | **Dispatch** | Read-only outbox — view queued/sent/failed emails | `dispatch/page.tsx` |
+| **Signups** | Public form builder for event signups (hosting, volunteering, RSVPs) | `signups/page.tsx` |
+| **Settings** | SMTP, users, integrations (ESV API key) | `settings/` |
 
 ### Data Flow
 
 ```
 Templates (base defaults)
     ↓
-Dashboard (compose weekly email using template + live data)
+Dashboard (compose weekly email using template + live data + signup auto-fill)
     ↓
 Composed Instances (saved drafts, per-week)
     ↓
@@ -46,6 +125,20 @@ event_instances table (per-date overrides: host, time, location, notes, status)
 getOccurrences() resolves dates for any week range
     ↓
 Dashboard consumes resolved dates + instance overrides for email composition
+```
+
+### Signup → Card Auto-Fill Flow
+
+```
+Public signup form (user signs up for a hosting month)
+    ↓
+signup_responses table (form_id, data JSONB with member/address/month)
+    ↓
+event_types.linked_signup_form_id + signup_field_map
+    ↓
+resolveSignupAutoFill() matches current month → extracts host/address
+    ↓
+Dashboard card auto-populates (with visual "linked form" indicator)
 ```
 
 ---
