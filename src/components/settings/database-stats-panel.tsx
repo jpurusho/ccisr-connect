@@ -64,6 +64,9 @@ const TABLE_DESCRIPTIONS: Record<string, string> = {
   smtp_configs: "SMTP account configs",
   app_users: "Application users",
   audit_log: "Activity audit trail",
+  signup_forms: "Public signup form definitions",
+  signup_responses: "Signup form submissions",
+  signup_rate_limits: "Signup rate limit tracking",
 }
 
 export function DatabaseStatsPanel() {
