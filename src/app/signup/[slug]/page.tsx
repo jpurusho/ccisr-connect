@@ -26,6 +26,7 @@ interface FormData {
   fields: SignupFieldConfig[]
   visibility: string
   member_autocomplete: boolean
+  show_responses?: boolean
 }
 
 interface MemberResult {
@@ -302,8 +303,8 @@ export default function PublicSignupPage() {
             ))}
           </div>
 
-          {/* Signed up list — inline within form */}
-          {form.visibility === "public_link" && responses.length > 0 && (
+          {/* Signed up list — inline within form (only if show_responses enabled) */}
+          {form.show_responses !== false && form.visibility === "public_link" && responses.length > 0 && (
             <SignupList
               responses={responses}
               fields={form.fields}

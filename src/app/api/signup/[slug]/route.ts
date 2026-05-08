@@ -18,7 +18,7 @@ export async function GET(
 
   const { data: form } = await supabase
     .from("signup_forms")
-    .select("id, title, description, theme, fields, status, visibility, member_autocomplete, duration_type, event_date, target_month, target_year, start_date, end_date, max_submissions")
+    .select("id, title, description, theme, fields, status, visibility, member_autocomplete, show_responses, duration_type, event_date, target_month, target_year, start_date, end_date, max_submissions")
     .eq("slug", slug)
     .single()
 
@@ -46,9 +46,10 @@ export async function GET(
     }
   }
 
-  // Fetch responses if visibility is public
+  // Fetch responses if visibility is public and show_responses is enabled
+  const showResponses = form.show_responses !== false
   let responses: { id: string; data: Record<string, unknown>; created_at: string }[] = []
-  if (form.visibility === "public_link") {
+  if (form.visibility === "public_link" && showResponses) {
     const { data: resps } = await supabase
       .from("signup_responses")
       .select("id, data, created_at")
@@ -68,6 +69,7 @@ export async function GET(
       fields: form.fields,
       visibility: form.visibility,
       member_autocomplete: form.member_autocomplete,
+      show_responses: showResponses,
     },
     responses,
     responseCount: responses.length,

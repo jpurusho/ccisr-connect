@@ -76,6 +76,7 @@ interface FormRow {
   member_autocomplete: boolean
   max_submissions: number | null
   allow_duplicates: boolean
+  show_responses: boolean
   rate_limit_per_hour: number | null
   created_at: string
   response_count?: number
@@ -109,7 +110,7 @@ export default function SignupsPage() {
     const supabase = createClient()
     const { data: formsData } = await supabase
       .from("signup_forms")
-      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, rate_limit_per_hour, created_at")
+      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, show_responses, rate_limit_per_hour, created_at")
       .order("created_at", { ascending: false })
 
     if (formsData) {
@@ -343,6 +344,7 @@ function FormDialog({
   const [memberAutocomplete, setMemberAutocomplete] = useState(false)
   const [maxSubmissions, setMaxSubmissions] = useState<string>("")
   const [allowDuplicates, setAllowDuplicates] = useState(false)
+  const [showResponses, setShowResponses] = useState(true)
   const [rateLimitPerHour, setRateLimitPerHour] = useState<string>("10")
   const [primaryColor, setPrimaryColor] = useState("#7C3AED")
   const [emoji, setEmoji] = useState("")
@@ -368,6 +370,7 @@ function FormDialog({
       setMemberAutocomplete(editForm.member_autocomplete)
       setMaxSubmissions(editForm.max_submissions ? String(editForm.max_submissions) : "")
       setAllowDuplicates(editForm.allow_duplicates)
+      setShowResponses(editForm.show_responses ?? true)
       setRateLimitPerHour(editForm.rate_limit_per_hour ? String(editForm.rate_limit_per_hour) : "10")
       setPrimaryColor(editForm.theme.primaryColor || "#7C3AED")
       setEmoji(editForm.theme.emoji || "")
@@ -427,6 +430,7 @@ function FormDialog({
         member_autocomplete: memberAutocomplete,
         max_submissions: maxSubmissions ? parseInt(maxSubmissions, 10) : null,
         allow_duplicates: allowDuplicates,
+        show_responses: showResponses,
         rate_limit_per_hour: rateLimitPerHour ? parseInt(rateLimitPerHour, 10) : 10,
       }
 
@@ -612,6 +616,10 @@ function FormDialog({
             <div className="flex items-center gap-2">
               <Switch checked={allowDuplicates} onCheckedChange={setAllowDuplicates} id="allow-dup" />
               <Label htmlFor="allow-dup" className="text-xs">Allow Duplicates</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={showResponses} onCheckedChange={setShowResponses} id="show-resp" />
+              <Label htmlFor="show-resp" className="text-xs">Show Signups Publicly</Label>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Max Submissions</Label>
