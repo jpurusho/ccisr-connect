@@ -93,6 +93,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", errors }, { status: 422 })
   }
 
+  // Capacity check for claim_select fields
+  const claimFields = fields.filter((f) => f.type === "claim_select") as Extract<SignupFieldConfig, { type: "claim_select" }>[]
+  for (const cf of claimFields) {
+    const selectedItems = sanitized[cf.id]
+    if (!Array.isArray(selectedItems) || selectedItems.length === 0) continue
+
+    const predefinedValues = cf.options.map((o) => o.value)
+    const predefinedSelected = selectedItems.filter((item) => predefinedValues.includes(item as string))
+    if (predefinedSelected.length === 0) continue
+
+    const { data: existingResponses } = await supabase
+      .from("signup_responses")
+      .select("data")
+      .eq("form_id", formId)
+      .returns<{ data: Record<string, unknown> }[]>()
+
+    const claimCounts: Record<string, number> = {}
+    for (const r of existingResponses ?? []) {
+      const items = r.data[cf.id]
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          if (typeof item === "string") claimCounts[item] = (claimCounts[item] || 0) + 1
+        }
+      }
+    }
+
+    for (const item of predefinedSelected) {
+      const opt = cf.options.find((o) => o.value === item)
+      if (opt && (claimCounts[item as string] || 0) >= opt.capacity) {
+        return NextResponse.json(
+          { error: `"${opt.label}" is full (${opt.capacity}/${opt.capacity} claimed)` },
+          { status: 409 }
+        )
+      }
+    }
+  }
+
   // Duplicate check
   if (!form.allow_duplicates) {
     const nameField = fields.find((f) => f.type === "member_lookup" || f.type === "text")

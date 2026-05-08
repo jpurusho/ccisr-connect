@@ -628,6 +628,99 @@ function FieldRenderer({
         </div>
       )
 
+    case "claim_select": {
+      const selected = (value as string[]) || []
+      const claimCounts: Record<string, number> = {}
+      for (const r of responses) {
+        const items = r.data[field.id]
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if (typeof item === "string") claimCounts[item] = (claimCounts[item] || 0) + 1
+          }
+        }
+      }
+      const atMax = !!(field.maxSelections && selected.length >= field.maxSelections)
+      return (
+        <div className="space-y-1.5">
+          {labelEl}
+          <div className="space-y-1">
+            {field.options.map((opt) => {
+              const taken = claimCounts[opt.value] || 0
+              const full = taken >= opt.capacity
+              const checked = selected.includes(opt.value)
+              return (
+                <label key={opt.value} className={`flex items-center gap-2 text-sm ${full && !checked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={full && !checked || (atMax && !checked)}
+                    onChange={() => {
+                      if (checked) {
+                        onChange(selected.filter((v) => v !== opt.value))
+                      } else {
+                        onChange([...selected, opt.value])
+                      }
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <span>{opt.label}</span>
+                  <span className={`text-xs ${full ? "text-red-500" : "text-gray-400"}`}>
+                    ({taken}/{opt.capacity})
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+          {field.allowCustom && (
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="Add your own item..."
+                className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    const val = (e.target as HTMLInputElement).value.trim()
+                    if (val && !selected.includes(val) && !atMax) {
+                      onChange([...selected, val])
+                      ;(e.target as HTMLInputElement).value = ""
+                    }
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50"
+                onClick={(e) => {
+                  const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement
+                  const val = input?.value.trim()
+                  if (val && !selected.includes(val) && !atMax) {
+                    onChange([...selected, val])
+                    input.value = ""
+                  }
+                }}
+              >
+                Add
+              </button>
+            </div>
+          )}
+          {selected.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {selected.map((item) => (
+                <span key={item} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                  {item}
+                  <button type="button" onClick={() => onChange(selected.filter((v) => v !== item))} className="text-gray-400 hover:text-red-500">
+                    &times;
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {field.helpText && <p className="text-xs text-muted-foreground">{field.helpText}</p>}
+        </div>
+      )
+    }
+
     case "date":
       return (
         <div className="space-y-1.5">

@@ -821,6 +821,36 @@ function FieldEditor({
         />
       )}
 
+      {field.type === "claim_select" && (
+        <div className="space-y-2">
+          <ClaimOptionsEditor
+            options={field.options}
+            onChange={(opts) => onUpdate({ options: opts } as Partial<SignupFieldConfig>)}
+          />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={field.allowCustom}
+                onCheckedChange={(v) => onUpdate({ allowCustom: v } as Partial<SignupFieldConfig>)}
+                id={`allow-custom-${field.id}`}
+              />
+              <Label htmlFor={`allow-custom-${field.id}`} className="text-[10px]">Allow Custom Items</Label>
+            </div>
+            <div className="flex items-center gap-1">
+              <Label className="text-[10px] text-muted-foreground">Max picks</Label>
+              <Input
+                type="number"
+                value={field.maxSelections ?? ""}
+                onChange={(e) => onUpdate({ maxSelections: e.target.value ? parseInt(e.target.value, 10) : undefined } as Partial<SignupFieldConfig>)}
+                className="h-6 text-xs w-14"
+                placeholder="∞"
+                min={1}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {field.type === "text" && (
         <div className="flex items-center gap-2">
           <Label className="text-[10px] text-muted-foreground">Max length</Label>
@@ -934,6 +964,67 @@ function OptionsEditor({
         className="text-[10px] text-primary hover:underline"
       >
         + Add option
+      </button>
+    </div>
+  )
+}
+
+// ── Claim Options Editor (for claim_select) ──────────────────────────────────
+
+function ClaimOptionsEditor({
+  options,
+  onChange,
+}: {
+  options: { value: string; label: string; capacity: number }[]
+  onChange: (opts: { value: string; label: string; capacity: number }[]) => void
+}) {
+  function addOption() {
+    const num = options.length + 1
+    onChange([...options, { value: `item${num}`, label: `Item ${num}`, capacity: 2 }])
+  }
+
+  function removeOption(index: number) {
+    onChange(options.filter((_, i) => i !== index))
+  }
+
+  function updateOption(index: number, label: string) {
+    onChange(options.map((o, i) => i === index ? { value: label.toLowerCase().replace(/[^a-z0-9]+/g, "_") || o.value, label, capacity: o.capacity } : o))
+  }
+
+  function updateCapacity(index: number, cap: number) {
+    onChange(options.map((o, i) => i === index ? { ...o, capacity: Math.max(1, cap) } : o))
+  }
+
+  return (
+    <div className="space-y-1 pl-2 border-l-2 border-muted">
+      <p className="text-[10px] text-muted-foreground font-medium">Items (label + capacity)</p>
+      {options.map((opt, i) => (
+        <div key={i} className="flex items-center gap-1">
+          <Input
+            value={opt.label}
+            onChange={(e) => updateOption(i, e.target.value)}
+            className="h-6 text-xs flex-1"
+            placeholder="Item name"
+          />
+          <Input
+            type="number"
+            value={opt.capacity}
+            onChange={(e) => updateCapacity(i, parseInt(e.target.value) || 1)}
+            className="h-6 text-xs w-12"
+            min={1}
+            title="Capacity"
+          />
+          <button type="button" onClick={() => removeOption(i)} className="p-0.5 text-muted-foreground hover:text-destructive">
+            <X className="size-3" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addOption}
+        className="text-[10px] text-primary hover:underline"
+      >
+        + Add item
       </button>
     </div>
   )

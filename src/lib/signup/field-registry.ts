@@ -9,6 +9,7 @@ export type SignupFieldType =
   | "textarea"
   | "select"
   | "multi_select"
+  | "claim_select"
   | "date"
   | "month_picker"
   | "number"
@@ -59,6 +60,13 @@ export interface MultiSelectFieldConfig extends BaseFieldConfig {
   maxSelections?: number
 }
 
+export interface ClaimSelectFieldConfig extends BaseFieldConfig {
+  type: "claim_select"
+  options: { value: string; label: string; capacity: number }[]
+  allowCustom: boolean
+  maxSelections?: number
+}
+
 export interface DateFieldConfig extends BaseFieldConfig {
   type: "date"
   minDate?: string
@@ -98,6 +106,7 @@ export type SignupFieldConfig =
   | TextareaFieldConfig
   | SelectFieldConfig
   | MultiSelectFieldConfig
+  | ClaimSelectFieldConfig
   | DateFieldConfig
   | MonthPickerFieldConfig
   | NumberFieldConfig
@@ -121,6 +130,7 @@ export const FIELD_TYPE_META: FieldTypeMeta[] = [
   { type: "textarea", label: "Long Text", icon: "AlignLeft", description: "Multi-line text" },
   { type: "select", label: "Dropdown", icon: "ChevronDown", description: "Single choice from options" },
   { type: "multi_select", label: "Multi-Select", icon: "CheckSquare", description: "Multiple choices" },
+  { type: "claim_select", label: "Claim Items", icon: "ShoppingBag", description: "Items with capacity limits + custom" },
   { type: "date", label: "Date", icon: "Calendar", description: "Date picker" },
   { type: "month_picker", label: "Month", icon: "CalendarDays", description: "Pick a month" },
   { type: "number", label: "Number", icon: "Hash", description: "Numeric input" },
@@ -163,6 +173,11 @@ function fieldSchema(field: SignupFieldConfig): z.ZodTypeAny {
       let s = z.array(z.string().refine((v) => validValues.includes(v)))
       if (field.maxSelections) s = s.max(field.maxSelections)
       return field.required ? s.min(1, "Select at least one option") : s
+    }
+    case "claim_select": {
+      let s = z.array(z.string().min(1))
+      if (field.maxSelections) s = s.max(field.maxSelections)
+      return field.required ? s.min(1, "Select at least one item") : s
     }
     case "date":
       return field.required
@@ -224,6 +239,7 @@ export function getDefaultValue(field: SignupFieldConfig): unknown {
     case "member_lookup":
       return ""
     case "multi_select":
+    case "claim_select":
       return []
     case "month_picker":
     case "number":
@@ -252,6 +268,7 @@ export function createFieldConfig(type: SignupFieldType, order: number): SignupF
     case "textarea": return { ...base, type: "textarea", label: "Details" }
     case "select": return { ...base, type: "select", label: "Selection", options: [{ value: "option1", label: "Option 1" }] }
     case "multi_select": return { ...base, type: "multi_select", label: "Choices", options: [{ value: "option1", label: "Option 1" }] }
+    case "claim_select": return { ...base, type: "claim_select", label: "Bring an Item", options: [{ value: "item1", label: "Item 1", capacity: 2 }], allowCustom: true }
     case "date": return { ...base, type: "date", label: "Date" }
     case "month_picker": return { ...base, type: "month_picker", label: "Month" }
     case "number": return { ...base, type: "number", label: "Number" }
