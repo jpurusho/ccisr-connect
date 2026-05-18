@@ -1,0 +1,20 @@
+name: Organic Activity
+
+on:
+  schedule:
+    - cron: '3 8 * * *'     # 8:03 AM UTC daily
+    - cron: '44 19 * * *'   # 7:44 PM UTC daily
+  workflow_dispatch:
+
+jobs:
+  activity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simulate organic usage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          sleep $((RANDOM % 60))
+          python3 scripts/organic-activity.py
