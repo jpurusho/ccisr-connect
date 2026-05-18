@@ -20,9 +20,14 @@ jobs:
             echo "Secrets not configured"
             exit 1
           fi
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${SUPABASE_URL}/rest/v1/?select=" \
+          # Query PostgREST root (returns OpenAPI spec — always works with valid key)
+          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            "${SUPABASE_URL}/rest/v1/" \
             -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}")
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Accept: application/json")
           echo "Ping result: HTTP $HTTP_CODE"
-          [ "$HTTP_CODE" = "200" ] || exit 1
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Response: $(cat /tmp/response.txt | head -200)"
+            exit 1
+          fi
