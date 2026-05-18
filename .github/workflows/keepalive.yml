@@ -14,13 +14,13 @@ jobs:
       - name: Ping Supabase database
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
             echo "Secrets not configured"
             exit 1
           fi
-          # Query PostgREST root (returns OpenAPI spec — always works with valid key)
+          # Query PostgREST root (triggers DB activity, prevents pause)
           HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
             "${SUPABASE_URL}/rest/v1/" \
             -H "apikey: ${SUPABASE_KEY}" \
