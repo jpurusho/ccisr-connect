@@ -204,7 +204,7 @@ export default function TemplatesPage() {
   const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown>; styleSettings: TemplateStyleSettings } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
   const [newCustomStyleSettings, setNewCustomStyleSettings] = useState<TemplateStyleSettings>({})
-  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, footerVerseTextColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
+  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, bodyTextColor: undefined as string | undefined, headerTitleColor: undefined as string | undefined, headerSubtitleColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, footerVerseTextColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
 
   // Style settings per template type
   const [styleSettings, setStyleSettings] = useState<Record<string, TemplateStyleSettings>>({})
@@ -1202,7 +1202,7 @@ export default function TemplatesPage() {
                 {!creatingCustom && !editingCustom && (
                   <Button
                     onClick={() => {
-                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined, footerVerse: "", footerVerseBgColor: undefined, footerVerseTextColor: undefined, resourceLinks: [], customSections: [], flyerSections: [] })
+                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined, bodyTextColor: undefined, headerTitleColor: undefined, headerSubtitleColor: undefined, footerVerse: "", footerVerseBgColor: undefined, footerVerseTextColor: undefined, resourceLinks: [], customSections: [], flyerSections: [] })
                       setNewCustomStyleSettings({})
                       setCreatingCustom(true)
                     }}
@@ -1239,14 +1239,18 @@ export default function TemplatesPage() {
                       value={newCustom.title}
                       onChange={(e) => setNewCustom({ ...newCustom, title: e.target.value })}
                       placeholder="e.g., Easter Sunday Service"
+                      style={newCustom.headerTitleColor ? { color: newCustom.headerTitleColor } : undefined}
                     />
+                    <TextColorPicker value={newCustom.headerTitleColor} onChange={(c) => setNewCustom({ ...newCustom, headerTitleColor: c })} label="Text" />
                   </Field>
                   <Field label="Subtitle" htmlFor="nc-sub">
                     <Input
                       id="nc-sub"
                       value={newCustom.subtitle}
                       onChange={(e) => setNewCustom({ ...newCustom, subtitle: e.target.value })}
+                      style={newCustom.headerSubtitleColor ? { color: newCustom.headerSubtitleColor } : undefined}
                     />
+                    <TextColorPicker value={newCustom.headerSubtitleColor} onChange={(c) => setNewCustom({ ...newCustom, headerSubtitleColor: c })} label="Text" />
                     <VerseLookup onSelect={(text, ref) => setNewCustom({ ...newCustom, subtitle: `"${text}" — ${ref}` })} />
                   </Field>
                   <Field label="Header Emoji" htmlFor="nc-emoji" hint="Paste an emoji (e.g. 🤝 🙌 ⛪)">
@@ -1273,17 +1277,23 @@ export default function TemplatesPage() {
                       onChange={(e) => setNewCustom({ ...newCustom, body: e.target.value })}
                       className="min-h-24 transition-colors"
                       placeholder="Write the main content of the announcement..."
-                      style={newCustom.bodyBgColor ? {
-                        backgroundColor: newCustom.bodyBgColor,
-                        borderColor: PASTEL_BORDER_MAP[newCustom.bodyBgColor],
-                        boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.bodyBgColor]}50`,
-                      } : undefined}
+                      style={{
+                        ...(newCustom.bodyBgColor ? {
+                          backgroundColor: newCustom.bodyBgColor,
+                          borderColor: PASTEL_BORDER_MAP[newCustom.bodyBgColor],
+                          boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.bodyBgColor]}50`,
+                        } : {}),
+                        ...(newCustom.bodyTextColor ? { color: newCustom.bodyTextColor } : {}),
+                      }}
                     />
-                    <PastelColorPicker
-                      value={newCustom.bodyBgColor}
-                      onChange={(color) => setNewCustom({ ...newCustom, bodyBgColor: color })}
-                      extraPastels={newCustomStyleSettings.customPastels}
-                    />
+                    <div className="flex items-center gap-4">
+                      <PastelColorPicker
+                        value={newCustom.bodyBgColor}
+                        onChange={(color) => setNewCustom({ ...newCustom, bodyBgColor: color })}
+                        extraPastels={newCustomStyleSettings.customPastels}
+                      />
+                      <TextColorPicker value={newCustom.bodyTextColor} onChange={(c) => setNewCustom({ ...newCustom, bodyTextColor: c })} label="Text" />
+                    </div>
                   </Field>
                   <Field label="Footer Verse" htmlFor="nc-foot">
                     <Input
@@ -1336,8 +1346,11 @@ export default function TemplatesPage() {
                           subtitle: newCustom.subtitle,
                           emoji: newCustom.emoji || "📋",
                           primaryColor: newCustom.primaryColor || undefined,
+                          headerTitleColor: newCustom.headerTitleColor || undefined,
+                          headerSubtitleColor: newCustom.headerSubtitleColor || undefined,
                           body: newCustom.body,
                           bodyBgColor: newCustom.bodyBgColor || undefined,
+                          bodyTextColor: newCustom.bodyTextColor || undefined,
                           footerVerse: newCustom.footerVerse,
                           footerVerseBgColor: newCustom.footerVerseBgColor || undefined,
                           footerVerseTextColor: newCustom.footerVerseTextColor || undefined,

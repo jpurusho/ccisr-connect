@@ -165,14 +165,16 @@ interface CustomDashFormData extends BaseFormData {
   emoji: string
   body: string
   bodyBgColor?: string
+  bodyTextColor?: string
   flyerSections: FlyerSectionItem[]
 }
 
 function buildCustomDashPreview(form: CustomDashFormData, styleSettings?: TemplateStyleSettings): string {
   const style = buildStyleContext(styleSettings)
   const sz = style.sizes
+  const bodyColor = form.bodyTextColor || "#374151"
   const rawBodyHtml = form.body
-    ? `<p style="margin:0;font-size:${sz.body}px;line-height:1.6;white-space:pre-wrap;color:#374151">${form.body}</p>`
+    ? `<p style="margin:0;font-size:${sz.body}px;line-height:1.6;white-space:pre-wrap;color:${bodyColor}">${form.body}</p>`
     : ""
   return buildCustomCard({
     title: form.title || "Announcement",
