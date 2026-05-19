@@ -19,6 +19,7 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ImagePlus, Loader2, Plus, T
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 import { formatPhone } from "@/lib/utils"
+import { VerseLookup } from "@/components/shared/verse-lookup"
 import type { BirthdayEntry, AnniversaryEntry } from "@/lib/email/card-builder"
 import { PASTEL_BORDER_MAP } from "@/lib/email/card-builder"
 
@@ -446,21 +447,24 @@ export function CustomSectionsEditor({
                 ))}
               </div>
               {sec.entries.map((entry, eIdx) => (
-                <div key={eIdx} className="flex items-center gap-2">
-                  <Input
-                    placeholder="Role / label"
-                    value={entry.label}
-                    onChange={(e) => updateEntry(sIdx, eIdx, "label", e.target.value)}
-                    className="w-36"
-                  />
-                  <MemberSearchInput
-                    value={entry.name}
-                    onChange={(v) => updateEntry(sIdx, eIdx, "name", v)}
-                    placeholder="Member name"
-                  />
-                  <Button variant="ghost" size="icon-sm" onClick={() => removeEntry(sIdx, eIdx)}>
-                    <Trash2 className="size-3.5 text-muted-foreground" />
-                  </Button>
+                <div key={eIdx} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Role / label"
+                      value={entry.label}
+                      onChange={(e) => updateEntry(sIdx, eIdx, "label", e.target.value)}
+                      className="w-36"
+                    />
+                    <MemberSearchInput
+                      value={entry.name}
+                      onChange={(v) => updateEntry(sIdx, eIdx, "name", v)}
+                      placeholder="Member name or text"
+                    />
+                    <Button variant="ghost" size="icon-sm" onClick={() => removeEntry(sIdx, eIdx)}>
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                  <VerseLookup onSelect={(text, ref) => updateEntry(sIdx, eIdx, "name", `"${text}" — ${ref}`)} />
                 </div>
               ))}
               <Button variant="outline" size="sm" onClick={() => addEntry(sIdx)}>
@@ -814,6 +818,7 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           onChange={(e) => onChange({ ...data, headerSubtitle: e.target.value })}
           placeholder="Christ Church of India, San Ramon"
         />
+        <VerseLookup onSelect={(text, ref) => onChange({ ...data, headerSubtitle: `"${text}" — ${ref}` })} />
       </Field>
       <Field label="Footer Verse / Text" htmlFor={`${idPrefix}-fv`}>
         <Input
@@ -831,6 +836,7 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           value={data.footerVerseBgColor}
           onChange={(color) => onChange({ ...data, footerVerseBgColor: color })}
         />
+        <VerseLookup onSelect={(text, ref) => onChange({ ...data, footerVerse: `"${text}" — ${ref}` })} />
       </Field>
       <Field label="Primary Color" htmlFor={`${idPrefix}-color`}>
         <div className="flex items-center gap-2">
