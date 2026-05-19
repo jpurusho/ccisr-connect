@@ -58,7 +58,7 @@ import {
   TEMPLATE_PLACEHOLDERS,
 } from "@/lib/template-defaults"
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
-import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, PastelColorPicker, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
+import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, PastelColorPicker, TextColorPicker, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
 import { TemplateStyleEditor } from "@/components/dashboard/template-style-editor"
 import { VerseLookup } from "@/components/shared/verse-lookup"
 import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-builder"
@@ -204,7 +204,7 @@ export default function TemplatesPage() {
   const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown>; styleSettings: TemplateStyleSettings } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
   const [newCustomStyleSettings, setNewCustomStyleSettings] = useState<TemplateStyleSettings>({})
-  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
+  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, footerVerseTextColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[] })
 
   // Style settings per template type
   const [styleSettings, setStyleSettings] = useState<Record<string, TemplateStyleSettings>>({})
@@ -665,11 +665,14 @@ export default function TemplatesPage() {
                           value={birthdayData.footerVerse || ""}
                           onChange={(e) => setBirthdayData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
-                        <PastelColorPicker
-                          value={birthdayData.footerVerseBgColor}
-                          onChange={(color) => setBirthdayData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
+                        <div className="flex items-center gap-4">
+                          <PastelColorPicker
+                            value={birthdayData.footerVerseBgColor}
+                            onChange={(color) => setBirthdayData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                            extraPastels={styleSettings[tab.name]?.customPastels}
+                          />
+                          <TextColorPicker value={birthdayData.footerVerseTextColor} onChange={(c) => setBirthdayData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
+                        </div>
                         <VerseLookup onSelect={(text, ref) => setBirthdayData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
                       <CommonTemplateFields data={birthdayData} onChange={setBirthdayData} />
@@ -698,11 +701,14 @@ export default function TemplatesPage() {
                           value={anniversaryData.footerVerse || ""}
                           onChange={(e) => setAnniversaryData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
-                        <PastelColorPicker
-                          value={anniversaryData.footerVerseBgColor}
-                          onChange={(color) => setAnniversaryData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
+                        <div className="flex items-center gap-4">
+                          <PastelColorPicker
+                            value={anniversaryData.footerVerseBgColor}
+                            onChange={(color) => setAnniversaryData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                            extraPastels={styleSettings[tab.name]?.customPastels}
+                          />
+                          <TextColorPicker value={anniversaryData.footerVerseTextColor} onChange={(c) => setAnniversaryData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
+                        </div>
                         <VerseLookup onSelect={(text, ref) => setAnniversaryData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
                       <CommonTemplateFields data={anniversaryData} onChange={setAnniversaryData} />
@@ -756,11 +762,14 @@ export default function TemplatesPage() {
                           value={bibleStudyData.footerVerse || ""}
                           onChange={(e) => setBibleStudyData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
-                        <PastelColorPicker
-                          value={bibleStudyData.footerVerseBgColor}
-                          onChange={(color) => setBibleStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
+                        <div className="flex items-center gap-4">
+                          <PastelColorPicker
+                            value={bibleStudyData.footerVerseBgColor}
+                            onChange={(color) => setBibleStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                            extraPastels={styleSettings[tab.name]?.customPastels}
+                          />
+                          <TextColorPicker value={bibleStudyData.footerVerseTextColor} onChange={(c) => setBibleStudyData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
+                        </div>
                         <VerseLookup onSelect={(text, ref) => setBibleStudyData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
 
@@ -941,11 +950,14 @@ export default function TemplatesPage() {
                           value={womensStudyData.footerVerse || ""}
                           onChange={(e) => setWomensStudyData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
-                        <PastelColorPicker
-                          value={womensStudyData.footerVerseBgColor}
-                          onChange={(color) => setWomensStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
+                        <div className="flex items-center gap-4">
+                          <PastelColorPicker
+                            value={womensStudyData.footerVerseBgColor}
+                            onChange={(color) => setWomensStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                            extraPastels={styleSettings[tab.name]?.customPastels}
+                          />
+                          <TextColorPicker value={womensStudyData.footerVerseTextColor} onChange={(c) => setWomensStudyData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
+                        </div>
                         <VerseLookup onSelect={(text, ref) => setWomensStudyData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
 
@@ -1040,11 +1052,14 @@ export default function TemplatesPage() {
                           value={prayerMeetingData.footerVerse || ""}
                           onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
-                        <PastelColorPicker
-                          value={prayerMeetingData.footerVerseBgColor}
-                          onChange={(color) => setPrayerMeetingData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
+                        <div className="flex items-center gap-4">
+                          <PastelColorPicker
+                            value={prayerMeetingData.footerVerseBgColor}
+                            onChange={(color) => setPrayerMeetingData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                            extraPastels={styleSettings[tab.name]?.customPastels}
+                          />
+                          <TextColorPicker value={prayerMeetingData.footerVerseTextColor} onChange={(c) => setPrayerMeetingData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
+                        </div>
                         <VerseLookup onSelect={(text, ref) => setPrayerMeetingData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
                       <CommonTemplateFields data={prayerMeetingData} onChange={setPrayerMeetingData} />
@@ -1121,11 +1136,14 @@ export default function TemplatesPage() {
                           value={bulletinData.footerVerse || ""}
                           onChange={(e) => setBulletinData((prev) => ({ ...prev, footerVerse: e.target.value }))}
                         />
-                        <PastelColorPicker
-                          value={bulletinData.footerVerseBgColor}
-                          onChange={(color) => setBulletinData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
+                        <div className="flex items-center gap-4">
+                          <PastelColorPicker
+                            value={bulletinData.footerVerseBgColor}
+                            onChange={(color) => setBulletinData((prev) => ({ ...prev, footerVerseBgColor: color }))}
+                            extraPastels={styleSettings[tab.name]?.customPastels}
+                          />
+                          <TextColorPicker value={bulletinData.footerVerseTextColor} onChange={(c) => setBulletinData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
+                        </div>
                         <VerseLookup onSelect={(text, ref) => setBulletinData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
                       </Field>
                       <CommonTemplateFields data={bulletinData} onChange={setBulletinData} />
@@ -1184,7 +1202,7 @@ export default function TemplatesPage() {
                 {!creatingCustom && !editingCustom && (
                   <Button
                     onClick={() => {
-                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined, footerVerse: "", footerVerseBgColor: undefined, resourceLinks: [], customSections: [], flyerSections: [] })
+                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined, footerVerse: "", footerVerseBgColor: undefined, footerVerseTextColor: undefined, resourceLinks: [], customSections: [], flyerSections: [] })
                       setNewCustomStyleSettings({})
                       setCreatingCustom(true)
                     }}
@@ -1273,17 +1291,23 @@ export default function TemplatesPage() {
                       value={newCustom.footerVerse}
                       onChange={(e) => setNewCustom({ ...newCustom, footerVerse: e.target.value })}
                       placeholder="e.g., For God so loved the world... — John 3:16"
-                      style={newCustom.footerVerseBgColor ? {
-                        backgroundColor: newCustom.footerVerseBgColor,
-                        borderColor: PASTEL_BORDER_MAP[newCustom.footerVerseBgColor],
-                        boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.footerVerseBgColor]}50`,
-                      } : undefined}
+                      style={{
+                        ...(newCustom.footerVerseBgColor ? {
+                          backgroundColor: newCustom.footerVerseBgColor,
+                          borderColor: PASTEL_BORDER_MAP[newCustom.footerVerseBgColor],
+                          boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.footerVerseBgColor]}50`,
+                        } : {}),
+                        ...(newCustom.footerVerseTextColor ? { color: newCustom.footerVerseTextColor } : {}),
+                      }}
                     />
-                    <PastelColorPicker
-                      value={newCustom.footerVerseBgColor}
-                      onChange={(color) => setNewCustom({ ...newCustom, footerVerseBgColor: color })}
-                      extraPastels={newCustomStyleSettings.customPastels}
-                    />
+                    <div className="flex items-center gap-4">
+                      <PastelColorPicker
+                        value={newCustom.footerVerseBgColor}
+                        onChange={(color) => setNewCustom({ ...newCustom, footerVerseBgColor: color })}
+                        extraPastels={newCustomStyleSettings.customPastels}
+                      />
+                      <TextColorPicker value={newCustom.footerVerseTextColor} onChange={(c) => setNewCustom({ ...newCustom, footerVerseTextColor: c })} label="Text" />
+                    </div>
                     <VerseLookup onSelect={(text, ref) => setNewCustom({ ...newCustom, footerVerse: `"${text}" — ${ref}` })} />
                   </Field>
                   <FlyerSectionsEditor
@@ -1316,6 +1340,7 @@ export default function TemplatesPage() {
                           bodyBgColor: newCustom.bodyBgColor || undefined,
                           footerVerse: newCustom.footerVerse,
                           footerVerseBgColor: newCustom.footerVerseBgColor || undefined,
+                          footerVerseTextColor: newCustom.footerVerseTextColor || undefined,
                           flyerSections: newCustom.flyerSections.filter((s) => s.imageUrl),
                           resourceLinks: newCustom.resourceLinks.filter((l) => l.url),
                           customSections: newCustom.customSections.filter((s) => s.title && s.entries.some((e) => e.name)),

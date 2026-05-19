@@ -23,11 +23,15 @@ export interface CustomSectionDefault {
 export interface CommonCardFields {
   message?: string
   messageBgColor?: string
+  messageTextColor?: string
   headerTitle?: string
+  headerTitleColor?: string
   headerSubtitle?: string
+  headerSubtitleColor?: string
   headerEmoji?: string
   footerVerse?: string
   footerVerseBgColor?: string
+  footerVerseTextColor?: string
   primaryColor?: string
   resourceLinks?: ResourceLinkDefault[]
   customSections?: CustomSectionDefault[]
@@ -76,24 +80,32 @@ export interface PrayerMeetingDefaults extends CommonCardFields {
 export function extractCommonFields(def: CommonCardFields): {
   message: string
   messageBgColor: string | undefined
+  messageTextColor: string | undefined
   headerTitle: string
+  headerTitleColor: string | undefined
   headerSubtitle: string
+  headerSubtitleColor: string | undefined
   headerEmoji: string
   primaryColor: string
   footerVerse: string
   footerVerseBgColor: string | undefined
+  footerVerseTextColor: string | undefined
   resourceLinks: ResourceLinkDefault[]
   customSections: CustomSectionDefault[]
 } {
   return {
     message: def.message ?? "",
     messageBgColor: def.messageBgColor,
+    messageTextColor: def.messageTextColor,
     headerTitle: def.headerTitle ?? "",
+    headerTitleColor: def.headerTitleColor,
     headerSubtitle: def.headerSubtitle ?? "",
+    headerSubtitleColor: def.headerSubtitleColor,
     headerEmoji: def.headerEmoji ?? "",
     primaryColor: def.primaryColor ?? "",
     footerVerse: def.footerVerse ?? "",
     footerVerseBgColor: def.footerVerseBgColor,
+    footerVerseTextColor: def.footerVerseTextColor,
     resourceLinks: (def.resourceLinks ?? []) as ResourceLinkDefault[],
     customSections: (def.customSections ?? []) as CustomSectionDefault[],
   }

@@ -758,12 +758,35 @@ export function FlyerSectionsEditor({
 interface CardStyleFieldsData {
   message: string
   messageBgColor?: string
+  messageTextColor?: string
   headerTitle: string
+  headerTitleColor?: string
   headerSubtitle: string
+  headerSubtitleColor?: string
   headerEmoji: string
   primaryColor: string
   footerVerse: string
   footerVerseBgColor?: string
+  footerVerseTextColor?: string
+}
+
+export function TextColorPicker({ value, onChange, label }: { value?: string; onChange: (v: string | undefined) => void; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 mt-1">
+      <span className="text-[10px] text-muted-foreground">{label}:</span>
+      <Input
+        type="color"
+        value={value || "#1E293B"}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-5 w-6 cursor-pointer rounded border-0 p-0"
+      />
+      {value && (
+        <button type="button" onClick={() => onChange(undefined)} className="text-[10px] text-muted-foreground hover:text-foreground">
+          reset
+        </button>
+      )}
+    </div>
+  )
 }
 
 export function CardStyleFields<T extends CardStyleFieldsData>({
@@ -784,16 +807,22 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           value={data.message}
           onChange={(e) => onChange({ ...data, message: e.target.value })}
           className="min-h-12 transition-colors"
-          style={data.messageBgColor ? {
-            backgroundColor: data.messageBgColor,
-            borderColor: PASTEL_BORDER_MAP[data.messageBgColor],
-            boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[data.messageBgColor]}50`,
-          } : undefined}
+          style={{
+            ...(data.messageBgColor ? {
+              backgroundColor: data.messageBgColor,
+              borderColor: PASTEL_BORDER_MAP[data.messageBgColor],
+              boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[data.messageBgColor]}50`,
+            } : {}),
+            ...(data.messageTextColor ? { color: data.messageTextColor } : {}),
+          }}
         />
-        <PastelColorPicker
-          value={data.messageBgColor}
-          onChange={(color) => onChange({ ...data, messageBgColor: color })}
-        />
+        <div className="flex items-center gap-4">
+          <PastelColorPicker
+            value={data.messageBgColor}
+            onChange={(color) => onChange({ ...data, messageBgColor: color })}
+          />
+          <TextColorPicker value={data.messageTextColor} onChange={(c) => onChange({ ...data, messageTextColor: c })} label="Text" />
+        </div>
       </Field>
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <Field label="Email Header Title (optional)" htmlFor={`${idPrefix}-htitle`}>
@@ -802,7 +831,9 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
             value={data.headerTitle}
             onChange={(e) => onChange({ ...data, headerTitle: e.target.value })}
             placeholder="Leave blank for default"
+            style={data.headerTitleColor ? { color: data.headerTitleColor } : undefined}
           />
+          <TextColorPicker value={data.headerTitleColor} onChange={(c) => onChange({ ...data, headerTitleColor: c })} label="Text" />
         </Field>
         <Field label="Emoji">
           <EmojiPickerInput
@@ -817,7 +848,11 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           value={data.headerSubtitle}
           onChange={(e) => onChange({ ...data, headerSubtitle: e.target.value })}
           placeholder="Christ Church of India, San Ramon"
+          style={data.headerSubtitleColor ? { color: data.headerSubtitleColor } : undefined}
         />
+        <div className="flex items-center gap-4">
+          <TextColorPicker value={data.headerSubtitleColor} onChange={(c) => onChange({ ...data, headerSubtitleColor: c })} label="Text" />
+        </div>
         <VerseLookup onSelect={(text, ref) => onChange({ ...data, headerSubtitle: `"${text}" — ${ref}` })} />
       </Field>
       <Field label="Footer Verse / Text" htmlFor={`${idPrefix}-fv`}>
@@ -826,16 +861,22 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
           value={data.footerVerse}
           onChange={(e) => onChange({ ...data, footerVerse: e.target.value })}
           placeholder="Christ Church of India, San Ramon"
-          style={data.footerVerseBgColor ? {
-            backgroundColor: data.footerVerseBgColor,
-            borderColor: PASTEL_BORDER_MAP[data.footerVerseBgColor],
-            boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[data.footerVerseBgColor]}50`,
-          } : undefined}
+          style={{
+            ...(data.footerVerseBgColor ? {
+              backgroundColor: data.footerVerseBgColor,
+              borderColor: PASTEL_BORDER_MAP[data.footerVerseBgColor],
+              boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[data.footerVerseBgColor]}50`,
+            } : {}),
+            ...(data.footerVerseTextColor ? { color: data.footerVerseTextColor } : {}),
+          }}
         />
-        <PastelColorPicker
-          value={data.footerVerseBgColor}
-          onChange={(color) => onChange({ ...data, footerVerseBgColor: color })}
-        />
+        <div className="flex items-center gap-4">
+          <PastelColorPicker
+            value={data.footerVerseBgColor}
+            onChange={(color) => onChange({ ...data, footerVerseBgColor: color })}
+          />
+          <TextColorPicker value={data.footerVerseTextColor} onChange={(c) => onChange({ ...data, footerVerseTextColor: c })} label="Text" />
+        </div>
         <VerseLookup onSelect={(text, ref) => onChange({ ...data, footerVerse: `"${text}" — ${ref}` })} />
       </Field>
       <Field label="Primary Color" htmlFor={`${idPrefix}-color`}>
@@ -863,12 +904,16 @@ export function CardStyleFields<T extends CardStyleFieldsData>({
 export interface BaseFormData {
   message: string
   messageBgColor?: string
+  messageTextColor?: string
   headerTitle: string
+  headerTitleColor?: string
   headerSubtitle: string
+  headerSubtitleColor?: string
   headerEmoji: string
   primaryColor: string
   footerVerse: string
   footerVerseBgColor?: string
+  footerVerseTextColor?: string
   resourceLinks: { label: string; url: string }[]
   customSections?: CustomSection[]
 }
