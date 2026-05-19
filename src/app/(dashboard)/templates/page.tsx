@@ -1229,6 +1229,7 @@ export default function TemplatesPage() {
                       value={newCustom.subtitle}
                       onChange={(e) => setNewCustom({ ...newCustom, subtitle: e.target.value })}
                     />
+                    <VerseLookup onSelect={(text, ref) => setNewCustom({ ...newCustom, subtitle: `"${text}" — ${ref}` })} />
                   </Field>
                   <Field label="Header Emoji" htmlFor="nc-emoji" hint="Paste an emoji (e.g. 🤝 🙌 ⛪)">
                     <Input
@@ -1283,6 +1284,7 @@ export default function TemplatesPage() {
                       onChange={(color) => setNewCustom({ ...newCustom, footerVerseBgColor: color })}
                       extraPastels={newCustomStyleSettings.customPastels}
                     />
+                    <VerseLookup onSelect={(text, ref) => setNewCustom({ ...newCustom, footerVerse: `"${text}" — ${ref}` })} />
                   </Field>
                   <FlyerSectionsEditor
                     sections={newCustom.flyerSections}
