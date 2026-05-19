@@ -18,8 +18,10 @@ import type {
   FontFamily,
   FontSizeScale,
   HeaderStyle,
+  HeaderGradient,
   SectionLayout,
 } from "@/lib/email/card-builder"
+import { HEADER_GRADIENTS } from "@/lib/email/card-builder"
 
 interface TemplateStyleEditorProps {
   value: TemplateStyleSettings
@@ -89,7 +91,7 @@ export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProp
       >
         {expanded ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
         Style & Appearance
-        {(value.fontFamily || value.headerStyle || value.sectionLayout || value.footerText) && (
+        {(value.fontFamily || value.headerStyle || value.sectionLayout || value.footerText || (value.headerGradient && value.headerGradient !== "none")) && (
           <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">customized</span>
         )}
       </button>
@@ -163,6 +165,60 @@ export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProp
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Header Gradient */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Header Background</p>
+            <div className="grid grid-cols-4 gap-1.5">
+              <button
+                type="button"
+                className={`rounded-md border p-1.5 text-center transition-all ${
+                  !value.headerGradient || value.headerGradient === "none"
+                    ? "border-primary ring-1 ring-primary/30"
+                    : "border-border hover:border-muted-foreground"
+                }`}
+                onClick={() => update({ headerGradient: "none", customGradientCss: undefined })}
+              >
+                <div className="mx-auto h-4 w-full rounded-sm bg-primary/70" />
+                <p className="text-[9px] mt-0.5">Solid</p>
+              </button>
+              {(Object.entries(HEADER_GRADIENTS) as [Exclude<HeaderGradient, "none" | "custom">, { label: string; css: string }][]).map(([key, g]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`rounded-md border p-1.5 text-center transition-all ${
+                    value.headerGradient === key
+                      ? "border-primary ring-1 ring-primary/30"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                  onClick={() => update({ headerGradient: key })}
+                >
+                  <div className="mx-auto h-4 w-full rounded-sm" style={{ background: g.css }} />
+                  <p className="text-[9px] mt-0.5">{g.label}</p>
+                </button>
+              ))}
+              <button
+                type="button"
+                className={`rounded-md border p-1.5 text-center transition-all ${
+                  value.headerGradient === "custom"
+                    ? "border-primary ring-1 ring-primary/30"
+                    : "border-border hover:border-muted-foreground"
+                }`}
+                onClick={() => update({ headerGradient: "custom" })}
+              >
+                <div className="mx-auto h-4 w-full rounded-sm bg-gradient-to-r from-gray-300 to-gray-500" />
+                <p className="text-[9px] mt-0.5">Custom</p>
+              </button>
+            </div>
+            {value.headerGradient === "custom" && (
+              <Input
+                value={value.customGradientCss ?? ""}
+                onChange={(e) => update({ customGradientCss: e.target.value })}
+                placeholder="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                className="h-7 text-xs font-mono"
+              />
+            )}
           </div>
 
           {/* Section Layout */}

@@ -30,10 +30,24 @@ export type FontSizeScale = "compact" | "default" | "large"
 export type HeaderStyle = "band" | "top-border" | "side-accent"
 export type SectionLayout = "table" | "paragraph" | "list"
 
+export type HeaderGradient = "none" | "sunset" | "ocean" | "forest" | "lavender" | "warm" | "midnight" | "rose" | "custom"
+
+export const HEADER_GRADIENTS: Record<Exclude<HeaderGradient, "none" | "custom">, { label: string; css: string; preview: string }> = {
+  sunset: { label: "Sunset", css: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", preview: "#f5576c" },
+  ocean: { label: "Ocean", css: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", preview: "#667eea" },
+  forest: { label: "Forest", css: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)", preview: "#11998e" },
+  lavender: { label: "Lavender", css: "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)", preview: "#a18cd1" },
+  warm: { label: "Warm", css: "linear-gradient(135deg, #f6d365 0%, #fda085 100%)", preview: "#fda085" },
+  midnight: { label: "Midnight", css: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)", preview: "#2c5364" },
+  rose: { label: "Rose", css: "linear-gradient(135deg, #ee9ca7 0%, #ffdde1 100%)", preview: "#ee9ca7" },
+}
+
 export interface TemplateStyleSettings {
   fontFamily?: FontFamily
   fontSizeScale?: FontSizeScale
   headerColor?: string
+  headerGradient?: HeaderGradient
+  customGradientCss?: string
   customPastels?: { bg: string; border: string; label: string }[]
   sectionLayout?: SectionLayout
   headerStyle?: HeaderStyle
@@ -49,6 +63,7 @@ export interface StyleContext {
   darkMode: boolean
   footerText?: string
   customPastels?: { bg: string; border: string }[]
+  headerGradientCss?: string
 }
 
 export const FONT_STACKS: Record<FontFamily, string> = {
@@ -66,6 +81,14 @@ export const SIZE_SCALES: Record<FontSizeScale, { header: number; body: number; 
 
 export function buildStyleContext(settings?: TemplateStyleSettings): StyleContext {
   const s = settings ?? {}
+  let headerGradientCss: string | undefined
+  if (s.headerGradient && s.headerGradient !== "none") {
+    if (s.headerGradient === "custom") {
+      headerGradientCss = s.customGradientCss
+    } else {
+      headerGradientCss = HEADER_GRADIENTS[s.headerGradient]?.css
+    }
+  }
   return {
     fontStack: FONT_STACKS[s.fontFamily ?? "sans-serif"],
     sizes: SIZE_SCALES[s.fontSizeScale ?? "default"],
@@ -74,6 +97,7 @@ export function buildStyleContext(settings?: TemplateStyleSettings): StyleContex
     darkMode: s.darkModeEnabled ?? false,
     footerText: s.footerText,
     customPastels: s.customPastels,
+    headerGradientCss,
   }
 }
 
@@ -383,7 +407,10 @@ function headerRow(
 </td></tr>`;
   }
 
-  return `<tr><td style="background:${colors.primary};padding:24px 28px;text-align:center">
+  const bgStyle = style?.headerGradientCss
+    ? `background-color:${colors.primary};background:${style.headerGradientCss}`
+    : `background:${colors.primary}`;
+  return `<tr><td style="${bgStyle};padding:24px 28px;text-align:center">
 <p style="margin:0;font-size:32px;line-height:1">${emoji}</p>
 <p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:${titleColor || "#ffffff"};letter-spacing:-0.3px">${title}</p>
 <p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:${subtitleColor || "rgba(255,255,255,0.85)"};font-weight:500">${subtitle}</p>
@@ -786,7 +813,10 @@ export function buildBulletinCard(data: BulletinCardData, style?: StyleContext):
 
   const bulletinEmoji = data.headerEmoji || "⛪";
   const bulletinTitle = data.headerTitle || "Weekly Bulletin";
-  const bulletinHeader = `<tr><td style="background:${colors.primary};padding:24px 28px;text-align:center">
+  const bulBgStyle = style?.headerGradientCss
+    ? `background-color:${colors.primary};background:${style.headerGradientCss}`
+    : `background:${colors.primary}`;
+  const bulletinHeader = `<tr><td style="${bulBgStyle};padding:24px 28px;text-align:center">
 <p style="margin:0;font-size:32px;line-height:1">${bulletinEmoji}</p>
 ${churchLine}<p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:${data.headerTitleColor || "#ffffff"};letter-spacing:-0.3px">${bulletinTitle}</p>
 <p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:${data.headerSubtitleColor || "rgba(255,255,255,0.85)"};font-weight:500">${data.weekLabel}</p>
@@ -829,9 +859,12 @@ export function buildCustomCard(data: CustomCardData, style?: StyleContext): str
   const effectiveSubtitle = data.headerSubtitle || data.subtitle;
   const effectiveEmoji = data.headerEmoji || data.emoji;
 
+  const customBgStyle = style?.headerGradientCss
+    ? `background-color:${colors.primary};background:${style.headerGradientCss}`
+    : `background:${colors.primary}`;
   const header = data.bannerImageUrl
     ? `<tr><td style="padding:0;line-height:0"><img src="${data.bannerImageUrl}" alt="${effectiveTitle}" style="width:100%;display:block;border-radius:12px 12px 0 0" /></td></tr>
-<tr><td style="background:${colors.primary};padding:12px 28px;text-align:center">
+<tr><td style="${customBgStyle};padding:12px 28px;text-align:center">
 <p style="margin:0;font-size:${sz.header - 2}px;font-weight:700;color:${data.headerTitleColor || "#ffffff"};letter-spacing:-0.3px">${effectiveTitle}</p>
 ${effectiveSubtitle ? `<p style="margin:4px 0 0;font-size:${sz.label}px;color:${data.headerSubtitleColor || "rgba(255,255,255,0.85)"};font-weight:500">${effectiveSubtitle}</p>` : ""}
 </td></tr>`
