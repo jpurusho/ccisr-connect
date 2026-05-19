@@ -1,7 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
+import { createClient } from "@/lib/supabase/client"
 import { statusLabel } from "@/lib/date-utils"
 import {
   Dialog,
@@ -15,6 +17,13 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   CalendarDays,
   Clock,
   MapPin,
@@ -27,7 +36,10 @@ import {
   Pencil,
   Trash2,
   Eye,
+  Loader2,
+  ExternalLink,
 } from "lucide-react"
+import { toast } from "sonner"
 import type { CalendarEvent } from "./types"
 
 interface EventDetailDialogProps {
@@ -38,6 +50,7 @@ interface EventDetailDialogProps {
   onEditInstance?: (event: CalendarEvent) => void
   onDelete?: (event: CalendarEvent) => void
   onViewDispatchEmail?: (event: CalendarEvent) => void
+  onDateUpdated?: () => void
 }
 
 const ET_TO_COMM: Record<string, string> = {
@@ -55,6 +68,104 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
 }
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+function daysInMonth(month: number): number {
+  return new Date(2024, month, 0).getDate()
+}
+
+function DateEditInline({ event, onSaved }: { event: CalendarEvent; onSaved: () => void }) {
+  const currentMonth = event.date.getMonth() + 1
+  const currentDay = event.date.getDate()
+  const [month, setMonth] = useState(currentMonth)
+  const [day, setDay] = useState(currentDay)
+  const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState(false)
+
+  const maxDay = daysInMonth(month)
+  const changed = month !== currentMonth || day !== currentDay
+
+  async function save() {
+    setSaving(true)
+    const supabase = createClient()
+
+    if (event.kind === "birthday" && event.memberId) {
+      const { error } = await supabase
+        .from("members")
+        .update({ birth_month: month, birth_day: day } as never)
+        .eq("id", event.memberId)
+      if (error) {
+        toast.error("Failed to update birthday")
+      } else {
+        toast.success("Birthday updated")
+        setEditing(false)
+        onSaved()
+      }
+    } else if (event.kind === "anniversary" && event.anniversaryId) {
+      const { error } = await supabase
+        .from("wedding_anniversaries")
+        .update({ anniversary_month: month, anniversary_day: day } as never)
+        .eq("id", event.anniversaryId)
+      if (error) {
+        toast.error("Failed to update anniversary")
+      } else {
+        toast.success("Anniversary updated")
+        setEditing(false)
+        onSaved()
+      }
+    }
+    setSaving(false)
+  }
+
+  if (!editing) {
+    return (
+      <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+        <Pencil className="size-3.5" />
+        Edit Date
+      </Button>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border p-3 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">Change date:</p>
+      <div className="flex items-center gap-2">
+        <Select value={String(month)} onValueChange={(v) => { setMonth(Number(v)); if (day > daysInMonth(Number(v))) setDay(daysInMonth(Number(v))) }}>
+          <SelectTrigger className="h-8 text-xs w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MONTHS.map((m, i) => (
+              <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={String(day)} onValueChange={(v) => setDay(Number(v))}>
+          <SelectTrigger className="h-8 text-xs w-16">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: maxDay }, (_, i) => (
+              <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="sm" className="h-7 text-xs" onClick={save} disabled={!changed || saving}>
+          {saving ? <Loader2 className="size-3 animate-spin" /> : "Save"}
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditing(false); setMonth(currentMonth); setDay(currentDay) }}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export function EventDetailDialog({
   event,
   open,
@@ -63,6 +174,7 @@ export function EventDetailDialog({
   onEditInstance,
   onDelete,
   onViewDispatchEmail,
+  onDateUpdated,
 }: EventDetailDialogProps) {
   if (!event) return null
 
@@ -213,6 +325,9 @@ export function EventDetailDialog({
               <p className="mt-0.5 text-sm text-purple-700 dark:text-purple-300">
                 {event.title} - {format(event.date, "MMMM d")}
               </p>
+              {event.memberId && (
+                <DateEditInline event={event} onSaved={() => onDateUpdated?.()} />
+              )}
             </div>
           )}
 
@@ -225,6 +340,9 @@ export function EventDetailDialog({
               <p className="mt-0.5 text-sm text-amber-700 dark:text-amber-300">
                 {event.title} - {format(event.date, "MMMM d")}
               </p>
+              {event.anniversaryId && (
+                <DateEditInline event={event} onSaved={() => onDateUpdated?.()} />
+              )}
             </div>
           )}
         </div>
@@ -270,6 +388,16 @@ export function EventDetailDialog({
                 {event.recurrenceRule ? "Edit Series" : "Edit"}
               </Button>
             </>
+          )}
+          {event.kind === "birthday" && event.memberId && (
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href={`/members/${event.memberId}`} />}
+            >
+              <ExternalLink className="size-3.5" />
+              View Member
+            </Button>
           )}
           {event.kind === "dispatch" && event.dispatchStatus === "sent" && onViewDispatchEmail && (
             <Button

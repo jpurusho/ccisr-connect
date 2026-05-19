@@ -414,6 +414,7 @@ export default function CalendarPage() {
           title: `${member.full_name}'s Birthday`,
           date: birthdayDate,
           color: "#9333ea", // purple-600
+          memberId: member.id,
         })
       }
     }
@@ -439,6 +440,7 @@ export default function CalendarPage() {
           title: `${husbandFirst} & ${wifeFirst}'s Anniversary`,
           date: annDate,
           color: "#d97706", // amber-600
+          anniversaryId: ann.id,
         })
       }
     }
@@ -747,6 +749,7 @@ export default function CalendarPage() {
         onEditInstance={handleEditInstance}
         onDelete={handleDeleteEvent}
         onViewDispatchEmail={handleViewDispatchEmail}
+        onDateUpdated={() => { setDialogOpen(false); fetchData() }}
       />
 
       {/* Event create/edit form dialog */}
