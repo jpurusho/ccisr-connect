@@ -46,6 +46,7 @@ import {
   shareCard,
   buildShareText,
 } from "@/lib/card-export"
+import { sanitizeHtml } from "@/lib/sanitize-html"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -524,7 +525,7 @@ export function WeeklyCommunicationCard({
           </DialogHeader>
           <div
             className="rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
-            dangerouslySetInnerHTML={{ __html: previewHtml ?? "" }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml ?? "") }}
           />
           <DialogFooter showCloseButton>
             {status === "draft" && (

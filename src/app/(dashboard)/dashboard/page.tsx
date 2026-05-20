@@ -88,6 +88,7 @@ import {
   type SmtpConfigOption,
 } from "@/components/dashboard/weekly-communication-card"
 import { logAudit } from "@/lib/audit"
+import { sanitizeHtml } from "@/lib/sanitize-html"
 import {
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
@@ -3069,7 +3070,7 @@ export default function DashboardPage() {
           </DialogHeader>
           <div
             className="rounded-lg border bg-white p-4 dark:bg-slate-900"
-            dangerouslySetInnerHTML={{ __html: sentEmailPreview?.html ?? "" }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(sentEmailPreview?.html ?? "") }}
           />
           <DialogFooter showCloseButton />
         </DialogContent>

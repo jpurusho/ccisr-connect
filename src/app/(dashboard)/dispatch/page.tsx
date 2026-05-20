@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
+import { sanitizeHtml } from "@/lib/sanitize-html"
 import type {
   DispatchQueue,
   DispatchStatus,
@@ -869,7 +870,7 @@ export default function DispatchQueuePage() {
 
               <div
                 className="rounded border bg-white p-4 text-black"
-                dangerouslySetInnerHTML={{ __html: previewItem.body_html }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewItem.body_html) }}
               />
             </>
           )}

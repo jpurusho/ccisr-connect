@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
+import { sanitizeHtml } from "@/lib/sanitize-html"
 import {
   Card,
   CardContent,
@@ -242,7 +243,7 @@ export default function HistoryPage() {
             <DialogTitle>Email Preview</DialogTitle>
             <DialogDescription>{previewSubject}</DialogDescription>
           </DialogHeader>
-          {previewHtml && <div className="rounded border bg-white p-4" dangerouslySetInnerHTML={{ __html: previewHtml }} />}
+          {previewHtml && <div className="rounded border bg-white p-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }} />}
         </DialogContent>
       </Dialog>
 

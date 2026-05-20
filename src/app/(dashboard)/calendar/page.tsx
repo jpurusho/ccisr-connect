@@ -46,6 +46,7 @@ import type {
   DispatchStatus,
 } from "@/types/database"
 import { logAudit } from "@/lib/audit"
+import { sanitizeHtml } from "@/lib/sanitize-html"
 import { toast } from "sonner"
 import {
   ChevronLeft,
@@ -793,7 +794,7 @@ export default function CalendarPage() {
           </DialogHeader>
           <div
             className="rounded-lg border bg-white p-4 dark:bg-slate-900"
-            dangerouslySetInnerHTML={{ __html: sentEmailHtml ?? "" }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(sentEmailHtml ?? "") }}
           />
           <DialogFooter showCloseButton />
         </DialogContent>

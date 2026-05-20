@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
+import { sanitizeHtml } from "@/lib/sanitize-html"
 import {
   Card,
   CardContent,
@@ -1180,7 +1181,7 @@ export default function TemplatesPage() {
                 <CardContent>
                   <div
                     className="rounded-lg border bg-slate-50 p-3 dark:bg-slate-900 overflow-auto max-h-[70vh]"
-                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
                   />
                 </CardContent>
               </Card>
@@ -1607,7 +1608,7 @@ export default function TemplatesPage() {
           </DialogHeader>
           <div
             className="rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
-            dangerouslySetInnerHTML={{ __html: previewHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
           />
         </DialogContent>
       </Dialog>
