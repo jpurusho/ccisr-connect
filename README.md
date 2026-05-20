@@ -41,12 +41,16 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Event Type Management** — Create/edit/deactivate event types with template associations
 - **Dispatch Tracking** — Sent emails shown on calendar with actual sent date and target week label
 - **View Sent Email** — Click any sent dispatch to see the exact HTML that was delivered
+- **Inline Birthday/Anniversary Editing** — Click any birthday or anniversary event to fix the date directly from the calendar
 
 ### Public Signup Forms
-- **Form Builder** — Create flexible signup forms with 12 field types (text, email, phone, address, date, month picker, select, multi-select, number, checkbox, textarea, member lookup)
+- **Form Builder** — Create flexible signup forms with 13 field types (text, email, phone, address, date, month picker, select, multi-select, claim select, number, checkbox, textarea, member lookup)
+- **Claim Select** — Capacity-limited item selection (e.g., potluck food signup) with custom free-text entries
 - **Public Links** — Share `/signup/[slug]` links via email; no login required to submit
 - **Member Auto-Complete** — Type name to auto-fill address/phone from member directory
 - **Visual Month Picker** — Color-coded grid showing Open/Taken/Past/Break with host names
+- **Show/Hide Responses** — Admin toggle to control whether public users see who signed up
+- **Signup → Card Auto-Fill** — Link signup forms to event types; dashboard cards auto-populate from responses
 - **Phone Verification** — Server-side verification required to remove a signup
 - **Rate Limiting** — Per-form configurable rate limits to prevent abuse
 - **Response Viewer** — Admin table with search, sort, CSV export, delete
@@ -56,10 +60,13 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Font Family** — Sans-serif, serif, rounded, monospace
 - **Font Size Scale** — Compact, default, large
 - **Header Variants** — Full color band, top border, side accent
+- **Header Gradients** — 7 preset gradients (Sunset, Ocean, Forest, etc.) + custom CSS gradient
 - **Section Layouts** — Table, paragraph, or list (per-section override)
 - **Custom Pastels** — Create your own background/border color pairs
+- **Text Color Pickers** — Per-field text color for header title, subtitle, message body, footer verse
 - **Dark Mode** — `@media (prefers-color-scheme: dark)` for Apple Mail/Outlook
 - **Custom Footer** — Override default footer text per template
+- **Bible Verse Picker** — Look up ESV/KJV/WEB verses inline for footer, subtitle, and custom sections
 
 ### Reports & History
 - **Demographics** — Clickable stat cards linking to filtered member views

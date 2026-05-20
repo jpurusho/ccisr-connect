@@ -1,7 +1,7 @@
 # CCISR Connect — Architecture
 
-**Version:** 1.43.1
-**Date:** 2026-05-07
+**Version:** 1.44.6
+**Date:** 2026-05-19
 **Status:** Production (single-church deployment)
 
 ---
@@ -35,6 +35,7 @@ CCISR Connect is a 2-tier web application: a React client running on Vercel that
 | `/api/signup/member-lookup` | Exposes member autocomplete to public forms (masked data) |
 | `/api/signup/remove` | Phone verification for self-removal |
 | `/api/bible` | Proxies ESV API (keeps the key server-side) |
+| `/api/signup/[slug]` | Fetches form config + responses for public form rendering |
 | `/api/cron/send-scheduled` | Daily cron that fires queued emails via SMTP |
 
 These exist because the client either lacks permission (no service role key in browser) or the logic needs secrets/server trust.
@@ -253,6 +254,11 @@ Adding a new recurring event type (e.g., Youth Group) requires code changes in:
 6. `00006-00010` — Dispatch/template enhancements
 7. `00011_event_types_soft_delete.sql` — is_active on event_types
 8. `00012_event_host_family.sql` — host_family_id + host_until on events
+9. `00013-00018` — Event instances, audit log, template style settings
+10. `00019_app_settings.sql` — ESV API key + integrations
+11. `00020_event_type_signup_link.sql` — linked_signup_form_id + signup_field_map on event_types
+12. `00021_signup_show_responses.sql` — show_responses toggle on signup_forms
+13. `00022_explicit_grants.sql` — Explicit GRANTs for Supabase Data API (Oct 2026 requirement)
 
 ---
 
