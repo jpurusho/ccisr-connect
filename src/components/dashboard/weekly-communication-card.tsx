@@ -30,6 +30,7 @@ import {
   RefreshCw,
   Download,
   Image,
+  Mail,
   Share2,
   Save,
   Trash2,
@@ -83,6 +84,7 @@ export interface WeeklyCommunicationCardProps {
   resourceLinks?: ResourceLink[]
   onSchedule: () => void
   onSendNow: () => void
+  onTestSend?: () => void
   onSave?: () => void
   onDelete?: () => void
   onCancel?: () => void
@@ -135,6 +137,7 @@ export function WeeklyCommunicationCard({
   previewHtml,
   onSchedule,
   onSendNow,
+  onTestSend,
   onSave,
   onDelete,
   onCancel,
@@ -375,6 +378,19 @@ export function WeeklyCommunicationCard({
                 <Clock className="size-3.5" data-icon="inline-start" />
                 Schedule
               </Button>
+              {onTestSend && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onTestSend}
+                  disabled={!selectedSmtpConfig}
+                  title={!selectedSmtpConfig ? "Select a Send From account first" : "Send test email to yourself"}
+                  className="text-xs text-muted-foreground"
+                >
+                  <Mail className="size-3.5" data-icon="inline-start" />
+                  Send Test
+                </Button>
+              )}
             </>
           )}
           {(status === "sent" || status === "scheduled") && (

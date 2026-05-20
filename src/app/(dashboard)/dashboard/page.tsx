@@ -1955,6 +1955,31 @@ export default function DashboardPage() {
     ]
   )
 
+  async function handleTestSend(type: CommType) {
+    const html = getLivePreview(type)
+    if (!html) { toast.error("No content to send."); return }
+    const opts = commOptions[type]
+    if (!opts.smtpConfigId) { toast.error("Select a Send From account first."); return }
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const adminEmail = user?.email
+    if (!adminEmail) { toast.error("Could not determine your email."); return }
+    const subject = getSubject(type)
+    try {
+      const res = await fetch("/api/dispatch/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, html, smtpConfigId: opts.smtpConfigId, toEmail: adminEmail }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json()
+        toast.error(`Test send failed: ${error}`)
+      } else {
+        toast.success(`Test email sent to ${adminEmail}`)
+      }
+    } catch { toast.error("Test send failed") }
+  }
+
   const handleSchedule = useCallback(
     async (type: CommType) => {
       const html = getLivePreview(type)
@@ -2650,6 +2675,7 @@ export default function DashboardPage() {
                 resourceLinks={links[type]}
                 onSchedule={() => handleSchedule(type)}
                 onSendNow={() => handleSendNow(type)}
+                onTestSend={() => handleTestSend(type)}
                 onSave={() => handleSaveInstance(type)}
                 onDelete={() => handleDeleteInstance(type)}
                 onCancel={() => handleCancelEdit(type)}
