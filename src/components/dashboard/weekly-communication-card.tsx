@@ -43,7 +43,6 @@ import { format } from "date-fns"
 import {
   downloadAsPdf,
   downloadAsImage,
-  shareViaWhatsApp,
   shareCard,
   buildShareText,
 } from "@/lib/card-export"
@@ -181,11 +180,6 @@ export function WeeklyCommunicationCard({
     downloadAsImage(previewHtml, title).catch(() => {
       toast.error("Failed to generate image. Try the PDF download instead.")
     })
-  }
-
-  function handleShareWhatsApp() {
-    if (!previewHtml) return
-    shareViaWhatsApp(previewHtml, title, getShareText())
   }
 
   function handleShare() {
@@ -437,16 +431,6 @@ export function WeeklyCommunicationCard({
               >
                 <Image className="size-3.5" data-icon="inline-start" />
                 Image
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleShareWhatsApp}
-                disabled={!previewHtml}
-                className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950"
-              >
-                <Share2 className="size-3.5" data-icon="inline-start" />
-                WhatsApp
               </Button>
               <Button
                 variant="outline"

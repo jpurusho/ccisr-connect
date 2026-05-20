@@ -13,7 +13,7 @@
 function createOffscreenContainer(html: string): HTMLDivElement {
   const el = document.createElement("div")
   el.style.cssText =
-    "position:fixed;top:0;left:0;z-index:-9999;width:480px;background:#fff;padding:16px;pointer-events:none;"
+    "position:fixed;top:0;left:0;z-index:-9999;width:496px;background:#ffffff;pointer-events:none;padding:8px;"
   el.innerHTML = html
   document.body.appendChild(el)
   return el
