@@ -1,7 +1,7 @@
 # CCISR Connect — Architecture
 
-**Version:** 1.44.6
-**Date:** 2026-05-19
+**Version:** 1.45.5
+**Date:** 2026-05-20
 **Status:** Production (single-church deployment)
 
 ---
@@ -36,6 +36,7 @@ CCISR Connect is a 2-tier web application: a React client running on Vercel that
 | `/api/signup/remove` | Phone verification for self-removal |
 | `/api/bible` | Proxies ESV API (keeps the key server-side) |
 | `/api/signup/[slug]` | Fetches form config + responses for public form rendering |
+| `/api/dispatch/test` | Send test email to admin only (bypasses queue) |
 | `/api/cron/send-scheduled` | Daily cron that fires queued emails via SMTP |
 
 These exist because the client either lacks permission (no service role key in browser) or the logic needs secrets/server trust.
@@ -149,7 +150,8 @@ Dashboard card auto-populates (with visual "linked form" indicator)
 ### Email Pipeline (Professional Grade)
 - **3-stage lifecycle:** Template defaults → Composed instances (drafts) → Dispatch queue (sent)
 - **body_html archival:** Exact email content preserved for every dispatch
-- **Sent email preview:** Viewable from both dashboard and calendar
+- **Sent email preview:** Viewable from both dashboard and calendar (DOMPurify-sanitized)
+- **Send Test:** Admin can send test to self before dispatching to full list
 - **Dispatch tracking:** Sent date, target week, reminder count, status badges
 - **Audit trail:** Every operation logged with user, entity, and timestamp
 
@@ -164,10 +166,19 @@ Dashboard card auto-populates (with visual "linked form" indicator)
 - **Clickable pills:** Events select dashboard card, sent dispatches show email preview
 - **Dispatch placement:** Sent emails appear on actual sent date with target week label
 
+### UX & Navigation
+- **Command palette (⌘K):** Search members, navigate pages instantly
+- **Keyboard shortcuts:** `g+letter` navigation, `?` help overlay
+- **Bulk operations:** Multi-select members for tag/untag/deactivate
+- **Inline validation:** Member form validates on blur with visual feedback
+- **Calendar Agenda view:** Scrollable list alongside week/month
+
 ### Code Quality
 - **Base type inheritance:** `BaseFormData` / `BaseCardData` — add a field once, all 7 types inherit
 - **Shared components:** `CommonFieldsEditor`, `CustomSectionsEditor`, `ResourceLinksEditor`
 - **Extracted utilities:** `extractCommonCardData()`, `commonTrailingHtml()`, `interpCommon()`
+- **HTML sanitization:** DOMPurify on all 7 `dangerouslySetInnerHTML` usages
+- **Accessibility:** `title` / `aria-label` on icon-only buttons throughout
 
 ---
 
@@ -196,7 +207,7 @@ All times stored as bare `time` fields, dates as `date`. Comparisons use browser
 
 **Impact:** Works for single-congregation in one timezone. Breaks for: Google Calendar sync (requires DTSTART with timezone), multi-site deployments, members in different timezones.
 
-### 4. Dashboard Monolith (~2800 lines)
+### 4. Dashboard Monolith (~3100 lines)
 
 `dashboard/page.tsx` manages all form state for 6+ communication types in one component. Every change risks regressions across types.
 
@@ -285,8 +296,9 @@ Adding a new recurring event type (e.g., Youth Group) requires code changes in:
 
 | Dimension | Score | Notes |
 |-----------|-------|-------|
-| Single-church internal tool | **8/10** | Email workflow is strong, calendar works, UX is intuitive |
+| Single-church internal tool | **9/10** | Email workflow is professional-grade, calendar flexible, UX polished |
 | Multi-tenant SaaS product | **5/10** | Hardcoded types, monolith dashboard, no timezone |
 | Google Calendar sync ready | **6/10** | Schema is close but format gaps + missing fields |
-| Code quality | **7/10** | Good extraction patterns, but dashboard monolith is fragile |
-| UX/Accessibility | **7/10** | Clean dark theme, keyboard support, but some mobile gaps |
+| Code quality | **7.5/10** | Good extraction patterns, DOMPurify sanitization; dashboard monolith is the main debt |
+| UX/Accessibility | **8/10** | Command palette, keyboard shortcuts, aria-labels, inline validation, bulk ops |
+| Security | **8/10** | RLS, DOMPurify, rate limiting, honeypot, sanitized previews |

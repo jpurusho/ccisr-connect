@@ -8,6 +8,9 @@ A full-featured church management application built with Next.js, Supabase, and 
 
 ### Membership Management
 - **Member Directory** — Add, edit, deactivate, or permanently delete members
+- **Reactivate** — Restore inactive members with one click from their profile
+- **Bulk Operations** — Select multiple members to bulk tag/untag or deactivate
+- **Inline Validation** — Real-time field validation on member create/edit (name required, email format)
 - **Family Grouping** — Organize members into families with family-level activate/deactivate (cascades to exclude all members from birthday/anniversary cards and bulletin listings)
 - **Tags** — Custom color-coded tags (Newcomer, Bible Study, Youth, Volunteer, etc.)
 - **City Consolidation** — Smart normalization of city names for filtering
@@ -24,6 +27,8 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Per-Card Options** — Independent mailing list, SMTP account, and additional recipients per card
 - **Week Navigation** — Navigate past and future weeks to compose or review communications
 - **Reminders** — Re-send communications with "Reminder:" prefix and count tracking
+- **Send Test** — Send a test email to yourself before dispatching to the full list
+- **Bulletin Auto-Fill** — Refresh birthdays and anniversaries from member database with one click
 - **Download** — PDF and PNG (WhatsApp-ready) exports for every card
 
 ### Email Dispatch
@@ -31,10 +36,11 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Dispatch Queue** — Preview, approve, reschedule, or send now
 - **Scheduled Sending** — Vercel cron for automatic daily dispatch
 - **Mailing Lists** — To/CC/BCC recipients from members or external emails
+- **HTML Sanitization** — All email previews sanitized with DOMPurify to prevent XSS
 
 ### Calendar & Event Scheduling
 - **Calendar-First Scheduling** — Create/edit/delete events by clicking dates (Google Calendar model)
-- **Week/Month Views** — Colored pill-style events, birthdays, anniversaries, dispatches
+- **Week/Month/Agenda Views** — Colored pill-style events, birthdays, anniversaries, dispatches; Agenda view for scrollable list
 - **Recurrence** — Weekly, monthly (nth day), exception dates, end dates
 - **Per-Occurrence Editing** — Change host, time, location for a specific date without touching the series
 - **Host Family Expiration** — Assign a host with an expiration date; auto-clears when expired
@@ -53,6 +59,7 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Signup → Card Auto-Fill** — Link signup forms to event types; dashboard cards auto-populate from responses
 - **Phone Verification** — Server-side verification required to remove a signup
 - **Rate Limiting** — Per-form configurable rate limits to prevent abuse
+- **Admin Notifications** — Admins receive email when a new signup is submitted
 - **Response Viewer** — Admin table with search, sort, CSV export, delete
 - **Theming** — Custom colors, emoji, bible verse with pastel background per form
 
@@ -67,6 +74,11 @@ A full-featured church management application built with Next.js, Supabase, and 
 - **Dark Mode** — `@media (prefers-color-scheme: dark)` for Apple Mail/Outlook
 - **Custom Footer** — Override default footer text per template
 - **Bible Verse Picker** — Look up ESV/KJV/WEB verses inline for footer, subtitle, and custom sections
+
+### Navigation & Productivity
+- **Command Palette (⌘K)** — Instantly search members or navigate to any page
+- **Keyboard Shortcuts** — `g+d` Dashboard, `g+c` Calendar, `g+m` Members, `g+s` Signups, `g+e` Email; press `?` for help
+- **Mobile Deploy** — Trigger version bump + tag from GitHub mobile app Actions tab
 
 ### Reports & History
 - **Demographics** — Clickable stat cards linking to filtered member views
@@ -89,8 +101,9 @@ graph TB
 
     subgraph API["Next.js API Routes"]
         SendAPI["/api/dispatch/send"]
+        TestAPI["/api/dispatch/test"]
         CronAPI["/api/dispatch/cron"]
-        PreviewAPI["/api/cards/preview"]
+        BibleAPI["/api/bible"]
         SignupAPI["/api/signup/*"]
     end
 
@@ -109,17 +122,21 @@ graph TB
     end
 
     Dashboard --> DB
+    Dashboard --> TestAPI
     Calendar --> DB
     Members --> DB
     Templates --> DB
     Dispatch --> SendAPI
     SendAPI --> SMTP
     SendAPI --> DB
+    TestAPI --> SMTP
     Vercel --> CronAPI
     CronAPI --> SendAPI
     SignupPage --> SignupAPI
     SignupAPI --> DB
+    SignupAPI --> SMTP
     Client --> Auth
+    Dashboard --> BibleAPI
 ```
 
 ### Data Model
@@ -150,14 +167,17 @@ erDiagram
 flowchart LR
     T[Template Defaults] --> D[Dashboard]
     C[Calendar] -->|Event dates & hosts| D
+    SF[Signup Forms] -->|Auto-fill| D
     D --> E{Edit & Preview}
     E --> Q[Dispatch Queue]
+    E -->|Send Test| TS[Test to Admin]
     Q -->|Send Now| S[SMTP Send]
     Q -->|Schedule| CR[Vercel Cron]
     CR --> S
+    TS --> S
     S --> H[Email Delivered]
     S --> A[Audit Log]
-    D --> P[Download PNG/PDF]
+    D --> P[Download PNG/PDF/Share]
 ```
 
 ### Event Lifecycle
@@ -187,6 +207,7 @@ flowchart LR
     PF -->|Submit| S["/api/signup/submit"]
     S -->|Rate limit check| S
     S -->|Validate + sanitize| R[signup_responses]
+    S -->|Notify| N[Admin Email Notification]
     R -->|Admin views| RV[Response Viewer]
     RV -->|Export| CSV[CSV Download]
 ```
