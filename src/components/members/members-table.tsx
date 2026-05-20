@@ -20,7 +20,8 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ChevronLeft, ChevronRight, Plus, Tag as TagIcon, UserX } from "lucide-react"
 
 type MemberWithFamily = Member & {
   families:
@@ -70,25 +71,30 @@ export function MembersTable({
   const [availableTags, setAvailableTags] = useState<{ id: string; name: string; color: string }[]>([])
   const [tagPopoverMemberId, setTagPopoverMemberId] = useState<string | null>(null)
   const [togglingTagId, setTogglingTagId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkTagOpen, setBulkTagOpen] = useState(false)
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+
+  async function fetchMembers() {
+    setLoading(true)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("members")
+      .select("*, families(family_name, addresses(city, zip, is_current)), member_tags(tags(id, name, color))")
+      .order("last_name", { ascending: true })
+      .order("first_name", { ascending: true })
+
+    if (!error && data) {
+      setMembers(data as MemberWithFamily[])
+    }
+    const { data: tags } = await supabase.from("tags").select("id, name, color").order("name")
+    if (tags) setAvailableTags(tags)
+    setLoading(false)
+  }
 
   useEffect(() => {
-    async function fetchMembers() {
-      setLoading(true)
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("members")
-        .select("*, families(family_name, addresses(city, zip, is_current)), member_tags(tags(id, name, color))")
-        .order("last_name", { ascending: true })
-        .order("first_name", { ascending: true })
-
-      if (!error && data) {
-        setMembers(data as MemberWithFamily[])
-      }
-      const { data: tags } = await supabase.from("tags").select("id, name, color").order("name")
-      if (tags) setAvailableTags(tags)
-      setLoading(false)
-    }
     fetchMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -166,6 +172,76 @@ export function MembersTable({
     return sortAsc ? " ↑" : " ↓"
   }
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === paginated.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(paginated.map((m) => m.id)))
+    }
+  }
+
+  async function bulkDeactivate() {
+    if (selected.size === 0) return
+    setBulkProcessing(true)
+    const supabase = createClient()
+    const ids = [...selected]
+    const { error } = await supabase.from("members").update({ is_active: false } as never).in("id", ids)
+    if (error) {
+      toast.error("Bulk deactivate failed")
+    } else {
+      toast.success(`${ids.length} member(s) deactivated`)
+      logAudit("bulk_deactivate", "members", null, { count: ids.length })
+      setSelected(new Set())
+      fetchMembers()
+      onRefresh?.()
+    }
+    setBulkProcessing(false)
+  }
+
+  async function bulkAddTag(tagId: string, tagName: string) {
+    if (selected.size === 0) return
+    setBulkProcessing(true)
+    const supabase = createClient()
+    const ids = [...selected]
+    const rows = ids.map((memberId) => ({ member_id: memberId, tag_id: tagId }))
+    const { error } = await supabase.from("member_tags").upsert(rows as never[], { onConflict: "member_id,tag_id" })
+    if (error) {
+      toast.error("Bulk tag failed")
+    } else {
+      toast.success(`"${tagName}" applied to ${ids.length} member(s)`)
+      logAudit("bulk_tag_added", "member_tags", null, { tagName, count: ids.length })
+      setBulkTagOpen(false)
+      fetchMembers()
+    }
+    setBulkProcessing(false)
+  }
+
+  async function bulkRemoveTag(tagId: string, tagName: string) {
+    if (selected.size === 0) return
+    setBulkProcessing(true)
+    const supabase = createClient()
+    const ids = [...selected]
+    const { error } = await supabase.from("member_tags").delete().eq("tag_id", tagId).in("member_id", ids)
+    if (error) {
+      toast.error("Bulk untag failed")
+    } else {
+      toast.success(`"${tagName}" removed from ${ids.length} member(s)`)
+      logAudit("bulk_tag_removed", "member_tags", null, { tagName, count: ids.length })
+      setBulkTagOpen(false)
+      fetchMembers()
+    }
+    setBulkProcessing(false)
+  }
+
   if (loading) {
     return (
       <div className="space-y-2">
@@ -191,9 +267,55 @@ export function MembersTable({
 
   return (
     <div className="space-y-4">
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
+          <span className="text-sm font-medium">{selected.size} selected</span>
+          <Popover open={bulkTagOpen} onOpenChange={setBulkTagOpen}>
+            <PopoverTrigger>
+              <Button variant="outline" size="sm" disabled={bulkProcessing}>
+                <TagIcon className="size-3.5" />
+                Tag
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Add tag:</p>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {availableTags.map((t) => (
+                  <button key={t.id} type="button" onClick={() => bulkAddTag(t.id, t.name)} className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: t.color + "30", color: t.color }}>
+                    + {t.name}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Remove tag:</p>
+              <div className="flex flex-wrap gap-1">
+                {availableTags.map((t) => (
+                  <button key={t.id} type="button" onClick={() => bulkRemoveTag(t.id, t.name)} className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: t.color + "15", color: t.color }}>
+                    − {t.name}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="sm" onClick={bulkDeactivate} disabled={bulkProcessing} className="text-destructive">
+            <UserX className="size-3.5" />
+            Deactivate
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} className="ml-auto text-xs">
+            Clear
+          </Button>
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <input
+                type="checkbox"
+                checked={paginated.length > 0 && selected.size === paginated.length}
+                onChange={toggleSelectAll}
+                className="size-4 rounded border-gray-300"
+              />
+            </TableHead>
             <TableHead
               className="cursor-pointer select-none"
               onClick={() => handleSort("name")}
@@ -226,6 +348,14 @@ export function MembersTable({
               className="cursor-pointer"
               onClick={() => router.push(`/members/${member.id}`)}
             >
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(member.id)}
+                  onChange={() => toggleSelect(member.id)}
+                  className="size-4 rounded border-gray-300"
+                />
+              </TableCell>
               <TableCell className="font-medium">{member.full_name}</TableCell>
               <TableCell className="text-muted-foreground">
                 {member.families?.family_name ?? "-"}
