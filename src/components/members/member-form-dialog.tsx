@@ -91,6 +91,24 @@ export function MemberFormDialog({
   const [families, setFamilies] = useState<Family[]>([])
   const [loadingFamilies, setLoadingFamilies] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  function validateField(field: string, value: string): string | null {
+    if (field === "firstName" && !value.trim()) return "First name is required"
+    if (field === "lastName" && !value.trim()) return "Last name is required"
+    if (field === "email" && value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return "Invalid email format"
+    return null
+  }
+
+  function onBlurValidate(field: string, value: string) {
+    const err = validateField(field, value)
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      if (err) next[field] = err
+      else delete next[field]
+      return next
+    })
+  }
 
   const fetchFamilies = useCallback(async () => {
     setLoadingFamilies(true)
@@ -187,19 +205,21 @@ export function MemberFormDialog({
       setHomePhone("")
       setAddressDirty(false)
       setSelectedTagIds(new Set())
+      setFieldErrors({})
     }
   }, [open, member, loadingFamilies])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!firstName.trim() || !lastName.trim()) {
-      toast.error("First name and last name are required.")
-      return
-    }
-
-    if (!familyId && !newFamilyName.trim()) {
-      toast.error("Please select an existing family or enter a new family name.")
+    const errors: Record<string, string> = {}
+    if (!firstName.trim()) errors.firstName = "First name is required"
+    if (!lastName.trim()) errors.lastName = "Last name is required"
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = "Invalid email format"
+    if (!familyId && !newFamilyName.trim()) errors.family = "Select a family or enter a new one"
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      toast.error("Please fix the highlighted fields.")
       return
     }
 
@@ -464,20 +484,26 @@ export function MemberFormDialog({
               <Input
                 id="firstName"
                 value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                onChange={(e) => { setFirstName(e.target.value); setFieldErrors((p) => { const n = { ...p }; delete n.firstName; return n }) }}
+                onBlur={() => onBlurValidate("firstName", firstName)}
                 placeholder="First name"
                 required
+                aria-invalid={!!fieldErrors.firstName}
               />
+              {fieldErrors.firstName && <p className="text-xs text-destructive">{fieldErrors.firstName}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="lastName">Last name *</Label>
               <Input
                 id="lastName"
                 value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                onChange={(e) => { setLastName(e.target.value); setFieldErrors((p) => { const n = { ...p }; delete n.lastName; return n }) }}
+                onBlur={() => onBlurValidate("lastName", lastName)}
                 placeholder="Last name"
                 required
+                aria-invalid={!!fieldErrors.lastName}
               />
+              {fieldErrors.lastName && <p className="text-xs text-destructive">{fieldErrors.lastName}</p>}
             </div>
           </div>
 
@@ -573,11 +599,14 @@ export function MemberFormDialog({
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setFieldErrors((p) => { const n = { ...p }; delete n.email; return n }) }}
+                onBlur={() => onBlurValidate("email", email)}
                 placeholder="email@example.com"
                 autoComplete="off"
+                aria-invalid={!!fieldErrors.email}
                 data-1p-ignore
               />
+              {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
           </div>
 
