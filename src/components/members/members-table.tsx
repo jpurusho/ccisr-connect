@@ -21,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ChevronLeft, ChevronRight, Plus, Tag as TagIcon, UserX } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Tag as TagIcon, Users, UserX } from "lucide-react"
 
 type MemberWithFamily = Member & {
   families:
@@ -255,12 +255,13 @@ export function MembersTable({
   if (filtered.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
+        <Users className="size-10 mx-auto text-muted-foreground/50 mb-3" />
         <p className="text-muted-foreground">No members found.</p>
-        {searchQuery && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Try adjusting your search or filter.
-          </p>
-        )}
+        <p className="mt-1 text-sm text-muted-foreground">
+          {searchQuery
+            ? "Try adjusting your search or filter."
+            : "Add your first member or import from a vCard file."}
+        </p>
       </div>
     )
   }
