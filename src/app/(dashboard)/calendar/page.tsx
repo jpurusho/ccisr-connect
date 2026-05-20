@@ -60,7 +60,7 @@ import {
 const DEFAULT_EVENT_COLOR = "#0d9488"
 
 export default function CalendarPage() {
-  const [view, setView] = useState<"week" | "month">("week")
+  const [view, setView] = useState<"week" | "month" | "agenda">("week")
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [loading, setLoading] = useState(true)
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -665,13 +665,14 @@ export default function CalendarPage() {
           <Tabs
             value={view}
             onValueChange={(val) => {
-              setView(val as "week" | "month")
+              setView(val as "week" | "month" | "agenda")
               setSelectedDay(null)
             }}
           >
             <TabsList>
               <TabsTrigger value="week">Week</TabsTrigger>
               <TabsTrigger value="month">Month</TabsTrigger>
+              <TabsTrigger value="agenda">Agenda</TabsTrigger>
             </TabsList>
           </Tabs>
           <EventTypeManager onTypesChanged={fetchData} />
@@ -704,7 +705,7 @@ export default function CalendarPage() {
 
       {/* Loading state */}
       {loading ? (
-        <CalendarSkeleton view={view} />
+        <CalendarSkeleton view={view === "agenda" ? "week" : view} />
       ) : (
         <>
           {/* Week view */}
@@ -737,6 +738,34 @@ export default function CalendarPage() {
                 />
               )}
             </>
+          )}
+
+          {/* Agenda view */}
+          {view === "agenda" && (
+            <div className="space-y-1">
+              {events
+                .sort((a, b) => a.date.getTime() - b.date.getTime())
+                .map((evt) => (
+                  <button
+                    key={evt.id}
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left hover:bg-muted/50 transition-colors"
+                    onClick={() => handleEventClick(evt)}
+                  >
+                    <div className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: evt.color }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{evt.title}</p>
+                      {evt.time && <p className="text-xs text-muted-foreground">{evt.time}</p>}
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {format(evt.date, "EEE, MMM d")}
+                    </span>
+                  </button>
+                ))}
+              {events.length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">No events in this period.</p>
+              )}
+            </div>
           )}
         </>
       )}
