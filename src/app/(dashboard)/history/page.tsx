@@ -215,7 +215,7 @@ export default function HistoryPage() {
                         <Badge variant={(STATUS_COLORS[d.status] as "default" | "destructive" | "outline" | "secondary") || "secondary"}>{d.status}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon-sm" onClick={() => { setPreviewSubject(d.subject); setPreviewHtml(d.body_html) }}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => { setPreviewSubject(d.subject); setPreviewHtml(d.body_html) }} title="Preview email">
                           <Eye className="size-3.5" />
                         </Button>
                       </TableCell>
@@ -227,8 +227,8 @@ export default function HistoryPage() {
                 <div className="mt-4 flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</p>
                   <div className="flex gap-1">
-                    <Button variant="outline" size="icon-sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}><ChevronLeft /></Button>
-                    <Button variant="outline" size="icon-sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}><ChevronRight /></Button>
+                    <Button variant="outline" size="icon-sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)} title="Previous page"><ChevronLeft /></Button>
+                    <Button variant="outline" size="icon-sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} title="Next page"><ChevronRight /></Button>
                   </div>
                 </div>
               )}

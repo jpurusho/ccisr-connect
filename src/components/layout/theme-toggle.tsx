@@ -64,6 +64,7 @@ export function ThemeToggle() {
         variant="ghost"
         size="icon-sm"
         onClick={() => setOpen((prev) => !prev)}
+        title="Toggle theme"
       >
         {icon}
         <span className="sr-only">Toggle theme</span>

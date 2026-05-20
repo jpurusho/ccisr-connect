@@ -212,7 +212,7 @@ export default function SignupResponsesPage() {
     <div className="space-y-4 p-4 sm:p-6">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon-sm" onClick={() => router.push("/signups")}>
+        <Button variant="ghost" size="icon-sm" onClick={() => router.push("/signups")} title="Back to signups">
           <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">

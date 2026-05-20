@@ -650,10 +650,10 @@ export default function CalendarPage() {
             Today
           </Button>
           <div className="flex items-center">
-            <Button variant="ghost" size="icon-sm" onClick={goPrev}>
+            <Button variant="ghost" size="icon-sm" onClick={goPrev} title="Previous">
               <ChevronLeft className="size-4" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={goNext}>
+            <Button variant="ghost" size="icon-sm" onClick={goNext} title="Next">
               <ChevronRight className="size-4" />
             </Button>
           </div>

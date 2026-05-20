@@ -205,10 +205,10 @@ export function TagManagementPanel() {
                         onKeyDown={(e) => e.key === "Enter" && handleUpdate()}
                         autoFocus
                       />
-                      <Button variant="ghost" size="icon-sm" onClick={handleUpdate}>
+                      <Button variant="ghost" size="icon-sm" onClick={handleUpdate} title="Save">
                         <Check className="size-3.5 text-green-600" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => setEditingId(null)}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => setEditingId(null)} title="Cancel">
                         <X className="size-3.5" />
                       </Button>
                     </>
@@ -219,10 +219,10 @@ export function TagManagementPanel() {
                         style={{ backgroundColor: tag.color }}
                       />
                       <span className="flex-1 text-sm font-medium">{tag.name}</span>
-                      <Button variant="ghost" size="icon-sm" onClick={() => startEdit(tag)}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => startEdit(tag)} title="Edit tag">
                         <Pencil className="size-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(tag)}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(tag)} title="Delete tag">
                         <Trash2 className="size-3.5 text-destructive" />
                       </Button>
                     </>

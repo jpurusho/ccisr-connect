@@ -420,10 +420,11 @@ export function CustomSectionsEditor({
               variant="ghost"
               size="icon-sm"
               onClick={() => setCollapsed((prev) => ({ ...prev, [sIdx]: !prev[sIdx] }))}
+              title={collapsed[sIdx] ? "Expand" : "Collapse"}
             >
               {collapsed[sIdx] ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={() => removeSection(sIdx)}>
+            <Button variant="ghost" size="icon-sm" onClick={() => removeSection(sIdx)} title="Remove section">
               <Trash2 className="size-3.5 text-muted-foreground" />
             </Button>
           </div>
@@ -460,7 +461,7 @@ export function CustomSectionsEditor({
                       onChange={(v) => updateEntry(sIdx, eIdx, "name", v)}
                       placeholder="Member name or text"
                     />
-                    <Button variant="ghost" size="icon-sm" onClick={() => removeEntry(sIdx, eIdx)}>
+                    <Button variant="ghost" size="icon-sm" onClick={() => removeEntry(sIdx, eIdx)} title="Remove entry">
                       <Trash2 className="size-3.5 text-muted-foreground" />
                     </Button>
                   </div>
@@ -595,6 +596,7 @@ export function ResourceLinksEditor({
             variant="ghost"
             size="icon-sm"
             onClick={() => onChange(links.filter((_, j) => j !== i))}
+            title="Remove link"
           >
             <Trash2 className="size-3.5 text-muted-foreground" />
           </Button>
@@ -672,7 +674,7 @@ export function FlyerSectionsEditor({
               <Button variant="ghost" size="icon-sm" onClick={() => move(idx, 1)} disabled={idx === sections.length - 1} title="Move down">
                 <ArrowDown className="size-3.5" />
               </Button>
-              <Button variant="ghost" size="icon-sm" onClick={() => onChange(sections.filter((_, i) => i !== idx))}>
+              <Button variant="ghost" size="icon-sm" onClick={() => onChange(sections.filter((_, i) => i !== idx))} title="Remove flyer">
                 <Trash2 className="size-3.5 text-muted-foreground" />
               </Button>
             </div>
@@ -1008,6 +1010,7 @@ export function BirthdayEditForm({
               variant="ghost"
               size="icon-sm"
               onClick={() => removeBirthday(i)}
+              title="Remove"
             >
               <Trash2 className="size-3.5 text-muted-foreground" />
             </Button>
@@ -1112,6 +1115,7 @@ export function AnniversaryEditForm({
               variant="ghost"
               size="icon-sm"
               onClick={() => removeAnniversary(i)}
+              title="Remove"
             >
               <Trash2 className="size-3.5 text-muted-foreground" />
             </Button>
@@ -1233,6 +1237,7 @@ export function BibleStudyEditForm({
                   size="icon-sm"
                   className="ml-2 shrink-0"
                   onClick={() => removeLocation(i)}
+                  title="Remove location"
                 >
                   <Trash2 className="size-3.5 text-muted-foreground" />
                 </Button>
@@ -1721,7 +1726,7 @@ export function BulletinEditForm({
                     onChange={(v) => updateHelper(i, "name", v)}
                     placeholder="Member name"
                   />
-                  <Button variant="ghost" size="icon-sm" onClick={() => removeHelper(i)}>
+                  <Button variant="ghost" size="icon-sm" onClick={() => removeHelper(i)} title="Remove helper">
                     <Trash2 className="size-3.5 text-muted-foreground" />
                   </Button>
                 </div>
@@ -1746,7 +1751,7 @@ export function BulletinEditForm({
                       onChange={(e) => updateEvent(i, "title", e.target.value)}
                       className="flex-1"
                     />
-                    <Button variant="ghost" size="icon-sm" onClick={() => removeEvent(i)}>
+                    <Button variant="ghost" size="icon-sm" onClick={() => removeEvent(i)} title="Remove event">
                       <Trash2 className="size-3.5 text-muted-foreground" />
                     </Button>
                   </div>
@@ -1832,6 +1837,7 @@ function InlineListSection<T extends Record<string, string>>({
             variant="ghost"
             size="icon-sm"
             onClick={() => onRemove(i)}
+            title="Remove"
           >
             <Trash2 className="size-3.5 text-muted-foreground" />
           </Button>

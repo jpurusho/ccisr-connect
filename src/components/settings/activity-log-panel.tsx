@@ -296,8 +296,8 @@ export default function ActivityLogPanel() {
                 <div className="mt-4 flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</p>
                   <div className="flex gap-1">
-                    <Button variant="outline" size="icon-sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}><ChevronLeft /></Button>
-                    <Button variant="outline" size="icon-sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}><ChevronRight /></Button>
+                    <Button variant="outline" size="icon-sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)} title="Previous page"><ChevronLeft /></Button>
+                    <Button variant="outline" size="icon-sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} title="Next page"><ChevronRight /></Button>
                   </div>
                 </div>
               )}
