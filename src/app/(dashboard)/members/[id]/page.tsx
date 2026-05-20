@@ -179,11 +179,27 @@ export default function MemberDetailPage() {
       return
     }
 
-    toast.success(`${member.full_name} has been marked as inactive.`)
+    toast.success(`${member.full_name} has been deactivated.`)
     logAudit("member_deleted", "members", member.id, { name: member.full_name })
     setDeleteDialogOpen(false)
     setDeleting(false)
     router.push("/members")
+  }
+
+  async function handleReactivate() {
+    if (!member) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("members")
+      .update({ is_active: true } as never)
+      .eq("id", member.id)
+    if (error) {
+      toast.error("Failed to reactivate: " + error.message)
+      return
+    }
+    toast.success(`${member.full_name} has been reactivated.`)
+    logAudit("member_reactivated", "members", member.id, { name: member.full_name })
+    fetchMember()
   }
 
   async function handlePermanentDelete() {
@@ -335,13 +351,23 @@ export default function MemberDetailPage() {
             <Pencil className="size-4" />
             Edit
           </Button>
-          <Button
-            variant="destructive"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            <Trash2 className="size-4" />
-            Deactivate
-          </Button>
+          {member.is_active ? (
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <Trash2 className="size-4" />
+              Deactivate
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={handleReactivate}
+              className="border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+            >
+              Reactivate
+            </Button>
+          )}
           <Button
             variant="outline"
             className="border-destructive text-destructive hover:bg-destructive/10"
