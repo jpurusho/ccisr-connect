@@ -13,6 +13,12 @@ import {
   CommandSeparator,
 } from "@/components/ui/command"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   LayoutDashboard,
   CalendarDays,
   Users,
@@ -44,16 +50,38 @@ export function CommandPalette() {
   const [members, setMembers] = useState<MemberResult[]>([])
   const router = useRouter()
 
+  const [showShortcuts, setShowShortcuts] = useState(false)
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
         setOpen((prev) => !prev)
       }
+      if (e.key === "?" && !isInput && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        setShowShortcuts((prev) => !prev)
+      }
+      if (isInput) return
+      if (e.key === "g" && !e.metaKey && !e.ctrlKey) {
+        const next = e
+        const handler = (e2: KeyboardEvent) => {
+          document.removeEventListener("keydown", handler)
+          if (e2.key === "d") router.push("/dashboard")
+          else if (e2.key === "c") router.push("/calendar")
+          else if (e2.key === "m") router.push("/members")
+          else if (e2.key === "s") router.push("/signups")
+          else if (e2.key === "e") router.push("/email")
+        }
+        document.addEventListener("keydown", handler, { once: true })
+        setTimeout(() => document.removeEventListener("keydown", handler), 1000)
+      }
     }
     document.addEventListener("keydown", onKeyDown)
     return () => document.removeEventListener("keydown", onKeyDown)
-  }, [])
+  }, [router])
 
   const searchMembers = useCallback(async (q: string) => {
     if (q.length < 2) { setMembers([]); return }
@@ -80,6 +108,7 @@ export function CommandPalette() {
   }
 
   return (
+    <>
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
         placeholder="Search members, pages..."
@@ -112,5 +141,30 @@ export function CommandPalette() {
         )}
       </CommandList>
     </CommandDialog>
+
+    <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Keyboard Shortcuts</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          {[
+            ["⌘ K", "Open command palette"],
+            ["?", "Show this help"],
+            ["g then d", "Go to Dashboard"],
+            ["g then c", "Go to Calendar"],
+            ["g then m", "Go to Members"],
+            ["g then s", "Go to Signups"],
+            ["g then e", "Go to Email"],
+          ].map(([key, desc]) => (
+            <div key={key} className="flex items-center justify-between">
+              <span className="text-muted-foreground">{desc}</span>
+              <kbd className="rounded border bg-muted px-2 py-0.5 text-xs font-mono">{key}</kbd>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
