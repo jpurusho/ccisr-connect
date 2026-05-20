@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { createHash } from "crypto"
+import nodemailer from "nodemailer"
 import { buildFormSchema, type SignupFieldConfig } from "@/lib/signup/field-registry"
 import { sanitizeFormData } from "@/lib/signup/sanitize"
 
@@ -165,5 +166,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to save response" }, { status: 500 })
   }
 
+  // Notify admin (best-effort, don't fail the response)
+  notifyAdmin(supabase, form.title || form.slug, sanitized, fields).catch(() => {})
+
   return NextResponse.json({ success: true }, { status: 201 })
+}
+
+interface SmtpRow { host: string; port: number; username: string; encrypted_password: string; from_name: string | null; from_email: string }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function notifyAdmin(
+  supabase: any,
+  formTitle: string,
+  data: Record<string, unknown>,
+  fields: SignupFieldConfig[]
+) {
+  const { data: smtpRaw } = await supabase
+    .from("smtp_configs")
+    .select("*")
+    .limit(1)
+    .single()
+  const smtp = smtpRaw as unknown as SmtpRow | null
+  if (!smtp) return
+
+  const { data: admins } = await supabase
+    .from("app_users")
+    .select("email")
+    .in("role", ["super_admin", "admin"])
+    .limit(3)
+  if (!admins || admins.length === 0) return
+
+  const nameField = fields.find((f) => f.type === "member_lookup" || f.type === "text")
+  const submitterName = nameField ? (data[nameField.id] as string) || "Someone" : "Someone"
+
+  const transporter = nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.port === 465,
+    auth: { user: smtp.username, pass: smtp.encrypted_password },
+  })
+
+  await transporter.sendMail({
+    from: smtp.from_name ? `"${smtp.from_name}" <${smtp.from_email}>` : smtp.from_email,
+    to: admins.map((a: { email: string }) => a.email).join(", "),
+    subject: `New Signup: ${formTitle}`,
+    text: `${submitterName} signed up for "${formTitle}".\n\nView responses in CCISR Connect → Signups.`,
+  })
 }
