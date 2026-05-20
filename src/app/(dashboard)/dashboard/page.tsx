@@ -390,6 +390,9 @@ export default function DashboardPage() {
     footerVerse: "",
   })
 
+  const [dbBdayEntries, setDbBdayEntries] = useState<BirthdayEntry[]>([])
+  const [dbAnniEntries, setDbAnniEntries] = useState<AnniversaryEntry[]>([])
+
   // ---- Custom dashboard templates ----
   interface DashboardCustomTemplate {
     id: string
@@ -802,6 +805,7 @@ export default function DashboardPage() {
           name: m.full_name,
           date: `${m.birth_month}/${m.birth_day}`,
         }))
+      setDbBdayEntries(bdayEntries)
 
       const inactiveBdays = bdays
         .filter((m) => !isActiveMember(m))
@@ -854,6 +858,7 @@ export default function DashboardPage() {
           ? currentYear - a.anniversary_year
           : undefined,
       }))
+      setDbAnniEntries(anniEntries)
 
       const hasAnDraft = !!composedMap["anniversary"]
       const anCommon = extractCommonFields(anDef)
@@ -2424,7 +2429,13 @@ export default function DashboardPage() {
               bible_study: <BibleStudyEditForm data={bibleStudyForm} onChange={setBibleStudyForm} />,
               womens_study: <WomensStudyEditForm data={womensStudyForm} onChange={setWomensStudyForm} />,
               prayer_meeting: <PrayerMeetingEditForm data={prayerMeetingForm} onChange={setPrayerMeetingForm} />,
-              bulletin: <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} />,
+              bulletin: <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} onRefreshFromDb={() => {
+                setBulletinForm((prev) => ({
+                  ...prev,
+                  birthdays: dbBdayEntries.map((b) => ({ name: b.name, date: b.date })),
+                  anniversaries: dbAnniEntries.map((a) => ({ names: `${a.husbandName} & ${a.wifeName}`, date: a.date })),
+                }))
+              }} />,
             }
 
             const visibleCards = BUILTIN_TEMPLATES.filter((t) => visibleTemplates.includes(t.type))

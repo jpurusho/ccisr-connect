@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ImagePlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 import { formatPhone } from "@/lib/utils"
@@ -1535,10 +1535,12 @@ export function BulletinEditForm({
   data,
   onChange,
   onWeeksChange,
+  onRefreshFromDb,
 }: {
   data: BulletinFormData
   onChange: (data: BulletinFormData) => void
   onWeeksChange?: (weeks: number) => void
+  onRefreshFromDb?: () => void
 }) {
   // --- Birthdays ---
   function updateBday(i: number, field: string, value: string) {
@@ -1644,6 +1646,18 @@ export function BulletinEditForm({
           </Field>
         )}
       </div>
+
+      {onRefreshFromDb && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefreshFromDb}
+          className="text-xs"
+        >
+          <RefreshCw className="size-3.5" />
+          Refresh Birthdays & Anniversaries from DB
+        </Button>
+      )}
 
       {(() => {
         const order = data.sectionOrder ?? [...BULLETIN_DEFAULT_SECTION_ORDER]
