@@ -3,6 +3,7 @@ import { Separator } from "@/components/ui/separator"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { DynamicBreadcrumb } from "@/components/layout/dynamic-breadcrumb"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
+import { CommandPalette } from "@/components/layout/command-palette"
 import { Toaster } from "@/components/ui/sonner"
 import { AppUserProvider } from "@/hooks/use-app-user"
 
@@ -19,7 +20,10 @@ export default function DashboardLayout({
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <DynamicBreadcrumb />
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono">
+              <span className="text-xs">⌘</span>K
+            </kbd>
             <ThemeToggle />
           </div>
         </header>
@@ -29,6 +33,7 @@ export default function DashboardLayout({
           </div>
         </AppUserProvider>
       </SidebarInset>
+      <CommandPalette />
       <Toaster />
     </SidebarProvider>
   )
