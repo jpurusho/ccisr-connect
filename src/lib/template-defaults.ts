@@ -1,3 +1,9 @@
+export interface LocationBreak {
+  from: string
+  to: string
+  message: string
+}
+
 export interface BibleStudyLocationDefault {
   label: string
   hostNames: string
@@ -6,6 +12,7 @@ export interface BibleStudyLocationDefault {
   phone: string
   onVacation?: boolean
   vacationMessage?: string
+  breaks?: LocationBreak[]
 }
 
 export interface ResourceLinkDefault {

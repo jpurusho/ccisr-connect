@@ -393,6 +393,7 @@ export default function DashboardPage() {
 
   const [dbBdayEntries, setDbBdayEntries] = useState<BirthdayEntry[]>([])
   const [dbAnniEntries, setDbAnniEntries] = useState<AnniversaryEntry[]>([])
+  const [dbBulletinEvents, setDbBulletinEvents] = useState<{ title: string; details: string }[]>([])
 
   // ---- Custom dashboard templates ----
   interface DashboardCustomTemplate {
@@ -1033,8 +1034,14 @@ export default function DashboardPage() {
 
         const savedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
         const locIdx = bsSignup?.fieldMap.location_index ?? 0
+        const todayISO = format(today, "yyyy-MM-dd")
         const mergedLocs = savedLocs.map((loc, i) => {
           const base = { onVacation: false, vacationMessage: "", ...loc }
+          // Auto-set vacation if current date falls within a scheduled break
+          const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && todayISO >= brk.from && todayISO <= brk.to)
+          if (activeBreak) {
+            return { ...base, onVacation: true, vacationMessage: activeBreak.message || `${loc.label} Bible Study is on break` }
+          }
           if (i === locIdx && bsHostData.hostName !== "TBD" && !base.onVacation) {
             return { ...base, hostNames: bsHostData.hostName, address: bsHostData.address, city: bsHostData.city, phone: bsHostData.phone }
           }
@@ -1155,6 +1162,25 @@ export default function DashboardPage() {
         })
       }
 
+      // ---- Build auto-fill events for bulletin from calendar ----
+      const bulletinAutoEvents: { title: string; details: string }[] = []
+      const bulletinCommTypes = new Set(["bible_study", "womens_study", "prayer_meeting", "bulletin", "birthday", "anniversary"])
+      for (const evt of activeEvents) {
+        const etName = etIdToName[evt.event_type_id] ?? ""
+        if (bulletinCommTypes.has(etName)) continue
+        if (evt.recurrence_rule) {
+          const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
+          for (const occ of occs) {
+            const inst = weekInstances.find((wi) => wi.event_id === evt.id && wi.instance_date === format(occ, "yyyy-MM-dd"))
+            if (inst?.status === "cancelled") continue
+            const time = inst?.instance_time ?? evt.default_time
+            bulletinAutoEvents.push({ title: evt.title, details: time ? `${format(occ, "EEEE, MMM d")} at ${time}` : format(occ, "EEEE, MMM d") })
+          }
+        }
+      }
+
+      setDbBulletinEvents(bulletinAutoEvents)
+
       // ---- Bulletin (same week as everything else) ----
       const hasBulDraft = !!composedMap["bulletin"]
       const bulCommon = extractCommonFields(bulDef)
@@ -1171,7 +1197,7 @@ export default function DashboardPage() {
           ...bulCommon,
         })
       } else {
-        const bulEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
+        const bulTemplateEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
         const bulHelpers = (bulDef as Record<string, unknown>).helpers as BulletinFormData["helpers"] ?? []
         setBulletinForm({
           weekLabel: `Week of ${wl}`,
@@ -1181,7 +1207,7 @@ export default function DashboardPage() {
             date: a.date,
           })),
           helpers: bulHelpers,
-          events: bulEvents,
+          events: [...bulletinAutoEvents, ...bulTemplateEvents],
           ...bulCommon,
         })
       }
@@ -2460,6 +2486,7 @@ export default function DashboardPage() {
                   ...prev,
                   birthdays: dbBdayEntries.map((b) => ({ name: b.name, date: b.date })),
                   anniversaries: dbAnniEntries.map((a) => ({ names: `${a.husbandName} & ${a.wifeName}`, date: a.date })),
+                  events: [...dbBulletinEvents, ...prev.events.filter((e) => !dbBulletinEvents.some((ae) => ae.title === e.title))],
                 }))
               }} />,
             }

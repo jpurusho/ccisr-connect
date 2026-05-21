@@ -133,10 +133,12 @@ export function HostFamilyInput({
 export function MemberSearchInput({
   value,
   onChange,
+  onMemberSelect,
   placeholder,
 }: {
   value: string
   onChange: (v: string) => void
+  onMemberSelect?: (memberId: string) => void
   placeholder?: string
 }) {
   const [results, setResults] = useState<{ id: string; full_name: string }[]>([])
@@ -183,6 +185,7 @@ export function MemberSearchInput({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 onChange(m.full_name)
+                onMemberSelect?.(m.id)
                 setShowResults(false)
               }}
             >
@@ -1144,6 +1147,7 @@ export interface BibleStudyLocationData {
   phone: string
   onVacation: boolean
   vacationMessage: string
+  breaks?: { from: string; to: string; message: string }[]
 }
 
 export interface BibleStudyFormData extends BaseFormData {
@@ -1298,6 +1302,68 @@ export function BibleStudyEditForm({
                 }}
               />
             )}
+            {/* Scheduled breaks */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] text-muted-foreground font-medium">Scheduled Breaks</p>
+              {(loc.breaks ?? []).map((brk, bIdx) => (
+                <div key={bIdx} className="flex items-center gap-1.5">
+                  <Input
+                    type="date"
+                    value={brk.from}
+                    onChange={(e) => {
+                      const locs = [...data.locations]
+                      const breaks = [...(locs[i].breaks ?? [])]
+                      breaks[bIdx] = { ...breaks[bIdx], from: e.target.value }
+                      locs[i] = { ...locs[i], breaks }
+                      onChange({ ...data, locations: locs })
+                    }}
+                    className="w-32 text-xs h-7"
+                  />
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <Input
+                    type="date"
+                    value={brk.to}
+                    onChange={(e) => {
+                      const locs = [...data.locations]
+                      const breaks = [...(locs[i].breaks ?? [])]
+                      breaks[bIdx] = { ...breaks[bIdx], to: e.target.value }
+                      locs[i] = { ...locs[i], breaks }
+                      onChange({ ...data, locations: locs })
+                    }}
+                    className="w-32 text-xs h-7"
+                  />
+                  <Input
+                    placeholder="Break message"
+                    value={brk.message}
+                    onChange={(e) => {
+                      const locs = [...data.locations]
+                      const breaks = [...(locs[i].breaks ?? [])]
+                      breaks[bIdx] = { ...breaks[bIdx], message: e.target.value }
+                      locs[i] = { ...locs[i], breaks }
+                      onChange({ ...data, locations: locs })
+                    }}
+                    className="flex-1 text-xs h-7"
+                  />
+                  <Button variant="ghost" size="icon-sm" title="Remove break" onClick={() => {
+                    const locs = [...data.locations]
+                    const breaks = (locs[i].breaks ?? []).filter((_, j) => j !== bIdx)
+                    locs[i] = { ...locs[i], breaks: breaks.length > 0 ? breaks : undefined }
+                    onChange({ ...data, locations: locs })
+                  }}>
+                    <Trash2 className="size-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
+                const locs = [...data.locations]
+                const breaks = [...(locs[i].breaks ?? []), { from: "", to: "", message: "" }]
+                locs[i] = { ...locs[i], breaks }
+                onChange({ ...data, locations: locs })
+              }}>
+                <Plus className="size-3" />
+                Add break period
+              </Button>
+            </div>
           </div>
         ))}
         <Button variant="outline" size="sm" onClick={addLocation}>
@@ -1684,32 +1750,66 @@ export function BulletinEditForm({
 
         const sectionRenderers: Record<BulletinSectionKey, React.ReactNode> = {
           birthdays: (
-            <InlineListSection
-              label=""
-              items={data.birthdays}
-              fields={[
-                { key: "name", placeholder: "Name", className: "flex-1" },
-                { key: "date", placeholder: "Date", className: "w-24" },
-              ]}
-              onUpdate={updateBday}
-              onRemove={removeBday}
-              onAdd={addBday}
-              addLabel="Add Birthday"
-            />
+            <div className="space-y-2">
+              {data.birthdays.map((b, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <MemberSearchInput
+                    value={b.name}
+                    onChange={(v) => updateBday(i, "name", v)}
+                    onMemberSelect={async (memberId) => {
+                      const supabase = (await import("@/lib/supabase/client")).createClient()
+                      const { data: m } = await supabase.from("members").select("full_name, birth_month, birth_day").eq("id", memberId).single() as { data: { full_name: string; birth_month: number | null; birth_day: number | null } | null }
+                      if (m) {
+                        updateBday(i, "name", m.full_name)
+                        if (m.birth_month && m.birth_day) updateBday(i, "date", `${m.birth_month}/${m.birth_day}`)
+                      }
+                    }}
+                    placeholder="Type member name"
+                  />
+                  <Input
+                    placeholder="Date"
+                    value={b.date}
+                    onChange={(e) => updateBday(i, "date", e.target.value)}
+                    className="w-24"
+                  />
+                  <Button variant="ghost" size="icon-sm" onClick={() => removeBday(i)} title="Remove">
+                    <Trash2 className="size-3.5 text-muted-foreground" />
+                  </Button>
+                </div>
+              ))}
+              {data.birthdays.length === 0 && <p className="text-xs text-muted-foreground">None added yet.</p>}
+              <Button variant="outline" size="sm" onClick={addBday}>
+                <Plus className="size-3.5" />
+                Add Birthday
+              </Button>
+            </div>
           ),
           anniversaries: (
-            <InlineListSection
-              label=""
-              items={data.anniversaries}
-              fields={[
-                { key: "names", placeholder: "Names (e.g., John & Jane)", className: "flex-1" },
-                { key: "date", placeholder: "Date", className: "w-24" },
-              ]}
-              onUpdate={updateAnni}
-              onRemove={removeAnni}
-              onAdd={addAnni}
-              addLabel="Add Anniversary"
-            />
+            <div className="space-y-2">
+              {data.anniversaries.map((a, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <MemberSearchInput
+                    value={a.names}
+                    onChange={(v) => updateAnni(i, "names", v)}
+                    placeholder="Names (e.g., John & Jane)"
+                  />
+                  <Input
+                    placeholder="Date"
+                    value={a.date}
+                    onChange={(e) => updateAnni(i, "date", e.target.value)}
+                    className="w-24"
+                  />
+                  <Button variant="ghost" size="icon-sm" onClick={() => removeAnni(i)} title="Remove">
+                    <Trash2 className="size-3.5 text-muted-foreground" />
+                  </Button>
+                </div>
+              ))}
+              {data.anniversaries.length === 0 && <p className="text-xs text-muted-foreground">None added yet.</p>}
+              <Button variant="outline" size="sm" onClick={addAnni}>
+                <Plus className="size-3.5" />
+                Add Anniversary
+              </Button>
+            </div>
           ),
           helpers: (
             <div className="space-y-2">
