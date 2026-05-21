@@ -253,11 +253,28 @@ export default function CalendarPage() {
         if (parsed.until && instance.instance_date > parsed.until) continue
       }
 
-      // Skip cancelled instances from display (but they're still in instanceDates to prevent regeneration)
-      if (instance.status === "cancelled") continue
-
       const eventType = typesMap.get(event.event_type_id)
       const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
+
+      // Show cancelled instances as dimmed "No {title}" entries
+      if (instance.status === "cancelled") {
+        calEvents.push({
+          id: instance.id,
+          kind: "event",
+          title: `No ${event.title}`,
+          date: new Date(instance.instance_date + "T00:00:00"),
+          color: "#9CA3AF",
+          status: "cancelled",
+          eventTypeName: eventType?.name ?? null,
+          notes: instance.notes,
+          eventId: event.id,
+          eventTypeId: event.event_type_id,
+          instanceId: instance.id,
+          recurrenceRule: event.recurrence_rule,
+        })
+        continue
+      }
+
       const hostFam = instance.host_family_id
         ? familiesMap.get(instance.host_family_id)
         : null

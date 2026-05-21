@@ -24,6 +24,8 @@ function EventPill({
   const isDispatch = event.kind === "dispatch"
   const isSent = isDispatch && event.dispatchStatus === "sent"
 
+  const isCancelled = event.kind === "event" && event.status === "cancelled"
+
   return (
     <button
       type="button"
@@ -32,11 +34,14 @@ function EventPill({
         "group/pill flex w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-xs transition-all hover:opacity-80",
         isBirthday && "bg-purple-500 text-white",
         isAnniversary && "bg-amber-500 text-white",
-        isDispatch && "border border-dashed"
+        isDispatch && "border border-dashed",
+        isCancelled && "opacity-60"
       )}
       style={
         isDispatch
           ? { borderColor: event.color, color: event.color, backgroundColor: event.color + "12" }
+          : isCancelled
+          ? { backgroundColor: "#9CA3AF30", color: "#6B7280" }
           : !isBirthday && !isAnniversary
           ? { backgroundColor: event.color, color: "#fff" }
           : undefined
@@ -49,7 +54,7 @@ function EventPill({
         ? <Check className="size-3 shrink-0" />
         : <Send className="size-3 shrink-0" />
       )}
-      <span className="truncate font-medium">{event.title}</span>
+      <span className={cn("truncate font-medium", isCancelled && "line-through")}>{event.title}</span>
       {isDispatch && isSent && (
         <span className="ml-auto shrink-0 text-[10px] opacity-70">Sent</span>
       )}

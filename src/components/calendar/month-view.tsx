@@ -121,11 +121,14 @@ export function MonthView({
                       event.kind === "anniversary" &&
                         "bg-amber-500 text-white dark:bg-amber-600",
                       event.kind === "dispatch" &&
-                        "border border-dashed"
+                        "border border-dashed",
+                      event.status === "cancelled" && "opacity-60 line-through"
                     )}
                     style={
                       event.kind === "dispatch"
                         ? { borderColor: event.color, color: event.color, backgroundColor: event.color + "12" }
+                        : event.status === "cancelled"
+                        ? { backgroundColor: "#9CA3AF30", color: "#6B7280" }
                         : event.kind === "event"
                         ? { backgroundColor: event.color, color: "#fff" }
                         : undefined
