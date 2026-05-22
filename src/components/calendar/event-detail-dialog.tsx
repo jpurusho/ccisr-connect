@@ -38,6 +38,8 @@ import {
   Eye,
   Loader2,
   ExternalLink,
+  Ban,
+  RotateCcw,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { CalendarEvent } from "./types"
@@ -49,6 +51,8 @@ interface EventDetailDialogProps {
   onEdit?: (event: CalendarEvent) => void
   onEditInstance?: (event: CalendarEvent) => void
   onDelete?: (event: CalendarEvent) => void
+  onCancelInstance?: (event: CalendarEvent) => void
+  onRestoreInstance?: (event: CalendarEvent) => void
   onViewDispatchEmail?: (event: CalendarEvent) => void
   onDateUpdated?: () => void
 }
@@ -173,6 +177,8 @@ export function EventDetailDialog({
   onEdit,
   onEditInstance,
   onDelete,
+  onCancelInstance,
+  onRestoreInstance,
   onViewDispatchEmail,
   onDateUpdated,
 }: EventDetailDialogProps) {
@@ -350,16 +356,39 @@ export function EventDetailDialog({
         <DialogFooter className="flex-wrap gap-2">
           {event.kind === "event" && event.eventId && (
             <>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => onDelete?.(event)}
-                className="sm:mr-auto"
-              >
-                <Trash2 className="size-3.5" />
-                Delete
-              </Button>
-              {event.eventTypeName && ET_TO_COMM[event.eventTypeName] && (
+              {event.status === "cancelled" && event.instanceId ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onRestoreInstance?.(event)}
+                  className="sm:mr-auto"
+                >
+                  <RotateCcw className="size-3.5" />
+                  Restore
+                </Button>
+              ) : (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => onDelete?.(event)}
+                  className="sm:mr-auto"
+                >
+                  <Trash2 className="size-3.5" />
+                  Delete
+                </Button>
+              )}
+              {event.status !== "cancelled" && event.instanceId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCancelInstance?.(event)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                >
+                  <Ban className="size-3.5" />
+                  Cancel This Week
+                </Button>
+              )}
+              {event.status !== "cancelled" && event.eventTypeName && ET_TO_COMM[event.eventTypeName] && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -369,7 +398,7 @@ export function EventDetailDialog({
                   Compose
                 </Button>
               )}
-              {event.recurrenceRule && (
+              {event.status !== "cancelled" && event.recurrenceRule && (
                 <Button
                   variant="outline"
                   size="sm"

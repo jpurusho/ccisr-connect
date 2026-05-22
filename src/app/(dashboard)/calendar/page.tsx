@@ -612,6 +612,34 @@ export default function CalendarPage() {
     setInstanceDialogOpen(true)
   }
 
+  async function handleCancelInstance(event: CalendarEvent) {
+    if (!event.instanceId) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("event_instances")
+      .update({ status: "cancelled" } as never)
+      .eq("id", event.instanceId)
+    if (error) { toast.error(`Failed: ${error.message}`); return }
+    toast.success(`"${event.title}" cancelled for ${format(event.date, "MMM d")}`)
+    logAudit("instance_cancelled", "event_instances", event.instanceId, { title: event.title, date: format(event.date, "yyyy-MM-dd") })
+    setDialogOpen(false)
+    fetchData()
+  }
+
+  async function handleRestoreInstance(event: CalendarEvent) {
+    if (!event.instanceId) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("event_instances")
+      .update({ status: "confirmed" } as never)
+      .eq("id", event.instanceId)
+    if (error) { toast.error(`Failed: ${error.message}`); return }
+    toast.success(`"${event.title.replace(/^No /, "")}" restored for ${format(event.date, "MMM d")}`)
+    logAudit("instance_restored", "event_instances", event.instanceId, { title: event.title, date: format(event.date, "yyyy-MM-dd") })
+    setDialogOpen(false)
+    fetchData()
+  }
+
   async function handleViewDispatchEmail(event: CalendarEvent) {
     const dispatchId = event.id.replace("dispatch-", "")
     const supabase = createClient()
@@ -795,6 +823,8 @@ export default function CalendarPage() {
         onEdit={handleEditEvent}
         onEditInstance={handleEditInstance}
         onDelete={handleDeleteEvent}
+        onCancelInstance={handleCancelInstance}
+        onRestoreInstance={handleRestoreInstance}
         onViewDispatchEmail={handleViewDispatchEmail}
         onDateUpdated={() => { setDialogOpen(false); fetchData() }}
       />
