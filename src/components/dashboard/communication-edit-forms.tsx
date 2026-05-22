@@ -1589,7 +1589,7 @@ export function PrayerMeetingEditForm({
 // Bulletin Edit Form (inline)
 // ---------------------------------------------------------------------------
 
-export const BULLETIN_DEFAULT_SECTION_ORDER = ["birthdays", "anniversaries", "helpers", "events"] as const
+export const BULLETIN_DEFAULT_SECTION_ORDER = ["birthdays", "anniversaries", "helpers", "events", "upcoming"] as const
 export type BulletinSectionKey = (typeof BULLETIN_DEFAULT_SECTION_ORDER)[number]
 
 export interface BulletinFormData extends BaseFormData {
@@ -1598,6 +1598,7 @@ export interface BulletinFormData extends BaseFormData {
   anniversaries: { names: string; date: string }[]
   helpers: { role: string; name: string }[]
   events: { title: string; details: string }[]
+  upcomingEvents?: { title: string; details: string }[]
   sectionOrder?: BulletinSectionKey[]
   weeksAhead?: number
 }
@@ -1688,6 +1689,17 @@ export function BulletinEditForm({
       events: [...data.events, { title: "", details: "" }],
     })
   }
+  function updateUpcoming(i: number, field: string, value: string) {
+    const updated = [...(data.upcomingEvents ?? [])]
+    updated[i] = { ...updated[i], [field]: value }
+    onChange({ ...data, upcomingEvents: updated })
+  }
+  function removeUpcoming(i: number) {
+    onChange({ ...data, upcomingEvents: (data.upcomingEvents ?? []).filter((_, idx) => idx !== i) })
+  }
+  function addUpcoming() {
+    onChange({ ...data, upcomingEvents: [...(data.upcomingEvents ?? []), { title: "", details: "" }] })
+  }
 
   return (
     <div className="space-y-5">
@@ -1709,9 +1721,10 @@ export function BulletinEditForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1">1 week</SelectItem>
+                <SelectItem value="1">This week only</SelectItem>
                 <SelectItem value="2">2 weeks</SelectItem>
                 <SelectItem value="3">3 weeks</SelectItem>
+                <SelectItem value="4">4 weeks</SelectItem>
               </SelectContent>
             </Select>
           </Field>
@@ -1745,7 +1758,8 @@ export function BulletinEditForm({
           birthdays: "Birthdays",
           anniversaries: "Anniversaries",
           helpers: "Helpers This Month",
-          events: "Events",
+          events: "This Week",
+          upcoming: "Upcoming Events",
         }
 
         const sectionRenderers: Record<BulletinSectionKey, React.ReactNode> = {
@@ -1866,6 +1880,36 @@ export function BulletinEditForm({
               <Button variant="outline" size="sm" onClick={addEvent}>
                 <Plus className="size-3.5" />
                 Add Event
+              </Button>
+            </div>
+          ),
+          upcoming: (
+            <div className="space-y-2">
+              {(data.upcomingEvents ?? []).map((evt, i) => (
+                <div key={i} className="space-y-1.5 rounded-md border border-dashed border-border p-2.5">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Title"
+                      value={evt.title}
+                      onChange={(e) => updateUpcoming(i, "title", e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button variant="ghost" size="icon-sm" onClick={() => removeUpcoming(i)} title="Remove">
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                  <Textarea
+                    placeholder="Details (date, time, location)"
+                    value={evt.details}
+                    onChange={(e) => updateUpcoming(i, "details", e.target.value)}
+                    className="min-h-10"
+                  />
+                </div>
+              ))}
+              {(data.upcomingEvents ?? []).length === 0 && <p className="text-xs text-muted-foreground">No upcoming events. Increase &quot;Weeks to Include&quot; or add manually.</p>}
+              <Button variant="outline" size="sm" onClick={addUpcoming}>
+                <Plus className="size-3.5" />
+                Add Upcoming Event
               </Button>
             </div>
           ),

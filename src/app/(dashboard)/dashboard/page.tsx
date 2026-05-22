@@ -1736,6 +1736,7 @@ export default function DashboardPage() {
       anniversaries: bulletinForm.anniversaries,
       helpers: bulletinForm.helpers,
       events: bulletinForm.events,
+      upcomingEvents: bulletinForm.upcomingEvents,
       sectionOrder: bulletinForm.sectionOrder,
       ...interpCommon(bulletinForm, vars),
     }, buildStyleContext(templateStyles.bulletin))
@@ -2612,7 +2613,34 @@ export default function DashboardPage() {
               bible_study: <BibleStudyEditForm data={bibleStudyForm} onChange={setBibleStudyForm} />,
               womens_study: <WomensStudyEditForm data={womensStudyForm} onChange={setWomensStudyForm} />,
               prayer_meeting: <PrayerMeetingEditForm data={prayerMeetingForm} onChange={setPrayerMeetingForm} />,
-              bulletin: <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} onRefreshFromDb={() => {
+              bulletin: <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} onWeeksChange={async (weeks) => {
+                setBulletinForm((prev) => ({ ...prev, weeksAhead: weeks }))
+                if (weeks <= 1) {
+                  setBulletinForm((prev) => ({ ...prev, upcomingEvents: [] }))
+                  return
+                }
+                const supabase = createClient()
+                const baseDate = addDays(new Date(), weekOffset * 7)
+                const nextStart = format(addDays(startOfWeek(baseDate, { weekStartsOn: 0 }), 7), "yyyy-MM-dd")
+                const futureEnd = format(addDays(startOfWeek(baseDate, { weekStartsOn: 0 }), weeks * 7 - 1), "yyyy-MM-dd")
+                const { data: futureInstances } = await supabase
+                  .from("event_instances")
+                  .select("event_id, instance_date, instance_time, status, events(title, default_time, event_type_id, event_types(name))")
+                  .gte("instance_date", nextStart)
+                  .lte("instance_date", futureEnd)
+                  .neq("status", "cancelled")
+                  .returns<{ event_id: string; instance_date: string; instance_time: string | null; status: string; events: { title: string; default_time: string | null; event_type_id: string; event_types: { name: string } | null } | null }[]>()
+                const upcomingItems: { title: string; details: string }[] = []
+                for (const inst of futureInstances ?? []) {
+                  if (!inst.events) continue
+                  const etName = inst.events.event_types?.name ?? ""
+                  if (["birthday", "anniversary", "bulletin"].includes(etName)) continue
+                  const time = inst.instance_time ?? inst.events.default_time
+                  const dateStr = format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")
+                  upcomingItems.push({ title: inst.events.title, details: time ? `${dateStr} at ${time}` : dateStr })
+                }
+                setBulletinForm((prev) => ({ ...prev, upcomingEvents: upcomingItems }))
+              }} onRefreshFromDb={() => {
                 setBulletinForm((prev) => ({
                   ...prev,
                   birthdays: dbBdayEntries.map((b) => ({ name: b.name, date: b.date })),

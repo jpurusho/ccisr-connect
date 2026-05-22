@@ -780,6 +780,7 @@ export interface BulletinCardData extends BaseCardData {
   anniversaries: { names: string; date: string }[];
   helpers: { role: string; name: string }[];
   events: { title: string; details: string }[];
+  upcomingEvents?: { title: string; details: string }[];
   sectionOrder?: string[];
 }
 
@@ -803,9 +804,12 @@ export function buildBulletinCard(data: BulletinCardData, style?: StyleContext):
     events: () => data.events.length === 0 ? "" :
       sectionLabel("📅", "This Week", EVENT_COLORS.friday_bible_study.primary) +
       dataListHtml(data.events.map((e) => ({ primary: e.title, secondary: e.details })), colors, style),
+    upcoming: () => !data.upcomingEvents || data.upcomingEvents.length === 0 ? "" :
+      sectionLabel("🔜", "Upcoming", colors.textLight) +
+      dataListHtml(data.upcomingEvents.map((e) => ({ primary: e.title, secondary: e.details })), colors, style),
   };
 
-  const order = data.sectionOrder ?? ["birthdays", "anniversaries", "helpers", "events"];
+  const order = data.sectionOrder ?? ["birthdays", "anniversaries", "helpers", "events", "upcoming"];
   let sections = order.map((key) => sectionBuilders[key]?.() ?? "").join("");
 
   const messageBg = data.messageBgColor || colors.bgLight;
