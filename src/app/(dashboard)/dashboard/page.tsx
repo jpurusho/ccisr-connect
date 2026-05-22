@@ -610,11 +610,12 @@ export default function DashboardPage() {
         // Event instances for current week (host/location overrides)
         supabase
           .from("event_instances")
-          .select("event_id, instance_date, instance_time, location_override, notes, host_family_id, status")
+          .select("id, event_id, instance_date, instance_time, location_override, notes, host_family_id, status")
           .gte("instance_date", wkSunISO)
           .lte("instance_date", wkSatISO)
           .neq("status", "cancelled")
           .returns<{
+            id: string
             event_id: string
             instance_date: string
             instance_time: string | null
@@ -1092,13 +1093,42 @@ export default function DashboardPage() {
           autoFills["bible_study"] = bsAutoFill
         }
 
+        // Query per-location host overrides from event_instance_locations
+        let dbLocHosts: { loc_label: string; host_name: string | null; address: string | null; city: string | null; phone: string | null; loc_status: string }[] = []
+        if (bsInstance) {
+          const { data: eilRows } = await supabase
+            .from("event_instance_locations")
+            .select("location_id, host_family_id, address_override, phone_override, status, event_locations(label), families(family_name, home_phone), addresses:families(addresses(full_address, city, state, zip))")
+            .eq("instance_id", bsInstance.id)
+            .returns<{ location_id: string; host_family_id: string | null; address_override: string | null; phone_override: string | null; status: string; event_locations: { label: string } | null; families: { family_name: string; home_phone: string | null; addresses: { full_address: string | null; city: string | null; state: string | null; zip: string | null }[] | null } | null }[]>()
+
+          if (eilRows && eilRows.length > 0) {
+            dbLocHosts = eilRows.map((r) => {
+              const addr = r.families?.addresses?.[0]
+              return {
+                loc_label: r.event_locations?.label ?? "",
+                host_name: r.families?.family_name ?? null,
+                address: r.address_override ?? addr?.full_address ?? null,
+                city: addr ? [addr.city, addr.state, addr.zip].filter(Boolean).join(", ") : null,
+                phone: r.phone_override ?? r.families?.home_phone ?? null,
+                loc_status: r.status,
+              }
+            })
+          }
+        }
+
         const locIdx = bsSignup?.fieldMap.location_index ?? 0
         const mergedLocs = bsSavedLocs.map((loc, i) => {
           const base = { onVacation: false, vacationMessage: "", ...loc }
           if (bsCancelled) {
             return { ...base, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
           }
-          // Check DB breaks first
+          // Check per-location cancellation from DB
+          const dbLocHost = dbLocHosts.find((h) => h.loc_label.toLowerCase() === loc.label.toLowerCase())
+          if (dbLocHost?.loc_status === "cancelled") {
+            return { ...base, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
+          }
+          // Check DB breaks
           if (hasWholeEventBreak) {
             const msg = dbBreaks.find((b) => b.location_id === null)?.message
             return { ...base, onVacation: true, vacationMessage: msg || `${loc.label} Bible Study is on break` }
@@ -1113,6 +1143,10 @@ export default function DashboardPage() {
           const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
           if (activeBreak) {
             return { ...base, onVacation: true, vacationMessage: activeBreak.message || `${loc.label} Bible Study is on break` }
+          }
+          // Apply per-location host from DB (takes priority over signup auto-fill)
+          if (dbLocHost?.host_name && dbLocHost.host_name !== "TBD") {
+            return { ...base, hostNames: dbLocHost.host_name, address: dbLocHost.address ?? base.address, city: dbLocHost.city ?? base.city, phone: dbLocHost.phone ?? base.phone }
           }
           if (i === locIdx && bsHostData.hostName !== "TBD" && !base.onVacation) {
             return { ...base, hostNames: bsHostData.hostName, address: bsHostData.address, city: bsHostData.city, phone: bsHostData.phone }
