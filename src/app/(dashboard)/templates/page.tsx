@@ -455,6 +455,77 @@ export default function TemplatesPage() {
     })
   }
 
+  async function syncBreaksToDb(typeName: string) {
+    const etId = eventTypeIds[typeName]
+    if (!etId) return
+
+    const supabase = createClient()
+
+    // Find the event for this event type
+    const { data: events } = await supabase
+      .from("events")
+      .select("id")
+      .eq("event_type_id", etId)
+      .eq("is_active", true)
+      .limit(1)
+      .returns<{ id: string }[]>()
+
+    if (!events || events.length === 0) return
+    const eventId = events[0].id
+
+    // Get current locations for this event
+    const { data: locations } = await supabase
+      .from("event_locations")
+      .select("id, label")
+      .eq("event_id", eventId)
+      .eq("is_active", true)
+      .order("sort_order")
+      .returns<{ id: string; label: string }[]>()
+
+    const formData = getDataForType(typeName) as Record<string, unknown>
+
+    // Collect breaks from form data
+    const breaksToWrite: { location_id: string | null; start_date: string; end_date: string; message: string | null }[] = []
+
+    // Template-level breaks (CommonCardFields.breaks)
+    const templateBreaks = formData.breaks as { from: string; to: string; message: string }[] | undefined
+    if (templateBreaks) {
+      for (const brk of templateBreaks) {
+        if (brk.from && brk.to) {
+          breaksToWrite.push({ location_id: null, start_date: brk.from, end_date: brk.to, message: brk.message || null })
+        }
+      }
+    }
+
+    // Location-level breaks (for Bible Study)
+    const formLocations = formData.locations as { label: string; breaks?: { from: string; to: string; message: string }[] }[] | undefined
+    if (formLocations && locations) {
+      for (const formLoc of formLocations) {
+        const dbLoc = locations.find((l) => l.label.toLowerCase() === formLoc.label.toLowerCase())
+        if (!dbLoc || !formLoc.breaks) continue
+        for (const brk of formLoc.breaks) {
+          if (brk.from && brk.to) {
+            breaksToWrite.push({ location_id: dbLoc.id, start_date: brk.from, end_date: brk.to, message: brk.message || null })
+          }
+        }
+      }
+    }
+
+    // Replace all breaks for this event (delete + insert)
+    await supabase.from("event_breaks").delete().eq("event_id", eventId)
+
+    if (breaksToWrite.length > 0) {
+      await supabase.from("event_breaks").insert(
+        breaksToWrite.map((b) => ({ event_id: eventId, ...b })) as never
+      )
+    }
+
+    // Also sync topic to events table
+    if (formData.topic) {
+      await supabase.from("events").update({ topic: formData.topic } as never).eq("id", eventId)
+    }
+  }
+
   async function handleSave(typeName: string) {
     const etId = eventTypeIds[typeName]
     if (!etId) {
@@ -485,6 +556,7 @@ export default function TemplatesPage() {
         } else {
           toast.success(`${typeName.replace(/_/g, " ")} template saved`)
           logAudit("template_updated", "email_templates", existing.id, { typeName })
+          await syncBreaksToDb(typeName)
           await fetchTemplates()
           await checkAndOfferDraftRefresh(typeName, bodyJson, subjectTmpl)
         }
@@ -507,6 +579,7 @@ export default function TemplatesPage() {
         } else {
           toast.success(`${typeName.replace(/_/g, " ")} template created`)
           logAudit("template_created", "email_templates", inserted?.id, { typeName })
+          await syncBreaksToDb(typeName)
           await fetchTemplates()
         }
       }

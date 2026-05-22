@@ -987,11 +987,41 @@ export default function DashboardPage() {
       const bsDateStr = bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"
       const bsTimeStr = bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : null
 
-      // Compute location break status (always, regardless of draft) for bulletin filtering
+      // Compute location break status — try DB first (event_breaks table), fall back to JSON
       const bsSavedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
       const bsBreakCheckDate = bsRawDate ? format(bsRawDate, "yyyy-MM-dd") : format(wkSun, "yyyy-MM-dd")
+
+      // Query event_breaks table for this event and date
+      let dbBreaks: { location_id: string | null; message: string | null; loc_label: string | null }[] = []
+      if (bsEvent) {
+        const { data: breakRows } = await supabase
+          .from("event_breaks")
+          .select("location_id, message, event_locations(label)")
+          .eq("event_id", bsEvent.id)
+          .lte("start_date", bsBreakCheckDate)
+          .gte("end_date", bsBreakCheckDate)
+          .returns<{ location_id: string | null; message: string | null; event_locations: { label: string } | null }[]>()
+        if (breakRows && breakRows.length > 0) {
+          dbBreaks = breakRows.map((r) => ({
+            location_id: r.location_id,
+            message: r.message,
+            loc_label: r.event_locations?.label ?? null,
+          }))
+        }
+      }
+
+      const hasDbBreaks = dbBreaks.length > 0
+      const hasWholeEventBreak = dbBreaks.some((b) => b.location_id === null)
+
       const bsLocBreakStatus = bsSavedLocs.map((loc) => {
         if (bsCancelled) return { label: loc.label, onVacation: true }
+        // Check DB breaks first
+        if (hasWholeEventBreak) return { label: loc.label, onVacation: true }
+        if (hasDbBreaks) {
+          const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
+          if (locBreak) return { label: loc.label, onVacation: true }
+        }
+        // Fall back to JSON breaks (for backwards compat until fully migrated)
         const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
         if (activeBreak) return { label: loc.label, onVacation: true }
         if (loc.onVacation) return { label: loc.label, onVacation: true }
@@ -1002,9 +1032,17 @@ export default function DashboardPage() {
       if (hasBsDraft) {
         const fd = composedMap["bible_study"].form_data as Record<string, unknown>
         const draftLocs = (fd.locations as BibleStudyFormData["locations"]) ?? bsDef.locations ?? []
-        // Apply break detection to draft locations too
+        // Apply break detection to draft locations — DB first, then JSON fallback
         const mergedDraftLocs = draftLocs.map((loc) => {
           if (bsCancelled) return { ...loc, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
+          if (hasWholeEventBreak) {
+            const msg = dbBreaks.find((b) => b.location_id === null)?.message
+            return { ...loc, onVacation: true, vacationMessage: msg || `${loc.label} Bible Study is on break` }
+          }
+          if (hasDbBreaks) {
+            const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
+            if (locBreak) return { ...loc, onVacation: true, vacationMessage: locBreak.message || `${loc.label} Bible Study is on break` }
+          }
           const activeBreak = (loc.breaks ?? []).find((brk: { from: string; to: string; message: string }) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
           if (activeBreak) return { ...loc, onVacation: true, vacationMessage: activeBreak.message || `${loc.label} Bible Study is on break` }
           return loc
@@ -1060,6 +1098,18 @@ export default function DashboardPage() {
           if (bsCancelled) {
             return { ...base, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
           }
+          // Check DB breaks first
+          if (hasWholeEventBreak) {
+            const msg = dbBreaks.find((b) => b.location_id === null)?.message
+            return { ...base, onVacation: true, vacationMessage: msg || `${loc.label} Bible Study is on break` }
+          }
+          if (hasDbBreaks) {
+            const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
+            if (locBreak) {
+              return { ...base, onVacation: true, vacationMessage: locBreak.message || `${loc.label} Bible Study is on break` }
+            }
+          }
+          // Fall back to JSON breaks
           const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
           if (activeBreak) {
             return { ...base, onVacation: true, vacationMessage: activeBreak.message || `${loc.label} Bible Study is on break` }
