@@ -455,7 +455,7 @@ export default function TemplatesPage() {
     })
   }
 
-  async function syncBreaksToDb(typeName: string) {
+  async function syncOperationalDataToDb(typeName: string) {
     const etId = eventTypeIds[typeName]
     if (!etId) return
 
@@ -473,8 +473,70 @@ export default function TemplatesPage() {
     if (!events || events.length === 0) return
     const eventId = events[0].id
 
-    // Get current locations for this event
-    const { data: locations } = await supabase
+    const formData = getDataForType(typeName) as Record<string, unknown>
+
+    // ---- Sync locations to event_locations table ----
+    const formLocations = formData.locations as { label: string; hostNames?: string; address?: string; city?: string; phone?: string; breaks?: { from: string; to: string; message: string }[] }[] | undefined
+
+    // Get current DB locations
+    const { data: dbLocations } = await supabase
+      .from("event_locations")
+      .select("id, label, sort_order")
+      .eq("event_id", eventId)
+      .order("sort_order")
+      .returns<{ id: string; label: string; sort_order: number }[]>()
+
+    const existingLocs = dbLocations ?? []
+
+    if (formLocations && formLocations.length > 0) {
+      // Sync: upsert form locations into DB
+      for (let i = 0; i < formLocations.length; i++) {
+        const formLoc = formLocations[i]
+        const existing = existingLocs.find((l) => l.label.toLowerCase() === formLoc.label.toLowerCase())
+
+        if (existing) {
+          await supabase.from("event_locations").update({
+            label: formLoc.label,
+            sort_order: i,
+            address: formLoc.address || null,
+            city: formLoc.city || null,
+            phone: formLoc.phone || null,
+          } as never).eq("id", existing.id)
+        } else {
+          await supabase.from("event_locations").insert({
+            event_id: eventId,
+            label: formLoc.label,
+            sort_order: i,
+            address: formLoc.address || null,
+            city: formLoc.city || null,
+            phone: formLoc.phone || null,
+          } as never)
+        }
+      }
+
+      // Deactivate locations no longer in form
+      const formLabels = new Set(formLocations.map((l) => l.label.toLowerCase()))
+      for (const dbLoc of existingLocs) {
+        if (!formLabels.has(dbLoc.label.toLowerCase())) {
+          await supabase.from("event_locations").update({ is_active: false } as never).eq("id", dbLoc.id)
+        }
+      }
+    } else if (!formLocations && existingLocs.length === 0) {
+      // Single-location events without explicit locations array: ensure one "Primary" row
+      const singleLoc = formData.location as string | undefined
+      await supabase.from("event_locations").insert({
+        event_id: eventId,
+        label: singleLoc || "Primary",
+        sort_order: 0,
+        address: (formData.address as string) || null,
+        city: (formData.city as string) || null,
+        phone: (formData.phone as string) || null,
+      } as never)
+    }
+
+    // ---- Sync breaks to event_breaks table ----
+    // Re-fetch locations after potential inserts
+    const { data: updatedLocs } = await supabase
       .from("event_locations")
       .select("id, label")
       .eq("event_id", eventId)
@@ -482,9 +544,6 @@ export default function TemplatesPage() {
       .order("sort_order")
       .returns<{ id: string; label: string }[]>()
 
-    const formData = getDataForType(typeName) as Record<string, unknown>
-
-    // Collect breaks from form data
     const breaksToWrite: { location_id: string | null; start_date: string; end_date: string; message: string | null }[] = []
 
     // Template-level breaks (CommonCardFields.breaks)
@@ -497,11 +556,10 @@ export default function TemplatesPage() {
       }
     }
 
-    // Location-level breaks (for Bible Study)
-    const formLocations = formData.locations as { label: string; breaks?: { from: string; to: string; message: string }[] }[] | undefined
-    if (formLocations && locations) {
+    // Location-level breaks (for multi-location events)
+    if (formLocations && updatedLocs) {
       for (const formLoc of formLocations) {
-        const dbLoc = locations.find((l) => l.label.toLowerCase() === formLoc.label.toLowerCase())
+        const dbLoc = updatedLocs.find((l) => l.label.toLowerCase() === formLoc.label.toLowerCase())
         if (!dbLoc || !formLoc.breaks) continue
         for (const brk of formLoc.breaks) {
           if (brk.from && brk.to) {
@@ -511,18 +569,34 @@ export default function TemplatesPage() {
       }
     }
 
-    // Replace all breaks for this event (delete + insert)
+    // Replace all breaks for this event
     await supabase.from("event_breaks").delete().eq("event_id", eventId)
-
     if (breaksToWrite.length > 0) {
       await supabase.from("event_breaks").insert(
         breaksToWrite.map((b) => ({ event_id: eventId, ...b })) as never
       )
     }
 
-    // Also sync topic to events table
-    if (formData.topic) {
-      await supabase.from("events").update({ topic: formData.topic } as never).eq("id", eventId)
+    // ---- Sync zoom/virtual config ----
+    const zoomLink = formData.zoomLink as string | undefined
+    if (zoomLink) {
+      await supabase.from("event_virtual_config").upsert({
+        event_id: eventId,
+        platform: "zoom",
+        meeting_link: zoomLink,
+        meeting_id: (formData.zoomMeetingId as string) || null,
+        passcode: (formData.zoomPasscode as string) || null,
+        is_active: true,
+      } as never, { onConflict: "event_id" })
+    }
+
+    // ---- Sync operational fields to events table ----
+    const eventUpdates: Record<string, unknown> = {}
+    if (formData.topic) eventUpdates.topic = formData.topic
+    if (formData.dinnerNote !== undefined) eventUpdates.dinner_note = formData.dinnerNote || null
+    if (formData.signupLink !== undefined) eventUpdates.signup_link = formData.signupLink || null
+    if (Object.keys(eventUpdates).length > 0) {
+      await supabase.from("events").update(eventUpdates as never).eq("id", eventId)
     }
   }
 
@@ -556,7 +630,7 @@ export default function TemplatesPage() {
         } else {
           toast.success(`${typeName.replace(/_/g, " ")} template saved`)
           logAudit("template_updated", "email_templates", existing.id, { typeName })
-          await syncBreaksToDb(typeName)
+          await syncOperationalDataToDb(typeName)
           await fetchTemplates()
           await checkAndOfferDraftRefresh(typeName, bodyJson, subjectTmpl)
         }
@@ -579,7 +653,7 @@ export default function TemplatesPage() {
         } else {
           toast.success(`${typeName.replace(/_/g, " ")} template created`)
           logAudit("template_created", "email_templates", inserted?.id, { typeName })
-          await syncBreaksToDb(typeName)
+          await syncOperationalDataToDb(typeName)
           await fetchTemplates()
         }
       }
