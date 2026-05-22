@@ -42,6 +42,9 @@ export interface CommonCardFields {
   primaryColor?: string
   resourceLinks?: ResourceLinkDefault[]
   customSections?: CustomSectionDefault[]
+  onBreak?: boolean
+  breakMessage?: string
+  breaks?: LocationBreak[]
 }
 
 export interface BibleStudyDefaults extends CommonCardFields {
