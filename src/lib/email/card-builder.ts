@@ -897,3 +897,156 @@ ${commonTrailingHtml(data, colors, undefined, style)}`, colors) +
 
   return wrapCard(content, colors, style);
 }
+
+// ---------- Generic Event Card (section-based, data-driven) ----------
+
+export interface GenericLocationData {
+  label: string;
+  hostName?: string;
+  address?: string;
+  city?: string;
+  phone?: string;
+  isOnBreak?: boolean;
+  breakMessage?: string;
+}
+
+export interface GenericVirtualData {
+  platform?: string;
+  meetingLink: string;
+  meetingId?: string;
+  passcode?: string;
+}
+
+export interface GenericEventCardData extends BaseCardData {
+  title: string;
+  date?: string;
+  time?: string;
+  topic?: string;
+  locations?: GenericLocationData[];
+  virtual?: GenericVirtualData;
+  signupLink?: string;
+  dinnerNote?: string;
+}
+
+export type CardSection = "header" | "details" | "locations" | "virtual" | "message" | "custom" | "footer"
+
+export function buildGenericEventCard(
+  data: GenericEventCardData,
+  style?: StyleContext,
+  sections?: CardSection[]
+): string {
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.bulletin;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
+  const activeSections = sections ?? ["header", "details", "locations", "virtual", "message", "custom", "footer"];
+
+  const detailRow = (label: string, value: string) =>
+    `<tr>
+<td style="padding:6px 0;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
+<td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
+</tr>`;
+
+  // Details section (when, topic)
+  let detailsHtml = "";
+  if (activeSections.includes("details")) {
+    const allOnBreak = data.locations && data.locations.length > 0 && data.locations.every((l) => l.isOnBreak);
+    if (!allOnBreak) {
+      let rows = "";
+      if (data.date && data.time) rows += detailRow("When", `${data.date} at ${data.time}`);
+      else if (data.date) rows += detailRow("When", data.date);
+      if (data.topic) rows += detailRow("Topic", data.topic);
+      if (data.dinnerNote) rows += detailRow("Note", data.dinnerNote);
+      if (rows) {
+        detailsHtml = `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">\n${rows}\n</table>`;
+      }
+    }
+  }
+
+  // Locations section
+  let locationsHtml = "";
+  if (activeSections.includes("locations") && data.locations && data.locations.length > 0) {
+    const showLabels = data.locations.length > 1;
+    locationsHtml = data.locations
+      .map((loc) => {
+        const locationHeader = showLabels
+          ? `<p style="margin:0 0 8px;font-size:${sz.body}px;font-weight:700;color:${colors.primary}">${loc.label}</p>`
+          : "";
+
+        if (loc.isOnBreak) {
+          const msg = loc.breakMessage || `${loc.label} is on break`;
+          return `${locationHeader}<div style="background:${colors.bgLight};border-radius:8px;padding:12px 16px;text-align:center">
+<p style="margin:0;font-size:${sz.label + 1}px;color:${colors.textLight};font-style:italic">${msg}</p>
+</div>`;
+        }
+
+        let details = "";
+        if (loc.hostName) details += detailRow("Host", loc.hostName);
+        const addrParts = [loc.address, loc.city].filter(Boolean).join("<br/>");
+        if (addrParts) details += detailRow("Where", addrParts);
+        if (loc.phone) details += detailRow("Contact", loc.phone);
+
+        if (!details) return "";
+
+        return `${locationHeader}<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
+${details}
+</table>`;
+      })
+      .filter(Boolean)
+      .join(`<div style="height:16px"></div>`);
+  }
+
+  // Virtual meeting section
+  let virtualHtml = "";
+  if (activeSections.includes("virtual") && data.virtual) {
+    let rows = detailRow("Where", "Via " + (data.virtual.platform ?? "Zoom"));
+    rows += detailRow("Link", `<a href="${data.virtual.meetingLink}" style="color:${colors.primary};text-decoration:underline">Join Meeting</a>`);
+    if (data.virtual.meetingId) rows += detailRow("Meeting ID", data.virtual.meetingId);
+    if (data.virtual.passcode) rows += detailRow("Passcode", data.virtual.passcode);
+    virtualHtml = `<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px;margin-bottom:16px">\n${rows}\n</table>`;
+  }
+
+  // Signup link
+  let signupHtml = "";
+  if (data.signupLink) {
+    signupHtml = `<div style="text-align:center;padding:12px 0">
+<a href="${data.signupLink}" style="display:inline-block;padding:10px 24px;background:${colors.primary};color:#fff;border-radius:20px;text-decoration:none;font-size:${sz.body}px;font-weight:600">Signup</a>
+</div>`;
+  }
+
+  // Assemble content
+  const bodyParts: string[] = [];
+  if (activeSections.includes("message") && data.message) {
+    bodyParts.push(msgBlock(data.message, data.messageBgColor, colors, "0 0 16px", style, data.messageTextColor));
+  }
+  if (detailsHtml) bodyParts.push(detailsHtml);
+  if (locationsHtml) bodyParts.push(locationsHtml);
+  if (virtualHtml) bodyParts.push(virtualHtml);
+  if (signupHtml) bodyParts.push(signupHtml);
+  if (activeSections.includes("custom")) {
+    bodyParts.push(commonTrailingHtml(data, colors, undefined, style));
+  }
+
+  const content =
+    (activeSections.includes("header")
+      ? headerRow(
+          data.title,
+          data.headerSubtitle || "",
+          data.headerEmoji || "📋",
+          colors,
+          style,
+          data.headerTitleColor,
+          data.headerSubtitleColor
+        )
+      : "") +
+    contentRow(bodyParts.join("\n"), colors) +
+    (activeSections.includes("footer")
+      ? footerRow(
+          data.footerVerse || style?.footerText || "",
+          colors,
+          data.footerVerseBgColor,
+          style,
+          data.footerVerseTextColor
+        )
+      : "");
+
+  return wrapCard(content, colors, style);
+}
