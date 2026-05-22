@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/client"
 
 export interface SignupFieldMapping {
   signup_field: string
-  card_field: "host_name" | "host_address" | "host_city" | "host_phone"
+  card_field: "host_name" | "host_address" | "host_city" | "host_phone" | "helper_role" | "helper_name"
 }
 
 export interface SignupFieldMap {
@@ -17,6 +17,7 @@ export interface AutoFillResult {
   city?: string
   phone?: string
   respondentName?: string
+  helpers?: { role: string; name: string }[]
   source: "signup" | "none"
   formTitle?: string
 }
@@ -59,6 +60,47 @@ export async function resolveSignupAutoFill(
     return false
   })
 
+  // Check if this is a helpers-type mapping (collects multiple responses)
+  const hasHelperFields = fieldMap.mappings.some((m) => m.card_field === "helper_role" || m.card_field === "helper_name")
+
+  if (hasHelperFields) {
+    // For helpers: collect ALL matching responses (multiple signups per week)
+    const allMatching = responses.filter((r) => {
+      const matchVal = r.data[fieldMap.match_field]
+      if (typeof matchVal === "number") return matchVal === month
+      if (typeof matchVal === "string") {
+        const monthIdx = MONTHS.findIndex((m) => m.toLowerCase() === matchVal.toLowerCase())
+        if (monthIdx > 0) return monthIdx === month
+      }
+      return false
+    })
+
+    if (allMatching.length === 0) return { source: "none" }
+
+    const result: AutoFillResult = { source: "signup", helpers: [] }
+    const roleField = fieldMap.mappings.find((m) => m.card_field === "helper_role")
+    const nameField = fieldMap.mappings.find((m) => m.card_field === "helper_name")
+
+    for (const resp of allMatching) {
+      const role = roleField ? String(resp.data[roleField.signup_field] ?? "") : ""
+      const name = nameField ? String(resp.data[nameField.signup_field] ?? "") : ""
+      if (role || name) {
+        result.helpers!.push({ role, name })
+      }
+    }
+
+    const { data: formInfo } = await supabase
+      .from("signup_forms")
+      .select("title")
+      .eq("id", linkedFormId)
+      .returns<{ title: string }[]>()
+      .single()
+    if (formInfo) result.formTitle = formInfo.title
+
+    return result
+  }
+
+  // Standard host-type mapping (first matching response)
   if (!matchingResponse) return { source: "none" }
 
   const result: AutoFillResult = { source: "signup" }
@@ -93,6 +135,9 @@ export async function resolveSignupAutoFill(
         break
       case "host_phone":
         if (typeof val === "string") result.phone = val
+        break
+      case "helper_role":
+      case "helper_name":
         break
     }
   }

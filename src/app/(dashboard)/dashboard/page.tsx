@@ -1316,20 +1316,32 @@ export default function DashboardPage() {
         })
       }
 
+      // Auto-fill helpers from signup form (if bulletin event type has a linked form)
+      let autoFilledHelpers: BulletinFormData["helpers"] = []
+      const bulSignup = etSignupLinks["bulletin"]
+      if (bulSignup && wkSun) {
+        const bulAutoFill = await resolveSignupAutoFill(bulSignup.formId, bulSignup.fieldMap, wkSun)
+        if (bulAutoFill.source === "signup" && bulAutoFill.helpers && bulAutoFill.helpers.length > 0) {
+          autoFilledHelpers = bulAutoFill.helpers
+        }
+      }
+
       if (hasBulDraft) {
         const fd = composedMap["bulletin"].form_data as Record<string, unknown>
         setBulletinForm({
           weekLabel: (fd.weekLabel as string) ?? `Week of ${wl}`,
           birthdays: (fd.birthdays as BulletinFormData["birthdays"]) ?? bdayEntries.map((b) => ({ name: b.name, date: b.date })),
           anniversaries: (fd.anniversaries as BulletinFormData["anniversaries"]) ?? anniEntries.map((a) => ({ names: `${a.husbandName} & ${a.wifeName}`, date: a.date })),
-          helpers: (fd.helpers as BulletinFormData["helpers"]) ?? [],
+          helpers: (fd.helpers as BulletinFormData["helpers"]) ?? autoFilledHelpers,
           events: (fd.events as BulletinFormData["events"]) ?? [],
           sectionOrder: (fd.sectionOrder as BulletinFormData["sectionOrder"]) ?? undefined,
           ...bulCommon,
         })
       } else {
         const bulTemplateEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
-        const bulHelpers = (bulDef as Record<string, unknown>).helpers as BulletinFormData["helpers"] ?? []
+        const bulHelpers = autoFilledHelpers.length > 0
+          ? autoFilledHelpers
+          : ((bulDef as Record<string, unknown>).helpers as BulletinFormData["helpers"] ?? [])
         setBulletinForm({
           weekLabel: `Week of ${wl}`,
           birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
