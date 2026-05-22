@@ -987,14 +987,34 @@ export default function DashboardPage() {
       const bsDateStr = bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"
       const bsTimeStr = bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : null
 
+      // Compute location break status (always, regardless of draft) for bulletin filtering
+      const bsSavedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
+      const bsBreakCheckDate = bsRawDate ? format(bsRawDate, "yyyy-MM-dd") : format(wkSun, "yyyy-MM-dd")
+      const bsLocBreakStatus = bsSavedLocs.map((loc) => {
+        if (bsCancelled) return { label: loc.label, onVacation: true }
+        const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
+        if (activeBreak) return { label: loc.label, onVacation: true }
+        if (loc.onVacation) return { label: loc.label, onVacation: true }
+        return { label: loc.label, onVacation: false }
+      })
+      const bsAllOnBreak = bsLocBreakStatus.length > 0 && bsLocBreakStatus.every((l) => l.onVacation)
+
       if (hasBsDraft) {
         const fd = composedMap["bible_study"].form_data as Record<string, unknown>
+        const draftLocs = (fd.locations as BibleStudyFormData["locations"]) ?? bsDef.locations ?? []
+        // Apply break detection to draft locations too
+        const mergedDraftLocs = draftLocs.map((loc) => {
+          if (bsCancelled) return { ...loc, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
+          const activeBreak = (loc.breaks ?? []).find((brk: { from: string; to: string; message: string }) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
+          if (activeBreak) return { ...loc, onVacation: true, vacationMessage: activeBreak.message || `${loc.label} Bible Study is on break` }
+          return loc
+        })
         setBibleStudyForm({
           title: (fd.title as string) ?? bsDef.title ?? "Bible Study This Friday",
-          date: bsDateStr,
+          date: bsAllOnBreak ? "No bible study this week" : bsDateStr,
           time: bsTimeStr ?? (fd.time as string) ?? bsDef.time ?? "7:30 PM",
           topic: (fd.topic as string) ?? bsDef.topic ?? "Studying the Book of Acts",
-          locations: (fd.locations as BibleStudyFormData["locations"]) ?? bsDef.locations ?? [],
+          locations: mergedDraftLocs,
           ...bsCommon,
         })
       } else {
@@ -1034,17 +1054,13 @@ export default function DashboardPage() {
           autoFills["bible_study"] = bsAutoFill
         }
 
-        const savedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
         const locIdx = bsSignup?.fieldMap.location_index ?? 0
-        const todayISO = format(today, "yyyy-MM-dd")
-        const mergedLocs = savedLocs.map((loc, i) => {
+        const mergedLocs = bsSavedLocs.map((loc, i) => {
           const base = { onVacation: false, vacationMessage: "", ...loc }
-          // If the whole instance is cancelled, mark all locations as on vacation
           if (bsCancelled) {
             return { ...base, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
           }
-          // Auto-set vacation if current date falls within a scheduled break
-          const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && todayISO >= brk.from && todayISO <= brk.to)
+          const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
           if (activeBreak) {
             return { ...base, onVacation: true, vacationMessage: activeBreak.message || `${loc.label} Bible Study is on break` }
           }
@@ -1056,7 +1072,7 @@ export default function DashboardPage() {
 
         setBibleStudyForm({
           title: bsDef.title ?? "Bible Study This Friday",
-          date: bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week",
+          date: bsAllOnBreak ? "No bible study this week" : (bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"),
           time: bsInstance?.instance_time
             ? formatTime(bsInstance.instance_time)
             : bsDef.time ?? "7:30 PM",
@@ -1196,11 +1212,17 @@ export default function DashboardPage() {
       const hasBulDraft = !!composedMap["bulletin"]
       const bulCommon = extractCommonFields(bulDef)
 
-      // Filter bulletin template events — remove entries for cancelled events this week
+      // Filter bulletin template events — remove entries for cancelled/on-break events this week
       const cancelledKeywords: string[] = []
-      if (bsCancelled) cancelledKeywords.push("bible study")
+      if (bsCancelled || bsAllOnBreak) cancelledKeywords.push("bible study")
       if (wsCancelled) cancelledKeywords.push("women")
       if (pmCancelled) cancelledKeywords.push("prayer")
+      // Add per-location breaks for Bible Study (e.g., "san ramon" on break but "mountain house" active)
+      for (const loc of bsLocBreakStatus) {
+        if (loc.onVacation && loc.label) {
+          cancelledKeywords.push(loc.label.toLowerCase())
+        }
+      }
 
       function filterCancelledBulletinEvents(events: { title: string; details: string }[]) {
         if (cancelledKeywords.length === 0) return events
