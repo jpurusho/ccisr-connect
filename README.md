@@ -149,8 +149,14 @@ erDiagram
     TAGS ||--o{ MEMBER_TAGS : applied_to
     MEMBERS ||--o{ WEDDING_ANNIVERSARIES : celebrates
     EVENT_TYPES ||--o{ EVENTS : categorizes
-    EVENTS ||--o{ EVENT_INSTANCES : scheduled_as
     EVENT_TYPES ||--o{ EMAIL_TEMPLATES : defaults_for
+    EVENTS ||--o{ EVENT_INSTANCES : scheduled_as
+    EVENTS ||--o{ EVENT_LOCATIONS : has_locations
+    EVENTS ||--o{ EVENT_BREAKS : has_breaks
+    EVENTS ||--o| EVENT_VIRTUAL_CONFIG : virtual_meeting
+    EVENT_LOCATIONS ||--o{ EVENT_BREAKS : location_breaks
+    EVENT_LOCATIONS ||--o{ EVENT_INSTANCE_LOCATIONS : overrides
+    EVENT_INSTANCES ||--o{ EVENT_INSTANCE_LOCATIONS : per_location
     MAILING_LISTS ||--o{ MAILING_LIST_MEMBERS : contains
     SMTP_CONFIGS ||--o{ DISPATCH_QUEUE : sends_via
     MAILING_LISTS ||--o{ DISPATCH_QUEUE : targets
@@ -161,13 +167,25 @@ erDiagram
     SIGNUP_FORMS }o--|| MAILING_LISTS : auto_adds
 ```
 
-### Communication Flow
+### Communication Workflow
+
+The system follows this flow every week:
+
+1. **Author a template** — subject pattern, colors, emoji, footer (visual only)
+2. **Create an event type** — a name + color (e.g., "Bible Study", "VBS")
+3. **Link them** — template's `event_type_id` points to the event type
+4. **Schedule via calendar** — create an event with recurrence, locations, breaks
+5. **Dashboard auto-shows card** — for every event type with an instance this week
+6. **Dynamic data fills in** — host, location, topic, break status from DB tables
+7. **Admin reviews and sends** — edit if needed, dispatch to mailing list
 
 ```mermaid
 flowchart LR
-    T[Template Defaults] --> D[Dashboard]
-    C[Calendar] -->|Event dates & hosts| D
-    SF[Signup Forms] -->|Auto-fill| D
+    T[Template<br/>visual styling] --> D[Dashboard Card]
+    ET[Event Type] --> T
+    ET --> EV[Event<br/>recurrence + locations]
+    EV -->|get_week_status| D
+    SF[Signup Forms] -->|Auto-fill host| D
     D --> E{Edit & Preview}
     E --> Q[Dispatch Queue]
     E -->|Send Test| TS[Test to Admin]
@@ -184,15 +202,29 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    C[Calendar: Create Event] --> EV[events table]
-    EV -->|Recurrence rule| OCC[getOccurrences resolves dates]
-    EV -->|Per-date override| EI[event_instances table]
-    OCC --> DASH[Dashboard: compose email]
-    EI --> DASH
+    ET[Event Type] --> EV[events table]
+    EV -->|Recurrence rule| EI[event_instances table]
+    EV -->|Multi-location| EL[event_locations table]
+    EV -->|Date-range breaks| EB[event_breaks table]
+    EL -->|Per-location breaks| EB
+    EI -->|Per-occurrence override| EIL[event_instance_locations]
+    EI --> WS["get_week_status(start, end)"]
+    EL --> WS
+    EB --> WS
+    EIL --> WS
+    WS --> DASH[Dashboard: compose email]
     DASH --> CI[composed_instances: draft]
     CI --> DQ[dispatch_queue: sent]
-    DQ -->|Shown on sent_at date| C
+    DQ -->|Shown on sent_at date| CAL[Calendar]
 ```
+
+### Data Separation Principle
+
+| Data Type | Storage | Examples |
+|-----------|---------|----------|
+| **Operational** | Relational tables (FKs, constraints) | Breaks, locations, hosts, zoom, status |
+| **Visual** | JSONB (`visual_config`) | Colors, emoji, message, footer verse |
+| **Snapshot** | HTML/JSONB | `dispatch_queue.body_html`, weekly drafts |
 
 ### Signup Form Flow
 
@@ -331,7 +363,7 @@ Connected to Vercel via GitHub integration. Every push to `main` triggers auto-d
 
 ## Database Migrations
 
-Run these in order via Supabase SQL Editor:
+Run via `npx supabase db push` or in order via Supabase SQL Editor:
 
 1. `00001_initial_schema.sql` — Core tables, RLS policies, seed data (6 event types)
 2. `00002_member_tags.sql` — Tags system (tags + member_tags tables)
@@ -341,6 +373,16 @@ Run these in order via Supabase SQL Editor:
 6. `00006` through `00010` — Dispatch and template enhancements
 7. `00011_event_types_soft_delete.sql` — Soft delete (is_active) on event_types
 8. `00012_event_host_family.sql` — Host family with expiration on events table
+9. `00013` through `00022` — Event date ranges, info sections, signup forms, app settings
+10. `00023_event_locations.sql` — Multi-location support per event
+11. `00024_event_breaks.sql` — Date-range breaks per event/location
+12. `00025_event_virtual_config.sql` — Zoom/virtual meeting details
+13. `00026_event_instance_locations.sql` — Per-occurrence location overrides
+14. `00027_event_columns.sql` — topic, dinner_note, signup_link on events
+15. `00028_bulletin_items.sql` — Manual bulletin entries
+16. `00029_visual_config.sql` — Visual-only JSONB column on email_templates
+17. `00030_get_week_status_fn.sql` — `get_week_status(start, end)` DB function
+18. `00031_migrate_json_to_tables.sql` — Data migration from JSON → relational tables
 
 ## License
 
