@@ -972,8 +972,10 @@ export default function DashboardPage() {
       const hasBsDraft = !!composedMap["bible_study"]
       const bsEvent = findEventByType("friday_bible_study")
       const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, wkSun, wkSat) : []
-      const bsDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
-      const bsInstance = bsDate && bsEvent ? findInstance(bsEvent.id, format(bsDate, "yyyy-MM-dd")) : null
+      const bsRawDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
+      const bsInstance = bsRawDate && bsEvent ? findInstance(bsEvent.id, format(bsRawDate, "yyyy-MM-dd")) : null
+      const bsCancelled = bsInstance?.status === "cancelled"
+      const bsDate = bsCancelled ? null : bsRawDate
 
       const bsCommon = extractCommonFields(bsDef)
       if (bsCommon.resourceLinks.length === 0) {
@@ -1037,6 +1039,10 @@ export default function DashboardPage() {
         const todayISO = format(today, "yyyy-MM-dd")
         const mergedLocs = savedLocs.map((loc, i) => {
           const base = { onVacation: false, vacationMessage: "", ...loc }
+          // If the whole instance is cancelled, mark all locations as on vacation
+          if (bsCancelled) {
+            return { ...base, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
+          }
           // Auto-set vacation if current date falls within a scheduled break
           const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && todayISO >= brk.from && todayISO <= brk.to)
           if (activeBreak) {
@@ -1064,7 +1070,10 @@ export default function DashboardPage() {
       const hasWsDraft = !!composedMap["womens_study"]
       const wsEvent = findEventByType("wednesday_womens_study")
       const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, wkSun, wkSat) : []
-      const wsDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
+      const wsRawDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
+      const wsInstance = wsRawDate && wsEvent ? findInstance(wsEvent.id, format(wsRawDate, "yyyy-MM-dd")) : null
+      const wsCancelled = wsInstance?.status === "cancelled"
+      const wsDate = wsCancelled ? null : wsRawDate
 
       const wsDateStr = wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week"
 
@@ -1100,8 +1109,10 @@ export default function DashboardPage() {
       const hasPmDraft = !!composedMap["prayer_meeting"]
       const pmEvent = findEventByType("monthly_prayer")
       const pmOccurrences = pmEvent ? getOccurrences(pmEvent.recurrence_rule, wkSun, wkSat) : []
-      const pmDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
-      const pmInstance = pmDate && pmEvent ? findInstance(pmEvent.id, format(pmDate, "yyyy-MM-dd")) : null
+      const pmRawDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
+      const pmInstance = pmRawDate && pmEvent ? findInstance(pmEvent.id, format(pmRawDate, "yyyy-MM-dd")) : null
+      const pmCancelled = pmInstance?.status === "cancelled"
+      const pmDate = pmCancelled ? null : pmRawDate
 
       const pmDateStr = pmDate ? format(pmDate, "EEEE, MMMM do") : null
       const pmTimeStr = pmInstance?.instance_time ? formatTime(pmInstance.instance_time) : null
@@ -1185,6 +1196,20 @@ export default function DashboardPage() {
       const hasBulDraft = !!composedMap["bulletin"]
       const bulCommon = extractCommonFields(bulDef)
 
+      // Filter bulletin template events — remove entries for cancelled events this week
+      const cancelledKeywords: string[] = []
+      if (bsCancelled) cancelledKeywords.push("bible study")
+      if (wsCancelled) cancelledKeywords.push("women")
+      if (pmCancelled) cancelledKeywords.push("prayer")
+
+      function filterCancelledBulletinEvents(events: { title: string; details: string }[]) {
+        if (cancelledKeywords.length === 0) return events
+        return events.filter((e) => {
+          const lower = e.title.toLowerCase()
+          return !cancelledKeywords.some((kw) => lower.includes(kw))
+        })
+      }
+
       if (hasBulDraft) {
         const fd = composedMap["bulletin"].form_data as Record<string, unknown>
         setBulletinForm({
@@ -1207,7 +1232,7 @@ export default function DashboardPage() {
             date: a.date,
           })),
           helpers: bulHelpers,
-          events: [...bulletinAutoEvents, ...bulTemplateEvents],
+          events: [...bulletinAutoEvents, ...filterCancelledBulletinEvents(bulTemplateEvents)],
           ...bulCommon,
         })
       }

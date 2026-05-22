@@ -602,8 +602,17 @@ ${details}
     .filter(Boolean)
     .join(`<div style="height:16px"></div>`);
 
-  let sharedDetails = detailRow("When", `${data.date} at ${data.time}`);
-  if (data.topic) sharedDetails += detailRow("Topic", data.topic);
+  const allOnVacation = data.locations.length > 0 && data.locations.every((loc) => loc.onVacation);
+
+  let sharedDetails = "";
+  if (!allOnVacation) {
+    sharedDetails = detailRow("When", `${data.date} at ${data.time}`);
+    if (data.topic) sharedDetails += detailRow("Topic", data.topic);
+  }
+
+  const sharedDetailsHtml = sharedDetails
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">\n${sharedDetails}\n</table>`
+    : "";
 
   const content =
     headerRow(
@@ -617,9 +626,7 @@ ${details}
     ) +
     contentRow(
       `${data.message ? msgBlock(data.message, data.messageBgColor, colors, "0 0 16px", style, data.messageTextColor) : ""}
-<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">
-${sharedDetails}
-</table>
+${sharedDetailsHtml}
 ${locationBlocks}
 ${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined, style)}`,
       colors
