@@ -1,22 +1,28 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import type { CommType } from "@/lib/dashboard-types"
 
 const BUILTIN_TYPES: CommType[] = ["bulletin", "birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting"]
-const TEMPLATE_STORAGE_KEY = "ccisr-dashboard-templates"
+const ORDER_STORAGE_KEY = "ccisr-dashboard-card-order"
+const HIDDEN_STORAGE_KEY = "ccisr-dashboard-hidden-cards"
 const CUSTOM_HIDDEN_KEY = "ccisr-dashboard-hidden-custom"
 
-function loadVisibleTemplates(): CommType[] {
-  if (typeof window === "undefined") return BUILTIN_TYPES
+interface CardOrderItem {
+  type: string
+  visible: boolean
+}
+
+function loadCardOrder(): CardOrderItem[] {
+  if (typeof window === "undefined") return BUILTIN_TYPES.map((t) => ({ type: t, visible: true }))
   try {
-    const saved = localStorage.getItem(TEMPLATE_STORAGE_KEY)
+    const saved = localStorage.getItem(ORDER_STORAGE_KEY)
     if (saved) {
-      const parsed = JSON.parse(saved) as string[]
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed as CommType[]
+      const parsed = JSON.parse(saved) as CardOrderItem[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
     }
   } catch { /* ignore */ }
-  return BUILTIN_TYPES
+  return BUILTIN_TYPES.map((t) => ({ type: t, visible: true }))
 }
 
 function loadHiddenCustom(): Set<string> {
@@ -32,13 +38,19 @@ function loadHiddenCustom(): Set<string> {
 }
 
 export function useCardVisibility() {
-  const [visibleTemplates, setVisibleTemplates] = useState<CommType[]>(() => loadVisibleTemplates())
+  const [cardOrder, setCardOrder] = useState<CardOrderItem[]>(() => loadCardOrder())
   const [hiddenCustom, setHiddenCustom] = useState<Set<string>>(() => loadHiddenCustom())
 
+  const visibleTemplates = cardOrder.filter((c) => c.visible).map((c) => c.type as CommType)
+
   function toggleTemplate(type: CommType) {
-    setVisibleTemplates((prev) => {
-      const next = prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-      localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(next))
+    setCardOrder((prev) => {
+      const next = prev.map((c) => c.type === type ? { ...c, visible: !c.visible } : c)
+      // Add if not in list yet
+      if (!next.find((c) => c.type === type)) {
+        next.push({ type, visible: true })
+      }
+      localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(next))
       return next
     })
   }
@@ -57,5 +69,32 @@ export function useCardVisibility() {
     })
   }
 
-  return { visibleTemplates, toggleTemplate, isCustomVisible, toggleCustomTemplate }
+  const reorderCards = useCallback((fromIndex: number, toIndex: number) => {
+    setCardOrder((prev) => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const ensureCardInOrder = useCallback((type: string) => {
+    setCardOrder((prev) => {
+      if (prev.find((c) => c.type === type)) return prev
+      const next = [...prev, { type, visible: true }]
+      localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  return {
+    visibleTemplates,
+    cardOrder,
+    toggleTemplate,
+    isCustomVisible,
+    toggleCustomTemplate,
+    reorderCards,
+    ensureCardInOrder,
+  }
 }
