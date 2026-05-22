@@ -98,6 +98,31 @@ export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProp
 
       {expanded && (
         <div className="border-t px-3 pb-3 space-y-4">
+          {/* Quick Theme Packages */}
+          <div className="pt-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quick Theme</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { name: "Classic", fontFamily: "serif" as FontFamily, headerStyle: "band" as HeaderStyle, gradient: "none" as HeaderGradient },
+                { name: "Modern", fontFamily: "sans-serif" as FontFamily, headerStyle: "top-border" as HeaderStyle, gradient: "ocean" as HeaderGradient },
+                { name: "Festive", fontFamily: "rounded" as FontFamily, headerStyle: "band" as HeaderStyle, gradient: "sunset" as HeaderGradient },
+                { name: "Elegant", fontFamily: "serif" as FontFamily, headerStyle: "side-accent" as HeaderStyle, gradient: "lavender" as HeaderGradient },
+                { name: "Bold", fontFamily: "sans-serif" as FontFamily, headerStyle: "band" as HeaderStyle, gradient: "midnight" as HeaderGradient },
+                { name: "Fresh", fontFamily: "rounded" as FontFamily, headerStyle: "band" as HeaderStyle, gradient: "emerald" as HeaderGradient },
+              ].map((pkg) => (
+                <Button
+                  key={pkg.name}
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-[11px] px-2.5"
+                  onClick={() => update({ fontFamily: pkg.fontFamily, headerStyle: pkg.headerStyle, headerGradient: pkg.gradient })}
+                >
+                  {pkg.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           {/* Typography */}
           <div className="pt-3 space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Typography</p>

@@ -7,10 +7,11 @@ import {
   LayoutDashboard,
   CalendarDays,
   Users,
-  Mail,
   Settings,
   Church,
   ClipboardList,
+  Palette,
+  BarChart3,
 } from "lucide-react"
 
 import {
@@ -19,6 +20,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -27,17 +29,46 @@ import {
 import { UserNav } from "@/components/layout/user-nav"
 import { APP_VERSION } from "@/lib/version"
 
-const navItems = [
+const opsItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Calendar", href: "/calendar", icon: CalendarDays },
   { title: "Members", href: "/members", icon: Users },
-  { title: "Email", href: "/email", icon: Mail },
+]
+
+const authoringItems = [
+  { title: "Templates", href: "/templates", icon: Palette },
   { title: "Signups", href: "/signups", icon: ClipboardList },
+]
+
+const adminItems = [
+  { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Settings", href: "/settings", icon: Settings },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
+
+  function renderGroup(items: typeof opsItems) {
+    return items.map((item) => {
+      const isActive =
+        item.href === "/dashboard"
+          ? pathname === "/dashboard"
+          : pathname.startsWith(item.href)
+
+      return (
+        <SidebarMenuItem key={item.href}>
+          <SidebarMenuButton
+            isActive={isActive}
+            tooltip={item.title}
+            render={<Link href={item.href} />}
+          >
+            <item.icon className="size-4" />
+            <span>{item.title}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      )
+    })
+  }
 
   return (
     <Sidebar>
@@ -63,25 +94,25 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
-                const isActive =
-                  item.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname.startsWith(item.href)
+              {renderGroup(opsItems)}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      tooltip={item.title}
-                      render={<Link href={item.href} />}
-                    >
-                      <item.icon className="size-4" />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
+        <SidebarGroup>
+          <SidebarGroupLabel>Authoring</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {renderGroup(authoringItems)}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Admin</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {renderGroup(adminItems)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

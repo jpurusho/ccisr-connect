@@ -30,7 +30,7 @@ export type FontSizeScale = "compact" | "default" | "large"
 export type HeaderStyle = "band" | "top-border" | "side-accent"
 export type SectionLayout = "table" | "paragraph" | "list"
 
-export type HeaderGradient = "none" | "sunset" | "ocean" | "forest" | "lavender" | "warm" | "midnight" | "rose" | "custom"
+export type HeaderGradient = "none" | "sunset" | "ocean" | "forest" | "lavender" | "warm" | "midnight" | "rose" | "coral" | "sky" | "emerald" | "peach" | "royal" | "custom"
 
 export const HEADER_GRADIENTS: Record<Exclude<HeaderGradient, "none" | "custom">, { label: string; css: string; preview: string }> = {
   sunset: { label: "Sunset", css: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", preview: "#f5576c" },
@@ -40,6 +40,11 @@ export const HEADER_GRADIENTS: Record<Exclude<HeaderGradient, "none" | "custom">
   warm: { label: "Warm", css: "linear-gradient(135deg, #f6d365 0%, #fda085 100%)", preview: "#fda085" },
   midnight: { label: "Midnight", css: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)", preview: "#2c5364" },
   rose: { label: "Rose", css: "linear-gradient(135deg, #ee9ca7 0%, #ffdde1 100%)", preview: "#ee9ca7" },
+  coral: { label: "Coral", css: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)", preview: "#ff9a9e" },
+  sky: { label: "Sky", css: "linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)", preview: "#a1c4fd" },
+  emerald: { label: "Emerald", css: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)", preview: "#43e97b" },
+  peach: { label: "Peach", css: "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)", preview: "#fcb69f" },
+  royal: { label: "Royal", css: "linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)", preview: "#4e54c8" },
 }
 
 export interface TemplateStyleSettings {

@@ -1,8 +1,13 @@
 "use client"
 
-import { Settings, Palette, Server, UserCog, Info, Church, Tag, Activity, Database, Plug } from "lucide-react"
+import { Suspense } from "react"
+import { useSearchParams } from "next/navigation"
+import { Settings, Palette, Server, UserCog, Info, Church, Tag, Activity, Database, Plug, Clock, Mail, History } from "lucide-react"
 import dynamic from "next/dynamic"
 const ActivityLogPanel = dynamic(() => import("@/components/settings/activity-log-panel"), { ssr: false })
+const DispatchPanel = dynamic(() => import("@/app/(dashboard)/dispatch/page"), { ssr: false })
+const MailingListsPanel = dynamic(() => import("@/app/(dashboard)/mailing-lists/page"), { ssr: false })
+const HistoryPanel = dynamic(() => import("@/app/(dashboard)/history/page"), { ssr: false })
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Card,
@@ -69,7 +74,17 @@ function AboutPanel() {
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsPageInner />
+    </Suspense>
+  )
+}
+
+function SettingsPageInner() {
   const { appUser, loading } = useAppUser()
+  const searchParams = useSearchParams()
+  const initialTab = searchParams.get("tab") || "themes"
   const isAdmin = appUser?.role === "admin" || appUser?.role === "super_admin"
   const isSuperAdmin = appUser?.role === "super_admin"
 
@@ -93,7 +108,7 @@ export default function SettingsPage() {
           <Skeleton className="h-64 w-full" />
         </div>
       ) : (
-        <Tabs defaultValue="themes">
+        <Tabs defaultValue={initialTab}>
           <TabsList
             variant="line"
             className="w-full justify-start overflow-x-auto scrollbar-none"
@@ -105,13 +120,31 @@ export default function SettingsPage() {
             {isAdmin && (
               <TabsTrigger value="email">
                 <Server className="size-4" />
-                <span className="hidden sm:inline">Email Configuration</span>
+                <span className="hidden sm:inline">SMTP</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="mailing-lists">
+                <Mail className="size-4" />
+                <span className="hidden sm:inline">Mailing Lists</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="dispatch">
+                <Clock className="size-4" />
+                <span className="hidden sm:inline">Dispatch Queue</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="history">
+                <History className="size-4" />
+                <span className="hidden sm:inline">Email History</span>
               </TabsTrigger>
             )}
             {isAdmin && (
               <TabsTrigger value="users">
                 <UserCog className="size-4" />
-                <span className="hidden sm:inline">User Management</span>
+                <span className="hidden sm:inline">Users</span>
               </TabsTrigger>
             )}
             <TabsTrigger value="tags">
@@ -147,6 +180,24 @@ export default function SettingsPage() {
           {isAdmin && (
             <TabsContent value="email" className="mt-6">
               <SmtpConfigPanel />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="mailing-lists" className="mt-6">
+              <MailingListsPanel />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="dispatch" className="mt-6">
+              <DispatchPanel />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="history" className="mt-6">
+              <HistoryPanel />
             </TabsContent>
           )}
 
