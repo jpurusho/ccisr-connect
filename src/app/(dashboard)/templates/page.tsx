@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import {
@@ -858,6 +859,92 @@ export default function TemplatesPage() {
                                 setBibleStudyData((prev) => ({ ...prev, locations: locs }))
                               }}
                             />
+                            {/* Vacation toggle */}
+                            <div className="flex items-center gap-2 pt-1">
+                              <Switch
+                                size="sm"
+                                checked={loc.onVacation}
+                                onCheckedChange={(checked) => {
+                                  const locs = [...(bibleStudyData.locations || [])]
+                                  locs[i] = { ...locs[i], onVacation: checked }
+                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
+                                }}
+                              />
+                              <Label className="text-xs text-muted-foreground">On vacation / break</Label>
+                            </div>
+                            {loc.onVacation && (
+                              <Input
+                                placeholder="e.g., Bible Study will resume on September 12th"
+                                value={loc.vacationMessage || ""}
+                                onChange={(e) => {
+                                  const locs = [...(bibleStudyData.locations || [])]
+                                  locs[i] = { ...locs[i], vacationMessage: e.target.value }
+                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
+                                }}
+                              />
+                            )}
+                            {/* Scheduled breaks */}
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] text-muted-foreground font-medium">Scheduled Breaks</p>
+                              {(loc.breaks ?? []).map((brk, bIdx) => (
+                                <div key={bIdx} className="flex items-center gap-1.5">
+                                  <Input
+                                    type="date"
+                                    value={brk.from}
+                                    onChange={(e) => {
+                                      const locs = [...(bibleStudyData.locations || [])]
+                                      const breaks = [...(locs[i].breaks ?? [])]
+                                      breaks[bIdx] = { ...breaks[bIdx], from: e.target.value }
+                                      locs[i] = { ...locs[i], breaks }
+                                      setBibleStudyData((prev) => ({ ...prev, locations: locs }))
+                                    }}
+                                    className="w-32 text-xs h-7"
+                                  />
+                                  <span className="text-xs text-muted-foreground">to</span>
+                                  <Input
+                                    type="date"
+                                    value={brk.to}
+                                    onChange={(e) => {
+                                      const locs = [...(bibleStudyData.locations || [])]
+                                      const breaks = [...(locs[i].breaks ?? [])]
+                                      breaks[bIdx] = { ...breaks[bIdx], to: e.target.value }
+                                      locs[i] = { ...locs[i], breaks }
+                                      setBibleStudyData((prev) => ({ ...prev, locations: locs }))
+                                    }}
+                                    className="w-32 text-xs h-7"
+                                  />
+                                  <Input
+                                    placeholder="Break message"
+                                    value={brk.message}
+                                    onChange={(e) => {
+                                      const locs = [...(bibleStudyData.locations || [])]
+                                      const breaks = [...(locs[i].breaks ?? [])]
+                                      breaks[bIdx] = { ...breaks[bIdx], message: e.target.value }
+                                      locs[i] = { ...locs[i], breaks }
+                                      setBibleStudyData((prev) => ({ ...prev, locations: locs }))
+                                    }}
+                                    className="flex-1 text-xs h-7"
+                                  />
+                                  <Button variant="ghost" size="icon-sm" title="Remove break" onClick={() => {
+                                    const locs = [...(bibleStudyData.locations || [])]
+                                    const breaks = (locs[i].breaks ?? []).filter((_, j) => j !== bIdx)
+                                    locs[i] = { ...locs[i], breaks: breaks.length > 0 ? breaks : undefined }
+                                    setBibleStudyData((prev) => ({ ...prev, locations: locs }))
+                                  }}>
+                                    <Trash2 className="size-3 text-muted-foreground" />
+                                  </Button>
+                                </div>
+                              ))}
+                              <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
+                                const locs = [...(bibleStudyData.locations || [])]
+                                const breaks = [...(locs[i].breaks ?? []), { from: "", to: "", message: "" }]
+                                locs[i] = { ...locs[i], breaks }
+                                setBibleStudyData((prev) => ({ ...prev, locations: locs }))
+                              }}>
+                                <Plus className="size-3" />
+                                Add break period
+                              </Button>
+                            </div>
                           </div>
                         ))}
                         <Button
