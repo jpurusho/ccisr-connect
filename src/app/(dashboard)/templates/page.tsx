@@ -732,14 +732,13 @@ export default function TemplatesPage() {
       {/* Header + back button when editing */}
       <div className="flex items-center gap-3">
         {activeTab && (
-          <Button variant="ghost" size="icon-sm" onClick={() => setActiveTab("")} className="shrink-0">
-            <Trash2 className="size-4 rotate-0" style={{ display: "none" }} />
+          <Button variant="ghost" size="icon-sm" onClick={() => { setActiveTab(""); setEditingCustom(null); setCreatingCustom(false) }} className="shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           </Button>
         )}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {activeTab ? (allTemplateCards.find((c) => c.id === activeTab || c.id === `custom-${activeTab}`)?.label ?? "Template") : "Templates"}
+            {activeTab ? (editingCustom?.name ?? allTemplateCards.find((c) => c.id === activeTab)?.label ?? "Template") : "Templates"}
           </h1>
           <p className="text-muted-foreground text-sm">
             {activeTab ? "Edit template styling and defaults" : "Design how your email cards look. Tap to edit."}
@@ -756,7 +755,20 @@ export default function TemplatesPage() {
               <button
                 key={card.id}
                 type="button"
-                onClick={() => setActiveTab(card.isCustom ? "custom" : card.id)}
+                onClick={() => {
+                  if (card.isCustom) {
+                    const ctId = card.id.replace("custom-", "")
+                    const ct = customTemplates.find((t) => t.id === ctId)
+                    if (ct) {
+                      let parsed: Record<string, unknown> = {}
+                      try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+                      setEditingCustom({ id: ct.id, name: ct.name, subject: ct.subject_template, data: parsed, styleSettings: (ct.style_settings as TemplateStyleSettings) ?? {} })
+                    }
+                    setActiveTab("custom")
+                  } else {
+                    setActiveTab(card.id)
+                  }
+                }}
                 className="flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all hover:shadow-md hover:border-primary/30 active:scale-95"
               >
                 <div
