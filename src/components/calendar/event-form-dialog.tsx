@@ -224,6 +224,23 @@ export function EventFormDialog({
         is_active: true,
       }
 
+      // Check for conflicts on the same date (one-time events only)
+      if (mode === "create" && recurrenceFreq === "NONE" && startDate) {
+        const { data: conflicts } = await supabase
+          .from("event_instances")
+          .select("id, events(title)")
+          .eq("instance_date", startDate)
+          .returns<{ id: string; events: { title: string } | null }[]>()
+
+        if (conflicts && conflicts.length > 0) {
+          const names = conflicts.map((c) => c.events?.title).filter(Boolean).join(", ")
+          if (!confirm(`There are existing events on this date: ${names}.\n\nDid you mean to cancel one of those instead? Click OK to create anyway, or Cancel to go back.`)) {
+            setSaving(false)
+            return
+          }
+        }
+      }
+
       if (mode === "edit" && eventId) {
         const { error } = await supabase
           .from("events")
@@ -243,6 +260,17 @@ export function EventFormDialog({
           .single()
 
         if (error) { toast.error(`Failed: ${error.message}`); return }
+
+        // For one-time events, also create an instance row so it appears in queries
+        if (recurrenceFreq === "NONE" && startDate && data?.id) {
+          await supabase.from("event_instances").insert({
+            event_id: data.id,
+            instance_date: startDate,
+            instance_time: time || null,
+            status: "confirmed",
+          } as never)
+        }
+
         toast.success(`"${title}" created`)
         const etName = eventTypes.find((t) => t.id === eventTypeId)?.name
         logAudit("event_created", "events", data?.id ?? null, { title: title.trim(), event_type: etName, recurrence: recurrenceFreq !== "NONE" ? recurrenceFreq : undefined })
