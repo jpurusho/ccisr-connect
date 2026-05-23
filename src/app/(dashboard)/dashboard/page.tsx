@@ -2709,7 +2709,7 @@ export default function DashboardPage() {
               return (
                 <button
                   key={type}
-                  onClick={() => setSelectedCard(isSelected ? type : type)}
+                  onClick={() => { setSelectedCard(type); setSelectedCustomCard(null) }}
                   className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
                     isSelected
                       ? "ring-2 ring-offset-1 shadow-sm"
@@ -2839,7 +2839,7 @@ export default function DashboardPage() {
               return (
                 <button
                   key={ct.id}
-                  onClick={() => { setSelectedCustomCard(isSelected ? null : ct.id); if (!isSelected) setSelectedCard("bulletin") }}
+                  onClick={() => { setSelectedCustomCard(isSelected ? null : ct.id); setSelectedCard(isSelected ? selectedCard : "" as CommType) }}
                   className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
                     isSelected ? "ring-2 ring-offset-1 shadow-sm" : "border-border hover:border-foreground/20"
                   }`}
@@ -2928,7 +2928,7 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Expanded card detail ── */}
-          {visibleTemplates.includes(selectedCard) && (() => {
+          {visibleTemplates.includes(selectedCard) && !selectedCustomCard && (() => {
             const tmpl = BUILTIN_TEMPLATES.find((t) => t.type === selectedCard)!
             const type = selectedCard
 
