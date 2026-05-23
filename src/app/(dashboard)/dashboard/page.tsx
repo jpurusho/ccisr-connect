@@ -478,7 +478,6 @@ export default function DashboardPage() {
   const [customSubjectOverrides, setCustomSubjectOverrides] = useState<Record<string, string>>({})
   const [customCommOptions, setCustomCommOptions] = useState<Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }>>({})
   const [customSnapshots, setCustomSnapshots] = useState<Record<string, Record<string, unknown>>>({})
-  const [selectedCustomCard, setSelectedCustomCard] = useState<string | null>(null)
 
   // ---- Saved form snapshots for cancel/revert ----
   const [savedSnapshots, setSavedSnapshots] = useState<Partial<Record<CommType, Record<string, unknown>>>>({})
@@ -540,8 +539,8 @@ export default function DashboardPage() {
     additionalRecipients?: string
   } | null>(null)
 
-  // ---- Selected communication card (supports ?card= query param from calendar) ----
-  const [selectedCard, setSelectedCard] = useState<CommType>("bulletin")
+  // ---- Selected card (unified: CommType for built-in, "custom:<id>" for custom) ----
+  const [activeCardKey, setActiveCardKey] = useState<string>("bulletin")
   const [cardParamApplied, setCardParamApplied] = useState(false)
 
   useEffect(() => {
@@ -550,10 +549,14 @@ export default function DashboardPage() {
     const cardParam = params.get("card")
     const valid: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
     if (cardParam && valid.includes(cardParam as CommType)) {
-      setSelectedCard(cardParam as CommType)
+      setActiveCardKey(cardParam)
     }
     setCardParamApplied(true)
   }, [cardParamApplied])
+
+  // Derived helpers for the unified selection
+  const selectedCard = (["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"].includes(activeCardKey) ? activeCardKey : "") as CommType
+  const selectedCustomCard = activeCardKey.startsWith("custom:") ? activeCardKey.slice(7) : null
 
   // ---- Week offset for future scheduling (0 = this week, 1 = next week, etc.) ----
   const [weekOffset, setWeekOffset] = useState(0)
@@ -2828,7 +2831,7 @@ export default function DashboardPage() {
               return (
                 <button
                   key={type}
-                  onClick={() => { setSelectedCard(type); setSelectedCustomCard(null) }}
+                  onClick={() => setActiveCardKey(type)}
                   className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
                     isSelected
                       ? "ring-2 ring-offset-1 shadow-sm"
@@ -2958,7 +2961,7 @@ export default function DashboardPage() {
               return (
                 <button
                   key={ct.id}
-                  onClick={() => { setSelectedCustomCard(isSelected ? null : ct.id); setSelectedCard(isSelected ? selectedCard : "" as CommType) }}
+                  onClick={() => setActiveCardKey(isSelected ? "bulletin" : `custom:${ct.id}`)}
                   className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
                     isSelected ? "ring-2 ring-offset-1 shadow-sm" : "border-border hover:border-foreground/20"
                   }`}
