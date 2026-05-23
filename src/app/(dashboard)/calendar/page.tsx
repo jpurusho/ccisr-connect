@@ -640,21 +640,37 @@ export default function CalendarPage() {
     fetchData()
   }
 
+  const [sentEmailMeta, setSentEmailMeta] = useState<{ sentAt?: string; from?: string; to?: string; recipientCount?: number; cc?: string }>({})
+
   async function handleViewDispatchEmail(event: CalendarEvent) {
     const dispatchId = event.id.replace("dispatch-", "")
     const supabase = createClient()
     const { data, error } = await supabase
       .from("dispatch_queue")
-      .select("subject, body_html")
+      .select("subject, body_html, sent_at, mailing_list_id, smtp_config_id, additional_recipients")
       .eq("id", dispatchId)
-      .returns<{ subject: string; body_html: string }[]>()
+      .returns<{ subject: string; body_html: string; sent_at: string | null; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null }[]>()
       .single()
     if (error || !data?.body_html) {
       toast.error("Could not load email content")
       return
     }
+    let from = ""
+    let to = ""
+    let recipientCount = 0
+    if (data.smtp_config_id) {
+      const { data: smtp } = await supabase.from("smtp_configs").select("from_email").eq("id", data.smtp_config_id).single() as { data: { from_email: string } | null }
+      from = smtp?.from_email ?? ""
+    }
+    if (data.mailing_list_id) {
+      const { data: ml } = await supabase.from("mailing_lists").select("name").eq("id", data.mailing_list_id).single() as { data: { name: string } | null }
+      to = ml?.name ?? ""
+      const { count } = await supabase.from("mailing_list_members").select("*", { count: "exact", head: true }).eq("mailing_list_id", data.mailing_list_id)
+      recipientCount = count ?? 0
+    }
     setSentEmailSubject(data.subject)
     setSentEmailHtml(data.body_html)
+    setSentEmailMeta({ sentAt: data.sent_at ?? undefined, from, to, recipientCount, cc: data.additional_recipients ?? undefined })
     setDialogOpen(false)
     setSentEmailOpen(true)
   }
@@ -868,6 +884,22 @@ export default function CalendarPage() {
               <DialogDescription>{sentEmailSubject}</DialogDescription>
             )}
           </DialogHeader>
+          {(sentEmailMeta.sentAt || sentEmailMeta.from || sentEmailMeta.to) && (
+            <div className="rounded-lg border bg-muted/50 p-3 space-y-1 text-xs text-muted-foreground">
+              {sentEmailMeta.sentAt && (
+                <p><span className="font-medium text-foreground">Sent:</span> {format(new Date(sentEmailMeta.sentAt), "MMM d, yyyy 'at' h:mm a")}</p>
+              )}
+              {sentEmailMeta.from && (
+                <p><span className="font-medium text-foreground">From:</span> {sentEmailMeta.from}</p>
+              )}
+              {sentEmailMeta.to && (
+                <p><span className="font-medium text-foreground">To:</span> {sentEmailMeta.to}{sentEmailMeta.recipientCount ? ` (${sentEmailMeta.recipientCount} recipients)` : ""}</p>
+              )}
+              {sentEmailMeta.cc && (
+                <p><span className="font-medium text-foreground">CC:</span> {sentEmailMeta.cc}</p>
+              )}
+            </div>
+          )}
           <div
             className="rounded-lg border bg-white p-4 dark:bg-slate-900"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(sentEmailHtml ?? "") }}

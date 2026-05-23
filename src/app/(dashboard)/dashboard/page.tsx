@@ -475,7 +475,15 @@ export default function DashboardPage() {
   const [weekStripDispatches, setWeekStripDispatches] = useState<{ label: string; date: string; color: string; status: string; targetLabel: string; commType: CommType | null; dispatchId: string }[]>([])
 
   // ---- Sent email preview ----
-  const [sentEmailPreview, setSentEmailPreview] = useState<{ subject: string; html: string } | null>(null)
+  const [sentEmailPreview, setSentEmailPreview] = useState<{
+    subject: string
+    html: string
+    sentAt?: string
+    mailingListName?: string
+    recipientCount?: number
+    smtpFrom?: string
+    additionalRecipients?: string
+  } | null>(null)
 
   // ---- Selected communication card (supports ?card= query param from calendar) ----
   const [selectedCard, setSelectedCard] = useState<CommType>("bulletin")
@@ -2745,7 +2753,25 @@ export default function DashboardPage() {
                               role="link"
                               tabIndex={0}
                               className="shrink-0 cursor-pointer text-[10px] font-medium text-green-600 hover:text-green-800 hover:underline dark:text-green-400"
-                              onClick={(e) => { e.stopPropagation(); setSentEmailPreview({ subject: dispatches[type]!.subject, html: dispatches[type]!.body_html! }) }}
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                const d = dispatches[type]!
+                                const supabase = createClient()
+                                let mailingListName = ""
+                                let recipientCount = 0
+                                let smtpFrom = ""
+                                if (d.mailing_list_id) {
+                                  const { data: ml } = await supabase.from("mailing_lists").select("name").eq("id", d.mailing_list_id).single() as { data: { name: string } | null }
+                                  mailingListName = ml?.name ?? ""
+                                  const { count } = await supabase.from("mailing_list_members").select("*", { count: "exact", head: true }).eq("mailing_list_id", d.mailing_list_id)
+                                  recipientCount = count ?? 0
+                                }
+                                if (d.smtp_config_id) {
+                                  const { data: smtp } = await supabase.from("smtp_configs").select("from_email").eq("id", d.smtp_config_id).single() as { data: { from_email: string } | null }
+                                  smtpFrom = smtp?.from_email ?? ""
+                                }
+                                setSentEmailPreview({ subject: d.subject, html: d.body_html!, sentAt: d.sent_at ?? undefined, mailingListName, recipientCount, smtpFrom, additionalRecipients: d.additional_recipients ?? undefined })
+                              }}
                               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setSentEmailPreview({ subject: dispatches[type]!.subject, html: dispatches[type]!.body_html! }) } }}
                             >
                               View
@@ -3355,6 +3381,22 @@ export default function DashboardPage() {
               <DialogDescription>{sentEmailPreview.subject}</DialogDescription>
             )}
           </DialogHeader>
+          {sentEmailPreview && (sentEmailPreview.sentAt || sentEmailPreview.mailingListName || sentEmailPreview.smtpFrom) && (
+            <div className="rounded-lg border bg-muted/50 p-3 space-y-1 text-xs text-muted-foreground">
+              {sentEmailPreview.sentAt && (
+                <p><span className="font-medium text-foreground">Sent:</span> {format(new Date(sentEmailPreview.sentAt), "MMM d, yyyy 'at' h:mm a")}</p>
+              )}
+              {sentEmailPreview.smtpFrom && (
+                <p><span className="font-medium text-foreground">From:</span> {sentEmailPreview.smtpFrom}</p>
+              )}
+              {sentEmailPreview.mailingListName && (
+                <p><span className="font-medium text-foreground">To:</span> {sentEmailPreview.mailingListName}{sentEmailPreview.recipientCount ? ` (${sentEmailPreview.recipientCount} recipients)` : ""}</p>
+              )}
+              {sentEmailPreview.additionalRecipients && (
+                <p><span className="font-medium text-foreground">CC:</span> {sentEmailPreview.additionalRecipients}</p>
+              )}
+            </div>
+          )}
           <div
             className="rounded-lg border bg-white p-4 dark:bg-slate-900"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(sentEmailPreview?.html ?? "") }}
