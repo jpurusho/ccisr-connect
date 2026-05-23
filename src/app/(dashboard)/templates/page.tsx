@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import {
@@ -162,75 +161,6 @@ function CommonTemplateFields<T extends CommonCardFields>({
         links={data.resourceLinks ?? []}
         onChange={(links) => onChange((prev) => ({ ...prev, resourceLinks: links }))}
       />
-      {/* Scheduled breaks */}
-      <div className="space-y-2 rounded-md border p-3">
-        <div className="flex items-center gap-2">
-          <Switch
-            size="sm"
-            checked={data.onBreak ?? false}
-            onCheckedChange={(checked) => onChange((prev) => ({ ...prev, onBreak: checked }))}
-          />
-          <Label className="text-xs font-medium">Currently on break</Label>
-        </div>
-        {data.onBreak && (
-          <Input
-            placeholder="e.g., Resumes in September"
-            value={data.breakMessage ?? ""}
-            onChange={(e) => onChange((prev) => ({ ...prev, breakMessage: e.target.value }))}
-          />
-        )}
-        <div className="space-y-1.5 pt-1">
-          <p className="text-[10px] text-muted-foreground font-medium">Scheduled Breaks</p>
-          {(data.breaks ?? []).map((brk, bIdx) => (
-            <div key={bIdx} className="flex items-center gap-1.5">
-              <Input
-                type="date"
-                value={brk.from}
-                onChange={(e) => {
-                  const breaks = [...(data.breaks ?? [])]
-                  breaks[bIdx] = { ...breaks[bIdx], from: e.target.value }
-                  onChange((prev) => ({ ...prev, breaks }))
-                }}
-                className="w-32 text-xs h-7"
-              />
-              <span className="text-xs text-muted-foreground">to</span>
-              <Input
-                type="date"
-                value={brk.to}
-                onChange={(e) => {
-                  const breaks = [...(data.breaks ?? [])]
-                  breaks[bIdx] = { ...breaks[bIdx], to: e.target.value }
-                  onChange((prev) => ({ ...prev, breaks }))
-                }}
-                className="w-32 text-xs h-7"
-              />
-              <Input
-                placeholder="Break message"
-                value={brk.message}
-                onChange={(e) => {
-                  const breaks = [...(data.breaks ?? [])]
-                  breaks[bIdx] = { ...breaks[bIdx], message: e.target.value }
-                  onChange((prev) => ({ ...prev, breaks }))
-                }}
-                className="flex-1 text-xs h-7"
-              />
-              <Button variant="ghost" size="icon-sm" title="Remove break" onClick={() => {
-                const breaks = (data.breaks ?? []).filter((_, j) => j !== bIdx)
-                onChange((prev) => ({ ...prev, breaks: breaks.length > 0 ? breaks : undefined }))
-              }}>
-                <Trash2 className="size-3 text-muted-foreground" />
-              </Button>
-            </div>
-          ))}
-          <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
-            const breaks = [...(data.breaks ?? []), { from: "", to: "", message: "" }]
-            onChange((prev) => ({ ...prev, breaks }))
-          }}>
-            <Plus className="size-3" />
-            Add break period
-          </Button>
-        </div>
-      </div>
     </>
   )
 }
@@ -1075,92 +1005,6 @@ export default function TemplatesPage() {
                                 setBibleStudyData((prev) => ({ ...prev, locations: locs }))
                               }}
                             />
-                            {/* Vacation toggle */}
-                            <div className="flex items-center gap-2 pt-1">
-                              <Switch
-                                size="sm"
-                                checked={loc.onVacation}
-                                onCheckedChange={(checked) => {
-                                  const locs = [...(bibleStudyData.locations || [])]
-                                  locs[i] = { ...locs[i], onVacation: checked }
-                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                }}
-                              />
-                              <Label className="text-xs text-muted-foreground">On vacation / break</Label>
-                            </div>
-                            {loc.onVacation && (
-                              <Input
-                                placeholder="e.g., Bible Study will resume on September 12th"
-                                value={loc.vacationMessage || ""}
-                                onChange={(e) => {
-                                  const locs = [...(bibleStudyData.locations || [])]
-                                  locs[i] = { ...locs[i], vacationMessage: e.target.value }
-                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                }}
-                              />
-                            )}
-                            {/* Scheduled breaks */}
-                            <div className="space-y-1.5">
-                              <p className="text-[10px] text-muted-foreground font-medium">Scheduled Breaks</p>
-                              {(loc.breaks ?? []).map((brk, bIdx) => (
-                                <div key={bIdx} className="flex items-center gap-1.5">
-                                  <Input
-                                    type="date"
-                                    value={brk.from}
-                                    onChange={(e) => {
-                                      const locs = [...(bibleStudyData.locations || [])]
-                                      const breaks = [...(locs[i].breaks ?? [])]
-                                      breaks[bIdx] = { ...breaks[bIdx], from: e.target.value }
-                                      locs[i] = { ...locs[i], breaks }
-                                      setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                    }}
-                                    className="w-32 text-xs h-7"
-                                  />
-                                  <span className="text-xs text-muted-foreground">to</span>
-                                  <Input
-                                    type="date"
-                                    value={brk.to}
-                                    onChange={(e) => {
-                                      const locs = [...(bibleStudyData.locations || [])]
-                                      const breaks = [...(locs[i].breaks ?? [])]
-                                      breaks[bIdx] = { ...breaks[bIdx], to: e.target.value }
-                                      locs[i] = { ...locs[i], breaks }
-                                      setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                    }}
-                                    className="w-32 text-xs h-7"
-                                  />
-                                  <Input
-                                    placeholder="Break message"
-                                    value={brk.message}
-                                    onChange={(e) => {
-                                      const locs = [...(bibleStudyData.locations || [])]
-                                      const breaks = [...(locs[i].breaks ?? [])]
-                                      breaks[bIdx] = { ...breaks[bIdx], message: e.target.value }
-                                      locs[i] = { ...locs[i], breaks }
-                                      setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                    }}
-                                    className="flex-1 text-xs h-7"
-                                  />
-                                  <Button variant="ghost" size="icon-sm" title="Remove break" onClick={() => {
-                                    const locs = [...(bibleStudyData.locations || [])]
-                                    const breaks = (locs[i].breaks ?? []).filter((_, j) => j !== bIdx)
-                                    locs[i] = { ...locs[i], breaks: breaks.length > 0 ? breaks : undefined }
-                                    setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                  }}>
-                                    <Trash2 className="size-3 text-muted-foreground" />
-                                  </Button>
-                                </div>
-                              ))}
-                              <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
-                                const locs = [...(bibleStudyData.locations || [])]
-                                const breaks = [...(locs[i].breaks ?? []), { from: "", to: "", message: "" }]
-                                locs[i] = { ...locs[i], breaks }
-                                setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                              }}>
-                                <Plus className="size-3" />
-                                Add break period
-                              </Button>
-                            </div>
                           </div>
                         ))}
                         <Button
@@ -1642,75 +1486,6 @@ export default function TemplatesPage() {
                     links={newCustom.resourceLinks}
                     onChange={(links) => setNewCustom({ ...newCustom, resourceLinks: links })}
                   />
-                  {/* Scheduled breaks */}
-                  <div className="space-y-2 rounded-md border p-3">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        size="sm"
-                        checked={newCustom.onBreak}
-                        onCheckedChange={(checked) => setNewCustom({ ...newCustom, onBreak: checked })}
-                      />
-                      <Label className="text-xs font-medium">Currently on break</Label>
-                    </div>
-                    {newCustom.onBreak && (
-                      <Input
-                        placeholder="e.g., Resumes in September"
-                        value={newCustom.breakMessage}
-                        onChange={(e) => setNewCustom({ ...newCustom, breakMessage: e.target.value })}
-                      />
-                    )}
-                    <div className="space-y-1.5 pt-1">
-                      <p className="text-[10px] text-muted-foreground font-medium">Scheduled Breaks</p>
-                      {newCustom.breaks.map((brk, bIdx) => (
-                        <div key={bIdx} className="flex items-center gap-1.5">
-                          <Input
-                            type="date"
-                            value={brk.from}
-                            onChange={(e) => {
-                              const breaks = [...newCustom.breaks]
-                              breaks[bIdx] = { ...breaks[bIdx], from: e.target.value }
-                              setNewCustom({ ...newCustom, breaks })
-                            }}
-                            className="w-32 text-xs h-7"
-                          />
-                          <span className="text-xs text-muted-foreground">to</span>
-                          <Input
-                            type="date"
-                            value={brk.to}
-                            onChange={(e) => {
-                              const breaks = [...newCustom.breaks]
-                              breaks[bIdx] = { ...breaks[bIdx], to: e.target.value }
-                              setNewCustom({ ...newCustom, breaks })
-                            }}
-                            className="w-32 text-xs h-7"
-                          />
-                          <Input
-                            placeholder="Break message"
-                            value={brk.message}
-                            onChange={(e) => {
-                              const breaks = [...newCustom.breaks]
-                              breaks[bIdx] = { ...breaks[bIdx], message: e.target.value }
-                              setNewCustom({ ...newCustom, breaks })
-                            }}
-                            className="flex-1 text-xs h-7"
-                          />
-                          <Button variant="ghost" size="icon-sm" title="Remove break" onClick={() => {
-                            const breaks = newCustom.breaks.filter((_, j) => j !== bIdx)
-                            setNewCustom({ ...newCustom, breaks })
-                          }}>
-                            <Trash2 className="size-3 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
-                        const breaks = [...newCustom.breaks, { from: "", to: "", message: "" }]
-                        setNewCustom({ ...newCustom, breaks })
-                      }}>
-                        <Plus className="size-3" />
-                        Add break period
-                      </Button>
-                    </div>
-                  </div>
                   <div className="flex gap-2 pt-2">
                     <Button
                       onClick={async () => {
@@ -1871,75 +1646,6 @@ export default function TemplatesPage() {
                     links={(editingCustom.data.resourceLinks as { label: string; url: string }[]) ?? []}
                     onChange={(links) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, resourceLinks: links } })}
                   />
-                  {/* Scheduled breaks */}
-                  <div className="space-y-2 rounded-md border p-3">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        size="sm"
-                        checked={(editingCustom.data.onBreak as boolean) ?? false}
-                        onCheckedChange={(checked) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, onBreak: checked } })}
-                      />
-                      <Label className="text-xs font-medium">Currently on break</Label>
-                    </div>
-                    {(editingCustom.data.onBreak as boolean) && (
-                      <Input
-                        placeholder="e.g., Resumes in September"
-                        value={(editingCustom.data.breakMessage as string) ?? ""}
-                        onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, breakMessage: e.target.value } })}
-                      />
-                    )}
-                    <div className="space-y-1.5 pt-1">
-                      <p className="text-[10px] text-muted-foreground font-medium">Scheduled Breaks</p>
-                      {((editingCustom.data.breaks as { from: string; to: string; message: string }[]) ?? []).map((brk, bIdx) => (
-                        <div key={bIdx} className="flex items-center gap-1.5">
-                          <Input
-                            type="date"
-                            value={brk.from}
-                            onChange={(e) => {
-                              const breaks = [...((editingCustom.data.breaks as { from: string; to: string; message: string }[]) ?? [])]
-                              breaks[bIdx] = { ...breaks[bIdx], from: e.target.value }
-                              setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, breaks } })
-                            }}
-                            className="w-32 text-xs h-7"
-                          />
-                          <span className="text-xs text-muted-foreground">to</span>
-                          <Input
-                            type="date"
-                            value={brk.to}
-                            onChange={(e) => {
-                              const breaks = [...((editingCustom.data.breaks as { from: string; to: string; message: string }[]) ?? [])]
-                              breaks[bIdx] = { ...breaks[bIdx], to: e.target.value }
-                              setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, breaks } })
-                            }}
-                            className="w-32 text-xs h-7"
-                          />
-                          <Input
-                            placeholder="Break message"
-                            value={brk.message}
-                            onChange={(e) => {
-                              const breaks = [...((editingCustom.data.breaks as { from: string; to: string; message: string }[]) ?? [])]
-                              breaks[bIdx] = { ...breaks[bIdx], message: e.target.value }
-                              setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, breaks } })
-                            }}
-                            className="flex-1 text-xs h-7"
-                          />
-                          <Button variant="ghost" size="icon-sm" title="Remove break" onClick={() => {
-                            const breaks = ((editingCustom.data.breaks as { from: string; to: string; message: string }[]) ?? []).filter((_, j) => j !== bIdx)
-                            setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, breaks: breaks.length > 0 ? breaks : undefined } })
-                          }}>
-                            <Trash2 className="size-3 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
-                        const breaks = [...((editingCustom.data.breaks as { from: string; to: string; message: string }[]) ?? []), { from: "", to: "", message: "" }]
-                        setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, breaks } })
-                      }}>
-                        <Plus className="size-3" />
-                        Add break period
-                      </Button>
-                    </div>
-                  </div>
                   <div className="flex gap-2 pt-2">
                     <Button
                       onClick={async () => {
