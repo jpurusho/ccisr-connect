@@ -194,7 +194,7 @@ function PlaceholderReference({ typeName }: { typeName: string }) {
 }
 
 export default function TemplatesPage() {
-  const [activeTab, setActiveTab] = useState("birthday")
+  const [activeTab, setActiveTab] = useState("")
   const [templates, setTemplates] = useState<SavedTemplate[]>([])
   const [eventTypeIds, setEventTypeIds] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -704,44 +704,93 @@ export default function TemplatesPage() {
     )
   }
 
+  const allTemplateCards = [
+    ...EVENT_TYPE_TABS.map((tab) => ({
+      id: tab.name,
+      label: tab.label,
+      icon: tab.icon,
+      color: tab.color,
+      hasSaved: templates.some((t) => t.event_type_name === tab.name),
+      isCustom: false,
+    })),
+    ...customTemplates.map((ct) => {
+      let parsed: Record<string, unknown> = {}
+      try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+      return {
+        id: `custom-${ct.id}`,
+        label: ct.name,
+        icon: Send,
+        color: (parsed.primaryColor as string) || "#6B7280",
+        hasSaved: true,
+        isCustom: true,
+      }
+    }),
+  ]
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Email Templates</h1>
-        <p className="text-muted-foreground">
-          Set default values for each communication type. These persist across weeks.
-        </p>
+      {/* Header + back button when editing */}
+      <div className="flex items-center gap-3">
+        {activeTab && (
+          <Button variant="ghost" size="icon-sm" onClick={() => setActiveTab("")} className="shrink-0">
+            <Trash2 className="size-4 rotate-0" style={{ display: "none" }} />
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </Button>
+        )}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {activeTab ? (allTemplateCards.find((c) => c.id === activeTab || c.id === `custom-${activeTab}`)?.label ?? "Template") : "Templates"}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {activeTab ? "Edit template styling and defaults" : "Design how your email cards look. Tap to edit."}
+          </p>
+        </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex h-auto gap-1 overflow-x-auto scrollbar-none pb-1">
-          {EVENT_TYPE_TABS.map((tab) => {
-            const Icon = tab.icon
-            const hasSaved = templates.some((t) => t.event_type_name === tab.name)
+      {/* Grid view — shown when no template is selected */}
+      {!activeTab && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {allTemplateCards.map((card) => {
+            const Icon = card.icon
             return (
-              <TabsTrigger
-                key={tab.name}
-                value={tab.name}
-                className="gap-1.5 shrink-0 data-[state=active]:text-white"
-                style={activeTab === tab.name ? { backgroundColor: tab.color } : undefined}
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => setActiveTab(card.isCustom ? "custom" : card.id)}
+                className="flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all hover:shadow-md hover:border-primary/30 active:scale-95"
               >
-                <Icon className="size-3.5" />
-                {tab.label}
-                {hasSaved && <span className="size-1.5 rounded-full bg-current opacity-60" />}
-              </TabsTrigger>
+                <div
+                  className="flex size-10 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: card.color + "18", color: card.color }}
+                >
+                  <Icon className="size-5" />
+                </div>
+                <span className="text-sm font-medium">{card.label}</span>
+                {card.hasSaved && (
+                  <span className="size-1.5 rounded-full" style={{ backgroundColor: card.color }} />
+                )}
+              </button>
             )
           })}
-          <TabsTrigger
-            value="custom"
-            className="gap-1.5 shrink-0 data-[state=active]:text-white"
-            style={activeTab === "custom" ? { backgroundColor: "#6B7280" } : undefined}
+          <button
+            type="button"
+            onClick={() => { setActiveTab("custom"); setCreatingCustom(true) }}
+            className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-center text-muted-foreground transition-all hover:border-primary/40 hover:text-primary"
           >
-            <Send className="size-3.5" />
-            Custom
-            {customTemplates.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{customTemplates.length}</Badge>
-            )}
-          </TabsTrigger>
+            <Plus className="size-5" />
+            <span className="text-sm font-medium">New Template</span>
+          </button>
+        </div>
+      )}
+
+      {/* Editor view — shown when a template is selected */}
+      {activeTab && (
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="hidden">
+          {EVENT_TYPE_TABS.map((tab) => (
+            <TabsTrigger key={tab.name} value={tab.name}>{tab.label}</TabsTrigger>
+          ))}
+          <TabsTrigger value="custom">Custom</TabsTrigger>
         </TabsList>
 
         {EVENT_TYPE_TABS.map((tab) => (
@@ -1755,6 +1804,7 @@ export default function TemplatesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      )}
 
       {/* Mobile preview dialog */}
       <Dialog open={previewing} onOpenChange={setPreviewing}>
