@@ -2835,6 +2835,51 @@ export default function DashboardPage() {
                 </button>
               )
             })}
+            {/* Custom template cards — in same grid */}
+            {customDashTemplates.filter((ct) => isCustomVisible(ct.id)).map((ct) => {
+              const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
+              const hasDraft = !!customInstanceIds[ct.id]
+              const isSelected = selectedCustomCard === ct.id
+
+              return (
+                <button
+                  key={ct.id}
+                  onClick={() => { setSelectedCustomCard(isSelected ? null : ct.id); if (!isSelected) setSelectedCard("bulletin") }}
+                  className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
+                    isSelected ? "ring-2 ring-offset-1 shadow-sm" : "border-border hover:border-foreground/20"
+                  }`}
+                  style={isSelected ? { borderColor: ct.color, "--tw-ring-color": ct.color } as React.CSSProperties : undefined}
+                >
+                  <div
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg text-lg"
+                    style={{ backgroundColor: ct.color + "15" }}
+                  >
+                    {ct.emoji}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold truncate">{ct.name}</span>
+                      {di.status === "sent" && di.count > 0 && (
+                        <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          Sent{di.count > 1 ? ` ${di.count}x` : ""}
+                        </span>
+                      )}
+                      {hasDraft && di.status === "draft" && (
+                        <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                          Draft
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                      {ct.eventInfo?.eventDate
+                        ? `${ct.eventInfo.eventDate}${ct.eventInfo.eventTime ? ` at ${ct.eventInfo.eventTime}` : ""}`
+                        : customForms[ct.id]?.title || "Custom announcement"}
+                    </p>
+                  </div>
+                  <span className="absolute right-2 top-2 size-2 rounded-full" style={{ backgroundColor: ct.color }} />
+                </button>
+              )
+            })}
           </div>
 
           {/* ── Settings popover ── */}
@@ -2866,9 +2911,7 @@ export default function DashboardPage() {
                   ))}
                   {customDashTemplates.length > 0 && (
                     <>
-                      <div className="border-t pt-2 mt-2">
-                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Custom Templates</p>
-                      </div>
+                      <div className="border-t pt-2 mt-2" />
                       {customDashTemplates.map((ct) => (
                         <div key={ct.id} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -2950,14 +2993,10 @@ export default function DashboardPage() {
               </WeeklyCommunicationCard>
             )
           })()}
-        {/* ── Custom Template Cards ── */}
-        {customDashTemplates.some((ct) => isCustomVisible(ct.id)) && (
+        {/* ── Custom Template Expanded Card (below grid) ── */}
+        {selectedCustomCard && (
           <>
-            <div className="flex items-center gap-2 pt-2">
-              <Send className="size-4 text-muted-foreground" />
-              <h3 className="text-sm font-semibold text-muted-foreground">Custom Templates</h3>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="hidden">
               {customDashTemplates.filter((ct) => isCustomVisible(ct.id)).map((ct) => {
                 const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
                 const hasDraft = !!customInstanceIds[ct.id]
