@@ -714,7 +714,7 @@ export default function TemplatesPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex flex-wrap h-auto gap-1">
+        <TabsList className="flex h-auto gap-1 overflow-x-auto scrollbar-none pb-1">
           {EVENT_TYPE_TABS.map((tab) => {
             const Icon = tab.icon
             const hasSaved = templates.some((t) => t.event_type_name === tab.name)
@@ -722,7 +722,7 @@ export default function TemplatesPage() {
               <TabsTrigger
                 key={tab.name}
                 value={tab.name}
-                className="gap-1.5 data-[state=active]:text-white"
+                className="gap-1.5 shrink-0 data-[state=active]:text-white"
                 style={activeTab === tab.name ? { backgroundColor: tab.color } : undefined}
               >
                 <Icon className="size-3.5" />
@@ -733,7 +733,7 @@ export default function TemplatesPage() {
           })}
           <TabsTrigger
             value="custom"
-            className="gap-1.5 data-[state=active]:text-white"
+            className="gap-1.5 shrink-0 data-[state=active]:text-white"
             style={activeTab === "custom" ? { backgroundColor: "#6B7280" } : undefined}
           >
             <Send className="size-3.5" />
