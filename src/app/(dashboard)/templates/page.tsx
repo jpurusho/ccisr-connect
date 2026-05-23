@@ -33,6 +33,7 @@ import {
   Loader2,
   Pencil,
   Send,
+  CalendarDays,
 } from "lucide-react"
 import {
   buildBirthdayCard,
@@ -208,6 +209,11 @@ export default function TemplatesPage() {
   const [newCustomStyleSettings, setNewCustomStyleSettings] = useState<TemplateStyleSettings>({})
   const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, bodyTextColor: undefined as string | undefined, headerTitleColor: undefined as string | undefined, headerSubtitleColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, footerVerseTextColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[], onBreak: false, breakMessage: "", breaks: [] as { from: string; to: string; message: string }[] })
 
+  // Event types management
+  const [eventTypes, setEventTypes] = useState<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; linked_signup_form_id: string | null }[]>([])
+  const [signupForms, setSignupForms] = useState<{ id: string; title: string }[]>([])
+  const [editingEventType, setEditingEventType] = useState<{ id?: string; name: string; color: string; templateId: string; signupFormId: string } | null>(null)
+
   // Style settings per template type
   const [styleSettings, setStyleSettings] = useState<Record<string, TemplateStyleSettings>>({})
 
@@ -316,6 +322,15 @@ export default function TemplatesPage() {
 
     setTemplates(saved)
     setSubjects(subjs)
+
+    // Fetch event types + signup forms for Event Types tab
+    const [etFullRes, sfRes] = await Promise.all([
+      supabase.from("event_types").select("id, name, color_scheme, is_active, default_template_id, linked_signup_form_id").order("name").returns<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; linked_signup_form_id: string | null }[]>(),
+      supabase.from("signup_forms").select("id, title").order("title").returns<{ id: string; title: string }[]>(),
+    ])
+    if (etFullRes.data) setEventTypes(etFullRes.data)
+    if (sfRes.data) setSignupForms(sfRes.data)
+
     setLoading(false)
   }, [])
 
@@ -705,6 +720,14 @@ export default function TemplatesPage() {
   }
 
   const allTemplateCards = [
+    {
+      id: "__event_types__",
+      label: "Event Types",
+      icon: CalendarDays,
+      color: "#374151",
+      hasSaved: true,
+      isCustom: false,
+    },
     ...EVENT_TYPE_TABS.map((tab) => ({
       id: tab.name,
       label: tab.label,
@@ -795,8 +818,144 @@ export default function TemplatesPage() {
         </div>
       )}
 
+      {/* Event Types management view */}
+      {activeTab === "__event_types__" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Manage event types and their template/signup associations.</p>
+            <Button size="sm" onClick={() => setEditingEventType({ name: "", color: "#6B7280", templateId: "", signupFormId: "" })}>
+              <Plus className="size-3.5" />
+              New Event Type
+            </Button>
+          </div>
+
+          {/* Event type list */}
+          <div className="space-y-2">
+            {eventTypes.map((et) => {
+              const linkedTemplate = templates.find((t) => t.id === et.default_template_id) ?? customTemplates.find((ct) => ct.id === et.default_template_id)
+              const linkedSignup = signupForms.find((sf) => sf.id === et.linked_signup_form_id)
+              return (
+                <div key={et.id} className={`flex items-center gap-3 rounded-lg border p-3 ${!et.is_active ? "opacity-50" : ""}`}>
+                  <div className="size-3 rounded-full shrink-0" style={{ backgroundColor: et.color_scheme?.primary ?? "#6B7280" }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{et.name}</p>
+                    <div className="flex flex-wrap gap-2 mt-0.5">
+                      {linkedTemplate && (
+                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          Template: {("name" in linkedTemplate) ? linkedTemplate.name : "Linked"}
+                        </span>
+                      )}
+                      {linkedSignup && (
+                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          Signup: {linkedSignup.title}
+                        </span>
+                      )}
+                      {!et.is_active && (
+                        <span className="text-[10px] text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 px-1.5 py-0.5 rounded">Inactive</span>
+                      )}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon-sm" title="Edit" onClick={() => setEditingEventType({
+                    id: et.id,
+                    name: et.name,
+                    color: et.color_scheme?.primary ?? "#6B7280",
+                    templateId: et.default_template_id ?? "",
+                    signupFormId: et.linked_signup_form_id ?? "",
+                  })}>
+                    <Pencil className="size-3.5" />
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Edit/Create dialog */}
+          {editingEventType && (
+            <div className="rounded-lg border p-4 space-y-3 bg-card">
+              <h3 className="text-sm font-semibold">{editingEventType.id ? "Edit Event Type" : "New Event Type"}</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Name</Label>
+                  <Input value={editingEventType.name} onChange={(e) => setEditingEventType({ ...editingEventType, name: e.target.value })} placeholder="e.g., Youth Group" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Color</Label>
+                  <Input type="color" value={editingEventType.color} onChange={(e) => setEditingEventType({ ...editingEventType, color: e.target.value })} className="h-9 w-20" />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Linked Template</Label>
+                  <select
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={editingEventType.templateId}
+                    onChange={(e) => setEditingEventType({ ...editingEventType, templateId: e.target.value })}
+                  >
+                    <option value="">None</option>
+                    {templates.map((t) => <option key={t.id} value={t.id}>{t.event_type_name}</option>)}
+                    {customTemplates.map((ct) => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Linked Signup Form</Label>
+                  <select
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={editingEventType.signupFormId}
+                    onChange={(e) => setEditingEventType({ ...editingEventType, signupFormId: e.target.value })}
+                  >
+                    <option value="">None</option>
+                    {signupForms.map((sf) => <option key={sf.id} value={sf.id}>{sf.title}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" disabled={!editingEventType.name.trim()} onClick={async () => {
+                  const supabase = createClient()
+                  const payload = {
+                    name: editingEventType.name.trim(),
+                    color_scheme: { primary: editingEventType.color },
+                    default_template_id: editingEventType.templateId || null,
+                    linked_signup_form_id: editingEventType.signupFormId || null,
+                  }
+                  if (editingEventType.id) {
+                    const { error } = await supabase.from("event_types").update(payload as never).eq("id", editingEventType.id)
+                    if (error) { toast.error(error.message); return }
+                    toast.success(`"${editingEventType.name}" updated`)
+                    logAudit("event_type_updated", "event_types", editingEventType.id, payload)
+                  } else {
+                    const { error } = await supabase.from("event_types").insert({ ...payload, is_active: true } as never)
+                    if (error) { toast.error(error.message); return }
+                    toast.success(`"${editingEventType.name}" created`)
+                    logAudit("event_type_created", "event_types", null, payload)
+                  }
+                  setEditingEventType(null)
+                  fetchTemplates()
+                }}>
+                  <Save className="size-3.5" />
+                  {editingEventType.id ? "Save" : "Create"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setEditingEventType(null)}>Cancel</Button>
+                {editingEventType.id && (
+                  <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={async () => {
+                    const supabase = createClient()
+                    const et = eventTypes.find((e) => e.id === editingEventType.id)
+                    const newActive = !et?.is_active
+                    await supabase.from("event_types").update({ is_active: newActive } as never).eq("id", editingEventType.id!)
+                    toast.success(newActive ? "Activated" : "Deactivated")
+                    setEditingEventType(null)
+                    fetchTemplates()
+                  }}>
+                    {eventTypes.find((e) => e.id === editingEventType.id)?.is_active ? "Deactivate" : "Activate"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Editor view — shown when a template is selected */}
-      {activeTab && (
+      {activeTab && activeTab !== "__event_types__" && (
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="hidden">
           {EVENT_TYPE_TABS.map((tab) => (
