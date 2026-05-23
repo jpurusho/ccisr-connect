@@ -1281,48 +1281,58 @@ export default function DashboardPage() {
         })
       }
 
-      // ---- Build auto-fill events for bulletin from calendar ----
+      // ---- Build bulletin events from ALL active calendar events for the week ----
       const bulletinAutoEvents: { title: string; details: string }[] = []
-      const bulletinCommTypes = new Set(["bible_study", "womens_study", "prayer_meeting", "bulletin", "birthday", "anniversary"])
+      const bulletinSkipTypes = new Set(["birthday", "anniversary", "bulletin"])
       for (const evt of activeEvents) {
         const etName = etIdToName[evt.event_type_id] ?? ""
-        if (bulletinCommTypes.has(etName)) continue
+        if (bulletinSkipTypes.has(etName)) continue
         if (evt.recurrence_rule) {
           const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
           for (const occ of occs) {
             const inst = weekInstances.find((wi) => wi.event_id === evt.id && wi.instance_date === format(occ, "yyyy-MM-dd"))
             if (inst?.status === "cancelled") continue
+            // Check DB breaks for this event on this date
+            const occDateStr = format(occ, "yyyy-MM-dd")
+            const { data: occBreaks } = await supabase
+              .from("event_breaks")
+              .select("id")
+              .eq("event_id", evt.id)
+              .lte("start_date", occDateStr)
+              .gte("end_date", occDateStr)
+              .is("location_id", null)
+              .limit(1)
+              .returns<{ id: string }[]>()
+            if (occBreaks && occBreaks.length > 0) continue
             const time = inst?.instance_time ?? evt.default_time
-            bulletinAutoEvents.push({ title: evt.title, details: time ? `${format(occ, "EEEE, MMM d")} at ${time}` : format(occ, "EEEE, MMM d") })
+            const timeStr = time ? formatTime(time) : null
+            bulletinAutoEvents.push({
+              title: evt.title,
+              details: timeStr ? `${format(occ, "EEEE, MMM d")} at ${timeStr}` : format(occ, "EEEE, MMM d"),
+            })
           }
         }
       }
 
-      setDbBulletinEvents(bulletinAutoEvents)
+      // Also fetch manual bulletin_items from DB
+      const { data: manualItems } = await supabase
+        .from("bulletin_items")
+        .select("title, details")
+        .eq("is_active", true)
+        .or(`is_recurring.eq.true,week_start.eq.${format(wkSun, "yyyy-MM-dd")}`)
+        .order("sort_order")
+        .returns<{ title: string; details: string | null }[]>()
+
+      const manualBulletinItems = (manualItems ?? []).map((item) => ({
+        title: item.title,
+        details: item.details ?? "",
+      }))
+
+      setDbBulletinEvents([...bulletinAutoEvents, ...manualBulletinItems])
 
       // ---- Bulletin (same week as everything else) ----
       const hasBulDraft = !!composedMap["bulletin"]
       const bulCommon = extractCommonFields(bulDef)
-
-      // Filter bulletin template events — remove entries for cancelled/on-break events this week
-      const cancelledKeywords: string[] = []
-      if (bsCancelled || bsAllOnBreak) cancelledKeywords.push("bible study")
-      if (wsCancelled) cancelledKeywords.push("women")
-      if (pmCancelled) cancelledKeywords.push("prayer")
-      // Add per-location breaks for Bible Study (e.g., "san ramon" on break but "mountain house" active)
-      for (const loc of bsLocBreakStatus) {
-        if (loc.onVacation && loc.label) {
-          cancelledKeywords.push(loc.label.toLowerCase())
-        }
-      }
-
-      function filterCancelledBulletinEvents(events: { title: string; details: string }[]) {
-        if (cancelledKeywords.length === 0) return events
-        return events.filter((e) => {
-          const lower = e.title.toLowerCase()
-          return !cancelledKeywords.some((kw) => lower.includes(kw))
-        })
-      }
 
       // Auto-fill helpers from signup form (if bulletin event type has a linked form)
       let autoFilledHelpers: BulletinFormData["helpers"] = []
@@ -1346,7 +1356,6 @@ export default function DashboardPage() {
           ...bulCommon,
         })
       } else {
-        const bulTemplateEvents = bulDef.events ?? (FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults).events ?? []
         const bulHelpers = autoFilledHelpers.length > 0
           ? autoFilledHelpers
           : ((bulDef as Record<string, unknown>).helpers as BulletinFormData["helpers"] ?? [])
@@ -1358,7 +1367,7 @@ export default function DashboardPage() {
             date: a.date,
           })),
           helpers: bulHelpers,
-          events: [...bulletinAutoEvents, ...filterCancelledBulletinEvents(bulTemplateEvents)],
+          events: [...bulletinAutoEvents, ...manualBulletinItems],
           ...bulCommon,
         })
       }

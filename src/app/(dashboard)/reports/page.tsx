@@ -59,7 +59,7 @@ export default function ReportsPage() {
             : Promise.resolve({ count: 0, error: null } as { count: number; error: null }),
           supabase.from("addresses").select("city").eq("is_current", true).returns<{ city: string }[]>(),
           supabase.from("members").select("full_name, birth_month, birth_day").eq("is_active", true).eq("birth_month", currentMonth).order("birth_day").returns<{ full_name: string; birth_month: number; birth_day: number }[]>(),
-          supabase.from("wedding_anniversaries").select("anniversary_month, anniversary_day, husband:members!husband_member_id(full_name), wife:members!wife_member_id(full_name)").eq("anniversary_month", currentMonth).order("anniversary_day").returns<Record<string, unknown>[]>(),
+          supabase.from("wedding_anniversaries").select("anniversary_month, anniversary_day, family:families!family_id(is_active), husband:members!husband_member_id(full_name, is_active), wife:members!wife_member_id(full_name, is_active)").eq("anniversary_month", currentMonth).order("anniversary_day").returns<Record<string, unknown>[]>(),
         ])
 
       setFamilyCount(famRes.count ?? 0)
@@ -93,14 +93,21 @@ export default function ReportsPage() {
 
       if (annRes.data) {
         setMonthAnniversaries(
-          annRes.data.map((a: Record<string, unknown>) => {
-            const husband = a.husband as { full_name: string } | null
-            const wife = a.wife as { full_name: string } | null
-            return {
-              names: `${husband?.full_name?.split(" ")[0] ?? "?"} & ${wife?.full_name?.split(" ")[0] ?? "?"}`,
-              date: `${a.anniversary_month}/${a.anniversary_day}`,
-            }
-          })
+          annRes.data
+            .filter((a: Record<string, unknown>) => {
+              const family = a.family as { is_active: boolean } | null
+              const husband = a.husband as { full_name: string; is_active: boolean } | null
+              const wife = a.wife as { full_name: string; is_active: boolean } | null
+              return (family?.is_active !== false) && (husband?.is_active !== false || wife?.is_active !== false)
+            })
+            .map((a: Record<string, unknown>) => {
+              const husband = a.husband as { full_name: string } | null
+              const wife = a.wife as { full_name: string } | null
+              return {
+                names: `${husband?.full_name?.split(" ")[0] ?? "?"} & ${wife?.full_name?.split(" ")[0] ?? "?"}`,
+                date: `${a.anniversary_month}/${a.anniversary_day}`,
+              }
+            })
         )
       }
     }
