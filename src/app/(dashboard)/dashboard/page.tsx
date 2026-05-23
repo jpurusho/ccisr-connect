@@ -2561,78 +2561,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats row moved to Members page */}
-
-      {/* ── Upcoming Events Strip ──────────────────────────────── */}
+      {/* Quick link to Calendar */}
       {!loading && (
-        <Card>
-          <CardContent className="py-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{weekOffset === 0 ? "This Week" : weekOffset > 0 ? "Upcoming" : "Past Week"}</p>
-              <Link href="/calendar" className="text-xs text-primary hover:underline">Full Calendar</Link>
-            </div>
-            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-              {(() => {
-                const days: { date: Date; label: string }[] = []
-                const start = startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 })
-                for (let i = 0; i < 7; i++) {
-                  const d = addDays(start, i)
-                  days.push({ date: d, label: format(d, "EEE d") })
-                }
-                return days.map((day) => {
-                  const dayBdays = birthdayForm.birthdays.filter((b) => {
-                    const [m, d] = b.date.split("/").map(Number)
-                    return m === day.date.getMonth() + 1 && d === day.date.getDate()
-                  })
-                  const dayAnnis = anniversaryForm.anniversaries.filter((a) => {
-                    const [m, d] = a.date.split("/").map(Number)
-                    return m === day.date.getMonth() + 1 && d === day.date.getDate()
-                  })
-                  const dayIso = format(day.date, "yyyy-MM-dd")
-                  const dayEvents = weekStripEvents.filter((e) => format(e.date, "yyyy-MM-dd") === dayIso)
-                  const dayDispatches = weekStripDispatches.filter((d) => d.date === dayIso)
-                  const isToday = dayIso === format(new Date(), "yyyy-MM-dd")
-                  const hasAnything = dayBdays.length > 0 || dayAnnis.length > 0 || dayEvents.length > 0 || dayDispatches.length > 0
-                  return (
-                    <div
-                      key={day.label}
-                      className={`flex min-w-[80px] flex-col items-center gap-1 rounded-lg border px-2 py-1.5 text-center ${isToday ? "border-primary bg-primary/5" : ""}`}
-                    >
-                      <span className={`text-[10px] font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{day.label}</span>
-                      {dayEvents.map((e, i) => (
-                        <button key={`e${i}`} type="button" className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white transition-opacity hover:opacity-80" style={{ backgroundColor: e.color }} onClick={() => e.commType && setSelectedCard(e.commType)}>{e.title.replace(/^San Ramon\s*/i, "").split(" ").slice(0, 2).join(" ")}</button>
-                      ))}
-                      {dayBdays.map((b, i) => (
-                        <button key={`b${i}`} type="button" className="w-full truncate rounded-full bg-purple-500 px-1.5 py-0.5 text-[9px] text-white transition-opacity hover:opacity-80" onClick={() => setSelectedCard("birthday")}>{b.name.split(" ")[0]}</button>
-                      ))}
-                      {dayAnnis.map((a, i) => (
-                        <button key={`a${i}`} type="button" className="w-full truncate rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] text-white transition-opacity hover:opacity-80" onClick={() => setSelectedCard("anniversary")}>{a.husbandName}</button>
-                      ))}
-                      {dayDispatches.map((d, i) => (
-                        d.status === "sent" ? (
-                          <button key={`d${i}`} type="button" className="w-full truncate rounded-full px-1.5 py-0.5 text-[9px] text-white transition-opacity hover:opacity-80" style={{ backgroundColor: d.color }} title={d.targetLabel ? `For week of ${d.targetLabel}` : undefined} onClick={async () => {
-                            const supabase = createClient()
-                            const { data } = await supabase.from("dispatch_queue").select("subject, body_html").eq("id", d.dispatchId).returns<{ subject: string; body_html: string }[]>().single()
-                            if (data?.body_html) setSentEmailPreview({ subject: data.subject, html: data.body_html })
-                          }}>
-                            {d.label} ✓{d.targetLabel ? ` (${d.targetLabel})` : ""}
-                          </button>
-                        ) : (
-                          <button key={`d${i}`} type="button" className="w-full truncate rounded-full border border-dashed px-1.5 py-0.5 text-[9px] transition-opacity hover:opacity-80" style={{ borderColor: d.color, color: d.color }} title={d.targetLabel ? `For week of ${d.targetLabel}` : undefined} onClick={() => d.commType && setSelectedCard(d.commType)}>
-                            {d.label}{d.targetLabel ? ` (${d.targetLabel})` : ""}
-                          </button>
-                        )
-                      ))}
-                      {!hasAnything && (
-                        <span className="text-[9px] text-muted-foreground/30">—</span>
-                      )}
-                    </div>
-                  )
-                })
-              })()}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-end">
+          <Link href="/calendar" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+            View schedule on Calendar →
+          </Link>
+        </div>
       )}
 
       {/* ── Communication Summary Tabs ────────────────────────── */}
@@ -2645,13 +2580,6 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Status legend */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-green-500" />Sent — email delivered</span>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-500" />Queued — waiting to send</span>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-500" />Draft — saved, not sent</span>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full border border-muted-foreground/30" />No action taken</span>
-          </div>
 
           {(() => {
             const hasContent: Record<CommType, boolean> = {
