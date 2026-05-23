@@ -30,18 +30,12 @@ import {
   Heart,
   Newspaper,
   HandHelping,
-  CalendarDays,
   Mail,
-  History,
-  ArrowRight,
   Loader2,
   ChevronLeft,
   ChevronRight,
   Settings2,
   Send,
-  Pencil,
-  Trash2,
-  Plus,
   X,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
