@@ -1288,11 +1288,11 @@ export default function DashboardPage() {
         const etName = etIdToName[evt.event_type_id] ?? ""
         if (bulletinSkipTypes.has(etName)) continue
         if (evt.recurrence_rule) {
+          // Recurring events — resolve occurrences for the week
           const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
           for (const occ of occs) {
             const inst = weekInstances.find((wi) => wi.event_id === evt.id && wi.instance_date === format(occ, "yyyy-MM-dd"))
             if (inst?.status === "cancelled") continue
-            // Check DB breaks for this event on this date
             const occDateStr = format(occ, "yyyy-MM-dd")
             const { data: occBreaks } = await supabase
               .from("event_breaks")
@@ -1310,6 +1310,30 @@ export default function DashboardPage() {
               title: evt.title,
               details: timeStr ? `${format(occ, "EEEE, MMM d")} at ${timeStr}` : format(occ, "EEEE, MMM d"),
             })
+          }
+        } else {
+          // One-time events — check if they have an instance this week
+          const inst = weekInstances.find((wi) => wi.event_id === evt.id)
+          if (inst) {
+            const timeStr = inst.instance_time ? formatTime(inst.instance_time) : (evt.default_time ? formatTime(evt.default_time) : null)
+            bulletinAutoEvents.push({
+              title: evt.title,
+              details: timeStr
+                ? `${format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")} at ${timeStr}`
+                : format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d"),
+            })
+          } else if (evt.start_date) {
+            // One-time events with start_date (no instance row yet) — check if date is in week
+            const evtDate = new Date(evt.start_date + "T00:00:00")
+            if (evtDate >= wkSun && evtDate <= wkSat) {
+              const timeStr = evt.default_time ? formatTime(evt.default_time) : null
+              bulletinAutoEvents.push({
+                title: evt.title,
+                details: timeStr
+                  ? `${format(evtDate, "EEEE, MMM d")} at ${timeStr}`
+                  : format(evtDate, "EEEE, MMM d"),
+              })
+            }
           }
         }
       }
