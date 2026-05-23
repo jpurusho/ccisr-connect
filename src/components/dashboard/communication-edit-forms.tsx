@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ImagePlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Expand, ImagePlus, Loader2, Minimize2, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 import { formatPhone } from "@/lib/utils"
@@ -617,6 +617,28 @@ export function ResourceLinksEditor({
 // Flyer Sections Editor (custom cards only)
 // ---------------------------------------------------------------------------
 
+function FlyerImagePreview({ src, onRemove }: { src: string; onRemove: () => void }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div className="relative rounded-lg border overflow-hidden">
+      <img
+        src={src}
+        alt="Flyer preview"
+        className={expanded ? "w-full object-contain" : "w-full max-h-48 object-cover cursor-pointer"}
+        onClick={() => setExpanded(!expanded)}
+      />
+      <div className="absolute top-2 right-2 flex gap-1">
+        <Button variant="secondary" size="icon-sm" onClick={() => setExpanded(!expanded)} title={expanded ? "Collapse" : "Expand to full size"}>
+          {expanded ? <Minimize2 className="size-3.5" /> : <Expand className="size-3.5" />}
+        </Button>
+        <Button variant="destructive" size="sm" onClick={onRemove}>
+          <Trash2 className="size-3.5" /> Remove
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export interface FlyerSectionItem {
   imageUrl: string
   caption: string
@@ -684,17 +706,10 @@ export function FlyerSectionsEditor({
           </div>
 
           {sec.imageUrl ? (
-            <div className="relative rounded-lg border overflow-hidden">
-              <img src={sec.imageUrl} alt="Flyer preview" className="w-full max-h-48 object-cover" />
-              <Button
-                variant="destructive"
-                size="sm"
-                className="absolute top-2 right-2"
-                onClick={() => { const u = [...sections]; u[idx] = { ...u[idx], imageUrl: "" }; onChange(u) }}
-              >
-                <Trash2 className="size-3.5" /> Remove
-              </Button>
-            </div>
+            <FlyerImagePreview
+              src={sec.imageUrl}
+              onRemove={() => { const u = [...sections]; u[idx] = { ...u[idx], imageUrl: "" }; onChange(u) }}
+            />
           ) : (
             <div className="space-y-2">
               <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-sm text-muted-foreground hover:border-primary/50 hover:bg-muted/30 transition-colors">
