@@ -2047,13 +2047,27 @@ export default function DashboardPage() {
         }
         snapshotForm(type)
 
+        // Resolve recipient count for confirmation
+        let recipientCount = 0
+        if (opts.mailingListId) {
+          const { count } = await supabase.from("mailing_list_members").select("*", { count: "exact", head: true }).eq("mailing_list_id", opts.mailingListId)
+          recipientCount = count ?? 0
+        }
+        const extraCount = opts.additionalRecipients.trim() ? opts.additionalRecipients.split(",").filter(Boolean).length : 0
+        const totalRecipients = recipientCount + extraCount
+
+        if (!confirm(`Send "${subject}" to ${totalRecipients} recipient${totalRecipients !== 1 ? "s" : ""}?`)) {
+          setSendingType(null)
+          return
+        }
+
         const { data: inserted, error } = await supabase
           .from("dispatch_queue")
           .insert({
             subject,
             body_html: html,
             scheduled_at: new Date().toISOString(),
-            status: "pending",
+            status: "sending",
             template_type: type,
             week_start: dispatchWeekStart,
             mailing_list_id: opts.mailingListId || null,
@@ -2067,11 +2081,19 @@ export default function DashboardPage() {
         if (error) {
           toast.error(`Failed: ${error.message}`)
         } else {
-          toast.success(
-            isReminder
-              ? `Reminder queued for "${getSubject(type)}".`
-              : `"${subject}" queued for dispatch. Go to Dispatch Queue to approve and send.`
-          )
+          // Immediately send via API
+          const sendRes = await fetch("/api/dispatch/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dispatchId: inserted?.id }),
+          })
+
+          if (sendRes.ok) {
+            toast.success(isReminder ? `Reminder sent!` : `"${subject}" sent to ${totalRecipients} recipients!`)
+          } else {
+            const err = await sendRes.json().catch(() => ({ error: "Send failed" }))
+            toast.error(`Queued but send failed: ${err.error}. Check Dispatch Queue in Settings.`)
+          }
           setDispatches((prev) => ({
             ...prev,
             [type]: {

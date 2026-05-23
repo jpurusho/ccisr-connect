@@ -366,7 +366,7 @@ export function WeeklyCommunicationCard({
                 title={dispatchTitle}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
-                Queue for Dispatch
+                Send
               </Button>
               <Button
                 variant="outline"
@@ -557,7 +557,7 @@ export function WeeklyCommunicationCard({
                 title={dispatchTitle}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
-                Queue for Dispatch
+                Send
               </Button>
             )}
           </DialogFooter>
