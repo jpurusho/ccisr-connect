@@ -3112,22 +3112,30 @@ export default function DashboardPage() {
                       }
                       setCustomSnapshots((prev) => ({ ...prev, [ct.id]: structuredClone(form as unknown as Record<string, unknown>) }))
 
-                      const { error } = await supabase.from("dispatch_queue").insert({
+                      const { data: inserted, error } = await supabase.from("dispatch_queue").insert({
                         subject: subj,
                         body_html: html,
                         scheduled_at: new Date().toISOString(),
-                        status: "pending",
+                        status: "sending",
                         template_type: ctKey,
                         week_start: weekStart,
                         mailing_list_id: opts.mailingListId || null,
                         smtp_config_id: opts.smtpConfigId || null,
                         additional_recipients: opts.additionalRecipients?.trim() || null,
                         created_by: user?.id ?? null,
-                      } as never)
-                      if (error) toast.error(`Failed: ${error.message}`)
-                      else {
-                        toast.success(`"${subj}" queued for dispatch`)
-                        setCustomDispatches((prev) => ({ ...prev, [ct.id]: { status: "scheduled", count: (prev[ct.id]?.count ?? 0) + 1, lastSentAt: prev[ct.id]?.lastSentAt ?? null } }))
+                      } as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null }
+                      if (error) { toast.error(`Failed: ${error.message}`); return }
+
+                      const sendRes = await fetch("/api/dispatch/send", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ dispatchId: inserted?.id }),
+                      })
+                      if (sendRes.ok) {
+                        toast.success(`"${subj}" sent!`)
+                        setCustomDispatches((prev) => ({ ...prev, [ct.id]: { status: "sent", count: (prev[ct.id]?.count ?? 0) + 1, lastSentAt: new Date().toISOString() } }))
+                      } else {
+                        toast.error("Send failed. Check Settings → Dispatch Queue.")
                       }
                     } finally { setSendingType(null) }
                   }}
