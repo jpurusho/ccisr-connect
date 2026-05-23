@@ -529,10 +529,6 @@ export default function DashboardPage() {
     isReminder: boolean
   }>({ open: false, type: null, subject: "", recipientCount: 0, listName: "", isReminder: false })
 
-  // ---- Week strip: recurring events + dispatches ----
-  const [weekStripEvents, setWeekStripEvents] = useState<{ title: string; date: Date; color: string; commType: CommType | null }[]>([])
-  const [weekStripDispatches, setWeekStripDispatches] = useState<{ label: string; date: string; color: string; status: string; targetLabel: string; commType: CommType | null; dispatchId: string }[]>([])
-
   // ---- Sent email preview ----
   const [sentEmailPreview, setSentEmailPreview] = useState<{
     subject: string
@@ -612,7 +608,6 @@ export default function DashboardPage() {
         templateDefaultsRes,
         eventTypesRes,
         composedInstancesRes,
-        stripDispatchesRes,
       ] = await Promise.all([
         // Stats
         supabase
@@ -744,14 +739,6 @@ export default function DashboardPage() {
           .or(`week_start.eq.${wkSunISO},and(is_recurring.eq.true,week_start.lte.${wkSunISO})`)
           .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null; updated_at: string }[]>(),
 
-        // Strip dispatches: anything sent during this week (for the upcoming strip)
-        supabase
-          .from("dispatch_queue")
-          .select("id, subject, template_type, status, sent_at, created_at, week_start")
-          .not("status", "eq", "cancelled")
-          .or(`and(sent_at.gte.${wkSunISO},sent_at.lte.${wkSatISO}T23:59:59),and(status.neq.sent,week_start.eq.${wkSunISO})`)
-          .order("created_at", { ascending: false })
-          .returns<{ id: string; subject: string; template_type: string | null; status: string; sent_at: string | null; created_at: string; week_start: string | null }[]>(),
       ])
 
       // Check errors
@@ -995,49 +982,6 @@ export default function DashboardPage() {
           counts[ct as CommType] = findEventsByType(etName).length
         }
         setEventCounts(counts)
-      }
-
-      // ---- Build week strip events (all recurring events resolved to dates) ----
-      {
-        const etNameToCommColor: Record<string, string> = {}
-        const etNameToCommType: Record<string, CommType> = {}
-        for (const bt of BUILTIN_TEMPLATES) {
-          const etName = COMM_TYPE_TO_ET[bt.type]
-          if (etName) {
-            etNameToCommColor[etName] = bt.color
-            etNameToCommType[etName] = bt.type
-          }
-        }
-        // Build event type → color map from event_types (for custom template events)
-        const etIdToColor: Record<string, string> = {}
-        for (const et of eventTypesRes.data ?? []) {
-          if (et.color_scheme?.primary) etIdToColor[et.id] = et.color_scheme.primary
-        }
-
-        const stripEvts: { title: string; date: Date; color: string; commType: CommType | null }[] = []
-        for (const evt of activeEvents) {
-          const etName = etIdToName[evt.event_type_id] ?? ""
-          const color = etNameToCommColor[etName] ?? etIdToColor[evt.event_type_id] ?? "#6B7280"
-          const commType = etNameToCommType[etName] ?? null
-
-          if (evt.recurrence_rule) {
-            const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
-            for (const occ of occs) {
-              stripEvts.push({ title: evt.title, date: occ, color, commType })
-            }
-          } else if ((evt as { start_date?: string }).start_date) {
-            const sd = new Date((evt as { start_date: string }).start_date + "T00:00:00")
-            const ed = (evt as { end_date?: string }).end_date ? new Date((evt as { end_date: string }).end_date + "T00:00:00") : sd
-            let d = new Date(sd)
-            while (d <= ed) {
-              if (d >= wkSun && d <= wkSat) {
-                stripEvts.push({ title: evt.title, date: new Date(d), color, commType })
-              }
-              d = addDays(d, 1)
-            }
-          }
-        }
-        setWeekStripEvents(stripEvts)
       }
 
       // ---- Signup auto-fill accumulator ----
@@ -1674,47 +1618,6 @@ export default function DashboardPage() {
 
       setDispatches(matchedDispatches)
       setDispatchCounts(counts)
-
-      // Build strip dispatch indicators (from dedicated strip query — sent during this week + pending for this week)
-      {
-        const commColorMap: Record<string, string> = {}
-        const commLabelMap: Record<string, string> = {}
-        for (const bt of BUILTIN_TEMPLATES) {
-          commColorMap[bt.type] = bt.color
-          commLabelMap[bt.type] = bt.label
-        }
-        for (const ct of customTmpls ?? []) {
-          const ctKey = `custom:${ct.id}`
-          let parsed: Record<string, unknown> = {}
-          try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
-          const linkedEt = (eventTypesRes.data ?? []).find((et) => et.default_template_id === ct.id)
-          commColorMap[ctKey] = linkedEt?.color_scheme?.primary ?? (parsed.primaryColor as string) ?? "#6B7280"
-          commLabelMap[ctKey] = ct.name
-        }
-        const stripDisps: { label: string; date: string; color: string; status: string; targetLabel: string; commType: CommType | null; dispatchId: string }[] = []
-        const seen = new Set<string>()
-        for (const d of (stripDispatchesRes.data ?? [])) {
-          const ct = d.template_type ?? ""
-          const key = `${ct}:${d.status}`
-          if (seen.has(key)) continue
-          seen.add(key)
-          const color = commColorMap[ct] ?? "#6B7280"
-          const label = commLabelMap[ct] || d.subject.split("—")[0].trim().split(" ").slice(0, 2).join(" ") || "Email"
-          const commType = ct in commColorMap ? (ct as CommType) : null
-          const isSent = d.status === "sent"
-          const dateStr = isSent && d.sent_at
-            ? format(new Date(d.sent_at), "yyyy-MM-dd")
-            : d.week_start ?? format(new Date(d.created_at), "yyyy-MM-dd")
-          let targetLabel = ""
-          if (d.week_start && d.week_start !== wkSunISO) {
-            const ws = new Date(d.week_start + "T00:00:00")
-            const we = addDays(ws, 6)
-            targetLabel = `${format(ws, "MMM d")}–${format(we, "d")}`
-          }
-          stripDisps.push({ label, date: dateStr, color, status: d.status, targetLabel, commType, dispatchId: d.id })
-        }
-        setWeekStripDispatches(stripDisps)
-      }
 
       // Fallback: pre-fill mailing list + SMTP from dispatches when no composed instance
       for (const ct of commTypes) {
