@@ -615,13 +615,12 @@ export default function DashboardPage() {
           .eq("is_active", true)
           .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean }[]>(),
 
-        // Event instances for current week (host/location overrides)
+        // Event instances for current week (including cancelled — needed for break/cancel detection)
         supabase
           .from("event_instances")
           .select("id, event_id, instance_date, instance_time, location_override, notes, host_family_id, status")
           .gte("instance_date", wkSunISO)
           .lte("instance_date", wkSatISO)
-          .neq("status", "cancelled")
           .returns<{
             id: string
             event_id: string
@@ -1368,14 +1367,23 @@ export default function DashboardPage() {
         }
       }
 
+      // Live events always come from DB (current state), not from stale drafts
+      const liveEvents = [...bulletinAutoEvents, ...manualBulletinItems]
+
       if (hasBulDraft) {
         const fd = composedMap["bulletin"].form_data as Record<string, unknown>
+        // Merge: keep manual additions from draft that aren't in live events, but use live as base
+        const draftEvents = (fd.events as BulletinFormData["events"]) ?? []
+        const manualDraftEvents = draftEvents.filter((de) =>
+          !liveEvents.some((le) => le.title === de.title) &&
+          !manualBulletinItems.some((mi) => mi.title === de.title)
+        )
         setBulletinForm({
           weekLabel: (fd.weekLabel as string) ?? `Week of ${wl}`,
           birthdays: (fd.birthdays as BulletinFormData["birthdays"]) ?? bdayEntries.map((b) => ({ name: b.name, date: b.date })),
           anniversaries: (fd.anniversaries as BulletinFormData["anniversaries"]) ?? anniEntries.map((a) => ({ names: `${a.husbandName} & ${a.wifeName}`, date: a.date })),
           helpers: (fd.helpers as BulletinFormData["helpers"]) ?? autoFilledHelpers,
-          events: (fd.events as BulletinFormData["events"]) ?? [],
+          events: [...liveEvents, ...manualDraftEvents],
           sectionOrder: (fd.sectionOrder as BulletinFormData["sectionOrder"]) ?? undefined,
           ...bulCommon,
         })
@@ -1391,7 +1399,7 @@ export default function DashboardPage() {
             date: a.date,
           })),
           helpers: bulHelpers,
-          events: [...bulletinAutoEvents, ...manualBulletinItems],
+          events: liveEvents,
           ...bulCommon,
         })
       }
