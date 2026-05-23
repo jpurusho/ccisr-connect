@@ -218,6 +218,8 @@ const BUILTIN_TEMPLATES: { type: CommType; label: string; color: string; icon: t
   { type: "prayer_meeting", label: "Prayer Meeting", color: "#059669", icon: HandHelping },
 ]
 
+const BUILTIN_LABEL: Record<CommType, string> = Object.fromEntries(BUILTIN_TEMPLATES.map((t) => [t.type, t.label])) as Record<CommType, string>
+
 // StatCardConfig kept for potential future use
 interface StatCardConfig {
   title: string
@@ -1902,7 +1904,7 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       const weekStart = getWeekStartForSave(type)
-      const templateName = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
+      const templateName = BUILTIN_LABEL[type] || type
 
       const payload = {
         template_type: type,
@@ -1957,7 +1959,7 @@ export default function DashboardPage() {
   async function handleDeleteInstance(type: CommType) {
     const id = instanceIds[type]
     if (!id) return
-    const label = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
+    const label = BUILTIN_LABEL[type] || type
     if (!confirm(`Delete the saved ${label} draft for this week?`)) return
 
     const supabase = createClient()
@@ -2039,7 +2041,7 @@ export default function DashboardPage() {
         const dispatchWeekStart = getWeekStartForSave(type)
 
         // Auto-save draft before dispatching so form data persists
-        const templateName = BUILTIN_TEMPLATES.find((t) => t.type === type)?.label || type
+        const templateName = BUILTIN_LABEL[type] || type
         const draftPayload = {
           template_type: type,
           name: templateName,
@@ -3104,54 +3106,49 @@ export default function DashboardPage() {
               </WeeklyCommunicationCard>
             )
           })()}
-        {/* ── Custom Template Expanded Card (below grid) ── */}
-        {selectedCustomCard && (
-          <>
-            {(() => {
-              const ct = customDashTemplates.find((t) => t.id === selectedCustomCard)
-              if (!ct) return null
-              const form = customForms[ct.id]
-              if (!form) return null
-              const ctKey = `custom:${ct.id}`
-              const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
-              const preview = buildCustomDashPreview(form, customTemplateStyles[ct.id])
-              const subj = customSubjectOverrides[ct.id] || ct.subject_template || ct.name
+        {/* ── Custom Template Expanded Card ── */}
+        {selectedCustomCard && (() => {
+          const ct = customDashTemplates.find((t) => t.id === selectedCustomCard)
+          if (!ct) return null
+          const form = customForms[ct.id]
+          if (!form) return null
+          const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
+          const preview = buildCustomDashPreview(form, customTemplateStyles[ct.id])
+          const subj = customSubjectOverrides[ct.id] || ct.subject_template || ct.name
 
-              return (
-                <WeeklyCommunicationCard
-                  key={ctKey}
-                  title={ct.name}
-                  accentColor={ct.color}
-                  icon={Send}
-                  status={di.status as CommunicationStatus}
-                  summaryLines={[form.title || "Custom announcement"]}
-                  subject={subj}
-                  onSubjectChange={(v) => setCustomSubjectOverrides((prev) => ({ ...prev, [ct.id]: v }))}
-                  previewHtml={preview}
-                  resourceLinks={(form.resourceLinks ?? []).filter((l) => l.url)}
-                  mailingLists={mailingLists}
-                  smtpConfigs={smtpConfigs}
-                  selectedMailingList={customCommOptions[ct.id]?.mailingListId}
-                  onMailingListChange={(id) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], mailingListId: id } }))}
-                  selectedSmtpConfig={customCommOptions[ct.id]?.smtpConfigId}
-                  onSmtpConfigChange={(id) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], smtpConfigId: id } }))}
-                  additionalRecipients={customCommOptions[ct.id]?.additionalRecipients}
-                  onAdditionalRecipientsChange={(v) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], additionalRecipients: v } }))}
-                  sendCount={di.count}
-                  onSchedule={() => {}}
-                  onSendNow={() => handleCustomSendNow(ct.id)}
-                  onSave={() => handleCustomSave(ct.id)}
-                  onDelete={() => handleCustomDelete(ct.id)}
-                  onCancel={() => handleCustomCancel(ct.id)}
-                  saving={savingInstance === "bulletin"}
-                  hasInstance={!!customInstanceIds[ct.id]}
-                >
-                  <CustomEditFields ctId={ct.id} form={form} onChange={updateCustomForm} />
-                </WeeklyCommunicationCard>
-              )
-            })()}
-          </>
-        )}
+          return (
+            <WeeklyCommunicationCard
+              key={`custom:${ct.id}`}
+              title={ct.name}
+              accentColor={ct.color}
+              icon={Send}
+              status={di.status as CommunicationStatus}
+              summaryLines={[form.title || "Custom announcement"]}
+              subject={subj}
+              onSubjectChange={(v) => setCustomSubjectOverrides((prev) => ({ ...prev, [ct.id]: v }))}
+              previewHtml={preview}
+              resourceLinks={(form.resourceLinks ?? []).filter((l) => l.url)}
+              mailingLists={mailingLists}
+              smtpConfigs={smtpConfigs}
+              selectedMailingList={customCommOptions[ct.id]?.mailingListId}
+              onMailingListChange={(id) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], mailingListId: id } }))}
+              selectedSmtpConfig={customCommOptions[ct.id]?.smtpConfigId}
+              onSmtpConfigChange={(id) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], smtpConfigId: id } }))}
+              additionalRecipients={customCommOptions[ct.id]?.additionalRecipients}
+              onAdditionalRecipientsChange={(v) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], additionalRecipients: v } }))}
+              sendCount={di.count}
+              onSchedule={() => {}}
+              onSendNow={() => handleCustomSendNow(ct.id)}
+              onSave={() => handleCustomSave(ct.id)}
+              onDelete={() => handleCustomDelete(ct.id)}
+              onCancel={() => handleCustomCancel(ct.id)}
+              saving={savingInstance === "bulletin"}
+              hasInstance={!!customInstanceIds[ct.id]}
+            >
+              <CustomEditFields ctId={ct.id} form={form} onChange={updateCustomForm} />
+            </WeeklyCommunicationCard>
+          )
+        })()}
         </>
           })()}
         </div>
