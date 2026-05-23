@@ -2254,6 +2254,159 @@ export default function DashboardPage() {
     } catch { toast.error("Test send failed") }
   }
 
+  // ---- Custom template handlers (shared logic) ----
+  async function handleCustomSendNow(ctId: string) {
+    const ct = customDashTemplates.find((t) => t.id === ctId)
+    if (!ct) return
+    const form = customForms[ctId]
+    if (!form) return
+    const html = buildCustomDashPreview(form, customTemplateStyles[ctId])
+    if (!html) { toast.error("No content"); return }
+    const opts = customCommOptions[ctId]
+    if (!opts?.smtpConfigId) { toast.error("Please select a Send From account first."); return }
+    if (!opts?.mailingListId && !opts?.additionalRecipients?.trim()) { toast.error("Please select a mailing list or add recipients."); return }
+
+    const ctKey = `custom:${ctId}`
+    const subj = customSubjectOverrides[ctId] || ct.subject_template || ct.name
+    setSendingType("bulletin")
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+
+      const draftPayload = {
+        template_type: ctKey,
+        name: ct.name,
+        subject: subj,
+        form_data: form as unknown as Record<string, unknown>,
+        mailing_list_id: opts.mailingListId || null,
+        smtp_config_id: opts.smtpConfigId || null,
+        additional_recipients: opts.additionalRecipients?.trim() || null,
+        is_active: true,
+        week_start: weekStart,
+        is_recurring: false,
+        recur_until: null,
+        created_by: user?.id ?? null,
+      }
+      const existingId = customInstanceIds[ctId]
+      if (existingId) {
+        await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingId)
+      } else {
+        const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
+        if (newDraft) setCustomInstanceIds((prev) => ({ ...prev, [ctId]: newDraft.id }))
+      }
+      setCustomSnapshots((prev) => ({ ...prev, [ctId]: structuredClone(form as unknown as Record<string, unknown>) }))
+
+      const { data: inserted, error } = await supabase.from("dispatch_queue").insert({
+        subject: subj,
+        body_html: html,
+        scheduled_at: new Date().toISOString(),
+        status: "sending",
+        template_type: ctKey,
+        week_start: weekStart,
+        mailing_list_id: opts.mailingListId || null,
+        smtp_config_id: opts.smtpConfigId || null,
+        additional_recipients: opts.additionalRecipients?.trim() || null,
+        created_by: user?.id ?? null,
+      } as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null }
+      if (error) { toast.error(`Failed: ${error.message}`); return }
+
+      const sendRes = await fetch("/api/dispatch/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatchId: inserted?.id }),
+      })
+      if (sendRes.ok) {
+        toast.success(`"${subj}" sent!`)
+        setCustomDispatches((prev) => ({ ...prev, [ctId]: { status: "sent", count: (prev[ctId]?.count ?? 0) + 1, lastSentAt: new Date().toISOString() } }))
+      } else {
+        toast.error("Send failed. Check Settings → Dispatch Queue.")
+      }
+    } finally { setSendingType(null) }
+  }
+
+  async function handleCustomSave(ctId: string) {
+    const ct = customDashTemplates.find((t) => t.id === ctId)
+    if (!ct) return
+    const form = customForms[ctId]
+    if (!form) return
+    const ctKey = `custom:${ctId}`
+    const subj = customSubjectOverrides[ctId] || ct.subject_template || ct.name
+    setSavingInstance("bulletin")
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+      const opts = customCommOptions[ctId]
+      const payload = {
+        template_type: ctKey,
+        name: ct.name,
+        subject: subj,
+        form_data: form as unknown as Record<string, unknown>,
+        mailing_list_id: opts?.mailingListId || null,
+        smtp_config_id: opts?.smtpConfigId || null,
+        additional_recipients: opts?.additionalRecipients?.trim() || null,
+        is_active: true,
+        week_start: weekStart,
+        is_recurring: false,
+        recur_until: null,
+        created_by: user?.id ?? null,
+      }
+      const existingId = customInstanceIds[ctId]
+      if (existingId) {
+        const { error } = await supabase.from("composed_instances").update(payload as never).eq("id", existingId)
+        if (error) toast.error(`Save failed: ${error.message}`)
+        else toast.success(`${ct.name} draft saved`)
+      } else {
+        const { data: ins, error } = await supabase.from("composed_instances").insert(payload as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null }
+        if (error) toast.error(`Save failed: ${error.message}`)
+        else {
+          toast.success(`${ct.name} draft saved`)
+          if (ins) setCustomInstanceIds((prev) => ({ ...prev, [ctId]: ins.id }))
+        }
+      }
+      setCustomSnapshots((prev) => ({ ...prev, [ctId]: structuredClone(form as unknown as Record<string, unknown>) }))
+    } finally { setSavingInstance(null) }
+  }
+
+  async function handleCustomDelete(ctId: string) {
+    const ct = customDashTemplates.find((t) => t.id === ctId)
+    const id = customInstanceIds[ctId]
+    if (!id || !confirm(`Delete the saved ${ct?.name ?? "custom"} draft?`)) return
+    const supabase = createClient()
+    await supabase.from("composed_instances").delete().eq("id", id)
+    setCustomInstanceIds((prev) => { const n = { ...prev }; delete n[ctId]; return n })
+    toast.success(`${ct?.name ?? "Custom"} draft deleted`)
+  }
+
+  function handleCustomCancel(ctId: string) {
+    const ct = customDashTemplates.find((t) => t.id === ctId)
+    if (!ct) return
+    const snap = customSnapshots[ctId]
+    if (snap) {
+      setCustomForms((prev) => ({ ...prev, [ctId]: structuredClone(snap) as unknown as CustomDashFormData }))
+    } else {
+      const parsed = ct.defaults
+      setCustomForms((prev) => ({
+        ...prev,
+        [ctId]: {
+          ...EMPTY_CUSTOM_FORM,
+          title: (parsed.title as string) || ct.name,
+          subtitle: (parsed.subtitle as string) || "",
+          emoji: (parsed.emoji as string) || "📋",
+          body: (parsed.body as string) || "",
+          bodyBgColor: (parsed.bodyBgColor as string) || undefined,
+          footerVerse: (parsed.footerVerse as string) || "",
+          footerVerseBgColor: (parsed.footerVerseBgColor as string) || undefined,
+          primaryColor: (parsed.primaryColor as string) || "",
+          resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
+          customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
+          flyerSections: (parsed.flyerSections as FlyerSectionItem[]) ?? [],
+        },
+      }))
+    }
+  }
+
   const handleSchedule = useCallback(
     async (type: CommType) => {
       const html = getLivePreview(type)
@@ -2991,60 +3144,7 @@ export default function DashboardPage() {
         {/* ── Custom Template Expanded Card (below grid) ── */}
         {selectedCustomCard && (
           <>
-            <div className="hidden">
-              {customDashTemplates.filter((ct) => isCustomVisible(ct.id)).map((ct) => {
-                const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
-                const hasDraft = !!customInstanceIds[ct.id]
-                const isSelected = selectedCustomCard === ct.id
-
-                return (
-                  <button
-                    key={ct.id}
-                    onClick={() => { setSelectedCustomCard(isSelected ? null : ct.id); setSelectedCard("bulletin") }}
-                    className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
-                      isSelected ? "ring-2 ring-offset-1 shadow-sm" : "border-border hover:border-foreground/20"
-                    }`}
-                    style={isSelected ? { borderColor: ct.color, "--tw-ring-color": ct.color } as React.CSSProperties : undefined}
-                  >
-                    <div
-                      className="flex size-9 shrink-0 items-center justify-center rounded-lg text-lg"
-                      style={{ backgroundColor: ct.color + "15" }}
-                    >
-                      {ct.emoji}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold truncate">{ct.name}</span>
-                        {di.status === "sent" && di.count > 0 && (
-                          <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            Sent{di.count > 1 ? ` ${di.count}x` : ""}
-                          </span>
-                        )}
-                        {hasDraft && di.status === "draft" && (
-                          <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                            Draft
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                        {ct.eventInfo?.eventDate
-                          ? `${ct.eventInfo.eventDate}${ct.eventInfo.eventTime ? ` at ${ct.eventInfo.eventTime}` : ""}`
-                          : customForms[ct.id]?.title || "Custom announcement"}
-                      </p>
-                      {di.lastSentAt ? (
-                        <p className="mt-0.5 text-[10px] text-green-600 dark:text-green-400">Sent {formatRelativeTime(di.lastSentAt)}</p>
-                      ) : hasDraft ? (
-                        <p className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-400">Draft saved</p>
-                      ) : null}
-                    </div>
-                    <span className="absolute right-2 top-2 size-2 rounded-full" style={{ backgroundColor: ct.color }} />
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Expanded custom card */}
-            {selectedCustomCard && (() => {
+            {(() => {
               const ct = customDashTemplates.find((t) => t.id === selectedCustomCard)
               if (!ct) return null
               const form = customForms[ct.id]
@@ -3076,139 +3176,10 @@ export default function DashboardPage() {
                   onAdditionalRecipientsChange={(v) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], additionalRecipients: v } }))}
                   sendCount={di.count}
                   onSchedule={() => {}}
-                  onSendNow={async () => {
-                    const html = buildCustomDashPreview(form, customTemplateStyles[ct.id])
-                    if (!html) { toast.error("No content"); return }
-                    const opts = customCommOptions[ct.id]
-                    if (!opts?.smtpConfigId) { toast.error("Please select a Send From account first."); return }
-                    if (!opts?.mailingListId && !opts?.additionalRecipients?.trim()) { toast.error("Please select a mailing list or add recipients."); return }
-                    setSendingType("bulletin")
-                    try {
-                      const supabase = createClient()
-                      const { data: { user } } = await supabase.auth.getUser()
-                      const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
-
-                      // Auto-save draft
-                      const draftPayload = {
-                        template_type: ctKey,
-                        name: ct.name,
-                        subject: subj,
-                        form_data: form as unknown as Record<string, unknown>,
-                        mailing_list_id: opts.mailingListId || null,
-                        smtp_config_id: opts.smtpConfigId || null,
-                        additional_recipients: opts.additionalRecipients?.trim() || null,
-                        is_active: true,
-                        week_start: weekStart,
-                        is_recurring: false,
-                        recur_until: null,
-                        created_by: user?.id ?? null,
-                      }
-                      const existingId = customInstanceIds[ct.id]
-                      if (existingId) {
-                        await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingId)
-                      } else {
-                        const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
-                        if (newDraft) setCustomInstanceIds((prev) => ({ ...prev, [ct.id]: newDraft.id }))
-                      }
-                      setCustomSnapshots((prev) => ({ ...prev, [ct.id]: structuredClone(form as unknown as Record<string, unknown>) }))
-
-                      const { data: inserted, error } = await supabase.from("dispatch_queue").insert({
-                        subject: subj,
-                        body_html: html,
-                        scheduled_at: new Date().toISOString(),
-                        status: "sending",
-                        template_type: ctKey,
-                        week_start: weekStart,
-                        mailing_list_id: opts.mailingListId || null,
-                        smtp_config_id: opts.smtpConfigId || null,
-                        additional_recipients: opts.additionalRecipients?.trim() || null,
-                        created_by: user?.id ?? null,
-                      } as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null }
-                      if (error) { toast.error(`Failed: ${error.message}`); return }
-
-                      const sendRes = await fetch("/api/dispatch/send", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ dispatchId: inserted?.id }),
-                      })
-                      if (sendRes.ok) {
-                        toast.success(`"${subj}" sent!`)
-                        setCustomDispatches((prev) => ({ ...prev, [ct.id]: { status: "sent", count: (prev[ct.id]?.count ?? 0) + 1, lastSentAt: new Date().toISOString() } }))
-                      } else {
-                        toast.error("Send failed. Check Settings → Dispatch Queue.")
-                      }
-                    } finally { setSendingType(null) }
-                  }}
-                  onSave={async () => {
-                    setSavingInstance("bulletin")
-                    try {
-                      const supabase = createClient()
-                      const { data: { user } } = await supabase.auth.getUser()
-                      const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
-                      const opts = customCommOptions[ct.id]
-                      const payload = {
-                        template_type: ctKey,
-                        name: ct.name,
-                        subject: subj,
-                        form_data: form as unknown as Record<string, unknown>,
-                        mailing_list_id: opts?.mailingListId || null,
-                        smtp_config_id: opts?.smtpConfigId || null,
-                        additional_recipients: opts?.additionalRecipients?.trim() || null,
-                        is_active: true,
-                        week_start: weekStart,
-                        is_recurring: false,
-                        recur_until: null,
-                        created_by: user?.id ?? null,
-                      }
-                      const existingId = customInstanceIds[ct.id]
-                      if (existingId) {
-                        const { error } = await supabase.from("composed_instances").update(payload as never).eq("id", existingId)
-                        if (error) toast.error(`Save failed: ${error.message}`)
-                        else toast.success(`${ct.name} draft saved`)
-                      } else {
-                        const { data: ins, error } = await supabase.from("composed_instances").insert(payload as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null }
-                        if (error) toast.error(`Save failed: ${error.message}`)
-                        else {
-                          toast.success(`${ct.name} draft saved`)
-                          if (ins) setCustomInstanceIds((prev) => ({ ...prev, [ct.id]: ins.id }))
-                        }
-                      }
-                      setCustomSnapshots((prev) => ({ ...prev, [ct.id]: structuredClone(form as unknown as Record<string, unknown>) }))
-                    } finally { setSavingInstance(null) }
-                  }}
-                  onDelete={async () => {
-                    const id = customInstanceIds[ct.id]
-                    if (!id || !confirm(`Delete the saved ${ct.name} draft?`)) return
-                    const supabase = createClient()
-                    await supabase.from("composed_instances").delete().eq("id", id)
-                    setCustomInstanceIds((prev) => { const n = { ...prev }; delete n[ct.id]; return n })
-                    toast.success(`${ct.name} draft deleted`)
-                  }}
-                  onCancel={() => {
-                    const snap = customSnapshots[ct.id]
-                    if (snap) {
-                      setCustomForms((prev) => ({ ...prev, [ct.id]: structuredClone(snap) as unknown as CustomDashFormData }))
-                    } else {
-                      const parsed = ct.defaults
-                      setCustomForms((prev) => ({
-                        ...prev,
-                        [ct.id]: {
-                          ...EMPTY_CUSTOM_FORM,
-                          title: (parsed.title as string) || ct.name,
-                          subtitle: (parsed.subtitle as string) || "",
-                          emoji: (parsed.emoji as string) || "📋",
-                          body: (parsed.body as string) || "",
-                          bodyBgColor: (parsed.bodyBgColor as string) || undefined,
-                          footerVerse: (parsed.footerVerse as string) || "",
-                          footerVerseBgColor: (parsed.footerVerseBgColor as string) || undefined,
-                          primaryColor: (parsed.primaryColor as string) || "",
-                          resourceLinks: (parsed.resourceLinks as BaseFormData["resourceLinks"]) ?? [],
-                          customSections: (parsed.customSections as BaseFormData["customSections"]) ?? [],
-                          flyerSections: (parsed.flyerSections as FlyerSectionItem[]) ?? [],
-                        },
-                      }))
-                    }
-                  }}
+                  onSendNow={() => handleCustomSendNow(ct.id)}
+                  onSave={() => handleCustomSave(ct.id)}
+                  onDelete={() => handleCustomDelete(ct.id)}
+                  onCancel={() => handleCustomCancel(ct.id)}
                   saving={savingInstance === "bulletin"}
                   hasInstance={!!customInstanceIds[ct.id]}
                 >
