@@ -234,6 +234,65 @@ interface StatCardConfig {
   href: string
 }
 
+// ── Custom Template Edit Fields (extracted to reduce render-path nesting) ──
+
+function CustomEditFields({ ctId, form, onChange }: {
+  ctId: string
+  form: CustomDashFormData
+  onChange: (id: string, partial: Partial<CustomDashFormData>) => void
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor={`ct-${ctId}-title`}>Card Title</Label>
+        <Input id={`ct-${ctId}-title`} value={form.title} onChange={(e) => onChange(ctId, { title: e.target.value })} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`ct-${ctId}-sub`}>Subtitle</Label>
+        <Input id={`ct-${ctId}-sub`} value={form.subtitle} onChange={(e) => onChange(ctId, { subtitle: e.target.value })} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`ct-${ctId}-emoji`}>Header Emoji</Label>
+        <Input id={`ct-${ctId}-emoji`} value={form.emoji} onChange={(e) => onChange(ctId, { emoji: e.target.value })} className="w-24 text-2xl text-center" />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`ct-${ctId}-body`}>Message Body</Label>
+        <textarea
+          id={`ct-${ctId}-body`}
+          value={form.body}
+          onChange={(e) => onChange(ctId, { body: e.target.value })}
+          className="w-full min-h-24 rounded-md border border-input px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors"
+          placeholder="Write your message..."
+          style={form.bodyBgColor ? { backgroundColor: form.bodyBgColor, borderColor: PASTEL_BORDER_MAP[form.bodyBgColor], boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[form.bodyBgColor]}50` } : undefined}
+        />
+        <PastelColorPicker value={form.bodyBgColor} onChange={(color) => onChange(ctId, { bodyBgColor: color })} />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Theme Color</Label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={form.primaryColor || "#6B7280"} onChange={(e) => onChange(ctId, { primaryColor: e.target.value })} className="h-8 w-12 cursor-pointer rounded border p-0.5" />
+          <span className="text-sm text-muted-foreground">{form.primaryColor || "Default"}</span>
+          {form.primaryColor && <button type="button" className="text-xs text-muted-foreground underline" onClick={() => onChange(ctId, { primaryColor: "" })}>Reset</button>}
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`ct-${ctId}-footer`}>Footer Verse</Label>
+        <Input
+          id={`ct-${ctId}-footer`}
+          value={form.footerVerse}
+          onChange={(e) => onChange(ctId, { footerVerse: e.target.value })}
+          style={form.footerVerseBgColor ? { backgroundColor: form.footerVerseBgColor, borderColor: PASTEL_BORDER_MAP[form.footerVerseBgColor], boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[form.footerVerseBgColor]}50` } : undefined}
+        />
+        <PastelColorPicker value={form.footerVerseBgColor} onChange={(color) => onChange(ctId, { footerVerseBgColor: color })} />
+      </div>
+      <FlyerSectionsEditor sections={form.flyerSections ?? []} onChange={(flyerSections) => onChange(ctId, { flyerSections })} />
+      <CustomSectionsEditor sections={form.customSections ?? []} onChange={(sections) => onChange(ctId, { customSections: sections })} />
+      <ResourceLinksEditor links={form.resourceLinks ?? []} onChange={(links) => onChange(ctId, { resourceLinks: links })} />
+      <CardStyleFields data={form} onChange={(updated) => onChange(ctId, { ...updated })} idPrefix={`ct-${ctId}`} />
+    </div>
+  )
+}
+
 // ── Skeleton ──────────────────────────────────────────────────────────────
 
 function CardSkeleton() {
@@ -2379,6 +2438,10 @@ export default function DashboardPage() {
     toast.success(`${ct?.name ?? "Custom"} draft deleted`)
   }
 
+  function updateCustomForm(ctId: string, partial: Partial<CustomDashFormData>) {
+    setCustomForms((prev) => ({ ...prev, [ctId]: { ...prev[ctId], ...partial } }))
+  }
+
   function handleCustomCancel(ctId: string) {
     const ct = customDashTemplates.find((t) => t.id === ctId)
     if (!ct) return
@@ -3183,107 +3246,7 @@ export default function DashboardPage() {
                   saving={savingInstance === "bulletin"}
                   hasInstance={!!customInstanceIds[ct.id]}
                 >
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`ct-${ct.id}-title`}>Card Title</Label>
-                      <Input
-                        id={`ct-${ct.id}-title`}
-                        value={form.title}
-                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], title: e.target.value } }))}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`ct-${ct.id}-sub`}>Subtitle</Label>
-                      <Input
-                        id={`ct-${ct.id}-sub`}
-                        value={form.subtitle}
-                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], subtitle: e.target.value } }))}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`ct-${ct.id}-emoji`}>Header Emoji</Label>
-                      <Input
-                        id={`ct-${ct.id}-emoji`}
-                        value={form.emoji}
-                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], emoji: e.target.value } }))}
-                        className="w-24 text-2xl text-center"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`ct-${ct.id}-body`}>Message Body</Label>
-                      <textarea
-                        id={`ct-${ct.id}-body`}
-                        value={form.body}
-                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], body: e.target.value } }))}
-                        className="w-full min-h-24 rounded-md border border-input px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-colors"
-                        placeholder="Write your message..."
-                        style={form.bodyBgColor ? {
-                          backgroundColor: form.bodyBgColor,
-                          borderColor: PASTEL_BORDER_MAP[form.bodyBgColor],
-                          boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[form.bodyBgColor]}50`,
-                        } : undefined}
-                      />
-                      <PastelColorPicker
-                        value={form.bodyBgColor}
-                        onChange={(color) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], bodyBgColor: color } }))}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Theme Color</Label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={form.primaryColor || "#6B7280"}
-                          onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], primaryColor: e.target.value } }))}
-                          className="h-8 w-12 cursor-pointer rounded border p-0.5"
-                        />
-                        <span className="text-sm text-muted-foreground">{form.primaryColor || "Default"}</span>
-                        {form.primaryColor && (
-                          <button
-                            type="button"
-                            className="text-xs text-muted-foreground underline"
-                            onClick={() => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], primaryColor: "" } }))}
-                          >
-                            Reset
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`ct-${ct.id}-footer`}>Footer Verse</Label>
-                      <Input
-                        id={`ct-${ct.id}-footer`}
-                        value={form.footerVerse}
-                        onChange={(e) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], footerVerse: e.target.value } }))}
-                        style={form.footerVerseBgColor ? {
-                          backgroundColor: form.footerVerseBgColor,
-                          borderColor: PASTEL_BORDER_MAP[form.footerVerseBgColor],
-                          boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[form.footerVerseBgColor]}50`,
-                        } : undefined}
-                      />
-                      <PastelColorPicker
-                        value={form.footerVerseBgColor}
-                        onChange={(color) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], footerVerseBgColor: color } }))}
-                      />
-                    </div>
-                    <FlyerSectionsEditor
-                      sections={form.flyerSections ?? []}
-                      onChange={(flyerSections) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], flyerSections } }))}
-                    />
-                    <CustomSectionsEditor
-                      sections={form.customSections ?? []}
-                      onChange={(sections) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], customSections: sections } }))}
-                    />
-                    <ResourceLinksEditor
-                      links={form.resourceLinks ?? []}
-                      onChange={(links) => setCustomForms((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], resourceLinks: links } }))}
-                    />
-                    <CardStyleFields
-                      data={form}
-                      onChange={(updated) => setCustomForms((prev) => ({ ...prev, [ct.id]: updated }))}
-                      idPrefix={`ct-${ct.id}`}
-                    />
-                  </div>
+                  <CustomEditFields ctId={ct.id} form={form} onChange={updateCustomForm} />
                 </WeeklyCommunicationCard>
               )
             })()}
