@@ -461,6 +461,14 @@ export default function DashboardPage() {
     dateTime: string
   }>({ open: false, commType: null, dateTime: "" })
   const [sendingType, setSendingType] = useState<CommType | null>(null)
+  const [sendConfirm, setSendConfirm] = useState<{
+    open: boolean
+    type: CommType | null
+    subject: string
+    recipientCount: number
+    listName: string
+    isReminder: boolean
+  }>({ open: false, type: null, subject: "", recipientCount: 0, listName: "", isReminder: false })
 
   // ---- Week strip: recurring events + dispatches ----
   const [weekStripEvents, setWeekStripEvents] = useState<{ title: string; date: Date; color: string; commType: CommType | null }[]>([])
@@ -2047,7 +2055,7 @@ export default function DashboardPage() {
         }
         snapshotForm(type)
 
-        // Resolve recipient count for confirmation
+        // Resolve recipient count for confirmation dialog
         let recipientCount = 0
         if (opts.mailingListId) {
           const { count } = await supabase.from("mailing_list_members").select("*", { count: "exact", head: true }).eq("mailing_list_id", opts.mailingListId)
@@ -2055,13 +2063,38 @@ export default function DashboardPage() {
         }
         const extraCount = opts.additionalRecipients.trim() ? opts.additionalRecipients.split(",").filter(Boolean).length : 0
         const totalRecipients = recipientCount + extraCount
+        const listName = mailingLists.find((ml) => ml.id === opts.mailingListId)?.name || "Direct recipients"
 
-        if (!confirm(`Send "${subject}" to ${totalRecipients} recipient${totalRecipients !== 1 ? "s" : ""}?`)) {
-          setSendingType(null)
-          return
-        }
+        // Show confirmation dialog instead of sending immediately
+        setSendConfirm({ open: true, type, subject, recipientCount: totalRecipients, listName, isReminder })
+        setSendingType(null)
+        return
+      } catch {
+        toast.error("An unexpected error occurred")
+      } finally {
+        setSendingType(null)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
 
-        const { data: inserted, error } = await supabase
+  const executeSend = useCallback(async () => {
+    if (!sendConfirm.type) return
+    const type = sendConfirm.type
+    const subject = sendConfirm.subject
+    const isReminder = sendConfirm.isReminder
+    setSendConfirm((prev) => ({ ...prev, open: false }))
+    setSendingType(type)
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const opts = commOptions[type]
+      const html = getLivePreview(type)
+      const dispatchWeekStart = getWeekStartForSave(type)
+
+      const { data: inserted, error } = await supabase
           .from("dispatch_queue")
           .insert({
             subject,
@@ -2089,7 +2122,7 @@ export default function DashboardPage() {
           })
 
           if (sendRes.ok) {
-            toast.success(isReminder ? `Reminder sent!` : `"${subject}" sent to ${totalRecipients} recipients!`)
+            toast.success(isReminder ? `Reminder sent!` : `"${subject}" sent to ${sendConfirm.recipientCount} recipients!`)
           } else {
             const err = await sendRes.json().catch(() => ({ error: "Send failed" }))
             toast.error(`Queued but send failed: ${err.error}. Check Dispatch Queue in Settings.`)
@@ -3319,6 +3352,37 @@ export default function DashboardPage() {
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(sentEmailPreview?.html ?? "") }}
           />
           <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
+
+      {/* Send confirmation dialog */}
+      <Dialog open={sendConfirm.open} onOpenChange={(open) => { if (!open) setSendConfirm((prev) => ({ ...prev, open: false })) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirm Send</DialogTitle>
+            <DialogDescription>
+              {sendConfirm.isReminder ? "Send a reminder?" : "Ready to send this email?"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="rounded-lg border bg-muted/50 p-3 space-y-1.5">
+              <p className="text-sm font-medium truncate">{sendConfirm.subject}</p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Mail className="size-3.5" />
+                <span>{sendConfirm.recipientCount} recipient{sendConfirm.recipientCount !== 1 ? "s" : ""}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{sendConfirm.listName}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setSendConfirm((prev) => ({ ...prev, open: false }))}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => executeSend()}>
+              <Send className="size-3.5" />
+              {sendConfirm.isReminder ? "Send Reminder" : "Send Now"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
