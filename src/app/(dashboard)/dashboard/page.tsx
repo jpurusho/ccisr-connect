@@ -69,6 +69,7 @@ import {
   type CommType,
   COMM_TYPE_TO_ET,
   DISPATCH_MATCHERS,
+  buildCommTypeMappings,
   formatRelativeTime,
   getWeekDays,
   mapDispatchStatus,
@@ -326,6 +327,7 @@ export default function DashboardPage() {
   const [weekLabel, setWeekLabel] = useState("")
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
   const [savedTemplateData, setSavedTemplateData] = useState<Record<string, Record<string, unknown>>>({})
+  const [commTypeEtNames, setCommTypeEtNames] = useState<Record<CommType, string>>(COMM_TYPE_TO_ET)
   const [templateStyles, setTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
   // ---- Template visibility (extracted hook) ----
   const { visibleTemplates, toggleTemplate, isCustomVisible, toggleCustomTemplate } = useCardVisibility()
@@ -722,11 +724,11 @@ export default function DashboardPage() {
           .eq("is_default", true)
           .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
 
-        // Event type id-to-name map (+ template link, color, signup link, bulletin detail template)
+        // Event type id-to-name map (+ template link, color, signup link, bulletin detail template, comm_type)
         supabase
           .from("event_types")
-          .select("id, name, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template")
-          .returns<{ id: string; name: string; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null }[]>(),
+          .select("id, name, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template, comm_type")
+          .returns<{ id: string; name: string; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null; comm_type: string | null }[]>(),
 
         // Composed instances: match current week, bulletin week, or recurring
         supabase
@@ -755,6 +757,11 @@ export default function DashboardPage() {
       const etIdToName: Record<string, string> = {}
       const etSignupLinks: Record<string, { formId: string; fieldMap: SignupFieldMap }> = {}
       const etBulletinTemplates: Record<string, string> = {}
+
+      // Build DB-driven comm_type mappings (replaces hardcoded COMM_TYPE_TO_ET)
+      const { commTypeToEtName, etIdToCommType } = buildCommTypeMappings(eventTypesRes.data ?? [])
+      setCommTypeEtNames(commTypeToEtName)
+
       if (eventTypesRes.data) {
         for (const et of eventTypesRes.data) {
           etIdToName[et.id] = et.name
@@ -979,7 +986,7 @@ export default function DashboardPage() {
       // Track event counts per comm type for multi-event indicator
       {
         const counts: Partial<Record<CommType, number>> = {}
-        for (const [ct, etName] of Object.entries(COMM_TYPE_TO_ET)) {
+        for (const [ct, etName] of Object.entries(commTypeToEtName)) {
           counts[ct as CommType] = findEventsByType(etName).length
         }
         setEventCounts(counts)
@@ -1836,7 +1843,7 @@ export default function DashboardPage() {
     const d = dispatches[type]
     if (d && (d.status === "sent" || d.status === "sending")) return d.subject
     if (subjectOverrides[type]) return subjectOverrides[type]!
-    const etKey = COMM_TYPE_TO_ET[type]
+    const etKey = commTypeEtNames[type]
     const savedTmpl = savedSubjectTemplates[etKey]
     if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
     switch (type) {
@@ -2026,15 +2033,7 @@ export default function DashboardPage() {
   }
 
   function handleRefreshFromTemplate(type: CommType) {
-    const etKeyMap: Record<CommType, string> = {
-      birthday: "birthday",
-      anniversary: "anniversary",
-      bible_study: "friday_bible_study",
-      womens_study: "wednesday_womens_study",
-      prayer_meeting: "monthly_prayer",
-      bulletin: "bulletin",
-    }
-    const etKey = etKeyMap[type]
+    const etKey = commTypeEtNames[type]
     const tmplData = savedTemplateData[etKey]
     if (!tmplData) {
       toast.error("No template defaults found")
