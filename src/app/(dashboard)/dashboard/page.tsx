@@ -2375,6 +2375,26 @@ export default function DashboardPage() {
     setCustomForms((prev) => ({ ...prev, [ctId]: { ...prev[ctId], ...partial } }))
   }
 
+  async function viewSentEmail(type: CommType) {
+    const d = dispatches[type]
+    if (!d?.body_html) return
+    const supabase = createClient()
+    let mailingListName = ""
+    let recipientCount = 0
+    let smtpFrom = ""
+    if (d.mailing_list_id) {
+      const { data: ml } = await supabase.from("mailing_lists").select("name").eq("id", d.mailing_list_id).single() as { data: { name: string } | null }
+      mailingListName = ml?.name ?? ""
+      const { count } = await supabase.from("mailing_list_members").select("*", { count: "exact", head: true }).eq("mailing_list_id", d.mailing_list_id)
+      recipientCount = count ?? 0
+    }
+    if (d.smtp_config_id) {
+      const { data: smtp } = await supabase.from("smtp_configs").select("from_email").eq("id", d.smtp_config_id).single() as { data: { from_email: string } | null }
+      smtpFrom = smtp?.from_email ?? ""
+    }
+    setSentEmailPreview({ subject: d.subject, html: d.body_html, sentAt: d.sent_at ?? undefined, mailingListName, recipientCount, smtpFrom, additionalRecipients: d.additional_recipients ?? undefined })
+  }
+
   function handleCustomCancel(ctId: string) {
     const ct = customDashTemplates.find((t) => t.id === ctId)
     if (!ct) return
@@ -2902,26 +2922,8 @@ export default function DashboardPage() {
                               role="link"
                               tabIndex={0}
                               className="shrink-0 cursor-pointer text-[10px] font-medium text-green-600 hover:text-green-800 hover:underline dark:text-green-400"
-                              onClick={async (e) => {
-                                e.stopPropagation()
-                                const d = dispatches[type]!
-                                const supabase = createClient()
-                                let mailingListName = ""
-                                let recipientCount = 0
-                                let smtpFrom = ""
-                                if (d.mailing_list_id) {
-                                  const { data: ml } = await supabase.from("mailing_lists").select("name").eq("id", d.mailing_list_id).single() as { data: { name: string } | null }
-                                  mailingListName = ml?.name ?? ""
-                                  const { count } = await supabase.from("mailing_list_members").select("*", { count: "exact", head: true }).eq("mailing_list_id", d.mailing_list_id)
-                                  recipientCount = count ?? 0
-                                }
-                                if (d.smtp_config_id) {
-                                  const { data: smtp } = await supabase.from("smtp_configs").select("from_email").eq("id", d.smtp_config_id).single() as { data: { from_email: string } | null }
-                                  smtpFrom = smtp?.from_email ?? ""
-                                }
-                                setSentEmailPreview({ subject: d.subject, html: d.body_html!, sentAt: d.sent_at ?? undefined, mailingListName, recipientCount, smtpFrom, additionalRecipients: d.additional_recipients ?? undefined })
-                              }}
-                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setSentEmailPreview({ subject: dispatches[type]!.subject, html: dispatches[type]!.body_html! }) } }}
+                              onClick={(e) => { e.stopPropagation(); viewSentEmail(type) }}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); viewSentEmail(type) } }}
                             >
                               View
                             </span>
