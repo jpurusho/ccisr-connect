@@ -13,6 +13,15 @@ export type VisualSectionType =
   | "resource_links"
   | "flyer"
   | "footer"
+  // Smart sections — auto-pull data from DB at compose time
+  | "locations_auto"
+  | "virtual_auto"
+  | "details_auto"
+  | "birthdays_auto"
+  | "anniversaries_auto"
+  | "helpers_auto"
+  | "upcoming_auto"
+  | "break_status"
 
 export interface VisualSection {
   id: string
@@ -39,6 +48,31 @@ export const SECTION_LABELS: Record<VisualSectionType, { label: string; emoji: s
   resource_links: { label: "Resource Links", emoji: "🔗" },
   flyer: { label: "Flyer Image", emoji: "📰" },
   footer: { label: "Footer", emoji: "👣" },
+  // Smart sections
+  locations_auto: { label: "Locations (Auto)", emoji: "📍" },
+  virtual_auto: { label: "Virtual (Auto)", emoji: "💻" },
+  details_auto: { label: "Details (Auto)", emoji: "📋" },
+  birthdays_auto: { label: "Birthdays (Auto)", emoji: "🎂" },
+  anniversaries_auto: { label: "Anniversaries (Auto)", emoji: "💍" },
+  helpers_auto: { label: "Helpers (Auto)", emoji: "🤝" },
+  upcoming_auto: { label: "Upcoming (Auto)", emoji: "🔜" },
+  break_status: { label: "Break Status", emoji: "🏖️" },
+}
+
+/** Section types that auto-pull data from the DB at compose time */
+export const SMART_SECTION_TYPES: VisualSectionType[] = [
+  "locations_auto",
+  "virtual_auto",
+  "details_auto",
+  "birthdays_auto",
+  "anniversaries_auto",
+  "helpers_auto",
+  "upcoming_auto",
+  "break_status",
+]
+
+export function isSmartSection(type: VisualSectionType): boolean {
+  return SMART_SECTION_TYPES.includes(type)
 }
 
 export const DEFAULT_SECTIONS: VisualSection[] = [

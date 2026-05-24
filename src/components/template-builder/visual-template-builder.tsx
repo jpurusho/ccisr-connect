@@ -14,6 +14,8 @@ import {
   type VisualSectionType,
   SECTION_LABELS,
   DEFAULT_SECTIONS,
+  isSmartSection,
+  SMART_SECTION_TYPES,
 } from "@/lib/email/visual-config-types"
 import { buildGenericEventCard, buildStyleContext, type TemplateStyleSettings } from "@/lib/email/card-builder"
 import { SectionCard } from "./section-card"
@@ -104,6 +106,8 @@ export function VisualTemplateBuilder({ initialConfig, globalStyle, onSave, savi
     "quote", "signup_cta", "custom", "resource_links", "flyer",
   ]
 
+  const smartToAdd: VisualSectionType[] = SMART_SECTION_TYPES
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr,400px]">
       {/* Left: Section editor */}
@@ -150,6 +154,24 @@ export function VisualTemplateBuilder({ initialConfig, globalStyle, onSave, savi
                 variant="outline"
                 size="sm"
                 className="h-7 text-xs"
+                onClick={() => addSection(type)}
+              >
+                {SECTION_LABELS[type].emoji} {SECTION_LABELS[type].label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Smart sections quick-add */}
+        <div className="rounded-lg border border-dashed border-blue-300/50 bg-blue-50/30 p-3 dark:border-blue-700/40 dark:bg-blue-950/20">
+          <p className="mb-2 text-xs font-medium text-blue-700 dark:text-blue-300">Add Smart Section (auto-fills from DB)</p>
+          <div className="flex flex-wrap gap-1.5">
+            {smartToAdd.map((type) => (
+              <Button
+                key={type}
+                variant="outline"
+                size="sm"
+                className="h-7 border-blue-200 text-xs text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
                 onClick={() => addSection(type)}
               >
                 {SECTION_LABELS[type].emoji} {SECTION_LABELS[type].label}
@@ -285,6 +307,55 @@ function SectionEditor({ section, onChange }: { section: VisualSection; onChange
         </div>
       )
 
+    // ── Smart Section Editors ─────────────────────────────────────
+    case "locations_auto":
+      return (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Locations are auto-filled from event calendar data at compose time.</p>
+          <Toggle label="Show phone numbers" checked={config.showPhone !== false} onChange={(v) => onChange({ showPhone: v })} />
+          <Toggle label="Show address" checked={config.showAddress !== false} onChange={(v) => onChange({ showAddress: v })} />
+        </div>
+      )
+
+    case "virtual_auto":
+      return (
+        <p className="text-xs text-muted-foreground">Virtual meeting details (Zoom link, meeting ID, passcode) are auto-filled from event settings.</p>
+      )
+
+    case "details_auto":
+      return (
+        <p className="text-xs text-muted-foreground">Event date, time, and topic are auto-filled from the calendar at compose time.</p>
+      )
+
+    case "birthdays_auto":
+      return (
+        <p className="text-xs text-muted-foreground">Birthdays for the current week are auto-populated from member records.</p>
+      )
+
+    case "anniversaries_auto":
+      return (
+        <p className="text-xs text-muted-foreground">Wedding anniversaries for the current week are auto-populated from member records.</p>
+      )
+
+    case "helpers_auto":
+      return (
+        <p className="text-xs text-muted-foreground">Monthly helpers/volunteers are auto-populated from event signup responses.</p>
+      )
+
+    case "upcoming_auto":
+      return (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Shows upcoming events from the calendar.</p>
+          <Field label="Weeks ahead" value={String((config.weeksAhead as number) ?? 2)} onChange={(v) => onChange({ weeksAhead: parseInt(v) || 2 })} placeholder="2" />
+          <Field label="Max items" value={String((config.maxItems as number) ?? 5)} onChange={(v) => onChange({ maxItems: parseInt(v) || 5 })} placeholder="5" />
+        </div>
+      )
+
+    case "break_status":
+      return (
+        <p className="text-xs text-muted-foreground">Displays a notice for any locations currently on break. Hidden when no locations are on break.</p>
+      )
+
     default:
       return null
   }
@@ -311,5 +382,23 @@ function Field({ label, value, onChange, type = "text", placeholder, className }
         <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={`h-8 text-sm ${className ?? ""}`} />
       )}
     </div>
+  )
+}
+
+function Toggle({ label, checked, onChange }: {
+  label: string
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-3.5 rounded border-gray-300"
+      />
+      {label}
+    </label>
   )
 }
