@@ -1112,10 +1112,6 @@ export default function DashboardPage() {
           const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
           if (locBreak) return { label: loc.label, onVacation: true }
         }
-        // Fall back to JSON breaks (for backwards compat until fully migrated)
-        const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
-        if (activeBreak) return { label: loc.label, onVacation: true }
-        if (loc.onVacation) return { label: loc.label, onVacation: true }
         return { label: loc.label, onVacation: false }
       })
       const bsAllOnBreak = bsLocBreakStatus.length > 0 && bsLocBreakStatus.every((l) => l.onVacation)
@@ -1134,8 +1130,6 @@ export default function DashboardPage() {
             const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
             if (locBreak) return { ...loc, onVacation: true, vacationMessage: locBreak.message || `${loc.label} Bible Study is on break` }
           }
-          const activeBreak = (loc.breaks ?? []).find((brk: { from: string; to: string; message: string }) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
-          if (activeBreak) return { ...loc, onVacation: true, vacationMessage: activeBreak.message || `${loc.label} Bible Study is on break` }
           return loc
         })
         setBibleStudyForm({
@@ -1228,11 +1222,6 @@ export default function DashboardPage() {
             if (locBreak) {
               return { ...base, onVacation: true, vacationMessage: locBreak.message || `${loc.label} Bible Study is on break` }
             }
-          }
-          // Fall back to JSON breaks
-          const activeBreak = (loc.breaks ?? []).find((brk) => brk.from && brk.to && bsBreakCheckDate >= brk.from && bsBreakCheckDate <= brk.to)
-          if (activeBreak) {
-            return { ...base, onVacation: true, vacationMessage: activeBreak.message || `${loc.label} Bible Study is on break` }
           }
           // Apply per-location host from DB (takes priority over signup auto-fill)
           if (dbLocHost?.host_name && dbLocHost.host_name !== "TBD") {
