@@ -1402,17 +1402,22 @@ export default function DashboardPage() {
               // Some locations on break, some active — show per-location status
               if (allLocs && allLocs.length > 0) {
                 const details = buildBulletinDetails(evt, occ, inst)
+                // Build a "clean" title by stripping any location name from it
+                const cleanTitle = allLocs.reduce(
+                  (t, l) => t.replace(new RegExp(l.label, "gi"), "").replace(/\s{2,}/g, " ").trim(),
+                  evt.title
+                )
                 for (const loc of allLocs) {
                   const titleHasLoc = evt.title.toLowerCase().includes(loc.label.toLowerCase())
                   if (brokenLocIds.has(loc.id)) {
                     const brk = occBreaks.find((b) => b.location_id === loc.id)
                     bulletinAutoEvents.push({
-                      title: titleHasLoc ? `No ${evt.title} this week` : `No ${loc.label} ${evt.title} this week`,
+                      title: `No ${loc.label} ${cleanTitle} this week`,
                       details: brk?.message || "On break",
                     })
                   } else {
                     bulletinAutoEvents.push({
-                      title: titleHasLoc ? evt.title : `${loc.label} — ${evt.title}`,
+                      title: titleHasLoc ? evt.title : `${loc.label} ${cleanTitle}`,
                       details,
                     })
                   }
