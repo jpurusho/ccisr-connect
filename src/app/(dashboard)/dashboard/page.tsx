@@ -469,11 +469,75 @@ export default function DashboardPage() {
   }
 
   const [customDashTemplates, setCustomDashTemplates] = useState<DashboardCustomTemplate[]>([])
-  const [customForms, setCustomForms] = useState<Record<string, CustomDashFormData>>({})
-  const [customTemplateStyles, setCustomTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
-  const [customInstanceIds, setCustomInstanceIds] = useState<Record<string, string>>({})
-  const [customDispatches, setCustomDispatches] = useState<Record<string, { status: string; count: number; lastSentAt: string | null }>>({})
-  const [customSnapshots, setCustomSnapshots] = useState<Record<string, Record<string, unknown>>>({})
+
+  // ---- Unified custom template state (one record per custom template ID) ----
+  interface CustomCardState {
+    form: CustomDashFormData
+    style: TemplateStyleSettings
+    instanceId: string | null
+    dispatch: { status: string; count: number; lastSentAt: string | null }
+    snapshot: Record<string, unknown> | null
+  }
+  const [customCards, setCustomCards] = useState<Record<string, CustomCardState>>({})
+
+  // Accessors for backward compat during transition
+  const customForms = Object.fromEntries(Object.entries(customCards).map(([k, v]) => [k, v.form]))
+  const customTemplateStyles = Object.fromEntries(Object.entries(customCards).map(([k, v]) => [k, v.style]))
+  const customInstanceIds = Object.fromEntries(Object.entries(customCards).filter(([, v]) => v.instanceId).map(([k, v]) => [k, v.instanceId!]))
+  const customDispatches = Object.fromEntries(Object.entries(customCards).map(([k, v]) => [k, v.dispatch]))
+  const customSnapshots = Object.fromEntries(Object.entries(customCards).filter(([, v]) => v.snapshot).map(([k, v]) => [k, v.snapshot!]))
+
+  function setCustomForms(updater: (prev: Record<string, CustomDashFormData>) => Record<string, CustomDashFormData>) {
+    setCustomCards((prev) => {
+      const prevForms = Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, v.form]))
+      const newForms = updater(prevForms)
+      const result = { ...prev }
+      for (const [k, form] of Object.entries(newForms)) {
+        result[k] = { ...(result[k] ?? { style: {}, instanceId: null, dispatch: { status: "draft", count: 0, lastSentAt: null }, snapshot: null }), form }
+      }
+      return result
+    })
+  }
+
+  function setCustomInstanceIds(updater: (prev: Record<string, string>) => Record<string, string>) {
+    setCustomCards((prev) => {
+      const prevIds = Object.fromEntries(Object.entries(prev).filter(([, v]) => v.instanceId).map(([k, v]) => [k, v.instanceId!]))
+      const newIds = updater(prevIds)
+      const result = { ...prev }
+      for (const k of Object.keys(result)) {
+        result[k] = { ...result[k], instanceId: newIds[k] ?? null }
+      }
+      for (const [k, id] of Object.entries(newIds)) {
+        if (!result[k]) continue
+        result[k] = { ...result[k], instanceId: id }
+      }
+      return result
+    })
+  }
+
+  function setCustomDispatches(updater: (prev: Record<string, { status: string; count: number; lastSentAt: string | null }>) => Record<string, { status: string; count: number; lastSentAt: string | null }>) {
+    setCustomCards((prev) => {
+      const prevDisp = Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, v.dispatch]))
+      const newDisp = updater(prevDisp)
+      const result = { ...prev }
+      for (const [k, dispatch] of Object.entries(newDisp)) {
+        if (result[k]) result[k] = { ...result[k], dispatch }
+      }
+      return result
+    })
+  }
+
+  function setCustomSnapshots(updater: (prev: Record<string, Record<string, unknown>>) => Record<string, Record<string, unknown>>) {
+    setCustomCards((prev) => {
+      const prevSnap = Object.fromEntries(Object.entries(prev).filter(([, v]) => v.snapshot).map(([k, v]) => [k, v.snapshot!]))
+      const newSnap = updater(prevSnap)
+      const result = { ...prev }
+      for (const [k, snapshot] of Object.entries(newSnap)) {
+        if (result[k]) result[k] = { ...result[k], snapshot }
+      }
+      return result
+    })
+  }
 
   // ---- Saved form snapshots for cancel/revert ----
   const [savedSnapshots, setSavedSnapshots] = useState<Partial<Record<CommType, Record<string, unknown>>>>({})
@@ -1591,10 +1655,18 @@ export default function DashboardPage() {
       }
 
       setCustomDashTemplates(dashCustom)
-      setCustomForms(customFormInit)
-      setCustomInstanceIds(customInstIds)
-      setCustomTemplateStyles(loadedCustomStyles)
-      setCustomSnapshots(Object.fromEntries(Object.entries(customFormInit).map(([k, v]) => [k, structuredClone(v as unknown as Record<string, unknown>)])))
+      // Build unified custom card state in one pass
+      const unifiedCustom: Record<string, CustomCardState> = {}
+      for (const ct of dashCustom) {
+        unifiedCustom[ct.id] = {
+          form: customFormInit[ct.id] ?? { ...EMPTY_CUSTOM_FORM },
+          style: (loadedCustomStyles[ct.id] ?? {}) as TemplateStyleSettings,
+          instanceId: customInstIds[ct.id] ?? null,
+          dispatch: { status: "draft", count: 0, lastSentAt: null },
+          snapshot: customFormInit[ct.id] ? structuredClone(customFormInit[ct.id] as unknown as Record<string, unknown>) : null,
+        }
+      }
+      setCustomCards(unifiedCustom)
 
       // ---- Mailing lists + SMTP configs ----
       setMailingLists(mailingListsRes.data ?? [])
@@ -1704,7 +1776,14 @@ export default function DashboardPage() {
         }
         customDispInfo[ct.id] = { status: dStatus, count: dCount, lastSentAt: lastSent }
       }
-      setCustomDispatches(customDispInfo)
+      // Merge dispatch info into unified custom state
+      setCustomCards((prev) => {
+        const result = { ...prev }
+        for (const [id, info] of Object.entries(customDispInfo)) {
+          if (result[id]) result[id] = { ...result[id], dispatch: info }
+        }
+        return result
+      })
       setSignupAutoFills(autoFills)
     } catch (err) {
       console.error("Dashboard fetch error:", err)
