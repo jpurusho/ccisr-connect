@@ -180,10 +180,7 @@ export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
   bulletin: {
     type: "bulletin",
     data: {
-      events: [
-        { title: "Women's Bible Study", details: "Building a Relationship with God — Wednesdays @ 7:00 PM via Zoom" },
-        { title: "San Ramon Bible Study", details: "Studying the Book of Acts — Friday at 7:30 PM" },
-      ],
+      events: [],
     },
   },
 }

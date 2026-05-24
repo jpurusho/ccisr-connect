@@ -1323,15 +1323,16 @@ export default function DashboardPage() {
                 const timeStr = time ? formatTime(time) : null
                 const dateDetails = timeStr ? `${format(occ, "EEEE, MMM d")} at ${timeStr}` : format(occ, "EEEE, MMM d")
                 for (const loc of allLocs) {
+                  const titleHasLoc = evt.title.toLowerCase().includes(loc.label.toLowerCase())
                   if (brokenLocIds.has(loc.id)) {
                     const brk = occBreaks.find((b) => b.location_id === loc.id)
                     bulletinAutoEvents.push({
-                      title: `No ${loc.label} ${evt.title}`,
+                      title: titleHasLoc ? `No ${evt.title} this week` : `No ${loc.label} ${evt.title} this week`,
                       details: brk?.message || "On break",
                     })
                   } else {
                     bulletinAutoEvents.push({
-                      title: `${loc.label} ${evt.title}`,
+                      title: titleHasLoc ? evt.title : `${loc.label} — ${evt.title}`,
                       details: dateDetails,
                     })
                   }
@@ -1408,12 +1409,16 @@ export default function DashboardPage() {
 
       if (hasBulDraft) {
         const fd = composedMap["bulletin"].form_data as Record<string, unknown>
-        // Merge: keep manual additions from draft that aren't in live events, but use live as base
+        // Merge: keep only user-added draft events not covered by live events or active calendar events
         const draftEvents = (fd.events as BulletinFormData["events"]) ?? []
-        const manualDraftEvents = draftEvents.filter((de) =>
-          !liveEvents.some((le) => le.title === de.title) &&
-          !manualBulletinItems.some((mi) => mi.title === de.title)
-        )
+        const activeEventTitles = activeEvents.map((e) => e.title.toLowerCase())
+        const manualDraftEvents = draftEvents.filter((de) => {
+          const dtl = de.title.toLowerCase()
+          if (liveEvents.some((le) => le.title === de.title)) return false
+          if (manualBulletinItems.some((mi) => mi.title === de.title)) return false
+          if (activeEventTitles.some((t) => dtl.includes(t) || t.includes(dtl))) return false
+          return true
+        })
         setBulletinForm({
           weekLabel: (fd.weekLabel as string) ?? `Week of ${wl}`,
           birthdays: (fd.birthdays as BulletinFormData["birthdays"]) ?? bdayEntries.map((b) => ({ name: b.name, date: b.date })),
