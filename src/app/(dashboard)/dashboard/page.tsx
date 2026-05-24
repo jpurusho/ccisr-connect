@@ -1305,14 +1305,19 @@ export default function DashboardPage() {
             const occDateStr = format(occ, "yyyy-MM-dd")
             const { data: occBreaks } = await supabase
               .from("event_breaks")
-              .select("id")
+              .select("id, location_id")
               .eq("event_id", evt.id)
               .lte("start_date", occDateStr)
               .gte("end_date", occDateStr)
-              .is("location_id", null)
-              .limit(1)
-              .returns<{ id: string }[]>()
-            if (occBreaks && occBreaks.length > 0) continue
+              .returns<{ id: string; location_id: string | null }[]>()
+            if (occBreaks && occBreaks.length > 0) {
+              const hasGlobalBreak = occBreaks.some((b) => b.location_id === null)
+              if (hasGlobalBreak) continue
+              // If per-location breaks exist, check if ALL locations are covered
+              const { count: locCount } = await supabase.from("event_locations").select("id", { count: "exact", head: true }).eq("event_id", evt.id)
+              const brokenLocCount = new Set(occBreaks.filter((b) => b.location_id).map((b) => b.location_id)).size
+              if (locCount && brokenLocCount >= locCount) continue
+            }
             const time = inst?.instance_time ?? evt.default_time
             const timeStr = time ? formatTime(time) : null
             bulletinAutoEvents.push({
