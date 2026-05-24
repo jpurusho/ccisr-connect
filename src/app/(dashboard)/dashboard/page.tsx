@@ -65,6 +65,8 @@ import {
   parse,
 } from "date-fns"
 import { getOccurrences } from "@/lib/recurrence"
+import { type SmartSectionContext, buildSmartSectionsHtml } from "@/lib/email/smart-section-builder"
+import { type VisualConfig, isSmartSection } from "@/lib/email/visual-config-types"
 import {
   type CommType,
   COMM_TYPE_TO_ET,
@@ -165,18 +167,34 @@ interface CustomDashFormData extends BaseFormData {
   flyerSections: FlyerSectionItem[]
 }
 
-function buildCustomDashPreview(form: CustomDashFormData, styleSettings?: TemplateStyleSettings): string {
+function buildCustomDashPreview(form: CustomDashFormData, styleSettings?: TemplateStyleSettings, visualConfig?: VisualConfig | null, ctx?: SmartSectionContext | null): string {
   const style = buildStyleContext(styleSettings)
   const sz = style.sizes
   const bodyColor = form.bodyTextColor || "#374151"
   const rawBodyHtml = form.body
     ? `<p style="margin:0;font-size:${sz.body}px;line-height:1.6;white-space:pre-wrap;color:${bodyColor}">${form.body}</p>`
     : ""
+
+  // If visual config has smart sections and context is available, render them
+  let smartHtml = ""
+  if (visualConfig && ctx) {
+    const smartSections = visualConfig.sections.filter((s) => s.enabled && isSmartSection(s.type))
+    if (smartSections.length > 0) {
+      const enrichedCtx: SmartSectionContext = {
+        ...ctx,
+        eventTitle: form.title || "Event",
+        primaryColor: form.primaryColor || null,
+        style,
+      }
+      smartHtml = buildSmartSectionsHtml(smartSections, enrichedCtx)
+    }
+  }
+
   return buildCustomCard({
     title: form.title || "Announcement",
     subtitle: form.subtitle || undefined,
     emoji: form.emoji || undefined,
-    bodyHtml: rawBodyHtml ? pastelBoxHtml(rawBodyHtml, form.bodyBgColor, undefined, style.customPastels) : "",
+    bodyHtml: (rawBodyHtml ? pastelBoxHtml(rawBodyHtml, form.bodyBgColor, undefined, style.customPastels) : "") + smartHtml,
     flyerSections: (form.flyerSections ?? [])
       .filter((s) => s.imageUrl)
       .map((s) => ({
@@ -340,6 +358,9 @@ export default function DashboardPage() {
 
   // ---- Signup auto-fill tracking ----
   const [signupAutoFills, setSignupAutoFills] = useState<Partial<Record<CommType, AutoFillResult>>>({})
+
+  // ---- Smart section context (resolved per week for visual builder templates) ----
+  const [smartContext, setSmartContext] = useState<SmartSectionContext | null>(null)
 
 
   const [dispatches, setDispatches] = useState<
@@ -1779,6 +1800,34 @@ export default function DashboardPage() {
         return result
       })
       setSignupAutoFills(autoFills)
+
+      // Build smart section context from resolved week data
+      setSmartContext({
+        eventTitle: "",
+        eventDate: null,
+        eventTime: null,
+        topic: null,
+        locations: bsSavedLocs.map((loc) => {
+          const locBreakStatus = bsLocBreakStatus.find((s) => s.label === loc.label)
+          return {
+            label: loc.label,
+            hostName: loc.hostNames || null,
+            address: loc.address || null,
+            city: loc.city || null,
+            phone: loc.phone || null,
+            isOnBreak: locBreakStatus?.onVacation ?? false,
+            breakMessage: loc.vacationMessage || null,
+          }
+        }),
+        virtual: null,
+        birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
+        anniversaries: anniEntries.map((a) => ({ names: `${a.husbandName} & ${a.wifeName}`, date: a.date })),
+        helpers: [],
+        upcomingEvents: [],
+        weekLabel: wl,
+        primaryColor: null,
+        style: null,
+      })
     } catch (err) {
       console.error("Dashboard fetch error:", err)
       setError(
@@ -2340,7 +2389,8 @@ export default function DashboardPage() {
     if (!ct) return
     const form = customForms[ctId]
     if (!form) return
-    const html = buildCustomDashPreview(form, customTemplateStyles[ctId])
+    const vc = (ct.defaults.visualConfig as VisualConfig) ?? null
+    const html = buildCustomDashPreview(form, customTemplateStyles[ctId], vc, smartContext)
     if (!html) { toast.error("No content"); return }
     const opts = commOptions[ctId]
     if (!opts?.smtpConfigId) { toast.error("Please select a Send From account first."); return }
@@ -3234,7 +3284,8 @@ export default function DashboardPage() {
           const form = customForms[ct.id]
           if (!form) return null
           const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
-          const preview = buildCustomDashPreview(form, customTemplateStyles[ct.id])
+          const vc = (ct.defaults.visualConfig as VisualConfig) ?? null
+          const preview = buildCustomDashPreview(form, customTemplateStyles[ct.id], vc, smartContext)
           const subj = subjectOverrides[ct.id] || ct.subject_template || ct.name
 
           return (
