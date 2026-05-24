@@ -263,12 +263,15 @@ export function EventFormDialog({
 
         // For one-time events, also create an instance row so it appears in queries
         if (recurrenceFreq === "NONE" && startDate && data?.id) {
-          await supabase.from("event_instances").insert({
+          const { error: instError } = await supabase.from("event_instances").insert({
             event_id: data.id,
             instance_date: startDate,
             instance_time: time || null,
             status: "confirmed",
           } as never)
+          if (instError) {
+            toast.error(`Event created but instance failed: ${instError.message}`)
+          }
         }
 
         toast.success(`"${title}" created`)
@@ -341,7 +344,7 @@ export function EventFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
