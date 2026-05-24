@@ -63,6 +63,8 @@ import {
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
 import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, PastelColorPicker, TextColorPicker, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
 import { TemplateStyleEditor } from "@/components/dashboard/template-style-editor"
+import { VisualTemplateBuilder } from "@/components/template-builder/visual-template-builder"
+import type { VisualConfig } from "@/lib/email/visual-config-types"
 import { VerseLookup } from "@/components/shared/verse-lookup"
 import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-builder"
 import { formatPhone } from "@/lib/utils"
@@ -1786,6 +1788,53 @@ export default function TemplatesPage() {
               {/* Edit form */}
               {editingCustom && !creatingCustom && (
                 <div className="space-y-4">
+                  <div className="flex items-center gap-2 border-b pb-3">
+                    <Button
+                      variant={!(editingCustom.data._useVisualBuilder) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, _useVisualBuilder: false } })}
+                    >
+                      Form Editor
+                    </Button>
+                    <Button
+                      variant={(editingCustom.data._useVisualBuilder) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, _useVisualBuilder: true } })}
+                    >
+                      Visual Builder
+                    </Button>
+                  </div>
+
+                  {editingCustom.data._useVisualBuilder ? (
+                    <VisualTemplateBuilder
+                      initialConfig={(editingCustom.data.visualConfig as VisualConfig) ?? null}
+                      globalStyle={editingCustom.styleSettings}
+                      saving={saving}
+                      onSave={async (config) => {
+                        setSaving(true)
+                        const supabase = createClient()
+                        const { error } = await supabase
+                          .from("email_templates")
+                          .update({
+                            name: editingCustom.name,
+                            subject_template: editingCustom.subject,
+                            body_template: JSON.stringify({ ...editingCustom.data, visualConfig: config, _useVisualBuilder: undefined }),
+                            style_settings: editingCustom.styleSettings,
+                            visual_config: config,
+                          } as never)
+                          .eq("id", editingCustom.id)
+                        if (error) {
+                          toast.error(`Failed: ${error.message}`)
+                        } else {
+                          toast.success(`"${editingCustom.name}" updated (visual builder)`)
+                          setEditingCustom(null)
+                          fetchTemplates()
+                        }
+                        setSaving(false)
+                      }}
+                    />
+                  ) : (
+                  <>
                   <Field label="Template Name" htmlFor="ct-name">
                     <Input
                       id="ct-name"
@@ -1912,6 +1961,8 @@ export default function TemplatesPage() {
                       Cancel
                     </Button>
                   </div>
+                  </>
+                  )}
                 </div>
               )}
 
