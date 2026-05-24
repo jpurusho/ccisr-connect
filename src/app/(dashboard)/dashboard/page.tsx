@@ -471,21 +471,19 @@ export default function DashboardPage() {
   const [customTemplateStyles, setCustomTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
   const [customInstanceIds, setCustomInstanceIds] = useState<Record<string, string>>({})
   const [customDispatches, setCustomDispatches] = useState<Record<string, { status: string; count: number; lastSentAt: string | null }>>({})
-  const [customSubjectOverrides, setCustomSubjectOverrides] = useState<Record<string, string>>({})
-  const [customCommOptions, setCustomCommOptions] = useState<Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }>>({})
   const [customSnapshots, setCustomSnapshots] = useState<Record<string, Record<string, unknown>>>({})
 
   // ---- Saved form snapshots for cancel/revert ----
   const [savedSnapshots, setSavedSnapshots] = useState<Partial<Record<CommType, Record<string, unknown>>>>({})
 
-  // ---- Custom subject overrides ----
-  const [customSubjects, setCustomSubjects] = useState<Partial<Record<CommType, string>>>({})
+  // ---- Subject overrides (built-in CommType keys + custom template IDs) ----
+  const [subjectOverrides, setSubjectOverrides] = useState<Record<string, string>>({})
 
-  // ---- Mailing list + SMTP state (per-card) ----
+  // ---- Mailing list + SMTP state (per-card, keyed by CommType or custom template ID) ----
   const [mailingLists, setMailingLists] = useState<MailingListOption[]>([])
   const [smtpConfigs, setSmtpConfigs] = useState<SmtpConfigOption[]>([])
   const [commOptions, setCommOptions] = useState<
-    Record<CommType, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }>
+    Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }>
   >({
     birthday: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
     anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
@@ -1588,8 +1586,6 @@ export default function DashboardPage() {
       setCustomDashTemplates(dashCustom)
       setCustomForms(customFormInit)
       setCustomInstanceIds(customInstIds)
-      setCustomSubjectOverrides(customSubjOvr)
-      setCustomCommOptions(customCommOpts)
       setCustomTemplateStyles(loadedCustomStyles)
       setCustomSnapshots(Object.fromEntries(Object.entries(customFormInit).map(([k, v]) => [k, structuredClone(v as unknown as Record<string, unknown>)])))
 
@@ -1618,11 +1614,11 @@ export default function DashboardPage() {
         }
       }
 
-      // Pre-fill custom subjects from composed instances
-      const subjectOverrides: Partial<Record<CommType, string>> = {}
+      // Pre-fill subject overrides from composed instances
+      const resolvedSubjects: Record<string, string> = {}
       for (const ct of commTypeKeys) {
         const ci = composedMap[ct]
-        if (ci?.subject) subjectOverrides[ct] = ci.subject
+        if (ci?.subject) resolvedSubjects[ct] = ci.subject
       }
 
       // ---- Match dispatches to communication types (count all, keep latest) ----
@@ -1682,8 +1678,8 @@ export default function DashboardPage() {
           }
         }
       }
-      setCommOptions(prefilledOptions)
-      setCustomSubjects(subjectOverrides)
+      setCommOptions({ ...prefilledOptions, ...customCommOpts })
+      setSubjectOverrides({ ...resolvedSubjects, ...customSubjOvr })
 
       // Match dispatches for custom templates
       const customDispInfo: Record<string, { status: string; count: number; lastSentAt: string | null }> = {}
@@ -1839,7 +1835,7 @@ export default function DashboardPage() {
     // If dispatched, show the exact subject that was sent
     const d = dispatches[type]
     if (d && (d.status === "sent" || d.status === "sending")) return d.subject
-    if (customSubjects[type]) return customSubjects[type]!
+    if (subjectOverrides[type]) return subjectOverrides[type]!
     const etKey = COMM_TYPE_TO_ET[type]
     const savedTmpl = savedSubjectTemplates[etKey]
     if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
@@ -1854,7 +1850,7 @@ export default function DashboardPage() {
   }
 
   function setSubjectOverride(type: CommType, value: string) {
-    setCustomSubjects((prev) => ({ ...prev, [type]: value }))
+    setSubjectOverrides((prev) => ({ ...prev, [type]: value }))
   }
 
   // ---- Get preview for type ----
@@ -2274,12 +2270,12 @@ export default function DashboardPage() {
     if (!form) return
     const html = buildCustomDashPreview(form, customTemplateStyles[ctId])
     if (!html) { toast.error("No content"); return }
-    const opts = customCommOptions[ctId]
+    const opts = commOptions[ctId]
     if (!opts?.smtpConfigId) { toast.error("Please select a Send From account first."); return }
     if (!opts?.mailingListId && !opts?.additionalRecipients?.trim()) { toast.error("Please select a mailing list or add recipients."); return }
 
     const ctKey = `custom:${ctId}`
-    const subj = customSubjectOverrides[ctId] || ct.subject_template || ct.name
+    const subj = subjectOverrides[ctId] || ct.subject_template || ct.name
     setSendingType("bulletin")
     try {
       const supabase = createClient()
@@ -2343,13 +2339,13 @@ export default function DashboardPage() {
     const form = customForms[ctId]
     if (!form) return
     const ctKey = `custom:${ctId}`
-    const subj = customSubjectOverrides[ctId] || ct.subject_template || ct.name
+    const subj = subjectOverrides[ctId] || ct.subject_template || ct.name
     setSavingInstance("bulletin")
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
-      const opts = customCommOptions[ctId]
+      const opts = commOptions[ctId]
       const payload = {
         template_type: ctKey,
         name: ct.name,
@@ -3167,7 +3163,7 @@ export default function DashboardPage() {
           if (!form) return null
           const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
           const preview = buildCustomDashPreview(form, customTemplateStyles[ct.id])
-          const subj = customSubjectOverrides[ct.id] || ct.subject_template || ct.name
+          const subj = subjectOverrides[ct.id] || ct.subject_template || ct.name
 
           return (
             <WeeklyCommunicationCard
@@ -3178,17 +3174,17 @@ export default function DashboardPage() {
               status={di.status as CommunicationStatus}
               summaryLines={[form.title || "Custom announcement"]}
               subject={subj}
-              onSubjectChange={(v) => setCustomSubjectOverrides((prev) => ({ ...prev, [ct.id]: v }))}
+              onSubjectChange={(v) => setSubjectOverrides((prev) => ({ ...prev, [ct.id]: v }))}
               previewHtml={preview}
               resourceLinks={(form.resourceLinks ?? []).filter((l) => l.url)}
               mailingLists={mailingLists}
               smtpConfigs={smtpConfigs}
-              selectedMailingList={customCommOptions[ct.id]?.mailingListId}
-              onMailingListChange={(id) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], mailingListId: id } }))}
-              selectedSmtpConfig={customCommOptions[ct.id]?.smtpConfigId}
-              onSmtpConfigChange={(id) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], smtpConfigId: id } }))}
-              additionalRecipients={customCommOptions[ct.id]?.additionalRecipients}
-              onAdditionalRecipientsChange={(v) => setCustomCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], additionalRecipients: v } }))}
+              selectedMailingList={commOptions[ct.id]?.mailingListId}
+              onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], mailingListId: id } }))}
+              selectedSmtpConfig={commOptions[ct.id]?.smtpConfigId}
+              onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], smtpConfigId: id } }))}
+              additionalRecipients={commOptions[ct.id]?.additionalRecipients}
+              onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], additionalRecipients: v } }))}
               sendCount={di.count}
               onSchedule={() => {}}
               onSendNow={() => handleCustomSendNow(ct.id)}
