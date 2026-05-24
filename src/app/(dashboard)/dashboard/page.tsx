@@ -1452,28 +1452,39 @@ export default function DashboardPage() {
             })
           }
         } else {
-          // One-time events — check if they have an instance this week
+          // One-time / date-range events — check if they overlap this week
+          const evtStart = evt.start_date ? new Date(evt.start_date + "T00:00:00") : null
+          const evtEnd = evt.end_date ? new Date(evt.end_date + "T00:00:00") : evtStart
           const inst = weekInstances.find((wi) => wi.event_id === evt.id)
-          if (inst) {
-            const timeStr = inst.instance_time ? formatTime(inst.instance_time) : (evt.default_time ? formatTime(evt.default_time) : null)
-            bulletinAutoEvents.push({
-              title: evt.title,
-              details: timeStr
-                ? `${format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")} at ${timeStr}`
-                : format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d"),
-            })
-          } else if (evt.start_date) {
-            // One-time events with start_date (no instance row yet) — check if date is in week
-            const evtDate = new Date(evt.start_date + "T00:00:00")
-            if (evtDate >= wkSun && evtDate <= wkSat) {
-              const timeStr = evt.default_time ? formatTime(evt.default_time) : null
-              bulletinAutoEvents.push({
-                title: evt.title,
-                details: timeStr
-                  ? `${format(evtDate, "EEEE, MMM d")} at ${timeStr}`
-                  : format(evtDate, "EEEE, MMM d"),
-              })
+
+          const overlapsWeek = inst
+            || (evtStart && evtEnd && evtStart <= wkSat && evtEnd >= wkSun)
+            || (evtStart && !evtEnd && evtStart >= wkSun && evtStart <= wkSat)
+
+          if (overlapsWeek) {
+            const timeStr = inst?.instance_time ? formatTime(inst.instance_time) : (evt.default_time ? formatTime(evt.default_time) : null)
+            let details: string
+            if (evtStart && evtEnd && evtStart.getTime() !== evtEnd.getTime()) {
+              // Multi-day event — show visible portion relative to this week
+              const visibleStart = evtStart >= wkSun ? evtStart : wkSun
+              const visibleEnd = evtEnd <= wkSat ? evtEnd : wkSat
+              const startsThisWeek = evtStart >= wkSun
+              if (startsThisWeek) {
+                details = timeStr
+                  ? `${format(visibleStart, "EEEE, MMM d")} – ${format(visibleEnd, "EEEE, MMM d")} at ${timeStr}`
+                  : `${format(visibleStart, "EEEE, MMM d")} – ${format(visibleEnd, "EEEE, MMM d")}`
+              } else {
+                details = timeStr
+                  ? `Continues through ${format(visibleEnd, "EEEE, MMM d")} at ${timeStr}`
+                  : `Continues through ${format(visibleEnd, "EEEE, MMM d")}`
+              }
+            } else {
+              const displayDate = inst ? new Date(inst.instance_date + "T00:00:00") : evtStart!
+              details = timeStr
+                ? `${format(displayDate, "EEEE, MMM d")} at ${timeStr}`
+                : format(displayDate, "EEEE, MMM d")
             }
+            bulletinAutoEvents.push({ title: evt.title, details })
           }
         }
       }
