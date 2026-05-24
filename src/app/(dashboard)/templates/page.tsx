@@ -210,9 +210,9 @@ export default function TemplatesPage() {
   const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, bodyTextColor: undefined as string | undefined, headerTitleColor: undefined as string | undefined, headerSubtitleColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, footerVerseTextColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[], onBreak: false, breakMessage: "", breaks: [] as { from: string; to: string; message: string }[] })
 
   // Event types management
-  const [eventTypes, setEventTypes] = useState<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; linked_signup_form_id: string | null }[]>([])
+  const [eventTypes, setEventTypes] = useState<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; linked_signup_form_id: string | null; bulletin_detail_template: string | null }[]>([])
   const [signupForms, setSignupForms] = useState<{ id: string; title: string }[]>([])
-  const [editingEventType, setEditingEventType] = useState<{ id?: string; name: string; color: string; templateId: string; signupFormId: string } | null>(null)
+  const [editingEventType, setEditingEventType] = useState<{ id?: string; name: string; color: string; templateId: string; signupFormId: string; bulletinTemplate: string } | null>(null)
 
   // Style settings per template type
   const [styleSettings, setStyleSettings] = useState<Record<string, TemplateStyleSettings>>({})
@@ -325,7 +325,7 @@ export default function TemplatesPage() {
 
     // Fetch event types + signup forms for Event Types tab
     const [etFullRes, sfRes] = await Promise.all([
-      supabase.from("event_types").select("id, name, color_scheme, is_active, default_template_id, linked_signup_form_id").order("name").returns<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; linked_signup_form_id: string | null }[]>(),
+      supabase.from("event_types").select("id, name, color_scheme, is_active, default_template_id, linked_signup_form_id, bulletin_detail_template").order("name").returns<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; linked_signup_form_id: string | null; bulletin_detail_template: string | null }[]>(),
       supabase.from("signup_forms").select("id, title").order("title").returns<{ id: string; title: string }[]>(),
     ])
     if (etFullRes.data) setEventTypes(etFullRes.data)
@@ -823,7 +823,7 @@ export default function TemplatesPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">Manage event types and their template/signup associations.</p>
-            <Button size="sm" onClick={() => setEditingEventType({ name: "", color: "#6B7280", templateId: "", signupFormId: "" })}>
+            <Button size="sm" onClick={() => setEditingEventType({ name: "", color: "#6B7280", templateId: "", signupFormId: "", bulletinTemplate: "" })}>
               <Plus className="size-3.5" />
               New Event Type
             </Button>
@@ -861,6 +861,7 @@ export default function TemplatesPage() {
                     color: et.color_scheme?.primary ?? "#6B7280",
                     templateId: et.default_template_id ?? "",
                     signupFormId: et.linked_signup_form_id ?? "",
+                    bulletinTemplate: (et as typeof et & { bulletin_detail_template?: string | null }).bulletin_detail_template ?? "",
                   })}>
                     <Pencil className="size-3.5" />
                   </Button>
@@ -908,6 +909,17 @@ export default function TemplatesPage() {
                   </select>
                 </div>
               </div>
+              <div className="space-y-1.5">
+                <Label>Bulletin Detail Template</Label>
+                <Input
+                  value={editingEventType.bulletinTemplate}
+                  onChange={(e) => setEditingEventType({ ...editingEventType, bulletinTemplate: e.target.value })}
+                  placeholder="{{topic}} — {{date}} at {{time}}"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Variables: {"{{date}}"}, {"{{time}}"}, {"{{topic}}"}, {"{{host}}"}, {"{{location}}"}, {"{{zoom}}"}. Leave blank for default (date + time).
+                </p>
+              </div>
               <div className="flex gap-2 pt-1">
                 <Button size="sm" disabled={!editingEventType.name.trim()} onClick={async () => {
                   const supabase = createClient()
@@ -916,6 +928,7 @@ export default function TemplatesPage() {
                     color_scheme: { primary: editingEventType.color },
                     default_template_id: editingEventType.templateId || null,
                     linked_signup_form_id: editingEventType.signupFormId || null,
+                    bulletin_detail_template: editingEventType.bulletinTemplate.trim() || null,
                   }
                   if (editingEventType.id) {
                     const { error } = await supabase.from("event_types").update(payload as never).eq("id", editingEventType.id)

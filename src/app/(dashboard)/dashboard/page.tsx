@@ -669,12 +669,12 @@ export default function DashboardPage() {
             }[]
           >(),
 
-        // Active events (for recurrence rules + host family)
+        // Active events (for recurrence rules + host family + bulletin details)
         supabase
           .from("events")
           .select("*")
           .eq("is_active", true)
-          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean }[]>(),
+          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean; description?: string | null; zoom_link?: string | null }[]>(),
 
         // Event instances for current week (including cancelled — needed for break/cancel detection)
         supabase
@@ -724,11 +724,11 @@ export default function DashboardPage() {
           .eq("is_default", true)
           .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
 
-        // Event type id-to-name map (+ template link, color, signup link for auto-fill)
+        // Event type id-to-name map (+ template link, color, signup link, bulletin detail template)
         supabase
           .from("event_types")
-          .select("id, name, default_template_id, color_scheme, linked_signup_form_id, signup_field_map")
-          .returns<{ id: string; name: string; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null }[]>(),
+          .select("id, name, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template")
+          .returns<{ id: string; name: string; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null }[]>(),
 
         // Composed instances: match current week, bulletin week, or recurring
         supabase
@@ -756,11 +756,15 @@ export default function DashboardPage() {
       // ---- Parse saved template defaults (no FK join, resolve in JS) ----
       const etIdToName: Record<string, string> = {}
       const etSignupLinks: Record<string, { formId: string; fieldMap: SignupFieldMap }> = {}
+      const etBulletinTemplates: Record<string, string> = {}
       if (eventTypesRes.data) {
         for (const et of eventTypesRes.data) {
           etIdToName[et.id] = et.name
           if (et.linked_signup_form_id && et.signup_field_map) {
             etSignupLinks[et.name] = { formId: et.linked_signup_form_id, fieldMap: et.signup_field_map }
+          }
+          if (et.bulletin_detail_template) {
+            etBulletinTemplates[et.id] = et.bulletin_detail_template
           }
         }
       }
@@ -1293,6 +1297,26 @@ export default function DashboardPage() {
       // ---- Build bulletin events from ALL active calendar events for the week ----
       const bulletinAutoEvents: { title: string; details: string }[] = []
       const bulletinSkipTypes = new Set(["birthday", "anniversary", "bulletin"])
+
+      // Helper: build bulletin details from template or fallback to date+time
+      function buildBulletinDetails(evt: typeof activeEvents[0], occ: Date, inst: typeof weekInstances[0] | undefined): string {
+        const time = inst?.instance_time ?? evt.default_time
+        const timeStr = time ? formatTime(time) : null
+        const dateStr = format(occ, "EEEE, MMM d")
+        const tmpl = etBulletinTemplates[evt.event_type_id]
+        if (!tmpl) return timeStr ? `${dateStr} at ${timeStr}` : dateStr
+        const evtAny = evt as typeof evt & { description?: string | null; zoom_link?: string | null }
+        const vars: Record<string, string> = {
+          date: dateStr,
+          time: timeStr ?? "",
+          topic: evtAny.description ?? "",
+          location: inst?.location_override ?? "",
+          zoom: evtAny.zoom_link ?? "",
+          host: "",
+        }
+        return tmpl.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "").replace(/\s{2,}/g, " ").trim() || (timeStr ? `${dateStr} at ${timeStr}` : dateStr)
+      }
+
       for (const evt of activeEvents) {
         const etName = etIdToName[evt.event_type_id] ?? ""
         if (bulletinSkipTypes.has(etName)) continue
@@ -1319,9 +1343,7 @@ export default function DashboardPage() {
               if (allLocs && allLocs.length > 0 && brokenLocIds.size >= allLocs.length) continue
               // Some locations on break, some active — show per-location status
               if (allLocs && allLocs.length > 0) {
-                const time = inst?.instance_time ?? evt.default_time
-                const timeStr = time ? formatTime(time) : null
-                const dateDetails = timeStr ? `${format(occ, "EEEE, MMM d")} at ${timeStr}` : format(occ, "EEEE, MMM d")
+                const details = buildBulletinDetails(evt, occ, inst)
                 for (const loc of allLocs) {
                   const titleHasLoc = evt.title.toLowerCase().includes(loc.label.toLowerCase())
                   if (brokenLocIds.has(loc.id)) {
@@ -1333,18 +1355,16 @@ export default function DashboardPage() {
                   } else {
                     bulletinAutoEvents.push({
                       title: titleHasLoc ? evt.title : `${loc.label} — ${evt.title}`,
-                      details: dateDetails,
+                      details,
                     })
                   }
                 }
                 continue
               }
             }
-            const time = inst?.instance_time ?? evt.default_time
-            const timeStr = time ? formatTime(time) : null
             bulletinAutoEvents.push({
               title: evt.title,
-              details: timeStr ? `${format(occ, "EEEE, MMM d")} at ${timeStr}` : format(occ, "EEEE, MMM d"),
+              details: buildBulletinDetails(evt, occ, inst),
             })
           }
         } else {
