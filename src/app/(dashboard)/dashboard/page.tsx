@@ -1305,18 +1305,39 @@ export default function DashboardPage() {
             const occDateStr = format(occ, "yyyy-MM-dd")
             const { data: occBreaks } = await supabase
               .from("event_breaks")
-              .select("id, location_id")
+              .select("id, location_id, message, event_locations(label)")
               .eq("event_id", evt.id)
               .lte("start_date", occDateStr)
               .gte("end_date", occDateStr)
-              .returns<{ id: string; location_id: string | null }[]>()
+              .returns<{ id: string; location_id: string | null; message: string | null; event_locations: { label: string } | null }[]>()
             if (occBreaks && occBreaks.length > 0) {
               const hasGlobalBreak = occBreaks.some((b) => b.location_id === null)
               if (hasGlobalBreak) continue
-              // If per-location breaks exist, check if ALL locations are covered
-              const { count: locCount } = await supabase.from("event_locations").select("id", { count: "exact", head: true }).eq("event_id", evt.id)
-              const brokenLocCount = new Set(occBreaks.filter((b) => b.location_id).map((b) => b.location_id)).size
-              if (locCount && brokenLocCount >= locCount) continue
+              // Per-location breaks: check if ALL locations are covered
+              const { data: allLocs } = await supabase.from("event_locations").select("id, label").eq("event_id", evt.id).returns<{ id: string; label: string }[]>()
+              const brokenLocIds = new Set(occBreaks.filter((b) => b.location_id).map((b) => b.location_id))
+              if (allLocs && allLocs.length > 0 && brokenLocIds.size >= allLocs.length) continue
+              // Some locations on break, some active — show per-location status
+              if (allLocs && allLocs.length > 0) {
+                const time = inst?.instance_time ?? evt.default_time
+                const timeStr = time ? formatTime(time) : null
+                const dateDetails = timeStr ? `${format(occ, "EEEE, MMM d")} at ${timeStr}` : format(occ, "EEEE, MMM d")
+                for (const loc of allLocs) {
+                  if (brokenLocIds.has(loc.id)) {
+                    const brk = occBreaks.find((b) => b.location_id === loc.id)
+                    bulletinAutoEvents.push({
+                      title: `No ${loc.label} ${evt.title}`,
+                      details: brk?.message || "On break",
+                    })
+                  } else {
+                    bulletinAutoEvents.push({
+                      title: `${loc.label} ${evt.title}`,
+                      details: dateDetails,
+                    })
+                  }
+                }
+                continue
+              }
             }
             const time = inst?.instance_time ?? evt.default_time
             const timeStr = time ? formatTime(time) : null
