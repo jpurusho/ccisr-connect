@@ -314,7 +314,9 @@ function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakCha
               <Label className="text-xs">Location</Label>
               <Select value={locationId} onValueChange={(v) => setLocationId(v ?? "all")}>
                 <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
+                  <SelectValue>
+                    {locationId === "all" ? "All locations" : locations.find((l) => l.id === locationId)?.label ?? "Select..."}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All locations</SelectItem>
