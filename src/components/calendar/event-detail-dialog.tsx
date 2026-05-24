@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -40,6 +42,8 @@ import {
   ExternalLink,
   Ban,
   RotateCcw,
+  PauseCircle,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { CalendarEvent } from "./types"
@@ -166,6 +170,144 @@ function DateEditInline({ event, onSaved }: { event: CalendarEvent; onSaved: () 
           Cancel
         </Button>
       </div>
+    </div>
+  )
+}
+
+// ── Break Manager (for recurring events) ────────────────────────────────────
+
+interface BreakRecord {
+  id: string
+  start_date: string
+  end_date: string
+  message: string | null
+  location_id: string | null
+}
+
+function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakChanged?: () => void }) {
+  const [breaks, setBreaks] = useState<BreakRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+  const [message, setMessage] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    loadBreaks()
+  }, [eventId])
+
+  async function loadBreaks() {
+    setLoading(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("event_breaks")
+      .select("id, start_date, end_date, message, location_id")
+      .eq("event_id", eventId)
+      .order("start_date", { ascending: true })
+      .returns<BreakRecord[]>()
+    setBreaks(data ?? [])
+    setLoading(false)
+  }
+
+  async function handleSaveBreak() {
+    if (!startDate || !endDate) { toast.error("Start and end dates are required"); return }
+    if (endDate < startDate) { toast.error("End date must be after start date"); return }
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("event_breaks").insert({
+      event_id: eventId,
+      start_date: startDate,
+      end_date: endDate,
+      message: message.trim() || null,
+      location_id: null,
+    } as never)
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+    } else {
+      toast.success("Break scheduled")
+      setShowForm(false)
+      setStartDate("")
+      setEndDate("")
+      setMessage("")
+      loadBreaks()
+      onBreakChanged?.()
+    }
+    setSaving(false)
+  }
+
+  async function handleDeleteBreak(id: string) {
+    const supabase = createClient()
+    const { error } = await supabase.from("event_breaks").delete().eq("id", id)
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+    } else {
+      toast.success("Break removed")
+      setBreaks((prev) => prev.filter((b) => b.id !== id))
+      onBreakChanged?.()
+    }
+  }
+
+  if (loading) return null
+
+  return (
+    <div className="space-y-2">
+      {breaks.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2 dark:border-amber-800 dark:bg-amber-950/20">
+          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Scheduled Breaks</p>
+          {breaks.map((brk) => (
+            <div key={brk.id} className="flex items-center justify-between gap-2 text-sm">
+              <div>
+                <span className="font-medium">
+                  {format(new Date(brk.start_date + "T00:00:00"), "MMM d")} – {format(new Date(brk.end_date + "T00:00:00"), "MMM d, yyyy")}
+                </span>
+                {brk.message && <span className="ml-2 text-muted-foreground text-xs">({brk.message})</span>}
+              </div>
+              <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteBreak(brk.id)} title="Remove break">
+                <X className="size-3.5 text-red-500" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm ? (
+        <div className="rounded-lg border p-3 space-y-3">
+          <p className="text-xs font-medium text-muted-foreground">Schedule a Break</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-8 text-sm" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Message (optional)</Label>
+            <Input
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="e.g., Summer break"
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" className="h-7 text-xs" onClick={handleSaveBreak} disabled={saving}>
+              {saving ? <Loader2 className="size-3 animate-spin" /> : "Save Break"}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
+          <PauseCircle className="size-3.5" />
+          Schedule Break
+        </Button>
+      )}
     </div>
   )
 }
@@ -320,6 +462,11 @@ export function EventDetailDialog({
               <StickyNote className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <span className="text-muted-foreground">{event.notes}</span>
             </div>
+          )}
+
+          {/* Break management for recurring events */}
+          {event.kind === "event" && event.eventId && event.recurrenceRule && (
+            <BreakManager eventId={event.eventId} onBreakChanged={onDateUpdated} />
           )}
 
           {/* Birthday-specific info */}
