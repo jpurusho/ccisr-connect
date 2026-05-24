@@ -951,17 +951,38 @@ export default function TemplatesPage() {
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setEditingEventType(null)}>Cancel</Button>
                 {editingEventType.id && (
-                  <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={async () => {
-                    const supabase = createClient()
-                    const et = eventTypes.find((e) => e.id === editingEventType.id)
-                    const newActive = !et?.is_active
-                    await supabase.from("event_types").update({ is_active: newActive } as never).eq("id", editingEventType.id!)
-                    toast.success(newActive ? "Activated" : "Deactivated")
-                    setEditingEventType(null)
-                    fetchTemplates()
-                  }}>
-                    {eventTypes.find((e) => e.id === editingEventType.id)?.is_active ? "Deactivate" : "Activate"}
-                  </Button>
+                  <>
+                    <Button variant="ghost" size="sm" className="ml-auto text-muted-foreground" onClick={async () => {
+                      const supabase = createClient()
+                      const et = eventTypes.find((e) => e.id === editingEventType.id)
+                      const newActive = !et?.is_active
+                      await supabase.from("event_types").update({ is_active: newActive } as never).eq("id", editingEventType.id!)
+                      toast.success(newActive ? "Activated" : "Deactivated")
+                      setEditingEventType(null)
+                      fetchTemplates()
+                    }}>
+                      {eventTypes.find((e) => e.id === editingEventType.id)?.is_active ? "Deactivate" : "Activate"}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={async () => {
+                      const supabase = createClient()
+                      const { count } = await supabase.from("events").select("id", { count: "exact", head: true }).eq("event_type_id", editingEventType.id!)
+                      const eventCount = count ?? 0
+                      if (eventCount > 0) {
+                        const msg = `Cannot delete — ${eventCount} event${eventCount > 1 ? "s" : ""} use this type. Delete or reassign those events first, or deactivate instead.`
+                        toast.error(msg)
+                        return
+                      }
+                      if (!confirm(`Delete "${editingEventType.name}" permanently? This cannot be undone.`)) return
+                      const { error } = await supabase.from("event_types").delete().eq("id", editingEventType.id!)
+                      if (error) { toast.error(`Failed: ${error.message}`); return }
+                      toast.success(`"${editingEventType.name}" deleted`)
+                      logAudit("event_type_deleted", "event_types", editingEventType.id!, { name: editingEventType.name })
+                      setEditingEventType(null)
+                      fetchTemplates()
+                    }}>
+                      Delete
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
