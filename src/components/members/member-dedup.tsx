@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import type { Member } from "@/types/database"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -149,30 +150,30 @@ export function MemberDedupDialog({ open, onOpenChange, onSuccess }: MemberDedup
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <Merge className="size-5" />
             Find Duplicate Members
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             Members matched by name, email, or phone number. Review and remove duplicates.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {loading ? (
-          <div className="space-y-3">
+          <div className="space-y-3 px-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-20 w-full" />
             ))}
           </div>
         ) : groups.length === 0 ? (
-          <div className="py-8 text-center">
+          <div className="py-8 text-center px-4">
             <p className="text-muted-foreground">No duplicates found.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 px-4">
             <p className="text-sm text-muted-foreground">
               {groups.length} potential duplicate group{groups.length !== 1 ? "s" : ""} found
             </p>
@@ -223,15 +224,13 @@ export function MemberDedupDialog({ open, onOpenChange, onSuccess }: MemberDedup
           </div>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Done
-          </Button>
+        <SheetFooter>
+          <SheetClose render={<Button variant="outline" />}>Close</SheetClose>
           <Button variant="outline" onClick={findDuplicates} disabled={loading}>
             Re-scan
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

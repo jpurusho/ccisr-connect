@@ -6,13 +6,14 @@ import { logAudit } from "@/lib/audit"
 import { formatPhone } from "@/lib/utils"
 import type { Member, Address, WeddingAnniversary } from "@/types/database"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -262,31 +263,31 @@ export function FamilyMergeDialog({ open, onOpenChange, onSuccess }: FamilyMerge
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <GitMerge className="size-5" />
             Merge Duplicate Families
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             Families with the same name are shown below. Select which record to keep as primary, then merge.
             Members, addresses, and anniversaries will be consolidated.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {loading ? (
-          <div className="space-y-3">
+          <div className="space-y-3 px-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-24 w-full" />
             ))}
           </div>
         ) : groups.length === 0 ? (
-          <div className="py-8 text-center">
+          <div className="py-8 text-center px-4">
             <p className="text-muted-foreground">No duplicate families found.</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 px-4">
             <p className="text-sm text-muted-foreground">
               {groups.length} duplicate group{groups.length !== 1 ? "s" : ""} found
             </p>
@@ -405,15 +406,13 @@ export function FamilyMergeDialog({ open, onOpenChange, onSuccess }: FamilyMerge
           </div>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Done
-          </Button>
+        <SheetFooter>
+          <SheetClose render={<Button variant="outline" />}>Close</SheetClose>
           <Button variant="outline" onClick={findDuplicateFamilies} disabled={loading}>
             Re-scan
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

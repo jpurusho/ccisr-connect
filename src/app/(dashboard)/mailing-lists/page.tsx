@@ -24,13 +24,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import {
@@ -656,20 +657,20 @@ export default function MailingListsPage() {
         </div>
       )}
 
-      {/* Create/Edit List Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
+      {/* Create/Edit List Sheet */}
+      <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>
               {editingList ? "Edit Mailing List" : "Create Mailing List"}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               {editingList
                 ? "Update mailing list details."
                 : "Create a new recipient group for email dispatches."}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 px-4">
             <div className="space-y-1.5">
               <Label htmlFor="listName">Name *</Label>
               <Input
@@ -703,23 +704,18 @@ export default function MailingListsPage() {
                 Optional — emails sent to this list will also go to the Google Group address.
               </p>
             </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-                disabled={saving}
-              >
+            <SheetFooter>
+              <SheetClose render={<Button variant="outline" disabled={saving} />}>
                 Cancel
-              </Button>
+              </SheetClose>
               <Button type="submit" disabled={saving}>
                 {saving && <Loader2 className="animate-spin" />}
                 {editingList ? "Save Changes" : "Create List"}
               </Button>
-            </DialogFooter>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

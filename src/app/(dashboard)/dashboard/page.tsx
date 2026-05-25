@@ -14,6 +14,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet"
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -3418,37 +3426,41 @@ export default function DashboardPage() {
       )}
 
       {/* Sent email preview dialog */}
-      <Dialog open={!!sentEmailPreview} onOpenChange={(open) => { if (!open) setSentEmailPreview(null) }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg lg:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Sent Email</DialogTitle>
+      <Sheet open={!!sentEmailPreview} onOpenChange={(open) => { if (!open) setSentEmailPreview(null) }}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Sent Email</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 space-y-4 px-4 pb-4">
             {sentEmailPreview?.subject && (
-              <DialogDescription>{sentEmailPreview.subject}</DialogDescription>
+              <p className="text-sm font-medium">{sentEmailPreview.subject}</p>
             )}
-          </DialogHeader>
-          {sentEmailPreview && (sentEmailPreview.sentAt || sentEmailPreview.mailingListName || sentEmailPreview.smtpFrom) && (
-            <div className="rounded-lg border bg-muted/50 p-3 space-y-1 text-xs text-muted-foreground">
-              {sentEmailPreview.sentAt && (
-                <p><span className="font-medium text-foreground">Sent:</span> {format(new Date(sentEmailPreview.sentAt), "MMM d, yyyy 'at' h:mm a")}</p>
-              )}
-              {sentEmailPreview.smtpFrom && (
-                <p><span className="font-medium text-foreground">From:</span> {sentEmailPreview.smtpFrom}</p>
-              )}
-              {sentEmailPreview.mailingListName && (
-                <p><span className="font-medium text-foreground">To:</span> {sentEmailPreview.mailingListName}{sentEmailPreview.recipientCount ? ` (${sentEmailPreview.recipientCount} recipients)` : ""}</p>
-              )}
-              {sentEmailPreview.additionalRecipients && (
-                <p><span className="font-medium text-foreground">CC:</span> {sentEmailPreview.additionalRecipients}</p>
-              )}
-            </div>
-          )}
-          <div
-            className="rounded-lg border bg-white p-4 dark:bg-slate-900"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(sentEmailPreview?.html ?? "") }}
-          />
-          <DialogFooter showCloseButton />
-        </DialogContent>
-      </Dialog>
+            {sentEmailPreview && (sentEmailPreview.sentAt || sentEmailPreview.mailingListName || sentEmailPreview.smtpFrom) && (
+              <div className="rounded-lg border bg-muted/50 p-3 space-y-1 text-xs text-muted-foreground">
+                {sentEmailPreview.sentAt && (
+                  <p><span className="font-medium text-foreground">Sent:</span> {format(new Date(sentEmailPreview.sentAt), "MMM d, yyyy 'at' h:mm a")}</p>
+                )}
+                {sentEmailPreview.smtpFrom && (
+                  <p><span className="font-medium text-foreground">From:</span> {sentEmailPreview.smtpFrom}</p>
+                )}
+                {sentEmailPreview.mailingListName && (
+                  <p><span className="font-medium text-foreground">To:</span> {sentEmailPreview.mailingListName}{sentEmailPreview.recipientCount ? ` (${sentEmailPreview.recipientCount} recipients)` : ""}</p>
+                )}
+                {sentEmailPreview.additionalRecipients && (
+                  <p><span className="font-medium text-foreground">CC:</span> {sentEmailPreview.additionalRecipients}</p>
+                )}
+              </div>
+            )}
+            <div
+              className="rounded-lg border bg-white p-4 dark:bg-slate-900"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(sentEmailPreview?.html ?? "") }}
+            />
+          </div>
+          <SheetFooter>
+            <SheetClose render={<Button variant="outline" />}>Close</SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Send confirmation dialog */}
       <Dialog open={sendConfirm.open} onOpenChange={(open) => { if (!open) setSendConfirm((prev) => ({ ...prev, open: false })) }}>

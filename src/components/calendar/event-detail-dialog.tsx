@@ -6,14 +6,14 @@ import { format } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
 import { statusLabel } from "@/lib/date-utils"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -370,9 +370,9 @@ export function EventDetailDialog({
   if (!event) return null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+        <SheetHeader>
           <div className="flex items-center gap-2">
             {event.kind === "birthday" && (
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/40">
@@ -396,7 +396,7 @@ export function EventDetailDialog({
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <DialogTitle>{event.title}</DialogTitle>
+              <SheetTitle>{event.title}</SheetTitle>
             </div>
           </div>
           {event.kind === "event" && event.eventTypeName && (
@@ -411,7 +411,7 @@ export function EventDetailDialog({
               )}
             </div>
           )}
-        </DialogHeader>
+        </SheetHeader>
 
         <div className="space-y-3">
           {/* Date */}
@@ -543,7 +543,7 @@ export function EventDetailDialog({
           )}
         </div>
 
-        <DialogFooter className="flex-wrap gap-2">
+        <SheetFooter className="flex-row flex-wrap gap-2">
           {event.kind === "event" && event.eventId && (
             <>
               {event.status === "cancelled" && event.instanceId ? (
@@ -628,11 +628,11 @@ export function EventDetailDialog({
               View Email
             </Button>
           )}
-          <DialogClose render={<Button variant="outline" size="sm" />}>
+          <SheetClose render={<Button variant="outline" size="sm" />}>
             Close
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </SheetClose>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

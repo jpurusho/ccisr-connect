@@ -15,13 +15,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import {
   Select,
   SelectContent,
@@ -319,15 +320,15 @@ export function UserManagementPanel() {
         </CardContent>
       </Card>
 
-      <Dialog open={isSuperAdmin && dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Invite User</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isSuperAdmin && dialogOpen} onOpenChange={setDialogOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Invite User</SheetTitle>
+            <SheetDescription>
               Add a new user to CCISR Connect. They will be able to sign in with their Google account.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleInvite} className="space-y-4">
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleInvite} className="space-y-4 px-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email *</Label>
               <Input
@@ -364,23 +365,18 @@ export function UserManagementPanel() {
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-                disabled={saving}
-              >
+            <SheetFooter>
+              <SheetClose render={<Button variant="outline" disabled={saving} />}>
                 Cancel
-              </Button>
+              </SheetClose>
               <Button type="submit" disabled={saving}>
                 {saving && <Loader2 className="animate-spin" />}
                 Invite
               </Button>
-            </DialogFooter>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

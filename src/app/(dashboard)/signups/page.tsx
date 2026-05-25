@@ -20,12 +20,14 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import {
   Select,
   SelectContent,
@@ -474,16 +476,16 @@ function FormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Form" : "New Signup Form"}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetHeader>
+          <SheetTitle>{isEdit ? "Edit Form" : "New Signup Form"}</SheetTitle>
+          <SheetDescription>
             {isEdit ? "Update the form configuration" : "Create a new public signup form"}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 px-4">
           {/* Title & Description */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -739,16 +741,18 @@ function FormDialog({
           </div>
 
           {/* Save */}
-          <div className="flex gap-2 pt-2 border-t">
+          <SheetFooter>
             <Button size="sm" onClick={handleSave} disabled={saving || !title.trim()}>
               {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
               {isEdit ? "Update" : "Create"}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          </div>
+            <SheetClose render={<Button size="sm" variant="outline" />}>
+              Cancel
+            </SheetClose>
+          </SheetFooter>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
 

@@ -28,6 +28,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -237,15 +245,20 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!previewHtml} onOpenChange={() => setPreviewHtml(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Email Preview</DialogTitle>
-            <DialogDescription>{previewSubject}</DialogDescription>
-          </DialogHeader>
+      <Sheet open={!!previewHtml} onOpenChange={() => setPreviewHtml(null)}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Email Preview</SheetTitle>
+            <p className="text-sm text-muted-foreground">{previewSubject}</p>
+          </SheetHeader>
           {previewHtml && <div className="rounded border bg-white p-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }} />}
-        </DialogContent>
-      </Dialog>
+          <SheetFooter>
+            <SheetClose render={<Button variant="outline" />}>
+              Close
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={purgeOpen} onOpenChange={setPurgeOpen}>
         <DialogContent className="sm:max-w-sm">

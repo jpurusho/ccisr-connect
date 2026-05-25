@@ -13,13 +13,14 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { toast } from "sonner"
 import {
   Database,
@@ -290,63 +291,69 @@ export function DatabaseStatsPanel() {
         </CardContent>
       </Card>
 
-      {/* Schema dialog */}
-      <Dialog open={!!schemaTable} onOpenChange={(open) => { if (!open) setSchemaTable(null) }}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-mono text-sm">{schemaTable}</DialogTitle>
-            <DialogDescription>
+      {/* Schema sheet */}
+      <Sheet open={!!schemaTable} onOpenChange={(open) => { if (!open) setSchemaTable(null) }}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle className="font-mono text-sm">{schemaTable}</SheetTitle>
+            <SheetDescription>
               {schemaTable && TABLE_DESCRIPTIONS[schemaTable]
                 ? `${TABLE_DESCRIPTIONS[schemaTable]} — ${tables.find((t) => t.table_name === schemaTable)?.row_count.toLocaleString() ?? 0} rows`
                 : `${tables.find((t) => t.table_name === schemaTable)?.row_count.toLocaleString() ?? 0} rows`}
-            </DialogDescription>
-          </DialogHeader>
-          {schemaLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : schemaColumns.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              Could not load schema. The information_schema may not be accessible via RLS.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th className="pb-2 pr-4 font-semibold">Column</th>
-                    <th className="pb-2 pr-4 font-semibold">Type</th>
-                    <th className="pb-2 pr-4 font-semibold">Nullable</th>
-                    <th className="pb-2 font-semibold">Default</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schemaColumns.map((col) => (
-                    <tr key={col.column_name} className="border-b last:border-0">
-                      <td className="py-1.5 pr-4 font-mono font-medium">{col.column_name}</td>
-                      <td className="py-1.5 pr-4 text-muted-foreground font-mono">
-                        {col.data_type}
-                        {col.character_maximum_length ? `(${col.character_maximum_length})` : ""}
-                      </td>
-                      <td className="py-1.5 pr-4">
-                        {col.is_nullable === "YES" ? (
-                          <span className="text-muted-foreground">nullable</span>
-                        ) : (
-                          <span className="text-amber-600 dark:text-amber-400">required</span>
-                        )}
-                      </td>
-                      <td className="py-1.5 font-mono text-muted-foreground max-w-40 truncate">
-                        {col.column_default ?? "—"}
-                      </td>
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4">
+            {schemaLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : schemaColumns.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Could not load schema. The information_schema may not be accessible via RLS.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="pb-2 pr-4 font-semibold">Column</th>
+                      <th className="pb-2 pr-4 font-semibold">Type</th>
+                      <th className="pb-2 pr-4 font-semibold">Nullable</th>
+                      <th className="pb-2 font-semibold">Default</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <DialogFooter showCloseButton />
-        </DialogContent>
-      </Dialog>
+                  </thead>
+                  <tbody>
+                    {schemaColumns.map((col) => (
+                      <tr key={col.column_name} className="border-b last:border-0">
+                        <td className="py-1.5 pr-4 font-mono font-medium">{col.column_name}</td>
+                        <td className="py-1.5 pr-4 text-muted-foreground font-mono">
+                          {col.data_type}
+                          {col.character_maximum_length ? `(${col.character_maximum_length})` : ""}
+                        </td>
+                        <td className="py-1.5 pr-4">
+                          {col.is_nullable === "YES" ? (
+                            <span className="text-muted-foreground">nullable</span>
+                          ) : (
+                            <span className="text-amber-600 dark:text-amber-400">required</span>
+                          )}
+                        </td>
+                        <td className="py-1.5 font-mono text-muted-foreground max-w-40 truncate">
+                          {col.column_default ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <SheetFooter>
+            <SheetClose render={<Button variant="outline" />}>
+              Close
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

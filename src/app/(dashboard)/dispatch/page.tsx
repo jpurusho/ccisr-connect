@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -805,20 +806,20 @@ export default function DispatchQueuePage() {
         ))}
       </Tabs>
 
-      {/* Preview dialog */}
-      <Dialog
+      {/* Preview panel */}
+      <Sheet
         open={!!previewItem}
         onOpenChange={(open) => {
           if (!open) setPreviewItem(null)
         }}
       >
-        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Email Preview</DialogTitle>
-            <DialogDescription>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Email Preview</SheetTitle>
+            <SheetDescription>
               {previewItem?.subject ?? ""}
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
           {previewItem && (
             <>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -874,7 +875,7 @@ export default function DispatchQueuePage() {
               />
             </>
           )}
-          <DialogFooter showCloseButton>
+          <SheetFooter>
             {previewItem && canSend(previewItem.status) && (
               <Button
                 onClick={() => {
@@ -886,9 +887,12 @@ export default function DispatchQueuePage() {
                 Send Now
               </Button>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <SheetClose render={<Button variant="outline" />}>
+              Close
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Cancel confirmation dialog */}
       <Dialog
@@ -919,20 +923,20 @@ export default function DispatchQueuePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Reschedule dialog */}
-      <Dialog
+      {/* Reschedule panel */}
+      <Sheet
         open={!!rescheduleTarget}
         onOpenChange={(open) => {
           if (!open) setRescheduleTarget(null)
         }}
       >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reschedule Dispatch</DialogTitle>
-            <DialogDescription>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Reschedule Dispatch</SheetTitle>
+            <SheetDescription>
               Set a new send date and time for &quot;{rescheduleTarget?.subject}&quot;.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="resched-date">Date</Label>
@@ -953,13 +957,10 @@ export default function DispatchQueuePage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setRescheduleTarget(null)}
-            >
+          <SheetFooter>
+            <SheetClose render={<Button variant="outline" />}>
               Cancel
-            </Button>
+            </SheetClose>
             <Button
               onClick={handleReschedule}
               disabled={!rescheduleDate}
@@ -967,9 +968,9 @@ export default function DispatchQueuePage() {
               <Clock className="size-3.5" data-icon="inline-start" />
               Save Schedule
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Send confirmation dialog */}
       <Dialog

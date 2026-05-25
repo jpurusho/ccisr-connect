@@ -70,11 +70,13 @@ import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-
 import { formatPhone } from "@/lib/utils"
 import { COMM_TYPE_TO_ET, type CommType } from "@/lib/dashboard-types"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet"
 
 interface SavedTemplate {
   id: string
@@ -2064,18 +2066,23 @@ export default function TemplatesPage() {
       </Tabs>
       )}
 
-      {/* Mobile preview dialog */}
-      <Dialog open={previewing} onOpenChange={setPreviewing}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Preview</DialogTitle>
-          </DialogHeader>
+      {/* Mobile preview sheet */}
+      <Sheet open={previewing} onOpenChange={setPreviewing}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Preview</SheetTitle>
+          </SheetHeader>
           <div
             className="rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
           />
-        </DialogContent>
-      </Dialog>
+          <SheetFooter>
+            <SheetClose render={<Button variant="outline" />}>
+              Close
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

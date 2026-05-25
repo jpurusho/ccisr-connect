@@ -12,12 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet"
 import {
   Pencil,
   Eye,
@@ -533,17 +534,19 @@ export function WeeklyCommunicationCard({
         )}
       </Card>
 
-      {/* Preview dialog */}
-      <Dialog open={previewing} onOpenChange={setPreviewing}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg lg:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Preview: {title}</DialogTitle>
-          </DialogHeader>
-          <div
-            className="rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml ?? "") }}
-          />
-          <DialogFooter showCloseButton>
+      {/* Preview panel */}
+      <Sheet open={previewing} onOpenChange={setPreviewing}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Preview: {title}</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 px-4 pb-4">
+            <div
+              className="rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml ?? "") }}
+            />
+          </div>
+          <SheetFooter>
             {status === "draft" && (
               <Button
                 size="sm"
@@ -560,9 +563,12 @@ export function WeeklyCommunicationCard({
                 Send
               </Button>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <SheetClose render={<Button variant="outline" size="sm" />}>
+              Close
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

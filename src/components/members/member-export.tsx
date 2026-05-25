@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase/client"
 import { canonicalCityName } from "@/lib/city-utils"
 import type { Member, Family, Address, Tag } from "@/types/database"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -184,25 +185,25 @@ export function MemberExportDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Export Members</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Export Members</SheetTitle>
+          <SheetDescription>
             {loading
               ? "Loading members..."
               : `${members.length} member${members.length !== 1 ? "s" : ""} match current filters`}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {loading ? (
-          <div className="space-y-2">
+          <div className="space-y-2 px-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-8 w-full" />
             ))}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 px-4">
             <div>
               <Label className="text-sm font-medium">Fields to include</Label>
               <div className="mt-2 grid grid-cols-2 gap-3">
@@ -226,16 +227,14 @@ export function MemberExportDialog({
           </div>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
+        <SheetFooter>
+          <SheetClose render={<Button variant="outline" />}>Close</SheetClose>
           <Button onClick={handlePrint} disabled={loading || members.length === 0}>
             <Printer className="size-4" />
             Print / Save PDF
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }
