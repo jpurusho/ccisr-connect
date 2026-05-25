@@ -27,7 +27,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { logAudit } from "@/lib/audit"
 import { formatPhone } from "@/lib/utils"
-import { MapPin, Phone, Mail, Heart, Cake, Pencil } from "lucide-react"
+import { MapPin, Phone, Mail, Heart, Cake, Pencil, Loader2 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type FamilyWithDetails = Family & {
   members: Member[]
@@ -48,66 +55,124 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
   const router = useRouter()
   const [families, setFamilies] = useState<FamilyWithDetails[]>([])
   const [loading, setLoading] = useState(true)
-  const [renameFamily, setRenameFamily] = useState<FamilyWithDetails | null>(null)
-  const [newFamilyName, setNewFamilyName] = useState("")
-  const [renaming, setRenaming] = useState(false)
+  const [editFamily, setEditFamily] = useState<FamilyWithDetails | null>(null)
+  const [editForm, setEditForm] = useState<{
+    familyName: string
+    homePhone: string
+    street: string
+    city: string
+    state: string
+    zip: string
+    members: { id: string; firstName: string; lastName: string; cellPhone: string; email: string; role: string; birthMonth: string; birthDay: string; birthYear: string }[]
+  } | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  async function handleRename() {
-    if (!renameFamily || !newFamilyName.trim()) return
-    setRenaming(true)
+  function openEditDialog(family: FamilyWithDetails) {
+    const addr = family.addresses.find((a) => a.is_current)
+    const roleOrder: Record<string, number> = { husband: 0, wife: 1, child: 2 }
+    const sorted = [...family.members].sort((a, b) => (roleOrder[a.role_in_family] ?? 3) - (roleOrder[b.role_in_family] ?? 3))
+    setEditForm({
+      familyName: family.family_name,
+      homePhone: family.home_phone ?? "",
+      street: addr?.street ?? "",
+      city: addr?.city ?? "",
+      state: addr?.state ?? "",
+      zip: addr?.zip ?? "",
+      members: sorted.map((m) => ({
+        id: m.id,
+        firstName: m.first_name,
+        lastName: m.last_name,
+        cellPhone: m.cell_phone ?? "",
+        email: m.email ?? "",
+        role: m.role_in_family,
+        birthMonth: m.birth_month?.toString() ?? "",
+        birthDay: m.birth_day?.toString() ?? "",
+        birthYear: m.birth_year?.toString() ?? "",
+      })),
+    })
+    setEditFamily(family)
+  }
+
+  async function handleSaveFamily() {
+    if (!editFamily || !editForm || !editForm.familyName.trim()) return
+    setSaving(true)
     const supabase = createClient()
-    const trimmed = newFamilyName.trim()
-    const oldName = renameFamily.family_name
+    const newName = editForm.familyName.trim()
+    const oldName = editFamily.family_name
+    const nameChanged = newName !== oldName
 
+    // Update family record
     const { error: famErr } = await supabase
       .from("families")
-      .update({ family_name: trimmed } as never)
-      .eq("id", renameFamily.id)
+      .update({ family_name: newName, home_phone: editForm.homePhone.trim() || null } as never)
+      .eq("id", editFamily.id)
 
     if (famErr) {
-      toast.error(`Failed to rename family: ${famErr.message}`)
-      setRenaming(false)
+      toast.error(`Failed to update family: ${famErr.message}`)
+      setSaving(false)
       return
     }
 
-    // Update last_name and full_name for all members
-    const updates = renameFamily.members.map((m) => ({
-      id: m.id,
-      last_name: trimmed,
-      full_name: `${m.first_name} ${trimmed}`,
-    }))
-
-    for (const u of updates) {
-      await supabase
-        .from("members")
-        .update({ last_name: u.last_name, full_name: u.full_name } as never)
-        .eq("id", u.id)
+    // Update/upsert address
+    const addr = editFamily.addresses.find((a) => a.is_current)
+    const fullAddress = [editForm.street, editForm.city, editForm.state, editForm.zip].filter(Boolean).join(", ")
+    if (addr) {
+      await supabase.from("addresses").update({
+        street: editForm.street.trim() || null,
+        city: editForm.city.trim() || null,
+        state: editForm.state.trim() || null,
+        zip: editForm.zip.trim() || null,
+        full_address: fullAddress || null,
+      } as never).eq("id", addr.id)
+    } else if (fullAddress) {
+      await supabase.from("addresses").insert({
+        family_id: editFamily.id,
+        street: editForm.street.trim() || null,
+        city: editForm.city.trim() || null,
+        state: editForm.state.trim() || null,
+        zip: editForm.zip.trim() || null,
+        full_address: fullAddress || null,
+        is_current: true,
+      } as never)
     }
 
-    setFamilies((prev) =>
-      prev.map((f) =>
-        f.id === renameFamily.id
-          ? {
-              ...f,
-              family_name: trimmed,
-              members: f.members.map((m) => ({
-                ...m,
-                last_name: trimmed,
-                full_name: `${m.first_name} ${trimmed}`,
-              })),
-            }
-          : f
-      )
-    )
+    // Update each member
+    for (const mf of editForm.members) {
+      const lastName = nameChanged ? newName : mf.lastName.trim()
+      const fullName = `${mf.firstName.trim()} ${lastName}`
+      await supabase.from("members").update({
+        first_name: mf.firstName.trim(),
+        last_name: lastName,
+        full_name: fullName,
+        role_in_family: mf.role,
+        cell_phone: mf.cellPhone.trim() || null,
+        email: mf.email.trim() || null,
+        birth_month: mf.birthMonth ? parseInt(mf.birthMonth, 10) : null,
+        birth_day: mf.birthDay ? parseInt(mf.birthDay, 10) : null,
+        birth_year: mf.birthYear ? parseInt(mf.birthYear, 10) : null,
+      } as never).eq("id", mf.id)
+    }
 
-    logAudit("family_renamed", "families", renameFamily.id, {
-      old_name: oldName,
-      new_name: trimmed,
-      members_updated: updates.length,
+    // Refresh local state
+    const { data: refreshed } = await supabase
+      .from("families")
+      .select("*, members(*), addresses(*), wedding_anniversaries(*)")
+      .eq("id", editFamily.id)
+      .single()
+
+    if (refreshed) {
+      setFamilies((prev) => prev.map((f) => f.id === editFamily.id ? refreshed as FamilyWithDetails : f))
+    }
+
+    logAudit("family_edited", "families", editFamily.id, {
+      family_name: newName,
+      ...(nameChanged ? { old_name: oldName } : {}),
+      members_updated: editForm.members.length,
     })
-    toast.success(`Renamed "${oldName}" → "${trimmed}" (${updates.length} member${updates.length !== 1 ? "s" : ""} updated)`)
-    setRenameFamily(null)
-    setRenaming(false)
+    toast.success(`${newName} family updated`)
+    setEditFamily(null)
+    setEditForm(null)
+    setSaving(false)
   }
 
   useEffect(() => {
@@ -223,11 +288,10 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        setNewFamilyName(family.family_name)
-                        setRenameFamily(family)
+                        openEditDialog(family)
                       }}
                       className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                      title="Rename family"
+                      title="Edit family"
                     >
                       <Pencil className="size-3.5" />
                     </button>
@@ -374,35 +438,133 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
       })}
     </div>
 
-    <Dialog open={!!renameFamily} onOpenChange={(open) => { if (!open) setRenameFamily(null) }}>
-      <DialogContent>
+    <Dialog open={!!editFamily} onOpenChange={(open) => { if (!open) { setEditFamily(null); setEditForm(null) } }}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Rename Family</DialogTitle>
+          <DialogTitle>Edit Family — {editFamily?.family_name}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 py-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="new-family-name">New family name</Label>
-            <Input
-              id="new-family-name"
-              value={newFamilyName}
-              onChange={(e) => setNewFamilyName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleRename() }}
-              placeholder="Enter new family name"
-            />
+        {editForm && (
+          <div className="space-y-6 py-2">
+            {/* Family details */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ef-name">Family Name</Label>
+                <Input id="ef-name" value={editForm.familyName} onChange={(e) => setEditForm({ ...editForm, familyName: e.target.value })} />
+                {editForm.familyName.trim() !== editFamily!.family_name && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">Last name will update for all members</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ef-phone">Home Phone</Label>
+                <Input id="ef-phone" value={editForm.homePhone} onChange={(e) => setEditForm({ ...editForm, homePhone: e.target.value })} placeholder="Home phone" />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Address</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="ef-street">Street</Label>
+                  <Input id="ef-street" value={editForm.street} onChange={(e) => setEditForm({ ...editForm, street: e.target.value })} placeholder="123 Main St" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ef-city">City</Label>
+                  <Input id="ef-city" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} placeholder="City" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ef-state">State</Label>
+                    <Input id="ef-state" value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} placeholder="CA" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ef-zip">ZIP</Label>
+                    <Input id="ef-zip" value={editForm.zip} onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })} placeholder="94000" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Members */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Members ({editForm.members.length})</p>
+              {editForm.members.map((mf, idx) => (
+                <div key={mf.id} className="rounded-lg border p-3 space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="space-y-1.5">
+                      <Label>First Name</Label>
+                      <Input value={mf.firstName} onChange={(e) => {
+                        const updated = [...editForm.members]
+                        updated[idx] = { ...updated[idx], firstName: e.target.value }
+                        setEditForm({ ...editForm, members: updated })
+                      }} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Role</Label>
+                      <Select value={mf.role} onValueChange={(v: string | null) => {
+                        if (!v) return
+                        const updated = [...editForm.members]
+                        updated[idx] = { ...updated[idx], role: v }
+                        setEditForm({ ...editForm, members: updated })
+                      }}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="husband">Husband</SelectItem>
+                          <SelectItem value="wife">Wife</SelectItem>
+                          <SelectItem value="child">Child</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Phone</Label>
+                      <Input value={mf.cellPhone} onChange={(e) => {
+                        const updated = [...editForm.members]
+                        updated[idx] = { ...updated[idx], cellPhone: e.target.value }
+                        setEditForm({ ...editForm, members: updated })
+                      }} placeholder="Cell phone" />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Email</Label>
+                      <Input value={mf.email} onChange={(e) => {
+                        const updated = [...editForm.members]
+                        updated[idx] = { ...updated[idx], email: e.target.value }
+                        setEditForm({ ...editForm, members: updated })
+                      }} placeholder="Email" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Birthday</Label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <Input value={mf.birthMonth} onChange={(e) => {
+                          const updated = [...editForm.members]
+                          updated[idx] = { ...updated[idx], birthMonth: e.target.value }
+                          setEditForm({ ...editForm, members: updated })
+                        }} placeholder="MM" className="text-center" />
+                        <Input value={mf.birthDay} onChange={(e) => {
+                          const updated = [...editForm.members]
+                          updated[idx] = { ...updated[idx], birthDay: e.target.value }
+                          setEditForm({ ...editForm, members: updated })
+                        }} placeholder="DD" className="text-center" />
+                        <Input value={mf.birthYear} onChange={(e) => {
+                          const updated = [...editForm.members]
+                          updated[idx] = { ...updated[idx], birthYear: e.target.value }
+                          setEditForm({ ...editForm, members: updated })
+                        }} placeholder="YYYY" className="text-center" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          {renameFamily && (
-            <p className="text-sm text-muted-foreground">
-              This will update the last name for {renameFamily.members.length} member{renameFamily.members.length !== 1 ? "s" : ""}:
-              {" "}{renameFamily.members.map((m) => m.first_name).join(", ")}
-            </p>
-          )}
-        </div>
+        )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => setRenameFamily(null)} disabled={renaming}>
+          <Button variant="outline" onClick={() => { setEditFamily(null); setEditForm(null) }} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleRename} disabled={renaming || !newFamilyName.trim() || newFamilyName.trim() === renameFamily?.family_name}>
-            {renaming ? "Renaming..." : "Rename"}
+          <Button onClick={handleSaveFamily} disabled={saving || !editForm?.familyName.trim()}>
+            {saving ? <><Loader2 className="size-4 animate-spin" /> Saving...</> : "Save All"}
           </Button>
         </DialogFooter>
       </DialogContent>
