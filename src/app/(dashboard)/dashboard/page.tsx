@@ -840,6 +840,7 @@ export default function DashboardPage() {
 
       // ---- Parse saved template defaults (no FK join, resolve in JS) ----
       const etIdToName: Record<string, string> = {}
+      const etIdToTabName: Record<string, string> = {}
       const etSignupLinks: Record<string, { formId: string; fieldMap: SignupFieldMap }> = {}
       const etBulletinTemplates: Record<string, string> = {}
 
@@ -850,8 +851,11 @@ export default function DashboardPage() {
       if (eventTypesRes.data) {
         for (const et of eventTypesRes.data) {
           etIdToName[et.id] = et.name
+          // Resolve internal tab name via comm_type → COMM_TYPE_TO_ET
+          const tabName = et.comm_type ? (COMM_TYPE_TO_ET[et.comm_type as CommType] ?? et.name) : et.name
+          etIdToTabName[et.id] = tabName
           if (et.linked_signup_form_id && et.signup_field_map) {
-            etSignupLinks[et.name] = { formId: et.linked_signup_form_id, fieldMap: et.signup_field_map }
+            etSignupLinks[tabName] = { formId: et.linked_signup_form_id, fieldMap: et.signup_field_map }
           }
           if (et.bulletin_detail_template) {
             etBulletinTemplates[et.id] = et.bulletin_detail_template
@@ -864,16 +868,16 @@ export default function DashboardPage() {
       const loadedStyles: Record<string, TemplateStyleSettings> = {}
       if (templateDefaultsRes.data) {
         for (const t of templateDefaultsRes.data) {
-          const etName = etIdToName[t.event_type_id]
-          if (!etName) continue
-          const parsed = parseBodyTemplate(etName, t.body_template)
+          const tabName = etIdToTabName[t.event_type_id]
+          if (!tabName) continue
+          const parsed = parseBodyTemplate(tabName, t.body_template)
           if (parsed) {
-            savedDefaults[etName] = {
+            savedDefaults[tabName] = {
               subject: t.subject_template,
               data: parsed.data as Record<string, unknown>,
             }
           }
-          if (t.style_settings) loadedStyles[etName] = t.style_settings as TemplateStyleSettings
+          if (t.style_settings) loadedStyles[tabName] = t.style_settings as TemplateStyleSettings
         }
       }
       setTemplateStyles(loadedStyles)
@@ -1063,16 +1067,17 @@ export default function DashboardPage() {
         }
       }
 
-      // Find events by type name (first match used for dashboard card, count for indicator)
+      // Find events by internal tab name
       const findEventsByType = (typeName: string) =>
-        activeEvents.filter((e) => etIdToName[e.event_type_id] === typeName)
+        activeEvents.filter((e) => etIdToTabName[e.event_type_id] === typeName)
       const findEventByType = (typeName: string) => findEventsByType(typeName)[0] ?? undefined
 
       // Track event counts per comm type for multi-event indicator
       {
         const counts: Partial<Record<CommType, number>> = {}
-        for (const [ct, etName] of Object.entries(commTypeToEtName)) {
-          counts[ct as CommType] = findEventsByType(etName).length
+        for (const ct of Object.keys(commTypeToEtName)) {
+          const tabName = COMM_TYPE_TO_ET[ct as CommType]
+          counts[ct as CommType] = tabName ? findEventsByType(tabName).length : 0
         }
         setEventCounts(counts)
       }
@@ -1397,8 +1402,8 @@ export default function DashboardPage() {
       }
 
       for (const evt of activeEvents) {
-        const etName = etIdToName[evt.event_type_id] ?? ""
-        if (bulletinSkipTypes.has(etName)) continue
+        const etTabName = etIdToTabName[evt.event_type_id] ?? ""
+        if (bulletinSkipTypes.has(etTabName)) continue
         if (evt.recurrence_rule) {
           // Recurring events — resolve occurrences for the week
           const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
@@ -2764,7 +2769,8 @@ export default function DashboardPage() {
 
   const bibleStudySummary = useMemo(() => {
     const lines: string[] = []
-    lines.push(`${bibleStudyForm.date} at ${bibleStudyForm.time}`)
+    const isBreak = bibleStudyForm.date.toLowerCase().includes("no ")
+    lines.push(isBreak ? bibleStudyForm.date : `${bibleStudyForm.date} at ${bibleStudyForm.time}`)
     for (const loc of bibleStudyForm.locations) {
       lines.push(`${loc.label}: ${loc.hostNames}${loc.address !== "TBD" ? ` — ${loc.address}` : ""}`)
     }

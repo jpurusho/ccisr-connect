@@ -68,6 +68,7 @@ import type { VisualConfig } from "@/lib/email/visual-config-types"
 import { VerseLookup } from "@/components/shared/verse-lookup"
 import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-builder"
 import { formatPhone } from "@/lib/utils"
+import { COMM_TYPE_TO_ET, type CommType } from "@/lib/dashboard-types"
 import {
   Dialog,
   DialogContent,
@@ -240,7 +241,7 @@ export default function TemplatesPage() {
 
     // Fetch event types and templates separately to avoid FK ambiguity
     const [etRes, tmplRes, customRes] = await Promise.all([
-      supabase.from("event_types").select("id, name").order("name").returns<{ id: string; name: string }[]>(),
+      supabase.from("event_types").select("id, name, comm_type").order("name").returns<{ id: string; name: string; comm_type: string | null }[]>(),
       supabase
         .from("email_templates")
         .select("id, event_type_id, subject_template, body_template, style_settings")
@@ -256,15 +257,16 @@ export default function TemplatesPage() {
 
     if (customRes.data) setCustomTemplates(customRes.data.map((ct) => ({ ...ct, style_settings: ct.style_settings ?? undefined })))
 
-    // Build event type maps
-    const idToName: Record<string, string> = {}
-    const nameToId: Record<string, string> = {}
+    // Build event type maps — keyed by internal tab name (via comm_type → COMM_TYPE_TO_ET)
+    const idToTabName: Record<string, string> = {}
+    const tabNameToId: Record<string, string> = {}
     if (etRes.data) {
       for (const et of etRes.data) {
-        idToName[et.id] = et.name
-        nameToId[et.name] = et.id
+        const tabName = et.comm_type ? (COMM_TYPE_TO_ET[et.comm_type as CommType] ?? et.name) : et.name
+        idToTabName[et.id] = tabName
+        tabNameToId[tabName] = et.id
       }
-      setEventTypeIds(nameToId)
+      setEventTypeIds(tabNameToId)
     }
 
     // Reset to defaults first, then overlay saved data
@@ -280,7 +282,7 @@ export default function TemplatesPage() {
 
     if (tmplRes.data) {
       for (const t of tmplRes.data) {
-        const etName = idToName[t.event_type_id]
+        const etName = idToTabName[t.event_type_id]
         if (!etName) continue
 
         saved.push({

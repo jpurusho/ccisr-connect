@@ -611,7 +611,10 @@ ${details}
 
   let sharedDetails = "";
   if (!allOnVacation) {
-    sharedDetails = detailRow("When", `${data.date} at ${data.time}`);
+    const isBreakDate = data.date.toLowerCase().includes("no ") || data.date.toLowerCase().includes("on break");
+    sharedDetails = isBreakDate
+      ? detailRow("When", data.date)
+      : detailRow("When", `${data.date} at ${data.time}`);
     if (data.topic) sharedDetails += detailRow("Topic", data.topic);
   }
 

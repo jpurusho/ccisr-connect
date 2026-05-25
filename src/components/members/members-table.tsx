@@ -21,7 +21,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ChevronLeft, ChevronRight, Plus, Tag as TagIcon, Users, UserX } from "lucide-react"
+import { Cake, ChevronLeft, ChevronRight, Plus, Tag as TagIcon, Users, UserX } from "lucide-react"
+import { MONTH_NAMES_FULL as MONTH_NAMES } from "@/lib/date-utils"
 
 type MemberWithFamily = Member & {
   families:
@@ -337,6 +338,7 @@ export function MembersTable({
             >
               City{sortIndicator("city")}
             </TableHead>
+            <TableHead className="hidden lg:table-cell">Birthday</TableHead>
             <TableHead className="hidden md:table-cell">Role</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="hidden xl:table-cell">Tags</TableHead>
@@ -371,6 +373,16 @@ export function MembersTable({
                 {getMemberCity(member) !== "Unknown"
                   ? getMemberCity(member)
                   : "-"}
+              </TableCell>
+              <TableCell className="hidden lg:table-cell">
+                {member.birth_month && member.birth_day ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400">
+                    <Cake className="size-3" />
+                    {MONTH_NAMES[member.birth_month]} {member.birth_day}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
               </TableCell>
               <TableCell className="hidden md:table-cell">
                 <Badge variant="secondary" className="capitalize">

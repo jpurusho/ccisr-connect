@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { logAudit } from "@/lib/audit"
 import { formatPhone } from "@/lib/utils"
-import { MapPin, Phone, Mail, Heart } from "lucide-react"
+import { MapPin, Phone, Mail, Heart, Cake } from "lucide-react"
 
 type FamilyWithDetails = Family & {
   members: Member[]
@@ -246,6 +246,12 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
                           {/* Newcomer shown via tags */}
                         </div>
                         <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 pl-3.5 text-xs text-muted-foreground">
+                          {member.birth_month && member.birth_day && (
+                            <span className="flex items-center gap-1 font-medium text-purple-600 dark:text-purple-400">
+                              <Cake className="size-3" />
+                              {MONTH_NAMES[member.birth_month]} {member.birth_day}
+                            </span>
+                          )}
                           {member.cell_phone && (
                             <span className="flex items-center gap-1">
                               <Phone className="size-3" />
@@ -266,9 +272,9 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
 
                 {/* Anniversary */}
                 {anniversary && (
-                  <div className="flex items-center gap-2 border-t pt-2 text-sm text-muted-foreground">
-                    <Heart className="size-3.5 shrink-0 text-pink-500" />
-                    <span>
+                  <div className="flex items-center gap-2 rounded-md border border-pink-200 bg-pink-50 px-3 py-2 text-sm dark:border-pink-900 dark:bg-pink-950/30">
+                    <Heart className="size-4 shrink-0 text-pink-500" />
+                    <span className="font-medium text-pink-700 dark:text-pink-400">
                       Anniversary: {MONTH_NAMES[anniversary.anniversary_month]}{" "}
                       {anniversary.anniversary_day}
                       {anniversary.anniversary_year

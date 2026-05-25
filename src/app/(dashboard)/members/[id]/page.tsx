@@ -413,11 +413,11 @@ export default function MemberDetailPage() {
                 </div>
               )}
               {birthday && (
-                <div className="flex items-center gap-3">
-                  <Cake className="size-4 shrink-0 text-muted-foreground" />
+                <div className="flex items-center gap-3 rounded-md border border-purple-200 bg-purple-50 px-3 py-2 dark:border-purple-900 dark:bg-purple-950/30">
+                  <Cake className="size-4 shrink-0 text-purple-500" />
                   <div>
-                    <p className="text-sm font-medium">Birthday</p>
-                    <p className="text-sm text-muted-foreground">{birthday}</p>
+                    <p className="text-xs font-medium text-purple-700 dark:text-purple-400">Birthday</p>
+                    <p className="text-sm font-semibold text-purple-800 dark:text-purple-300">{birthday}</p>
                   </div>
                 </div>
               )}
@@ -569,6 +569,12 @@ export default function MemberDetailPage() {
                       >
                         {fm.role_in_family}
                       </Badge>
+                      {fm.birth_month && fm.birth_day && (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400">
+                          <Cake className="size-3" />
+                          {MONTH_NAMES[fm.birth_month]} {fm.birth_day}
+                        </span>
+                      )}
                     </div>
                     {fm.cell_phone && (
                       <span className="text-xs text-muted-foreground">
@@ -586,16 +592,18 @@ export default function MemberDetailPage() {
               {anniversary && (
                 <>
                   <Separator />
-                  <div className="flex items-center gap-2 text-sm">
-                    <Heart className="size-4 text-pink-500" />
-                    <span className="text-muted-foreground">
-                      Wedding Anniversary:{" "}
-                      {MONTH_NAMES[anniversary.anniversary_month]}{" "}
-                      {anniversary.anniversary_day}
-                      {anniversary.anniversary_year
-                        ? `, ${anniversary.anniversary_year}`
-                        : ""}
-                    </span>
+                  <div className="flex items-center gap-3 rounded-md border border-pink-200 bg-pink-50 px-3 py-2 dark:border-pink-900 dark:bg-pink-950/30">
+                    <Heart className="size-4 shrink-0 text-pink-500" />
+                    <div>
+                      <p className="text-xs font-medium text-pink-700 dark:text-pink-400">Wedding Anniversary</p>
+                      <p className="text-sm font-semibold text-pink-800 dark:text-pink-300">
+                        {MONTH_NAMES[anniversary.anniversary_month]}{" "}
+                        {anniversary.anniversary_day}
+                        {anniversary.anniversary_year
+                          ? `, ${anniversary.anniversary_year}`
+                          : ""}
+                      </p>
+                    </div>
                   </div>
                 </>
               )}

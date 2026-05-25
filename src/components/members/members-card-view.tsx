@@ -8,7 +8,8 @@ import { canonicalCityName } from "@/lib/city-utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Phone, Mail, MapPin } from "lucide-react"
+import { Phone, Mail, MapPin, Cake } from "lucide-react"
+import { MONTH_NAMES_FULL as MONTH_NAMES } from "@/lib/date-utils"
 
 type MemberWithFamily = Member & {
   families:
@@ -149,6 +150,14 @@ export function MembersCardView({ searchQuery, filter, cityFilter }: MembersCard
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Mail className="size-3.5 shrink-0" />
                   <span className="truncate">{member.email}</span>
+                </div>
+              )}
+              {member.birth_month && member.birth_day && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Cake className="size-3.5 shrink-0 text-purple-500" />
+                  <span className="font-medium text-purple-600 dark:text-purple-400">
+                    {MONTH_NAMES[member.birth_month]} {member.birth_day}
+                  </span>
                 </div>
               )}
               {(() => {
