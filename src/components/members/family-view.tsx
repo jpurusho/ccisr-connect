@@ -11,13 +11,23 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { logAudit } from "@/lib/audit"
 import { formatPhone } from "@/lib/utils"
-import { MapPin, Phone, Mail, Heart, Cake } from "lucide-react"
+import { MapPin, Phone, Mail, Heart, Cake, Pencil } from "lucide-react"
 
 type FamilyWithDetails = Family & {
   members: Member[]
@@ -38,6 +48,67 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
   const router = useRouter()
   const [families, setFamilies] = useState<FamilyWithDetails[]>([])
   const [loading, setLoading] = useState(true)
+  const [renameFamily, setRenameFamily] = useState<FamilyWithDetails | null>(null)
+  const [newFamilyName, setNewFamilyName] = useState("")
+  const [renaming, setRenaming] = useState(false)
+
+  async function handleRename() {
+    if (!renameFamily || !newFamilyName.trim()) return
+    setRenaming(true)
+    const supabase = createClient()
+    const trimmed = newFamilyName.trim()
+    const oldName = renameFamily.family_name
+
+    const { error: famErr } = await supabase
+      .from("families")
+      .update({ family_name: trimmed } as never)
+      .eq("id", renameFamily.id)
+
+    if (famErr) {
+      toast.error(`Failed to rename family: ${famErr.message}`)
+      setRenaming(false)
+      return
+    }
+
+    // Update last_name and full_name for all members
+    const updates = renameFamily.members.map((m) => ({
+      id: m.id,
+      last_name: trimmed,
+      full_name: `${m.first_name} ${trimmed}`,
+    }))
+
+    for (const u of updates) {
+      await supabase
+        .from("members")
+        .update({ last_name: u.last_name, full_name: u.full_name } as never)
+        .eq("id", u.id)
+    }
+
+    setFamilies((prev) =>
+      prev.map((f) =>
+        f.id === renameFamily.id
+          ? {
+              ...f,
+              family_name: trimmed,
+              members: f.members.map((m) => ({
+                ...m,
+                last_name: trimmed,
+                full_name: `${m.first_name} ${trimmed}`,
+              })),
+            }
+          : f
+      )
+    )
+
+    logAudit("family_renamed", "families", renameFamily.id, {
+      old_name: oldName,
+      new_name: trimmed,
+      members_updated: updates.length,
+    })
+    toast.success(`Renamed "${oldName}" → "${trimmed}" (${updates.length} member${updates.length !== 1 ? "s" : ""} updated)`)
+    setRenameFamily(null)
+    setRenaming(false)
+  }
 
   useEffect(() => {
     async function fetchFamilies() {
@@ -123,6 +194,7 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
   }
 
   return (
+    <>
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {filtered.map((family) => {
         const currentAddress = family.addresses.find((a) => a.is_current)
@@ -141,12 +213,24 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
         )
 
         return (
-          <Card key={family.id}>
+          <Card key={family.id} className="group">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-lg">
+                  <CardTitle className="flex items-center gap-1.5 text-lg">
                     {family.family_name}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setNewFamilyName(family.family_name)
+                        setRenameFamily(family)
+                      }}
+                      className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                      title="Rename family"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
                   </CardTitle>
                   {currentAddress?.full_address && (
                     <CardDescription className="mt-1 flex items-start gap-1.5">
@@ -289,5 +373,40 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
         )
       })}
     </div>
+
+    <Dialog open={!!renameFamily} onOpenChange={(open) => { if (!open) setRenameFamily(null) }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rename Family</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="new-family-name">New family name</Label>
+            <Input
+              id="new-family-name"
+              value={newFamilyName}
+              onChange={(e) => setNewFamilyName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleRename() }}
+              placeholder="Enter new family name"
+            />
+          </div>
+          {renameFamily && (
+            <p className="text-sm text-muted-foreground">
+              This will update the last name for {renameFamily.members.length} member{renameFamily.members.length !== 1 ? "s" : ""}:
+              {" "}{renameFamily.members.map((m) => m.first_name).join(", ")}
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setRenameFamily(null)} disabled={renaming}>
+            Cancel
+          </Button>
+          <Button onClick={handleRename} disabled={renaming || !newFamilyName.trim() || newFamilyName.trim() === renameFamily?.family_name}>
+            {renaming ? "Renaming..." : "Rename"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
