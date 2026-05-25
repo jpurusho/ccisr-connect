@@ -1116,35 +1116,48 @@ export default function DashboardPage() {
       const bsDateStr = bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"
       const bsTimeStr = bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : null
 
-      // Compute location break status — try DB first (event_breaks table), fall back to JSON
-      const bsSavedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.bible_study.data as BibleStudyDefaults).locations ?? []
+      // Compute location break status from DB (event_locations + event_breaks are source of truth)
       const bsBreakCheckDate = bsRawDate ? format(bsRawDate, "yyyy-MM-dd") : format(wkSun, "yyyy-MM-dd")
 
-      // Query event_breaks table for this event and date
       let dbBreaks: { location_id: string | null; message: string | null; loc_label: string | null }[] = []
+      let dbEventLocs: { id: string; label: string }[] = []
       if (bsEvent) {
-        const { data: breakRows } = await supabase
-          .from("event_breaks")
-          .select("location_id, message, event_locations(label)")
-          .eq("event_id", bsEvent.id)
-          .lte("start_date", bsBreakCheckDate)
-          .gte("end_date", bsBreakCheckDate)
-          .returns<{ location_id: string | null; message: string | null; event_locations: { label: string } | null }[]>()
-        if (breakRows && breakRows.length > 0) {
-          dbBreaks = breakRows.map((r) => ({
+        const [breakRes, locsRes] = await Promise.all([
+          supabase
+            .from("event_breaks")
+            .select("location_id, message, event_locations(label)")
+            .eq("event_id", bsEvent.id)
+            .lte("start_date", bsBreakCheckDate)
+            .gte("end_date", bsBreakCheckDate)
+            .returns<{ location_id: string | null; message: string | null; event_locations: { label: string } | null }[]>(),
+          supabase
+            .from("event_locations")
+            .select("id, label")
+            .eq("event_id", bsEvent.id)
+            .order("sort_order")
+            .returns<{ id: string; label: string }[]>(),
+        ])
+        if (breakRes.data && breakRes.data.length > 0) {
+          dbBreaks = breakRes.data.map((r) => ({
             location_id: r.location_id,
             message: r.message,
             loc_label: r.event_locations?.label ?? null,
           }))
         }
+        dbEventLocs = locsRes.data ?? []
       }
 
       const hasDbBreaks = dbBreaks.length > 0
       const hasWholeEventBreak = dbBreaks.some((b) => b.location_id === null)
 
-      const bsLocBreakStatus = bsSavedLocs.map((loc) => {
+      // Use event_locations from DB as source of truth for break status
+      const bsSavedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.bible_study.data as BibleStudyDefaults).locations ?? []
+      const bsLocSource = dbEventLocs.length > 0
+        ? dbEventLocs.map((el) => ({ label: el.label, ...(bsSavedLocs.find((s) => s.label.toLowerCase() === el.label.toLowerCase()) ?? {}) }))
+        : bsSavedLocs
+
+      const bsLocBreakStatus = bsLocSource.map((loc) => {
         if (bsCancelled) return { label: loc.label, onVacation: true }
-        // Check DB breaks first
         if (hasWholeEventBreak) return { label: loc.label, onVacation: true }
         if (hasDbBreaks) {
           const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
@@ -1157,8 +1170,15 @@ export default function DashboardPage() {
       if (hasBsDraft) {
         const fd = composedMap["bible_study"].form_data as Record<string, unknown>
         const draftLocs = (fd.locations as BibleStudyFormData["locations"]) ?? bsDef.locations ?? []
-        // Apply break detection to draft locations — DB first, then JSON fallback
-        const mergedDraftLocs = draftLocs.map((loc) => {
+        // Use DB event_locations as source of truth, merge with draft data where labels match
+        const locsToUse = dbEventLocs.length > 0
+          ? dbEventLocs.map((el) => {
+              const existing = draftLocs.find((d) => d.label.toLowerCase() === el.label.toLowerCase())
+              return existing ?? { label: el.label, hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" }
+            })
+          : draftLocs
+        // Apply break detection to locations
+        const mergedDraftLocs = locsToUse.map((loc) => {
           if (bsCancelled) return { ...loc, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
           if (hasWholeEventBreak) {
             const msg = dbBreaks.find((b) => b.location_id === null)?.message
