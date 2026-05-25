@@ -124,10 +124,10 @@ export function extractCommonFields(def: CommonCardFields): {
 export type TemplateDefaults =
   | { type: "birthday"; data: BirthdayDefaults }
   | { type: "anniversary"; data: AnniversaryDefaults }
-  | { type: "friday_bible_study"; data: BibleStudyDefaults }
-  | { type: "wednesday_womens_study"; data: WomensStudyDefaults }
+  | { type: "bible_study"; data: BibleStudyDefaults }
+  | { type: "womens_study"; data: WomensStudyDefaults }
   | { type: "bulletin"; data: BulletinDefaults }
-  | { type: "monthly_prayer"; data: PrayerMeetingDefaults }
+  | { type: "prayer_meeting"; data: PrayerMeetingDefaults }
 
 export function parseBodyTemplate(eventTypeName: string, bodyJson: string): TemplateDefaults | null {
   try {
@@ -137,14 +137,14 @@ export function parseBodyTemplate(eventTypeName: string, bodyJson: string): Temp
         return { type: "birthday", data: data as BirthdayDefaults }
       case "anniversary":
         return { type: "anniversary", data: data as AnniversaryDefaults }
-      case "friday_bible_study":
-        return { type: "friday_bible_study", data: data as BibleStudyDefaults }
-      case "wednesday_womens_study":
-        return { type: "wednesday_womens_study", data: data as WomensStudyDefaults }
+      case "bible_study":
+        return { type: "bible_study", data: data as BibleStudyDefaults }
+      case "womens_study":
+        return { type: "womens_study", data: data as WomensStudyDefaults }
       case "bulletin":
         return { type: "bulletin", data: data as BulletinDefaults }
-      case "monthly_prayer":
-        return { type: "monthly_prayer", data: data as PrayerMeetingDefaults }
+      case "prayer_meeting":
+        return { type: "prayer_meeting", data: data as PrayerMeetingDefaults }
       default:
         return null
     }
@@ -157,8 +157,8 @@ export function parseBodyTemplate(eventTypeName: string, bodyJson: string): Temp
 export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
   birthday: { type: "birthday", data: {} },
   anniversary: { type: "anniversary", data: {} },
-  friday_bible_study: {
-    type: "friday_bible_study",
+  bible_study: {
+    type: "bible_study",
     data: {
       title: "Bible Study This Friday",
       topic: "Studying the Book of Acts",
@@ -169,8 +169,8 @@ export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
       ],
     },
   },
-  wednesday_womens_study: {
-    type: "wednesday_womens_study",
+  womens_study: {
+    type: "womens_study",
     data: {
       title: "Women's Bible Study",
       topic: "Building a Relationship with God",
@@ -188,9 +188,9 @@ export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
 export const SUBJECT_FALLBACKS: Record<string, string> = {
   birthday: "Happy Birthday! — Week of {{weekLabel}}",
   anniversary: "Happy Anniversary! — Week of {{weekLabel}}",
-  friday_bible_study: "Bible Study This Friday — {{date}}",
-  wednesday_womens_study: "Women's Bible Study This Wednesday",
-  monthly_prayer: "Monthly Prayer Meeting — {{date}}",
+  bible_study: "Bible Study This Friday — {{date}}",
+  womens_study: "Women's Bible Study This Wednesday",
+  prayer_meeting: "Monthly Prayer Meeting — {{date}}",
   bulletin: "Weekly Bulletin — {{weekLabel}}",
 }
 
@@ -211,19 +211,19 @@ export const TEMPLATE_PLACEHOLDERS: Record<string, PlaceholderDef[]> = {
     { token: "{{couples}}", description: "Couple names", example: "John & Mary" },
     { token: "{{count}}", description: "Number of anniversaries", example: "1" },
   ],
-  friday_bible_study: [
+  bible_study: [
     { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
     { token: "{{date}}", description: "Event date", example: "Friday, May 2nd" },
     { token: "{{time}}", description: "Start time", example: "7:30 PM" },
     { token: "{{topic}}", description: "Study topic", example: "Book of Acts" },
   ],
-  wednesday_womens_study: [
+  womens_study: [
     { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
     { token: "{{date}}", description: "Event date", example: "Wednesday, Apr 29th" },
     { token: "{{time}}", description: "Start time", example: "7:00 PM" },
     { token: "{{topic}}", description: "Study topic", example: "Building a Relationship with God" },
   ],
-  monthly_prayer: [
+  prayer_meeting: [
     { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
     { token: "{{date}}", description: "Event date", example: "Saturday, May 3rd" },
     { token: "{{time}}", description: "Start time", example: "6:00 PM" },

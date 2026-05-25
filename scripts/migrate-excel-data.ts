@@ -298,8 +298,8 @@ async function migrateHostingSchedule() {
   console.log("--- Migrating Hosting Schedule ---");
   if (!fs.existsSync(HOSTING_FILE)) return;
 
-  const { data: eventType } = await supabase.from("event_types").select("id").eq("name", "friday_bible_study").single();
-  if (!eventType) { log.warnings.push("Event type friday_bible_study not found"); return; }
+  const { data: eventType } = await supabase.from("event_types").select("id").eq("comm_type", "bible_study").single();
+  if (!eventType) { log.warnings.push("Event type with comm_type bible_study not found"); return; }
 
   const { data: event } = await supabase.from("events").insert({
     event_type_id: eventType.id, title: "San Ramon Friday Bible Study",

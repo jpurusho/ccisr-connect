@@ -77,7 +77,6 @@ import { type SmartSectionContext, buildSmartSectionsHtml } from "@/lib/email/sm
 import { type VisualConfig, isSmartSection } from "@/lib/email/visual-config-types"
 import {
   type CommType,
-  COMM_TYPE_TO_ET,
   DISPATCH_MATCHERS,
   buildCommTypeMappings,
   formatRelativeTime,
@@ -353,7 +352,14 @@ export default function DashboardPage() {
   const [weekLabel, setWeekLabel] = useState("")
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
   const [savedTemplateData, setSavedTemplateData] = useState<Record<string, Record<string, unknown>>>({})
-  const [commTypeEtNames, setCommTypeEtNames] = useState<Record<CommType, string>>(COMM_TYPE_TO_ET)
+  const [commTypeEtNames, setCommTypeEtNames] = useState<Record<CommType, string>>({
+    birthday: "birthday",
+    anniversary: "anniversary",
+    bible_study: "bible_study",
+    womens_study: "womens_study",
+    prayer_meeting: "prayer_meeting",
+    bulletin: "bulletin",
+  })
   const [templateStyles, setTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
   // ---- Template visibility (extracted hook) ----
   const { visibleTemplates, toggleTemplate, isCustomVisible, toggleCustomTemplate } = useCardVisibility()
@@ -852,27 +858,15 @@ export default function DashboardPage() {
       const etSignupLinks: Record<string, { formId: string; fieldMap: SignupFieldMap }> = {}
       const etBulletinTemplates: Record<string, string> = {}
 
-      // Build DB-driven comm_type mappings (replaces hardcoded COMM_TYPE_TO_ET)
+      // Build DB-driven comm_type mappings
       const { commTypeToEtName, etIdToCommType } = buildCommTypeMappings(eventTypesRes.data ?? [])
       setCommTypeEtNames(commTypeToEtName)
 
       if (eventTypesRes.data) {
         for (const et of eventTypesRes.data) {
           etIdToName[et.id] = et.name
-          // Resolve internal tab name via comm_type → COMM_TYPE_TO_ET, with name-pattern fallback
-          let tabName: string
-          if (et.comm_type) {
-            tabName = COMM_TYPE_TO_ET[et.comm_type as CommType] ?? et.name
-          } else {
-            const n = et.name.toLowerCase()
-            if (n.includes("bible study") && !n.includes("women")) tabName = "friday_bible_study"
-            else if (n.includes("women") && n.includes("study")) tabName = "wednesday_womens_study"
-            else if (n.includes("prayer")) tabName = "monthly_prayer"
-            else if (n.includes("birthday")) tabName = "birthday"
-            else if (n.includes("anniversary")) tabName = "anniversary"
-            else if (n.includes("bulletin")) tabName = "bulletin"
-            else tabName = et.name
-          }
+          // Resolve internal tab name via comm_type directly
+          const tabName = (et.comm_type as string) ?? et.name
           etIdToTabName[et.id] = tabName
           if (et.linked_signup_form_id && et.signup_field_map) {
             etSignupLinks[tabName] = { formId: et.linked_signup_form_id, fieldMap: et.signup_field_map }
@@ -945,9 +939,9 @@ export default function DashboardPage() {
       const resolve = (ciKey: string, etKey: string, fallbackKey?: string): CommonCardFields & Record<string, unknown> =>
         (composedMap[ciKey]?.form_data ?? savedDefaults[etKey]?.data ?? (fallbackKey ? FALLBACK_DEFAULTS[fallbackKey].data : {})) as CommonCardFields & Record<string, unknown>
 
-      const bsDef = resolve("bible_study", "friday_bible_study", "friday_bible_study") as BibleStudyDefaults
-      const wsDef = resolve("womens_study", "wednesday_womens_study", "wednesday_womens_study") as WomensStudyDefaults
-      const pmDef = resolve("prayer_meeting", "monthly_prayer") as PrayerMeetingDefaults
+      const bsDef = resolve("bible_study", "bible_study", "bible_study") as BibleStudyDefaults
+      const wsDef = resolve("womens_study", "womens_study", "womens_study") as WomensStudyDefaults
+      const pmDef = resolve("prayer_meeting", "prayer_meeting") as PrayerMeetingDefaults
       const bdDef = resolve("birthday", "birthday") as CommonCardFields
       const anDef = resolve("anniversary", "anniversary") as CommonCardFields
       const bulDef = resolve("bulletin", "bulletin", "bulletin") as BulletinDefaults
@@ -1096,8 +1090,7 @@ export default function DashboardPage() {
       {
         const counts: Partial<Record<CommType, number>> = {}
         for (const ct of Object.keys(commTypeToEtName)) {
-          const tabName = COMM_TYPE_TO_ET[ct as CommType]
-          counts[ct as CommType] = tabName ? findEventsByType(tabName).length : 0
+          counts[ct as CommType] = findEventsByType(ct).length
         }
         setEventCounts(counts)
       }
@@ -1107,7 +1100,7 @@ export default function DashboardPage() {
 
       // ---- Process Bible Study (recurrence-based) ----
       const hasBsDraft = !!composedMap["bible_study"]
-      const bsEvent = findEventByType("friday_bible_study")
+      const bsEvent = findEventByType("bible_study")
       const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, wkSun, wkSat) : []
       const bsRawDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
       const bsInstance = bsRawDate && bsEvent ? findInstance(bsEvent.id, format(bsRawDate, "yyyy-MM-dd")) : null
@@ -1125,7 +1118,7 @@ export default function DashboardPage() {
       const bsTimeStr = bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : null
 
       // Compute location break status — try DB first (event_breaks table), fall back to JSON
-      const bsSavedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults).locations ?? []
+      const bsSavedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.bible_study.data as BibleStudyDefaults).locations ?? []
       const bsBreakCheckDate = bsRawDate ? format(bsRawDate, "yyyy-MM-dd") : format(wkSun, "yyyy-MM-dd")
 
       // Query event_breaks table for this event and date
@@ -1190,7 +1183,7 @@ export default function DashboardPage() {
         let bsHostData = { hostName: "TBD", address: "TBD", city: "", phone: "" }
 
         // Try signup auto-fill first (most specific — user signed up for this month)
-        const bsSignup = etSignupLinks["friday_bible_study"]
+        const bsSignup = etSignupLinks["bible_study"]
         let bsAutoFill: AutoFillResult | null = null
         if (bsSignup && bsDate) {
           bsAutoFill = await resolveSignupAutoFill(bsSignup.formId, bsSignup.fieldMap, bsDate)
@@ -1293,7 +1286,7 @@ export default function DashboardPage() {
 
       // ---- Women's Study (recurrence-based) ----
       const hasWsDraft = !!composedMap["womens_study"]
-      const wsEvent = findEventByType("wednesday_womens_study")
+      const wsEvent = findEventByType("womens_study")
       const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, wkSun, wkSat) : []
       const wsRawDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
       const wsInstance = wsRawDate && wsEvent ? findInstance(wsEvent.id, format(wsRawDate, "yyyy-MM-dd")) : null
@@ -1332,7 +1325,7 @@ export default function DashboardPage() {
 
       // ---- Prayer Meeting (recurrence-based) ----
       const hasPmDraft = !!composedMap["prayer_meeting"]
-      const pmEvent = findEventByType("monthly_prayer")
+      const pmEvent = findEventByType("prayer_meeting")
       const pmOccurrences = pmEvent ? getOccurrences(pmEvent.recurrence_rule, wkSun, wkSat) : []
       const pmRawDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
       const pmInstance = pmRawDate && pmEvent ? findInstance(pmEvent.id, format(pmRawDate, "yyyy-MM-dd")) : null
@@ -1360,7 +1353,7 @@ export default function DashboardPage() {
         let pmHostData = { hostName: pmDef.hostNames ?? "TBD", address: pmDef.address ?? "TBD", city: pmDef.city ?? "", phone: pmDef.phone ?? "" }
 
         // Try signup auto-fill first
-        const pmSignup = etSignupLinks["monthly_prayer"]
+        const pmSignup = etSignupLinks["prayer_meeting"]
         if (pmSignup && pmDate) {
           const pmAutoFill = await resolveSignupAutoFill(pmSignup.formId, pmSignup.fieldMap, pmDate)
           if (pmAutoFill.source === "signup") {
@@ -1955,7 +1948,7 @@ export default function DashboardPage() {
         phone: loc.phone || undefined,
       })),
       ...interpCommon(bibleStudyForm, vars),
-    }, buildStyleContext(templateStyles.friday_bible_study))
+    }, buildStyleContext(templateStyles.bible_study))
   }, [bibleStudyForm, weekLabel, templateStyles])
 
   const womensStudyPreview = useMemo(() => {
@@ -1970,7 +1963,7 @@ export default function DashboardPage() {
       zoomPasscode: womensStudyForm.zoomPasscode || undefined,
       location: womensStudyForm.location || undefined,
       ...interpCommon(womensStudyForm, vars),
-    }, buildStyleContext(templateStyles.wednesday_womens_study))
+    }, buildStyleContext(templateStyles.womens_study))
   }, [womensStudyForm, weekLabel, templateStyles])
 
   const prayerMeetingPreview = useMemo(() => {
@@ -1984,7 +1977,7 @@ export default function DashboardPage() {
       dinnerNote: prayerMeetingForm.dinnerNote || undefined,
       signupLink: prayerMeetingForm.signupLink || undefined,
       ...interpCommon(prayerMeetingForm, {}),
-    }, buildStyleContext(templateStyles.monthly_prayer))
+    }, buildStyleContext(templateStyles.prayer_meeting))
   }, [prayerMeetingForm, templateStyles])
 
   const bulletinPreview = useMemo(() => {

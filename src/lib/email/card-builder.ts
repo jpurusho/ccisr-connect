@@ -181,7 +181,7 @@ export const EVENT_COLORS: Record<string, CardColors> = {
     border: "#FDE68A",
     bgLight: "#FFFBEB",
   },
-  friday_bible_study: {
+  bible_study: {
     primary: "#0D9488",
     primaryLight: "#CCFBF1",
     accent: "#14B8A6",
@@ -190,7 +190,7 @@ export const EVENT_COLORS: Record<string, CardColors> = {
     border: "#99F6E4",
     bgLight: "#F0FDFA",
   },
-  wednesday_womens_study: {
+  womens_study: {
     primary: "#DB2777",
     primaryLight: "#FCE7F3",
     accent: "#F472B6",
@@ -199,7 +199,7 @@ export const EVENT_COLORS: Record<string, CardColors> = {
     border: "#FBCFE8",
     bgLight: "#FDF2F8",
   },
-  monthly_prayer: {
+  prayer_meeting: {
     primary: "#059669",
     primaryLight: "#D1FAE5",
     accent: "#34D399",
@@ -570,7 +570,7 @@ export interface BibleStudyCardData extends BaseCardData {
 }
 
 export function buildBibleStudyCard(data: BibleStudyCardData, style?: StyleContext): string {
-  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.friday_bible_study;
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.bible_study;
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const detailRow = (label: string, value: string) =>
@@ -658,7 +658,7 @@ export interface WomensStudyCardData extends BaseCardData {
 }
 
 export function buildWomensStudyCard(data: WomensStudyCardData, style?: StyleContext): string {
-  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.wednesday_womens_study;
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.womens_study;
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const detailRow = (label: string, value: string) =>
@@ -719,7 +719,7 @@ export interface PrayerMeetingCardData extends BaseCardData {
 }
 
 export function buildPrayerMeetingCard(data: PrayerMeetingCardData, style?: StyleContext): string {
-  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.monthly_prayer;
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.prayer_meeting;
   const sz = style?.sizes ?? SIZE_SCALES.default;
   const message =
     data.message ||
@@ -810,7 +810,7 @@ export function buildBulletinCard(data: BulletinCardData, style?: StyleContext):
       sectionLabel("🤝", "Helpers This Month", colors.primary) +
       dataListHtml(data.helpers.map((h) => ({ primary: h.role, secondary: h.name })), colors, style),
     events: () => data.events.length === 0 ? "" :
-      sectionLabel("📅", "This Week", EVENT_COLORS.friday_bible_study.primary) +
+      sectionLabel("📅", "This Week", EVENT_COLORS.bible_study.primary) +
       dataListHtml(data.events.map((e) => ({ primary: e.title, secondary: e.details })), colors, style),
     upcoming: () => !data.upcomingEvents || data.upcomingEvents.length === 0 ? "" :
       sectionLabel("🔜", "Upcoming", colors.textLight) +

@@ -68,7 +68,7 @@ import type { VisualConfig } from "@/lib/email/visual-config-types"
 import { VerseLookup } from "@/components/shared/verse-lookup"
 import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-builder"
 import { formatPhone } from "@/lib/utils"
-import { COMM_TYPE_TO_ET, type CommType } from "@/lib/dashboard-types"
+import { type CommType } from "@/lib/dashboard-types"
 import {
   Sheet,
   SheetClose,
@@ -90,9 +90,9 @@ interface SavedTemplate {
 const EVENT_TYPE_TABS = [
   { name: "birthday", label: "Birthday", icon: Cake, color: "#7C3AED" },
   { name: "anniversary", label: "Anniversary", icon: Heart, color: "#D97706" },
-  { name: "friday_bible_study", label: "Bible Study", icon: BookOpen, color: "#0D9488" },
-  { name: "wednesday_womens_study", label: "Women's Study", icon: Users, color: "#DB2777" },
-  { name: "monthly_prayer", label: "Prayer Meeting", icon: HandHelping, color: "#059669" },
+  { name: "bible_study", label: "Bible Study", icon: BookOpen, color: "#0D9488" },
+  { name: "womens_study", label: "Women's Study", icon: Users, color: "#DB2777" },
+  { name: "prayer_meeting", label: "Prayer Meeting", icon: HandHelping, color: "#059669" },
   { name: "bulletin", label: "Bulletin", icon: Newspaper, color: "#4F46E5" },
 ]
 
@@ -227,10 +227,10 @@ export default function TemplatesPage() {
   const [birthdayData, setBirthdayData] = useState<BirthdayDefaults>({})
   const [anniversaryData, setAnniversaryData] = useState<AnniversaryDefaults>({})
   const [bibleStudyData, setBibleStudyData] = useState<BibleStudyDefaults>(
-    FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults
+    FALLBACK_DEFAULTS.bible_study.data as BibleStudyDefaults
   )
   const [womensStudyData, setWomensStudyData] = useState<WomensStudyDefaults>(
-    FALLBACK_DEFAULTS.wednesday_womens_study.data as WomensStudyDefaults
+    FALLBACK_DEFAULTS.womens_study.data as WomensStudyDefaults
   )
   const [prayerMeetingData, setPrayerMeetingData] = useState<PrayerMeetingDefaults>({})
   const [bulletinData, setBulletinData] = useState<BulletinDefaults>(
@@ -259,24 +259,12 @@ export default function TemplatesPage() {
 
     if (customRes.data) setCustomTemplates(customRes.data.map((ct) => ({ ...ct, style_settings: ct.style_settings ?? undefined })))
 
-    // Build event type maps — keyed by internal tab name (via comm_type → COMM_TYPE_TO_ET)
+    // Build event type maps — keyed by comm_type directly
     const idToTabName: Record<string, string> = {}
     const tabNameToId: Record<string, string> = {}
     if (etRes.data) {
       for (const et of etRes.data) {
-        let tabName: string
-        if (et.comm_type) {
-          tabName = COMM_TYPE_TO_ET[et.comm_type as CommType] ?? et.name
-        } else {
-          const n = et.name.toLowerCase()
-          if (n.includes("bible study") && !n.includes("women")) tabName = "friday_bible_study"
-          else if (n.includes("women") && n.includes("study")) tabName = "wednesday_womens_study"
-          else if (n.includes("prayer")) tabName = "monthly_prayer"
-          else if (n.includes("birthday")) tabName = "birthday"
-          else if (n.includes("anniversary")) tabName = "anniversary"
-          else if (n.includes("bulletin")) tabName = "bulletin"
-          else tabName = et.name
-        }
+        const tabName = (et.comm_type as string) ?? et.name
         idToTabName[et.id] = tabName
         tabNameToId[tabName] = et.id
       }
@@ -286,8 +274,8 @@ export default function TemplatesPage() {
     // Reset to defaults first, then overlay saved data
     setBirthdayData({})
     setAnniversaryData({})
-    setBibleStudyData(FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults)
-    setWomensStudyData(FALLBACK_DEFAULTS.wednesday_womens_study.data as WomensStudyDefaults)
+    setBibleStudyData(FALLBACK_DEFAULTS.bible_study.data as BibleStudyDefaults)
+    setWomensStudyData(FALLBACK_DEFAULTS.womens_study.data as WomensStudyDefaults)
     setPrayerMeetingData({})
     setBulletinData(FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults)
 
@@ -321,13 +309,13 @@ export default function TemplatesPage() {
             case "anniversary":
               setAnniversaryData(parsed.data)
               break
-            case "friday_bible_study":
-              setBibleStudyData({ ...(FALLBACK_DEFAULTS.friday_bible_study.data as BibleStudyDefaults), ...parsed.data })
+            case "bible_study":
+              setBibleStudyData({ ...(FALLBACK_DEFAULTS.bible_study.data as BibleStudyDefaults), ...parsed.data })
               break
-            case "wednesday_womens_study":
-              setWomensStudyData({ ...(FALLBACK_DEFAULTS.wednesday_womens_study.data as WomensStudyDefaults), ...parsed.data })
+            case "womens_study":
+              setWomensStudyData({ ...(FALLBACK_DEFAULTS.womens_study.data as WomensStudyDefaults), ...parsed.data })
               break
-            case "monthly_prayer":
+            case "prayer_meeting":
               setPrayerMeetingData(parsed.data as PrayerMeetingDefaults)
               break
             case "bulletin":
@@ -360,20 +348,21 @@ export default function TemplatesPage() {
     switch (typeName) {
       case "birthday": return birthdayData
       case "anniversary": return anniversaryData
-      case "friday_bible_study": return bibleStudyData
-      case "wednesday_womens_study": return womensStudyData
-      case "monthly_prayer": return prayerMeetingData
+      case "bible_study": return bibleStudyData
+      case "womens_study": return womensStudyData
+      case "prayer_meeting": return prayerMeetingData
       case "bulletin": return bulletinData
       default: return {}
     }
   }
 
+  // CommType is now the single routing key — identity mapping
   const ET_NAME_TO_COMM_TYPE: Record<string, string> = {
     birthday: "birthday",
     anniversary: "anniversary",
-    friday_bible_study: "bible_study",
-    wednesday_womens_study: "womens_study",
-    monthly_prayer: "prayer_meeting",
+    bible_study: "bible_study",
+    womens_study: "womens_study",
+    prayer_meeting: "prayer_meeting",
     bulletin: "bulletin",
   }
 
@@ -655,7 +644,7 @@ export default function TemplatesPage() {
           headerSubtitle: interp(anniversaryData.headerSubtitle, vars) || undefined,
         }, sc)
       }
-      case "friday_bible_study": {
+      case "bible_study": {
         const vars = makeEventVars(sampleWeek, "Friday, May 1st", bibleStudyData.time || "7:30 PM", bibleStudyData.topic || "Book of Acts")
         return buildBibleStudyCard({
           date: "Friday, May 1st",
@@ -674,7 +663,7 @@ export default function TemplatesPage() {
           footerVerse: interp(bibleStudyData.footerVerse, vars) || undefined,
         }, sc)
       }
-      case "wednesday_womens_study": {
+      case "womens_study": {
         const vars = makeEventVars(sampleWeek, "Wednesday, Apr 29th", womensStudyData.time || "7:00 PM", womensStudyData.topic || "Building a Relationship with God")
         return buildWomensStudyCard({
           date: "Wednesday, April 29th",
@@ -690,7 +679,7 @@ export default function TemplatesPage() {
           footerVerse: interp(womensStudyData.footerVerse, vars) || undefined,
         }, sc)
       }
-      case "monthly_prayer": {
+      case "prayer_meeting": {
         return buildPrayerMeetingCard({
           hostNames: prayerMeetingData.hostNames || "Sample Family",
           address: prayerMeetingData.address || "123 Main St",
@@ -1045,9 +1034,9 @@ export default function TemplatesPage() {
                     value={
                       tab.name === "birthday" ? birthdayData.primaryColor
                       : tab.name === "anniversary" ? anniversaryData.primaryColor
-                      : tab.name === "friday_bible_study" ? bibleStudyData.primaryColor
-                      : tab.name === "wednesday_womens_study" ? womensStudyData.primaryColor
-                      : tab.name === "monthly_prayer" ? prayerMeetingData.primaryColor
+                      : tab.name === "bible_study" ? bibleStudyData.primaryColor
+                      : tab.name === "womens_study" ? womensStudyData.primaryColor
+                      : tab.name === "prayer_meeting" ? prayerMeetingData.primaryColor
                       : tab.name === "bulletin" ? bulletinData.primaryColor
                       : undefined
                     }
@@ -1056,9 +1045,9 @@ export default function TemplatesPage() {
                       switch (tab.name) {
                         case "birthday": setBirthdayData((p) => ({ ...p, primaryColor: color })); break
                         case "anniversary": setAnniversaryData((p) => ({ ...p, primaryColor: color })); break
-                        case "friday_bible_study": setBibleStudyData((p) => ({ ...p, primaryColor: color })); break
-                        case "wednesday_womens_study": setWomensStudyData((p) => ({ ...p, primaryColor: color })); break
-                        case "monthly_prayer": setPrayerMeetingData((p) => ({ ...p, primaryColor: color })); break
+                        case "bible_study": setBibleStudyData((p) => ({ ...p, primaryColor: color })); break
+                        case "womens_study": setWomensStudyData((p) => ({ ...p, primaryColor: color })); break
+                        case "prayer_meeting": setPrayerMeetingData((p) => ({ ...p, primaryColor: color })); break
                         case "bulletin": setBulletinData((p) => ({ ...p, primaryColor: color })); break
                       }
                     }}
@@ -1142,7 +1131,7 @@ export default function TemplatesPage() {
                   )}
 
                   {/* Bible Study fields */}
-                  {tab.name === "friday_bible_study" && (
+                  {tab.name === "bible_study" && (
                     <>
                       <Field label="Card Title" htmlFor="bs-title">
                         <Input
@@ -1295,7 +1284,7 @@ export default function TemplatesPage() {
                   )}
 
                   {/* Women's Study fields */}
-                  {tab.name === "wednesday_womens_study" && (
+                  {tab.name === "womens_study" && (
                     <>
                       <Field label="Card Title" htmlFor="ws-title">
                         <Input
@@ -1392,7 +1381,7 @@ export default function TemplatesPage() {
                   )}
 
                   {/* Prayer Meeting fields */}
-                  {tab.name === "monthly_prayer" && (
+                  {tab.name === "prayer_meeting" && (
                     <>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Field label="Default Date" htmlFor="pm-date" hint="e.g., First Saturday of each month">

@@ -64,9 +64,9 @@ interface EventDetailDialogProps {
 const ET_TO_COMM: Record<string, string> = {
   birthday: "birthday",
   anniversary: "anniversary",
-  friday_bible_study: "bible_study",
-  wednesday_womens_study: "womens_study",
-  monthly_prayer: "prayer_meeting",
+  bible_study: "bible_study",
+  womens_study: "womens_study",
+  prayer_meeting: "prayer_meeting",
   bulletin: "bulletin",
 }
 

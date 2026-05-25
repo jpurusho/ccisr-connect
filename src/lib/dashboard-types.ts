@@ -8,16 +8,6 @@ export type CommType =
   | "prayer_meeting"
   | "bulletin"
 
-// Legacy fallback — used only when event_types.comm_type hasn't been populated yet
-export const COMM_TYPE_TO_ET: Record<CommType, string> = {
-  birthday: "birthday",
-  anniversary: "anniversary",
-  bible_study: "friday_bible_study",
-  womens_study: "wednesday_womens_study",
-  prayer_meeting: "monthly_prayer",
-  bulletin: "bulletin",
-}
-
 export function buildCommTypeMappings(eventTypes: { id: string; name: string; comm_type: string | null }[]): {
   commTypeToEtId: Record<CommType, string>
   commTypeToEtName: Record<CommType, string>
@@ -33,20 +23,6 @@ export function buildCommTypeMappings(eventTypes: { id: string; name: string; co
       commTypeToEtId[ct] = et.id
       commTypeToEtName[ct] = et.name
       etIdToCommType[et.id] = ct
-    }
-  }
-
-  // Fill gaps from legacy name mapping for backwards compat
-  const validCommTypes: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
-  for (const ct of validCommTypes) {
-    if (!commTypeToEtId[ct]) {
-      const legacyName = COMM_TYPE_TO_ET[ct]
-      const et = eventTypes.find((e) => e.name === legacyName)
-      if (et) {
-        commTypeToEtId[ct] = et.id
-        commTypeToEtName[ct] = et.name
-        etIdToCommType[et.id] = ct
-      }
     }
   }
 
