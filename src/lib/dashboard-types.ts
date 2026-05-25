@@ -8,6 +8,17 @@ export type CommType =
   | "prayer_meeting"
   | "bulletin"
 
+export function inferCommType(name: string): CommType | null {
+  const n = name.toLowerCase()
+  if (n.includes("bible study") && !n.includes("women")) return "bible_study"
+  if (n.includes("women") && n.includes("study")) return "womens_study"
+  if (n.includes("prayer")) return "prayer_meeting"
+  if (n.includes("birthday")) return "birthday"
+  if (n.includes("anniversary")) return "anniversary"
+  if (n.includes("bulletin")) return "bulletin"
+  return null
+}
+
 export function buildCommTypeMappings(eventTypes: { id: string; name: string; comm_type: string | null }[]): {
   commTypeToEtId: Record<CommType, string>
   commTypeToEtName: Record<CommType, string>
@@ -18,8 +29,8 @@ export function buildCommTypeMappings(eventTypes: { id: string; name: string; co
   const etIdToCommType: Record<string, CommType> = {}
 
   for (const et of eventTypes) {
-    if (et.comm_type) {
-      const ct = et.comm_type as CommType
+    const ct = (et.comm_type as CommType) ?? inferCommType(et.name)
+    if (ct) {
       commTypeToEtId[ct] = et.id
       commTypeToEtName[ct] = et.name
       etIdToCommType[et.id] = ct
