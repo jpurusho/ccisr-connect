@@ -264,7 +264,19 @@ export default function TemplatesPage() {
     const tabNameToId: Record<string, string> = {}
     if (etRes.data) {
       for (const et of etRes.data) {
-        const tabName = et.comm_type ? (COMM_TYPE_TO_ET[et.comm_type as CommType] ?? et.name) : et.name
+        let tabName: string
+        if (et.comm_type) {
+          tabName = COMM_TYPE_TO_ET[et.comm_type as CommType] ?? et.name
+        } else {
+          const n = et.name.toLowerCase()
+          if (n.includes("bible study") && !n.includes("women")) tabName = "friday_bible_study"
+          else if (n.includes("women") && n.includes("study")) tabName = "wednesday_womens_study"
+          else if (n.includes("prayer")) tabName = "monthly_prayer"
+          else if (n.includes("birthday")) tabName = "birthday"
+          else if (n.includes("anniversary")) tabName = "anniversary"
+          else if (n.includes("bulletin")) tabName = "bulletin"
+          else tabName = et.name
+        }
         idToTabName[et.id] = tabName
         tabNameToId[tabName] = et.id
       }

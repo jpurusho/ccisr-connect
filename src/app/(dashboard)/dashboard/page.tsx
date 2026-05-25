@@ -859,8 +859,20 @@ export default function DashboardPage() {
       if (eventTypesRes.data) {
         for (const et of eventTypesRes.data) {
           etIdToName[et.id] = et.name
-          // Resolve internal tab name via comm_type → COMM_TYPE_TO_ET
-          const tabName = et.comm_type ? (COMM_TYPE_TO_ET[et.comm_type as CommType] ?? et.name) : et.name
+          // Resolve internal tab name via comm_type → COMM_TYPE_TO_ET, with name-pattern fallback
+          let tabName: string
+          if (et.comm_type) {
+            tabName = COMM_TYPE_TO_ET[et.comm_type as CommType] ?? et.name
+          } else {
+            const n = et.name.toLowerCase()
+            if (n.includes("bible study") && !n.includes("women")) tabName = "friday_bible_study"
+            else if (n.includes("women") && n.includes("study")) tabName = "wednesday_womens_study"
+            else if (n.includes("prayer")) tabName = "monthly_prayer"
+            else if (n.includes("birthday")) tabName = "birthday"
+            else if (n.includes("anniversary")) tabName = "anniversary"
+            else if (n.includes("bulletin")) tabName = "bulletin"
+            else tabName = et.name
+          }
           etIdToTabName[et.id] = tabName
           if (et.linked_signup_form_id && et.signup_field_map) {
             etSignupLinks[tabName] = { formId: et.linked_signup_form_id, fieldMap: et.signup_field_map }
