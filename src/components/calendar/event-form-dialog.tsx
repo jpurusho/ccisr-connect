@@ -16,14 +16,15 @@ import {
   dayCodeFromDate,
 } from "@/lib/recurrence"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet"
+import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -343,23 +344,23 @@ export function EventFormDialog({
     : startDate && endDate ? `${startDate} to ${endDate}` : startDate ? `Single day: ${startDate}` : "Set a date"
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetHeader>
           <div className="flex items-center gap-2">
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
               <CalendarDays className="size-4 text-primary" />
             </div>
             <div>
-              <DialogTitle>{mode === "create" ? "Create Event" : "Edit Event"}</DialogTitle>
+              <SheetTitle>{mode === "create" ? "Create Event" : "Edit Event"}</SheetTitle>
               {mode === "create" && initialDate && (
-                <DialogDescription>
+                <SheetDescription>
                   {format(initialDate, "EEEE, MMMM d, yyyy")}
-                </DialogDescription>
+                </SheetDescription>
               )}
             </div>
           </div>
-        </DialogHeader>
+        </SheetHeader>
 
         {!loaded ? (
           <div className="flex items-center justify-center py-8">
@@ -617,19 +618,19 @@ export function EventFormDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <SheetFooter>
           {mode === "edit" && (
             <Button variant="destructive" onClick={handleDelete} disabled={saving} className="sm:mr-auto">
               Delete Event
             </Button>
           )}
-          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+          <SheetClose render={<Button variant="outline" />}>Cancel</SheetClose>
           <Button onClick={handleSave} disabled={saving || !title.trim() || !eventTypeId}>
             {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
             {mode === "create" ? "Create" : "Save Changes"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

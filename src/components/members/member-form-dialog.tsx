@@ -6,13 +6,14 @@ import { logAudit } from "@/lib/audit"
 import type { Member, Family, FamilyRole, FamilyInsert, MemberInsert, Tag } from "@/types/database"
 import { formatPhone } from "@/lib/utils"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet"
+import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -465,18 +466,18 @@ export function MemberFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Member" : "Add Member"}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{isEditing ? "Edit Member" : "Add Member"}</SheetTitle>
+          <SheetDescription>
             {isEditing
               ? "Update member information below."
               : "Fill in the details to add a new member."}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4" data-1p-ignore autoComplete="off">
+        <form onSubmit={handleSubmit} className="flex-1 space-y-5 px-4 pb-4" data-1p-ignore autoComplete="off">
           {/* Name fields */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -579,7 +580,10 @@ export function MemberFormDialog({
             </Select>
           </div>
 
+          <Separator />
+
           {/* Contact */}
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contact</h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="cellPhone">Cell phone</Label>
@@ -610,9 +614,11 @@ export function MemberFormDialog({
             </div>
           </div>
 
+          <Separator />
+
           {/* Address (family-level) */}
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Address</h3>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Family Address</Label>
             <Input
               value={street}
               onChange={(e) => { setStreet(e.target.value); setAddressDirty(true) }}
@@ -662,9 +668,11 @@ export function MemberFormDialog({
             />
           </div>
 
+          <Separator />
+
           {/* Birthday */}
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Birthday</h3>
           <div className="space-y-1.5">
-            <Label>Birthday</Label>
             <div className="grid grid-cols-3 gap-3">
               <Select
                 value={birthMonth || undefined}
@@ -709,7 +717,10 @@ export function MemberFormDialog({
             </div>
           </div>
 
+          <Separator />
+
           {/* Switches */}
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label htmlFor="isActive">Active</Label>
@@ -768,7 +779,8 @@ export function MemberFormDialog({
             />
           </div>
 
-          <DialogFooter>
+          <Separator className="my-2" />
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"
@@ -781,9 +793,9 @@ export function MemberFormDialog({
               {saving && <Loader2 className="animate-spin" />}
               {isEditing ? "Save Changes" : "Add Member"}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }

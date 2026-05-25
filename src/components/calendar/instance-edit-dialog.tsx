@@ -6,14 +6,14 @@ import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import { formatTime } from "@/lib/recurrence"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -319,19 +319,19 @@ export function InstanceEditDialog({
   })()
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetHeader>
           <div className="flex items-center gap-2">
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
               <CalendarDays className="size-4 text-primary" />
             </div>
             <div>
-              <DialogTitle>Edit Occurrence</DialogTitle>
-              <DialogDescription>{eventTitle} — {dateLabel}</DialogDescription>
+              <SheetTitle>Edit Occurrence</SheetTitle>
+              <SheetDescription>{eventTitle} — {dateLabel}</SheetDescription>
             </div>
           </div>
-        </DialogHeader>
+        </SheetHeader>
 
         {loading ? (
           <div className="flex items-center justify-center py-8">
@@ -468,7 +468,7 @@ export function InstanceEditDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <SheetFooter>
           <Button
             variant="destructive"
             size="sm"
@@ -479,13 +479,13 @@ export function InstanceEditDialog({
             <XCircle className="size-3.5" />
             Cancel Occurrence
           </Button>
-          <DialogClose render={<Button variant="outline" size="sm" />}>Close</DialogClose>
+          <SheetClose render={<Button variant="outline" size="sm" />}>Close</SheetClose>
           <Button size="sm" onClick={handleSave} disabled={saving || loading}>
             {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
             Save
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }
