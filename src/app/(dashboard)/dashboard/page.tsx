@@ -1451,10 +1451,27 @@ export default function DashboardPage() {
                 continue
               }
             }
-            bulletinAutoEvents.push({
-              title: evt.title,
-              details: buildBulletinDetails(evt, occ, inst),
-            })
+            // No breaks — check if event has multiple locations to show per-location entries
+            const { data: evtLocs } = await supabase.from("event_locations").select("id, label").eq("event_id", evt.id).order("sort_order").returns<{ id: string; label: string }[]>()
+            if (evtLocs && evtLocs.length > 1) {
+              const details = buildBulletinDetails(evt, occ, inst)
+              const cleanTitle = evtLocs.reduce(
+                (t, l) => t.replace(new RegExp(l.label, "gi"), "").replace(/\s{2,}/g, " ").trim(),
+                evt.title
+              )
+              for (const loc of evtLocs) {
+                const titleHasLoc = evt.title.toLowerCase().includes(loc.label.toLowerCase())
+                bulletinAutoEvents.push({
+                  title: titleHasLoc ? evt.title : `${loc.label} ${cleanTitle}`,
+                  details,
+                })
+              }
+            } else {
+              bulletinAutoEvents.push({
+                title: evt.title,
+                details: buildBulletinDetails(evt, occ, inst),
+              })
+            }
           }
         } else {
           // One-time / date-range events — check if they overlap this week
