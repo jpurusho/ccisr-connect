@@ -15,12 +15,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet"
+import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -438,137 +439,157 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
       })}
     </div>
 
-    <Dialog open={!!editFamily} onOpenChange={(open) => { if (!open) { setEditFamily(null); setEditForm(null) } }}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Edit Family — {editFamily?.family_name}</DialogTitle>
-        </DialogHeader>
+    <Sheet open={!!editFamily} onOpenChange={(open) => { if (!open) { setEditFamily(null); setEditForm(null) } }}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Edit Family</SheetTitle>
+          <p className="text-sm text-muted-foreground">{editFamily?.family_name}</p>
+        </SheetHeader>
         {editForm && (
-          <div className="space-y-6 py-2">
+          <div className="flex-1 space-y-6 px-4 pb-4">
             {/* Family details */}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Family</h3>
               <div className="space-y-1.5">
-                <Label htmlFor="ef-name">Family Name</Label>
+                <Label htmlFor="ef-name">Last Name</Label>
                 <Input id="ef-name" value={editForm.familyName} onChange={(e) => setEditForm({ ...editForm, familyName: e.target.value })} />
                 {editForm.familyName.trim() !== editFamily!.family_name && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">Last name will update for all members</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">Updates last name for all members</p>
                 )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ef-phone">Home Phone</Label>
                 <Input id="ef-phone" value={editForm.homePhone} onChange={(e) => setEditForm({ ...editForm, homePhone: e.target.value })} placeholder="Home phone" />
               </div>
-            </div>
+            </section>
+
+            <Separator />
 
             {/* Address */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Address</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="ef-street">Street</Label>
-                  <Input id="ef-street" value={editForm.street} onChange={(e) => setEditForm({ ...editForm, street: e.target.value })} placeholder="123 Main St" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ef-city">City</Label>
-                  <Input id="ef-city" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} placeholder="City" />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ef-state">State</Label>
-                    <Input id="ef-state" value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} placeholder="CA" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ef-zip">ZIP</Label>
-                    <Input id="ef-zip" value={editForm.zip} onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })} placeholder="94000" />
-                  </div>
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Address</h3>
+              <div className="space-y-2">
+                <Input value={editForm.street} onChange={(e) => setEditForm({ ...editForm, street: e.target.value })} placeholder="Street" />
+                <div className="grid grid-cols-3 gap-2">
+                  <Input value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} placeholder="City" className="col-span-1" />
+                  <Input value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} placeholder="State" />
+                  <Input value={editForm.zip} onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })} placeholder="ZIP" />
                 </div>
               </div>
-            </div>
+            </section>
+
+            <Separator />
 
             {/* Members */}
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Members ({editForm.members.length})</p>
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Members ({editForm.members.length})
+              </h3>
               {editForm.members.map((mf, idx) => (
-                <div key={mf.id} className="rounded-lg border p-3 space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="space-y-1.5">
-                      <Label>First Name</Label>
-                      <Input value={mf.firstName} onChange={(e) => {
+                <div key={mf.id} className="space-y-2 rounded-xl bg-muted/40 p-3">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={mf.firstName}
+                      onChange={(e) => {
                         const updated = [...editForm.members]
                         updated[idx] = { ...updated[idx], firstName: e.target.value }
                         setEditForm({ ...editForm, members: updated })
-                      }} />
+                      }}
+                      placeholder="First name"
+                      className="flex-1 font-medium"
+                    />
+                    <Select value={mf.role} onValueChange={(v: string | null) => {
+                      if (!v) return
+                      const updated = [...editForm.members]
+                      updated[idx] = { ...updated[idx], role: v }
+                      setEditForm({ ...editForm, members: updated })
+                    }}>
+                      <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="husband">Husband</SelectItem>
+                        <SelectItem value="wife">Wife</SelectItem>
+                        <SelectItem value="child">Child</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <Phone className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={mf.cellPhone}
+                        onChange={(e) => {
+                          const updated = [...editForm.members]
+                          updated[idx] = { ...updated[idx], cellPhone: e.target.value }
+                          setEditForm({ ...editForm, members: updated })
+                        }}
+                        placeholder="Phone"
+                        className="pl-8"
+                      />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Role</Label>
-                      <Select value={mf.role} onValueChange={(v: string | null) => {
-                        if (!v) return
-                        const updated = [...editForm.members]
-                        updated[idx] = { ...updated[idx], role: v }
-                        setEditForm({ ...editForm, members: updated })
-                      }}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="husband">Husband</SelectItem>
-                          <SelectItem value="wife">Wife</SelectItem>
-                          <SelectItem value="child">Child</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Phone</Label>
-                      <Input value={mf.cellPhone} onChange={(e) => {
-                        const updated = [...editForm.members]
-                        updated[idx] = { ...updated[idx], cellPhone: e.target.value }
-                        setEditForm({ ...editForm, members: updated })
-                      }} placeholder="Cell phone" />
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={mf.email}
+                        onChange={(e) => {
+                          const updated = [...editForm.members]
+                          updated[idx] = { ...updated[idx], email: e.target.value }
+                          setEditForm({ ...editForm, members: updated })
+                        }}
+                        placeholder="Email"
+                        className="pl-8"
+                      />
                     </div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label>Email</Label>
-                      <Input value={mf.email} onChange={(e) => {
-                        const updated = [...editForm.members]
-                        updated[idx] = { ...updated[idx], email: e.target.value }
-                        setEditForm({ ...editForm, members: updated })
-                      }} placeholder="Email" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Birthday</Label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <Input value={mf.birthMonth} onChange={(e) => {
+                  <div className="flex items-center gap-2">
+                    <Cake className="size-3.5 shrink-0 text-purple-500" />
+                    <div className="grid flex-1 grid-cols-3 gap-1.5">
+                      <Input
+                        value={mf.birthMonth}
+                        onChange={(e) => {
                           const updated = [...editForm.members]
                           updated[idx] = { ...updated[idx], birthMonth: e.target.value }
                           setEditForm({ ...editForm, members: updated })
-                        }} placeholder="MM" className="text-center" />
-                        <Input value={mf.birthDay} onChange={(e) => {
+                        }}
+                        placeholder="MM"
+                        className="text-center text-sm"
+                      />
+                      <Input
+                        value={mf.birthDay}
+                        onChange={(e) => {
                           const updated = [...editForm.members]
                           updated[idx] = { ...updated[idx], birthDay: e.target.value }
                           setEditForm({ ...editForm, members: updated })
-                        }} placeholder="DD" className="text-center" />
-                        <Input value={mf.birthYear} onChange={(e) => {
+                        }}
+                        placeholder="DD"
+                        className="text-center text-sm"
+                      />
+                      <Input
+                        value={mf.birthYear}
+                        onChange={(e) => {
                           const updated = [...editForm.members]
                           updated[idx] = { ...updated[idx], birthYear: e.target.value }
                           setEditForm({ ...editForm, members: updated })
-                        }} placeholder="YYYY" className="text-center" />
-                      </div>
+                        }}
+                        placeholder="YYYY"
+                        className="text-center text-sm"
+                      />
                     </div>
                   </div>
                 </div>
               ))}
-            </div>
+            </section>
           </div>
         )}
-        <DialogFooter>
+        <SheetFooter>
           <Button variant="outline" onClick={() => { setEditFamily(null); setEditForm(null) }} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={handleSaveFamily} disabled={saving || !editForm?.familyName.trim()}>
             {saving ? <><Loader2 className="size-4 animate-spin" /> Saving...</> : "Save All"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
     </>
   )
 }
