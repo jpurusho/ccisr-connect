@@ -427,75 +427,8 @@ export default function TemplatesPage() {
 
     const formData = getDataForType(typeName) as Record<string, unknown>
 
-    // ---- Sync locations to event_locations table ----
-    const formLocations = formData.locations as { label: string; hostNames?: string; address?: string; city?: string; phone?: string; breaks?: { from: string; to: string; message: string }[] }[] | undefined
-
-    // Get current DB locations
-    const { data: dbLocations } = await supabase
-      .from("event_locations")
-      .select("id, label, sort_order")
-      .eq("event_id", eventId)
-      .order("sort_order")
-      .returns<{ id: string; label: string; sort_order: number }[]>()
-
-    const existingLocs = dbLocations ?? []
-
-    if (formLocations && formLocations.length > 0) {
-      // Sync: upsert form locations into DB
-      for (let i = 0; i < formLocations.length; i++) {
-        const formLoc = formLocations[i]
-        const existing = existingLocs.find((l) => l.label.toLowerCase() === formLoc.label.toLowerCase())
-
-        if (existing) {
-          await supabase.from("event_locations").update({
-            label: formLoc.label,
-            sort_order: i,
-            address: formLoc.address || null,
-            city: formLoc.city || null,
-            phone: formLoc.phone || null,
-          } as never).eq("id", existing.id)
-        } else {
-          await supabase.from("event_locations").insert({
-            event_id: eventId,
-            label: formLoc.label,
-            sort_order: i,
-            address: formLoc.address || null,
-            city: formLoc.city || null,
-            phone: formLoc.phone || null,
-          } as never)
-        }
-      }
-
-      // Deactivate locations no longer in form
-      const formLabels = new Set(formLocations.map((l) => l.label.toLowerCase()))
-      for (const dbLoc of existingLocs) {
-        if (!formLabels.has(dbLoc.label.toLowerCase())) {
-          await supabase.from("event_locations").update({ is_active: false } as never).eq("id", dbLoc.id)
-        }
-      }
-    } else if (!formLocations && existingLocs.length === 0) {
-      // Single-location events without explicit locations array: ensure one "Primary" row
-      const singleLoc = formData.location as string | undefined
-      await supabase.from("event_locations").insert({
-        event_id: eventId,
-        label: singleLoc || "Primary",
-        sort_order: 0,
-        address: (formData.address as string) || null,
-        city: (formData.city as string) || null,
-        phone: (formData.phone as string) || null,
-      } as never)
-    }
-
     // ---- Sync breaks to event_breaks table ----
-    // Re-fetch locations after potential inserts
-    const { data: updatedLocs } = await supabase
-      .from("event_locations")
-      .select("id, label")
-      .eq("event_id", eventId)
-      .eq("is_active", true)
-      .order("sort_order")
-      .returns<{ id: string; label: string }[]>()
-
+    const formLocations = formData.locations as { label: string; breaks?: { from: string; to: string; message: string }[] }[] | undefined
     const breaksToWrite: { location_id: string | null; start_date: string; end_date: string; message: string | null }[] = []
 
     // Template-level breaks (CommonCardFields.breaks)
@@ -508,14 +441,13 @@ export default function TemplatesPage() {
       }
     }
 
-    // Location-level breaks (for multi-location events)
-    if (formLocations && updatedLocs) {
+    // Location-level breaks from form (stored without location_id since single-location)
+    if (formLocations) {
       for (const formLoc of formLocations) {
-        const dbLoc = updatedLocs.find((l) => l.label.toLowerCase() === formLoc.label.toLowerCase())
-        if (!dbLoc || !formLoc.breaks) continue
+        if (!formLoc.breaks) continue
         for (const brk of formLoc.breaks) {
           if (brk.from && brk.to) {
-            breaksToWrite.push({ location_id: dbLoc.id, start_date: brk.from, end_date: brk.to, message: brk.message || null })
+            breaksToWrite.push({ location_id: null, start_date: brk.from, end_date: brk.to, message: brk.message || null })
           }
         }
       }

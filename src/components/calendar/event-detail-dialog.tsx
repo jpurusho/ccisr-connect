@@ -184,20 +184,13 @@ interface BreakRecord {
   location_id: string | null
 }
 
-interface EventLocation {
-  id: string
-  label: string
-}
-
 function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakChanged?: () => void }) {
   const [breaks, setBreaks] = useState<BreakRecord[]>([])
-  const [locations, setLocations] = useState<EventLocation[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [message, setMessage] = useState("")
-  const [locationId, setLocationId] = useState<string>("all")
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -207,22 +200,13 @@ function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakCha
   async function loadBreaks() {
     setLoading(true)
     const supabase = createClient()
-    const [breaksRes, locsRes] = await Promise.all([
-      supabase
-        .from("event_breaks")
-        .select("id, start_date, end_date, message, location_id, event_locations(label)")
-        .eq("event_id", eventId)
-        .order("start_date", { ascending: true })
-        .returns<(BreakRecord & { event_locations: { label: string } | null })[]>(),
-      supabase
-        .from("event_locations")
-        .select("id, label")
-        .eq("event_id", eventId)
-        .order("sort_order")
-        .returns<EventLocation[]>(),
-    ])
-    setBreaks((breaksRes.data ?? []).map((b) => ({ ...b, loc_label: b.event_locations?.label ?? null })) as (BreakRecord & { loc_label?: string | null })[])
-    setLocations(locsRes.data ?? [])
+    const { data } = await supabase
+      .from("event_breaks")
+      .select("id, start_date, end_date, message, location_id")
+      .eq("event_id", eventId)
+      .order("start_date", { ascending: true })
+      .returns<BreakRecord[]>()
+    setBreaks(data ?? [])
     setLoading(false)
   }
 
@@ -236,7 +220,7 @@ function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakCha
       start_date: startDate,
       end_date: endDate,
       message: message.trim() || null,
-      location_id: locationId === "all" ? null : locationId,
+      location_id: null,
     } as never)
     if (error) {
       toast.error(`Failed: ${error.message}`)
@@ -246,7 +230,6 @@ function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakCha
       setStartDate("")
       setEndDate("")
       setMessage("")
-      setLocationId("all")
       loadBreaks()
       onBreakChanged?.()
     }
@@ -296,14 +279,6 @@ function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakCha
                 <span className="font-medium">
                   {format(new Date(brk.start_date + "T00:00:00"), "MMM d")} – {format(new Date(brk.end_date + "T00:00:00"), "MMM d, yyyy")}
                 </span>
-                {brk.location_id && (
-                  <span className="ml-1.5 text-xs rounded bg-amber-200/60 px-1.5 py-0.5 dark:bg-amber-800/40">
-                    {(brk as BreakRecord & { loc_label?: string | null }).loc_label ?? "Location"}
-                  </span>
-                )}
-                {!brk.location_id && locations.length > 0 && (
-                  <span className="ml-1.5 text-xs text-amber-700 dark:text-amber-400">All locations</span>
-                )}
                 {brk.message && <span className="ml-2 text-muted-foreground text-xs">({brk.message})</span>}
               </div>
               <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteBreak(brk.id)} title="Remove break">
@@ -327,24 +302,6 @@ function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakCha
               <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-8 text-sm" />
             </div>
           </div>
-          {locations.length > 0 && (
-            <div className="space-y-1">
-              <Label className="text-xs">Location</Label>
-              <Select value={locationId} onValueChange={(v) => setLocationId(v ?? "all")}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue>
-                    {locationId === "all" ? "All locations" : locations.find((l) => l.id === locationId)?.label ?? "Select..."}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All locations</SelectItem>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id}>{loc.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
           <div className="space-y-1">
             <Label className="text-xs">Message (optional)</Label>
             <Input

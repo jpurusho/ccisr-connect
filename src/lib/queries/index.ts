@@ -1,9 +1,6 @@
 export { getWeekStatus, summarizeWeekStatus } from "./week-status"
 export type { WeekEventStatus, WeekEventSummary, EventLocationStatus } from "./week-status"
 
-export { getEventLocations, getLocationsByEventType, createEventLocation, updateEventLocation, deleteEventLocation } from "./event-locations"
-export type { EventLocation, CreateLocationInput } from "./event-locations"
-
 export { getEventBreaks, getBreaksForLocation, getActiveBreaks, createEventBreak, updateEventBreak, deleteEventBreak } from "./event-breaks"
 export type { EventBreak, CreateBreakInput } from "./event-breaks"
 
