@@ -387,8 +387,10 @@ export default function ReportsPage() {
           Object.entries(dMap).map(([key, counts]) => {
             let label = etNames.get(key)
             if (!label && key.startsWith("custom:")) {
-              const tmplId = key.slice(7)
-              label = templateNames.get(tmplId) ?? tmplId
+              label = templateNames.get(key.slice(7))
+            }
+            if (!label) {
+              label = templateNames.get(key)
             }
             return {
               templateType: key,

@@ -2304,14 +2304,14 @@ export default function DashboardPage() {
       }
       snapshotForm(type)
 
-      // Insert into dispatch_queue as "queued" (not sent)
+      // Insert into dispatch_queue as "pending" (for review, not sent)
       const { error } = await supabase
         .from("dispatch_queue")
         .insert({
           subject,
           body_html: html,
           scheduled_at: null,
-          status: "queued",
+          status: "pending",
           template_type: type,
           week_start: dispatchWeekStart,
           mailing_list_id: opts.mailingListId || null,
@@ -2580,7 +2580,7 @@ export default function DashboardPage() {
         subject: subj,
         body_html: html,
         scheduled_at: null,
-        status: "queued",
+        status: "pending",
         template_type: ctKey,
         week_start: weekStart,
         mailing_list_id: opts.mailingListId || null,

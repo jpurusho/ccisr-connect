@@ -130,54 +130,75 @@ export function MemberExportDialog({
     const printWindow = window.open("", "_blank")
     if (!printWindow) return
 
-    const cards = members.map((m) => {
-      const parts: string[] = []
+    const rows = members.map((m) => {
       const memberTags = getMemberTags(m)
+      const cells: string[] = []
 
-      if (fields.family && m.families?.family_name) parts.push(`<div style="font-size:12px;color:#64748b">${m.families.family_name} Family</div>`)
-      if (fields.phone && m.cell_phone) parts.push(`<div style="font-size:13px;margin-top:4px">📱 ${formatPhone(m.cell_phone)}</div>`)
-      if (fields.email && m.email) parts.push(`<div style="font-size:13px;margin-top:2px">✉ ${m.email}</div>`)
-      if (fields.city) {
-        const city = getMemberCity(m)
-        if (city !== "Unknown") parts.push(`<div style="font-size:13px;margin-top:2px;color:#64748b">📍 ${city}</div>`)
-      }
-      if (fields.role) parts.push(`<div style="font-size:12px;margin-top:4px;color:#64748b;text-transform:capitalize">${m.role_in_family}</div>`)
-      if (fields.birthday && m.birth_month && m.birth_day) {
-        parts.push(`<div style="font-size:12px;margin-top:2px;color:#64748b">🎂 ${m.birth_month}/${m.birth_day}${m.birth_year ? `/${m.birth_year}` : ""}</div>`)
-      }
-      if (fields.tags && memberTags.length > 0) {
+      if (fields.name) cells.push(`<td class="name">${m.full_name}</td>`)
+      if (fields.family) cells.push(`<td>${m.families?.family_name ?? ""}</td>`)
+      if (fields.phone) cells.push(`<td class="mono">${m.cell_phone ? formatPhone(m.cell_phone) : ""}</td>`)
+      if (fields.email) cells.push(`<td class="email">${m.email ?? ""}</td>`)
+      if (fields.city) cells.push(`<td>${getMemberCity(m) !== "Unknown" ? getMemberCity(m) : ""}</td>`)
+      if (fields.role) cells.push(`<td class="cap">${m.role_in_family}</td>`)
+      if (fields.birthday) cells.push(`<td>${m.birth_month && m.birth_day ? `${m.birth_month}/${m.birth_day}` : ""}</td>`)
+      if (fields.tags) {
         const tagHtml = memberTags.map((t) =>
-          `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:10px;color:#fff;background:${t.color};margin-right:4px">${t.name}</span>`
+          `<span class="tag" style="background:${t.color}">${t.name}</span>`
         ).join("")
-        parts.push(`<div style="margin-top:6px">${tagHtml}</div>`)
+        cells.push(`<td>${tagHtml}</td>`)
       }
 
-      const accentColor = memberTags.length > 0 ? memberTags[0].color : "#3B82F6"
-      return `<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:10px;padding:14px 14px 14px 18px;background:#fff;border-left:4px solid ${accentColor}">
-        <div style="font-size:15px;font-weight:600;color:#1e293b;margin-bottom:4px">${m.full_name}</div>
-        ${parts.join("")}
-      </div>`
+      return `<tr>${cells.join("")}</tr>`
     }).join("")
 
+    const headers = FIELD_OPTIONS
+      .filter((f) => fields[f.key])
+      .map((f) => `<th>${f.label}</th>`)
+      .join("")
+
     printWindow.document.write(`<!DOCTYPE html><html><head>
-      <title>Members Export — CCISR Connect</title>
+      <title>Members Directory — CCISR Connect</title>
       <style>
-        body { font-family: 'Inter', -apple-system, sans-serif; margin: 0; padding: 20px; color: #1e293b; }
-        .header { text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e2e8f0; }
-        .header h1 { font-size: 22px; margin: 0; }
-        .header p { font-size: 13px; color: #64748b; margin: 4px 0 0; }
-        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-        .footer { text-align: center; margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; }
-        @media print { body { padding: 12px; } .grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif; color: #1a1a1a; padding: 32px; font-size: 13px; line-height: 1.4; }
+        .header { margin-bottom: 24px; }
+        .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+        .header .meta { display: flex; gap: 16px; margin-top: 6px; font-size: 12px; color: #6b7280; }
+        .header .meta span { display: flex; align-items: center; gap: 4px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead { position: sticky; top: 0; }
+        th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; padding: 8px 12px; border-bottom: 2px solid #e5e7eb; background: #f9fafb; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        tr:hover td { background: #f8fafc; }
+        .name { font-weight: 600; white-space: nowrap; }
+        .mono { font-family: 'SF Mono', 'JetBrains Mono', monospace; font-size: 12px; }
+        .email { font-size: 12px; color: #4b5563; }
+        .cap { text-transform: capitalize; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 500; color: #fff; margin-right: 3px; }
+        .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; display: flex; justify-content: space-between; }
+        @media print {
+          body { padding: 16px; }
+          th { background: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          tr:hover td { background: none; }
+        }
       </style>
     </head><body>
       <div class="header">
-        <h1>Christ Church of India, San Ramon</h1>
-        <p>Member Directory — ${members.length} member${members.length !== 1 ? "s" : ""} — ${new Date().toLocaleDateString()}</p>
+        <h1>Member Directory</h1>
+        <div class="meta">
+          <span>${members.length} member${members.length !== 1 ? "s" : ""}</span>
+          <span>${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
+        </div>
       </div>
-      <div class="grid">${cards}</div>
-      <div class="footer">Generated by CCISR Connect</div>
+      <table>
+        <thead><tr>${headers}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="footer">
+        <span>CCISR Connect</span>
+        <span>Christ Church of India, San Ramon</span>
+      </div>
     </body></html>`)
     printWindow.document.close()
     printWindow.focus()
