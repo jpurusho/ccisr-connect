@@ -2255,7 +2255,7 @@ export default function DashboardPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [commOptions, instanceIds, mailingLists]
   )
 
   const executeSend = useCallback(async () => {
@@ -2586,6 +2586,7 @@ export default function DashboardPage() {
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
+      commOptions,
       birthdayPreview,
       anniversaryPreview,
       bibleStudyPreview,
