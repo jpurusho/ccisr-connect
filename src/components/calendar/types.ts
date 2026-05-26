@@ -11,6 +11,7 @@ export type CalendarEvent = {
   time?: string | null
   status?: EventInstanceStatus | null
   eventTypeName?: string | null
+  commType?: string | null
   description?: string | null
   notes?: string | null
   zoomLink?: string | null

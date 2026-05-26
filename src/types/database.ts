@@ -79,6 +79,7 @@ export type WeddingAnniversary = {
 export type EventType = {
   id: string
   name: string
+  comm_type: string | null
   color_scheme: JsonColorScheme | null
   icon: string | null
   default_template_id: string | null

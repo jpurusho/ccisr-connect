@@ -61,14 +61,6 @@ interface EventDetailDialogProps {
   onDateUpdated?: () => void
 }
 
-const ET_TO_COMM: Record<string, string> = {
-  birthday: "birthday",
-  anniversary: "anniversary",
-  bible_study: "bible_study",
-  womens_study: "womens_study",
-  prayer_meeting: "prayer_meeting",
-  bulletin: "bulletin",
-}
 
 const statusColors: Record<string, string> = {
   confirmed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
@@ -553,11 +545,11 @@ export function EventDetailDialog({
                   Cancel This Week
                 </Button>
               )}
-              {event.status !== "cancelled" && event.eventTypeName && ET_TO_COMM[event.eventTypeName] && (
+              {event.status !== "cancelled" && event.commType && (
                 <Button
                   variant="outline"
                   size="sm"
-                  render={<Link href={`/dashboard?card=${ET_TO_COMM[event.eventTypeName]}`} />}
+                  render={<Link href={`/dashboard?card=${event.commType}`} />}
                 >
                   <Mail className="size-3.5" />
                   Compose
