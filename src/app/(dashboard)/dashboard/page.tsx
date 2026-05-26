@@ -47,6 +47,7 @@ import {
   X,
   CalendarDays,
 } from "lucide-react"
+import { getIconComponent } from "@/components/ui/icon-picker"
 import { createClient } from "@/lib/supabase/client"
 import {
   buildBirthdayCard,
@@ -362,6 +363,7 @@ export default function DashboardPage() {
     prayer_meeting: "prayer_meeting",
     bulletin: "bulletin",
   })
+  const [commTypeIcons, setCommTypeIcons] = useState<Partial<Record<CommType, string>>>({})
   const [templateStyles, setTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
   // ---- Template visibility (extracted hook) ----
   const { visibleTemplates, toggleTemplate, isCustomVisible, toggleCustomTemplate } = useCardVisibility()
@@ -496,6 +498,7 @@ export default function DashboardPage() {
     subject_template: string
     color: string
     emoji: string
+    iconName: string | null
     defaults: Record<string, unknown>
     eventInfo?: {
       eventTypeName: string
@@ -840,11 +843,11 @@ export default function DashboardPage() {
           .eq("is_default", true)
           .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
 
-        // Event type id-to-name map (+ template link, color, signup link, bulletin detail template, comm_type)
+        // Event type id-to-name map (+ template link, color, icon, signup link, bulletin detail template, comm_type)
         supabase
           .from("event_types")
-          .select("id, name, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template, comm_type")
-          .returns<{ id: string; name: string; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null; comm_type: string | null }[]>(),
+          .select("id, name, icon, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template, comm_type")
+          .returns<{ id: string; name: string; icon: string | null; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null; comm_type: string | null }[]>(),
 
         // Composed instances: match current week, bulletin week, or recurring
         supabase
@@ -878,6 +881,14 @@ export default function DashboardPage() {
       // Build DB-driven comm_type mappings
       const { commTypeToEtName, etIdToCommType } = buildCommTypeMappings(eventTypesRes.data ?? [])
       setCommTypeEtNames(commTypeToEtName)
+
+      // Build icon overrides from DB
+      const iconOverrides: Partial<Record<CommType, string>> = {}
+      for (const et of (eventTypesRes.data ?? [])) {
+        const ct = etIdToCommType[et.id]
+        if (ct && et.icon) iconOverrides[ct as CommType] = et.icon
+      }
+      setCommTypeIcons(iconOverrides)
 
       if (eventTypesRes.data) {
         for (const et of eventTypesRes.data) {
@@ -1589,6 +1600,7 @@ export default function DashboardPage() {
           subject_template: ct.subject_template,
           color: (parsed.primaryColor as string) || "#6B7280",
           emoji: (parsed.emoji as string) || "📋",
+          iconName: null,
           defaults: parsed,
         })
         if (ct.style_settings) loadedCustomStyles[ct.id] = ct.style_settings as TemplateStyleSettings
@@ -1651,6 +1663,7 @@ export default function DashboardPage() {
         const linkedEvents = activeEvents.filter((e) => e.event_type_id === linkedEt.id)
         const linkedColor = linkedEt.color_scheme?.primary
         if (linkedColor) ct.color = linkedColor
+        if (linkedEt.icon) ct.iconName = linkedEt.icon
 
         for (const evt of linkedEvents) {
           if (!evt.recurrence_rule) continue
@@ -3147,7 +3160,8 @@ export default function DashboardPage() {
             return <>
           {/* ── Mini-card grid ── */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleCards.map(({ type, label, color, icon: TIcon }) => {
+            {visibleCards.map(({ type, label, color, icon: DefaultIcon }) => {
+              const TIcon = commTypeIcons[type] ? getIconComponent(commTypeIcons[type]) : DefaultIcon
               const status = getStatus(type)
               const count = dispatchCounts[type]
               const hasData = hasContent[type]
@@ -3416,7 +3430,7 @@ export default function DashboardPage() {
                 key={type}
                 title={cardTitles[type]}
                 accentColor={tmpl.color}
-                icon={tmpl.icon}
+                icon={commTypeIcons[type] ? getIconComponent(commTypeIcons[type]) : tmpl.icon}
                 status={getStatus(type)}
                 summaryLines={summaries}
                 subject={getSubject(type)}
@@ -3464,7 +3478,7 @@ export default function DashboardPage() {
               key={`custom:${ct.id}`}
               title={ct.name}
               accentColor={ct.color}
-              icon={Send}
+              icon={ct.iconName ? getIconComponent(ct.iconName) : Send}
               status={di.status as CommunicationStatus}
               summaryLines={[form.title || "Custom announcement"]}
               subject={subj}
