@@ -2310,7 +2310,7 @@ export default function DashboardPage() {
         .insert({
           subject,
           body_html: html,
-          scheduled_at: null,
+          scheduled_at: new Date().toISOString(),
           status: "pending",
           template_type: type,
           week_start: dispatchWeekStart,
@@ -2579,7 +2579,7 @@ export default function DashboardPage() {
       const { error } = await supabase.from("dispatch_queue").insert({
         subject: subj,
         body_html: html,
-        scheduled_at: null,
+        scheduled_at: new Date().toISOString(),
         status: "pending",
         template_type: ctKey,
         week_start: weekStart,
