@@ -83,8 +83,8 @@ export interface WeeklyCommunicationCardProps {
   scheduledAt?: Date | null
   previewHtml?: string | null
   resourceLinks?: ResourceLink[]
-  onSchedule: () => void
   onSendNow: () => void
+  onQueue?: () => void
   onTestSend?: () => void
   onSave?: () => void
   onDelete?: () => void
@@ -136,8 +136,8 @@ export function WeeklyCommunicationCard({
   onSubjectChange,
   scheduledAt,
   previewHtml,
-  onSchedule,
   onSendNow,
+  onQueue,
   onTestSend,
   onSave,
   onDelete,
@@ -358,6 +358,18 @@ export function WeeklyCommunicationCard({
 
           {status === "draft" && (
             <>
+              {onQueue && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onQueue}
+                  disabled={!canDispatch}
+                  title={dispatchTitle || "Queue for review before sending"}
+                >
+                  <Clock className="size-3.5" data-icon="inline-start" />
+                  Queue
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={onSendNow}
@@ -367,17 +379,7 @@ export function WeeklyCommunicationCard({
                 title={dispatchTitle}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
-                Send
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onSchedule}
-                disabled={!canDispatch}
-                title={dispatchTitle}
-              >
-                <Clock className="size-3.5" data-icon="inline-start" />
-                Schedule
+                Send Now
               </Button>
               {onTestSend && (
                 <Button
@@ -389,7 +391,7 @@ export function WeeklyCommunicationCard({
                   className="text-xs text-muted-foreground"
                 >
                   <Mail className="size-3.5" data-icon="inline-start" />
-                  Send Test
+                  Test
                 </Button>
               )}
             </>
@@ -547,6 +549,21 @@ export function WeeklyCommunicationCard({
             />
           </div>
           <SheetFooter>
+            {status === "draft" && onQueue && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPreviewing(false)
+                  onQueue()
+                }}
+                disabled={!canDispatch}
+                title={dispatchTitle || "Queue for review"}
+              >
+                <Clock className="size-3.5" data-icon="inline-start" />
+                Queue
+              </Button>
+            )}
             {status === "draft" && (
               <Button
                 size="sm"
@@ -560,7 +577,7 @@ export function WeeklyCommunicationCard({
                 title={dispatchTitle}
               >
                 <Send className="size-3.5" data-icon="inline-start" />
-                Send
+                Send Now
               </Button>
             )}
             <SheetClose render={<Button variant="outline" size="sm" />}>

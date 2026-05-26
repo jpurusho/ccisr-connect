@@ -2258,6 +2258,82 @@ export default function DashboardPage() {
     [commOptions, instanceIds, mailingLists]
   )
 
+  async function handleQueue(type: CommType) {
+    const html = getLivePreview(type)
+    const subject = getSubject(type)
+    if (!html) { toast.error("No content to queue. Please add data first."); return }
+
+    const opts = commOptions[type]
+    if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
+      toast.error("Please select a mailing list or add recipient emails before queuing.")
+      return
+    }
+    if (!opts.smtpConfigId) {
+      toast.error("Please select a Send From account before queuing.")
+      return
+    }
+
+    setSendingType(type)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const dispatchWeekStart = getWeekStartForSave(type)
+
+      // Auto-save draft
+      const templateName = BUILTIN_LABEL[type] || type
+      const draftPayload = {
+        template_type: type,
+        name: templateName,
+        subject,
+        form_data: getFormData(type),
+        mailing_list_id: opts.mailingListId || null,
+        smtp_config_id: opts.smtpConfigId || null,
+        additional_recipients: opts.additionalRecipients.trim() || null,
+        is_active: true,
+        week_start: dispatchWeekStart,
+        is_recurring: false,
+        recur_until: null,
+        created_by: user?.id ?? null,
+      }
+      const existingDraftId = instanceIds[type]
+      if (existingDraftId) {
+        await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingDraftId)
+      } else {
+        const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
+        if (newDraft) setInstanceIds((prev) => ({ ...prev, [type]: newDraft.id }))
+      }
+      snapshotForm(type)
+
+      // Insert into dispatch_queue as "queued" (not sent)
+      const { error } = await supabase
+        .from("dispatch_queue")
+        .insert({
+          subject,
+          body_html: html,
+          scheduled_at: null,
+          status: "queued",
+          template_type: type,
+          week_start: dispatchWeekStart,
+          mailing_list_id: opts.mailingListId || null,
+          smtp_config_id: opts.smtpConfigId || null,
+          additional_recipients: opts.additionalRecipients.trim() || null,
+          created_by: user?.id ?? null,
+        } as never)
+
+      if (error) {
+        toast.error(`Failed to queue: ${error.message}`)
+      } else {
+        toast.success(`"${subject}" queued for review. Approve it in Dispatch.`)
+        setDispatchCounts((prev) => ({ ...prev, [type]: prev[type] + 1 }))
+        await logAudit("dispatch_queued", "dispatch_queue", null, { subject, commType: type })
+      }
+    } catch {
+      toast.error("An unexpected error occurred")
+    } finally {
+      setSendingType(null)
+    }
+  }
+
   const executeSend = useCallback(async () => {
     if (!sendConfirm.type) return
     const type = sendConfirm.type
@@ -2454,6 +2530,67 @@ export default function DashboardPage() {
       } else {
         toast.error("Send failed. Check Settings → Dispatch Queue.")
       }
+    } finally { setSendingType(null) }
+  }
+
+  async function handleCustomQueue(ctId: string) {
+    const ct = customDashTemplates.find((t) => t.id === ctId)
+    if (!ct) return
+    const form = customForms[ctId]
+    if (!form) return
+    const vc = (ct.defaults.visualConfig as VisualConfig) ?? null
+    const html = buildCustomDashPreview(form, customTemplateStyles[ctId], vc, smartContext)
+    if (!html) { toast.error("No content"); return }
+    const opts = commOptions[ctId]
+    if (!opts?.smtpConfigId) { toast.error("Please select a Send From account first."); return }
+    if (!opts?.mailingListId && !opts?.additionalRecipients?.trim()) { toast.error("Please select a mailing list or add recipients."); return }
+
+    const ctKey = `custom:${ctId}`
+    const subj = subjectOverrides[ctId] || ct.subject_template || ct.name
+    setSendingType("bulletin")
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
+
+      const draftPayload = {
+        template_type: ctKey,
+        name: ct.name,
+        subject: subj,
+        form_data: form as unknown as Record<string, unknown>,
+        mailing_list_id: opts.mailingListId || null,
+        smtp_config_id: opts.smtpConfigId || null,
+        additional_recipients: opts.additionalRecipients?.trim() || null,
+        is_active: true,
+        week_start: weekStart,
+        is_recurring: false,
+        recur_until: null,
+        created_by: user?.id ?? null,
+      }
+      const existingId = customInstanceIds[ctId]
+      if (existingId) {
+        await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingId)
+      } else {
+        const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
+        if (newDraft) setCustomInstanceIds((prev) => ({ ...prev, [ctId]: newDraft.id }))
+      }
+      setCustomSnapshots((prev) => ({ ...prev, [ctId]: structuredClone(form as unknown as Record<string, unknown>) }))
+
+      const { error } = await supabase.from("dispatch_queue").insert({
+        subject: subj,
+        body_html: html,
+        scheduled_at: null,
+        status: "queued",
+        template_type: ctKey,
+        week_start: weekStart,
+        mailing_list_id: opts.mailingListId || null,
+        smtp_config_id: opts.smtpConfigId || null,
+        additional_recipients: opts.additionalRecipients?.trim() || null,
+        created_by: user?.id ?? null,
+      } as never)
+      if (error) { toast.error(`Failed to queue: ${error.message}`); return }
+      toast.success(`"${subj}" queued for review. Approve it in Dispatch.`)
+      setCustomDispatches((prev) => ({ ...prev, [ctId]: { status: "scheduled", count: (prev[ctId]?.count ?? 0) + 1, lastSentAt: null } }))
     } finally { setSendingType(null) }
   }
 
@@ -3287,7 +3424,7 @@ export default function DashboardPage() {
                 scheduledAt={getScheduledAt(type)}
                 previewHtml={getPreview(type)}
                 resourceLinks={links[type]}
-                onSchedule={() => handleSchedule(type)}
+                onQueue={() => handleQueue(type)}
                 onSendNow={() => handleSendNow(type)}
                 onTestSend={() => handleTestSend(type)}
                 onSave={() => handleSaveInstance(type)}
@@ -3343,7 +3480,7 @@ export default function DashboardPage() {
               additionalRecipients={commOptions[ct.id]?.additionalRecipients}
               onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, [ct.id]: { ...prev[ct.id], additionalRecipients: v } }))}
               sendCount={di.count}
-              onSchedule={() => {}}
+              onQueue={() => handleCustomQueue(ct.id)}
               onSendNow={() => handleCustomSendNow(ct.id)}
               onSave={() => handleCustomSave(ct.id)}
               onDelete={() => handleCustomDelete(ct.id)}
@@ -3391,7 +3528,6 @@ export default function DashboardPage() {
               status="draft"
               summaryLines={summaryLines}
               previewHtml={previewHtml}
-              onSchedule={() => {}}
               onSendNow={() => {}}
             />
           )
