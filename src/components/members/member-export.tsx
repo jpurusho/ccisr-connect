@@ -130,75 +130,91 @@ export function MemberExportDialog({
     const printWindow = window.open("", "_blank")
     if (!printWindow) return
 
-    const rows = members.map((m) => {
+    const cards = members.map((m) => {
       const memberTags = getMemberTags(m)
-      const cells: string[] = []
+      const accentColor = memberTags.length > 0 ? memberTags[0].color : "#3B82F6"
+      const details: string[] = []
 
-      if (fields.name) cells.push(`<td class="name">${m.full_name}</td>`)
-      if (fields.family) cells.push(`<td>${m.families?.family_name ?? ""}</td>`)
-      if (fields.phone) cells.push(`<td class="mono">${m.cell_phone ? formatPhone(m.cell_phone) : ""}</td>`)
-      if (fields.email) cells.push(`<td class="email">${m.email ?? ""}</td>`)
-      if (fields.city) cells.push(`<td>${getMemberCity(m) !== "Unknown" ? getMemberCity(m) : ""}</td>`)
-      if (fields.role) cells.push(`<td class="cap">${m.role_in_family}</td>`)
-      if (fields.birthday) cells.push(`<td>${m.birth_month && m.birth_day ? `${m.birth_month}/${m.birth_day}` : ""}</td>`)
-      if (fields.tags) {
-        const tagHtml = memberTags.map((t) =>
-          `<span class="tag" style="background:${t.color}">${t.name}</span>`
-        ).join("")
-        cells.push(`<td>${tagHtml}</td>`)
+      if (fields.phone && m.cell_phone) {
+        details.push(`<div class="detail"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><span>${formatPhone(m.cell_phone)}</span></div>`)
+      }
+      if (fields.email && m.email) {
+        details.push(`<div class="detail"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg><span>${m.email}</span></div>`)
+      }
+      if (fields.city) {
+        const city = getMemberCity(m)
+        if (city !== "Unknown") {
+          details.push(`<div class="detail"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>${city}</span></div>`)
+        }
+      }
+      if (fields.birthday && m.birth_month && m.birth_day) {
+        details.push(`<div class="detail birthday"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/><path d="M7 4h.01"/><path d="M12 4h.01"/><path d="M17 4h.01"/></svg><span>${m.birth_month}/${m.birth_day}${m.birth_year ? `/${m.birth_year}` : ""}</span></div>`)
+      }
+      if (fields.role) {
+        details.push(`<div class="role-badge">${m.role_in_family}</div>`)
       }
 
-      return `<tr>${cells.join("")}</tr>`
+      let tagsHtml = ""
+      if (fields.tags && memberTags.length > 0) {
+        tagsHtml = `<div class="tags">${memberTags.map((t) => `<span class="tag" style="background:${t.color}">${t.name}</span>`).join("")}</div>`
+      }
+
+      return `<div class="card" style="border-left-color:${accentColor}">
+        <div class="card-header">
+          <div class="name-block">
+            <div class="member-name">${m.full_name}</div>
+            ${fields.family && m.families?.family_name ? `<div class="family-name">${m.families.family_name} Family</div>` : ""}
+          </div>
+          <span class="status-dot ${m.is_active ? "active" : "inactive"}"></span>
+        </div>
+        <div class="card-body">
+          ${details.join("")}
+          ${tagsHtml}
+        </div>
+      </div>`
     }).join("")
 
-    const headers = FIELD_OPTIONS
-      .filter((f) => fields[f.key])
-      .map((f) => `<th>${f.label}</th>`)
-      .join("")
-
     printWindow.document.write(`<!DOCTYPE html><html><head>
-      <title>Members Directory — CCISR Connect</title>
+      <title>Member Directory — CCISR Connect</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif; color: #1a1a1a; padding: 32px; font-size: 13px; line-height: 1.4; }
-        .header { margin-bottom: 24px; }
-        .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-        .header .meta { display: flex; gap: 16px; margin-top: 6px; font-size: 12px; color: #6b7280; }
-        .header .meta span { display: flex; align-items: center; gap: 4px; }
-        table { width: 100%; border-collapse: collapse; }
-        thead { position: sticky; top: 0; }
-        th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; padding: 8px 12px; border-bottom: 2px solid #e5e7eb; background: #f9fafb; }
-        td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
-        tr:hover td { background: #f8fafc; }
-        .name { font-weight: 600; white-space: nowrap; }
-        .mono { font-family: 'SF Mono', 'JetBrains Mono', monospace; font-size: 12px; }
-        .email { font-size: 12px; color: #4b5563; }
-        .cap { text-transform: capitalize; }
-        .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 500; color: #fff; margin-right: 3px; }
-        .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; display: flex; justify-content: space-between; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif; color: #1e293b; padding: 28px; background: #f8fafc; }
+        .header { text-align: center; margin-bottom: 28px; }
+        .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+        .header p { font-size: 13px; color: #64748b; margin-top: 4px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 16px 14px 20px; border-left: 4px solid #3B82F6; break-inside: avoid; transition: box-shadow 0.15s; }
+        .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+        .name-block { min-width: 0; flex: 1; }
+        .member-name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .family-name { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+        .status-dot.active { background: #22c55e; }
+        .status-dot.inactive { background: #9ca3af; }
+        .card-body { display: flex; flex-direction: column; gap: 6px; }
+        .detail { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
+        .detail svg { flex-shrink: 0; }
+        .detail.birthday { color: #7c3aed; }
+        .detail.birthday span { font-weight: 500; }
+        .role-badge { display: inline-block; font-size: 11px; font-weight: 500; text-transform: capitalize; padding: 2px 10px; border-radius: 6px; background: #f1f5f9; color: #475569; margin-top: 2px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+        .tag { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 10px; font-weight: 500; color: #fff; }
+        .footer { text-align: center; margin-top: 28px; padding-top: 14px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; }
         @media print {
-          body { padding: 16px; }
-          th { background: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          tr:hover td { background: none; }
+          body { background: #fff; padding: 12px; }
+          .card { border-color: #e2e8f0; box-shadow: none; }
+          .tag, .status-dot, .role-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .grid { gap: 10px; }
         }
+        @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
       </style>
     </head><body>
       <div class="header">
-        <h1>Member Directory</h1>
-        <div class="meta">
-          <span>${members.length} member${members.length !== 1 ? "s" : ""}</span>
-          <span>${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
-        </div>
+        <h1>Christ Church of India, San Ramon</h1>
+        <p>Member Directory — ${members.length} member${members.length !== 1 ? "s" : ""} — ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
       </div>
-      <table>
-        <thead><tr>${headers}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div class="footer">
-        <span>CCISR Connect</span>
-        <span>Christ Church of India, San Ramon</span>
-      </div>
+      <div class="grid">${cards}</div>
+      <div class="footer">Generated by CCISR Connect</div>
     </body></html>`)
     printWindow.document.close()
     printWindow.focus()
