@@ -74,12 +74,37 @@ export default function ReportsPage() {
   const router = useRouter()
 
   // Period state
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("week")
+  const [periodMode, setPeriodMode] = useState<PeriodMode>(() => {
+    if (typeof window === "undefined") return "week"
+    return (localStorage.getItem("reports:periodMode") as PeriodMode) || "week"
+  })
   const [periodOffset, setPeriodOffset] = useState(0)
 
-  // UI state
-  const [eventsExpanded, setEventsExpanded] = useState(false)
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  // UI state — persisted to localStorage
+  const [eventsExpanded, setEventsExpanded] = useState(() => {
+    if (typeof window === "undefined") return false
+    return localStorage.getItem("reports:eventsExpanded") === "true"
+  })
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set()
+    try {
+      const raw = localStorage.getItem("reports:collapsedSections")
+      return raw ? new Set(JSON.parse(raw)) : new Set()
+    } catch { return new Set() }
+  })
+  const [hiddenEventTypes, setHiddenEventTypes] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set()
+    try {
+      const raw = localStorage.getItem("reports:hiddenEventTypes")
+      return raw ? new Set(JSON.parse(raw)) : new Set()
+    } catch { return new Set() }
+  })
+
+  // Persist preferences
+  useEffect(() => { localStorage.setItem("reports:periodMode", periodMode) }, [periodMode])
+  useEffect(() => { localStorage.setItem("reports:eventsExpanded", String(eventsExpanded)) }, [eventsExpanded])
+  useEffect(() => { localStorage.setItem("reports:collapsedSections", JSON.stringify([...collapsedSections])) }, [collapsedSections])
+  useEffect(() => { localStorage.setItem("reports:hiddenEventTypes", JSON.stringify([...hiddenEventTypes])) }, [hiddenEventTypes])
 
   function toggleSection(key: string) {
     setCollapsedSections((prev) => {
@@ -103,9 +128,6 @@ export default function ReportsPage() {
   const [agendaItems, setAgendaItems] = useState<EventAgendaItem[] | null>(null)
   const [dispatches, setDispatches] = useState<DispatchSummary[] | null>(null)
   const [signups, setSignups] = useState<SignupActivity[] | null>(null)
-
-  // Event type filter
-  const [hiddenEventTypes, setHiddenEventTypes] = useState<Set<string>>(new Set())
 
   const { rangeStart, rangeEnd, periodLabel } = useMemo(() => {
     const today = new Date()

@@ -11,6 +11,9 @@ import {
   Waves,
   TreePine,
   Palette,
+  Sunset,
+  Sparkles,
+  Heart,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -19,9 +22,12 @@ const THEMES = [
   { value: "warm", label: "Warm", icon: Flame, group: "light" },
   { value: "ocean", label: "Ocean", icon: Waves, group: "light" },
   { value: "forest", label: "Forest", icon: TreePine, group: "light" },
+  { value: "sunset", label: "Sunset", icon: Sunset, group: "light" },
+  { value: "rose-gold", label: "Rose Gold", icon: Heart, group: "light" },
   { value: "dark", label: "Dark", icon: Moon, group: "dark" },
   { value: "github-dark", label: "GitHub Dark", icon: Code2, group: "dark" },
   { value: "midnight", label: "Midnight", icon: Star, group: "dark" },
+  { value: "aurora", label: "Aurora", icon: Sparkles, group: "dark" },
 ]
 
 export function ThemeToggle() {
@@ -44,19 +50,9 @@ export function ThemeToggle() {
     return () => document.removeEventListener("mousedown", handleClick)
   }, [open])
 
-  const icon = !mounted ? (
-    <Palette className="size-4" />
-  ) : theme === "dark" || theme === "github-dark" || theme === "midnight" ? (
-    <Moon className="size-4" />
-  ) : theme === "warm" ? (
-    <Flame className="size-4" />
-  ) : theme === "ocean" ? (
-    <Waves className="size-4" />
-  ) : theme === "forest" ? (
-    <TreePine className="size-4" />
-  ) : (
-    <Sun className="size-4" />
-  )
+  const currentTheme = THEMES.find((t) => t.value === theme)
+  const IconComponent = !mounted ? Palette : currentTheme?.icon ?? Sun
+  const icon = <IconComponent className="size-4" />
 
   return (
     <div className="relative" ref={ref}>
