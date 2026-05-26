@@ -34,6 +34,7 @@ import {
   Pencil,
   Send,
   CalendarDays,
+  Copy,
 } from "lucide-react"
 import {
   buildBirthdayCard,
@@ -548,6 +549,39 @@ export default function TemplatesPage() {
     if (formData.signupLink !== undefined) eventUpdates.signup_link = formData.signupLink || null
     if (Object.keys(eventUpdates).length > 0) {
       await supabase.from("events").update(eventUpdates as never).eq("id", eventId)
+    }
+  }
+
+  async function cloneTemplate(sourceId: string, sourceName: string) {
+    const supabase = createClient()
+    const { data: source } = await supabase
+      .from("email_templates")
+      .select("subject_template, body_template, style_settings")
+      .eq("id", sourceId)
+      .returns<{ subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>()
+      .single()
+    if (!source) { toast.error("Source template not found"); return }
+
+    const cloneName = `${sourceName} (Copy)`
+    const { data: inserted, error } = await supabase
+      .from("email_templates")
+      .insert({
+        name: cloneName,
+        subject_template: source.subject_template,
+        body_template: source.body_template,
+        style_settings: source.style_settings,
+        is_default: false,
+      } as never)
+      .select("id")
+      .returns<{ id: string }[]>()
+      .single()
+
+    if (error) {
+      toast.error(`Clone failed: ${error.message}`)
+    } else {
+      toast.success(`Cloned as "${cloneName}"`)
+      logAudit("custom_template_created", "email_templates", inserted?.id, { name: cloneName, cloned_from: sourceId })
+      fetchTemplates()
     }
   }
 
@@ -1519,6 +1553,20 @@ export default function TemplatesPage() {
                       <Eye className="size-4" />
                       Preview
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const existing = templates.find((t) => t.event_type_name === tab.name)
+                        if (existing) {
+                          cloneTemplate(existing.id, tab.label)
+                        } else {
+                          toast.error("Save the template first before cloning")
+                        }
+                      }}
+                    >
+                      <Copy className="size-4" />
+                      Clone
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1972,6 +2020,14 @@ export default function TemplatesPage() {
                                 }}
                               >
                                 <Pencil className="size-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Clone"
+                                onClick={() => cloneTemplate(ct.id, ct.name)}
+                              >
+                                <Copy className="size-3.5 text-muted-foreground" />
                               </Button>
                               <Button
                                 variant="ghost"
