@@ -265,14 +265,32 @@ function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakCha
     }
   }
 
+  const [showPastBreaks, setShowPastBreaks] = useState(false)
+
   if (loading) return null
+
+  const today = format(new Date(), "yyyy-MM-dd")
+  const activeBreaks = breaks.filter((b) => b.end_date >= today)
+  const pastBreaks = breaks.filter((b) => b.end_date < today)
+  const visibleBreaks = showPastBreaks ? breaks : activeBreaks
 
   return (
     <div className="space-y-2">
       {breaks.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2 dark:border-amber-800 dark:bg-amber-950/20">
-          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Scheduled Breaks</p>
-          {breaks.map((brk) => (
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Scheduled Breaks</p>
+            {pastBreaks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowPastBreaks(!showPastBreaks)}
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPastBreaks ? "Hide past" : `Show past (${pastBreaks.length})`}
+              </button>
+            )}
+          </div>
+          {visibleBreaks.map((brk) => (
             <div key={brk.id} className="flex items-center justify-between gap-2 text-sm">
               <div>
                 <span className="font-medium">
