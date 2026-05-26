@@ -45,6 +45,7 @@ import {
   Settings2,
   Send,
   X,
+  CalendarDays,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -55,6 +56,7 @@ import {
   buildPrayerMeetingCard,
   buildBulletinCard,
   buildCustomCard,
+  buildGenericEventCard,
   buildStyleContext,
   type BirthdayEntry,
   type AnniversaryEntry,
@@ -504,6 +506,21 @@ export default function DashboardPage() {
   }
 
   const [customDashTemplates, setCustomDashTemplates] = useState<DashboardCustomTemplate[]>([])
+
+  // ---- Generic event cards (event types with active events but no built-in card) ----
+  interface GenericCardData {
+    eventTypeId: string
+    eventTypeName: string
+    eventId: string
+    title: string
+    date: string
+    time: string
+    hostNames: string
+    address: string
+    topic: string
+    color: string
+  }
+  const [genericCards, setGenericCards] = useState<GenericCardData[]>([])
 
   // ---- Unified custom template state (one record per custom template ID) ----
   interface CustomCardState {
@@ -1456,6 +1473,96 @@ export default function DashboardPage() {
           ...bulCommon,
         })
       }
+
+      // ---- Generic event cards (non-built-in event types with occurrences this week) ----
+      const builtinCommTypes = new Set<string>(["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"])
+      // Event types that have a linked custom template already get their own card
+      const etIdsWithCustomTemplate = new Set(
+        (eventTypesRes.data ?? []).filter((et) => et.default_template_id).map((et) => et.id)
+      )
+      const resolvedGenericCards: GenericCardData[] = []
+
+      for (const evt of activeEvents) {
+        const etTabName = etIdToTabName[evt.event_type_id] ?? ""
+        // Skip if this event belongs to a built-in comm type
+        if (builtinCommTypes.has(etTabName)) continue
+        // Skip if this event type has a custom template (already shown as custom card)
+        if (etIdsWithCustomTemplate.has(evt.event_type_id)) continue
+        // Skip if there's already a generic card for this event type
+        if (resolvedGenericCards.some((g) => g.eventTypeId === evt.event_type_id)) continue
+
+        // Resolve occurrences for recurring events
+        let occDate: Date | null = null
+        let instForOcc: typeof weekInstances[0] | undefined
+
+        if (evt.recurrence_rule) {
+          const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
+          if (occs.length > 0) {
+            occDate = occs[0]
+            instForOcc = weekInstances.find((i) => i.event_id === evt.id && i.instance_date === format(occs[0], "yyyy-MM-dd"))
+          }
+        } else {
+          // One-time / date-range events
+          const evtStart = evt.start_date ? new Date(evt.start_date + "T00:00:00") : null
+          const evtEnd = evt.end_date ? new Date(evt.end_date + "T00:00:00") : evtStart
+          instForOcc = weekInstances.find((i) => i.event_id === evt.id)
+          if (instForOcc) {
+            occDate = new Date(instForOcc.instance_date + "T00:00:00")
+          } else if (evtStart && evtEnd && evtStart <= wkSat && evtEnd >= wkSun) {
+            occDate = evtStart >= wkSun ? evtStart : wkSun
+          }
+        }
+
+        if (!occDate) continue
+
+        // Skip if cancelled
+        if (instForOcc?.status === "cancelled") continue
+
+        // Check for breaks
+        const occDateStr = format(occDate, "yyyy-MM-dd")
+        const { data: breakRows } = await supabase
+          .from("event_breaks")
+          .select("id")
+          .eq("event_id", evt.id)
+          .lte("start_date", occDateStr)
+          .gte("end_date", occDateStr)
+          .limit(1)
+        if (breakRows && breakRows.length > 0) continue
+
+        // Resolve host info
+        let hostName = ""
+        let address = ""
+        if (instForOcc?.host_family_id) {
+          const hf = await resolveHostFamily(instForOcc.host_family_id)
+          hostName = hf.hostName !== "TBD" ? hf.hostName : ""
+          address = hf.address !== "TBD" ? hf.address : ""
+        } else if (evt.host_family_id) {
+          const expired = evt.host_until ? new Date(evt.host_until + "T23:59:59") < new Date() : false
+          if (!expired) {
+            const hf = await resolveHostFamily(evt.host_family_id)
+            hostName = hf.hostName !== "TBD" ? hf.hostName : ""
+            address = hf.address !== "TBD" ? hf.address : ""
+          }
+        }
+        if (instForOcc?.location_override) address = instForOcc.location_override
+
+        const etColor = (eventTypesRes.data ?? []).find((et) => et.id === evt.event_type_id)?.color_scheme?.primary || "#6B7280"
+        const timeStr = instForOcc?.instance_time ? formatTime(instForOcc.instance_time) : (evt.default_time ? formatTime(evt.default_time) : "")
+
+        resolvedGenericCards.push({
+          eventTypeId: evt.event_type_id,
+          eventTypeName: etIdToName[evt.event_type_id] || evt.title,
+          eventId: evt.id,
+          title: evt.title,
+          date: format(occDate, "EEEE, MMMM do"),
+          time: timeStr,
+          hostNames: hostName,
+          address: address,
+          topic: evt.description ?? "",
+          color: etColor,
+        })
+      }
+      setGenericCards(resolvedGenericCards)
 
       // ---- Custom dashboard templates ----
       const { data: customTmpls } = await supabase
@@ -3059,6 +3166,36 @@ export default function DashboardPage() {
                 </button>
               )
             })}
+            {/* Generic event cards — auto-discovered from active events */}
+            {genericCards.map((gc) => {
+              const isSelected = activeCardKey === `generic:${gc.eventTypeId}`
+              return (
+                <button
+                  key={`generic:${gc.eventTypeId}`}
+                  onClick={() => setActiveCardKey(isSelected ? "bulletin" : `generic:${gc.eventTypeId}`)}
+                  className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
+                    isSelected ? "ring-2 ring-offset-1 shadow-sm" : "border-border hover:border-foreground/20"
+                  }`}
+                  style={isSelected ? { borderColor: gc.color, "--tw-ring-color": gc.color } as React.CSSProperties : undefined}
+                >
+                  <div
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: gc.color + "15", color: gc.color }}
+                  >
+                    <CalendarDays className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold truncate">{gc.eventTypeName}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                      {gc.date}{gc.time ? ` at ${gc.time}` : ""}
+                    </p>
+                  </div>
+                  <span className="absolute right-2 top-2 size-2 rounded-full" style={{ backgroundColor: gc.color }} />
+                </button>
+              )
+            })}
           </div>
 
           {/* ── Settings popover ── */}
@@ -3214,6 +3351,47 @@ export default function DashboardPage() {
             >
               <CustomEditFields ctId={ct.id} form={form} onChange={updateCustomForm} />
             </WeeklyCommunicationCard>
+          )
+        })()}
+        {/* ── Generic Event Card Expanded ── */}
+        {activeCardKey.startsWith("generic:") && (() => {
+          const genericEtId = activeCardKey.slice(8)
+          const gc = genericCards.find((g) => g.eventTypeId === genericEtId)
+          if (!gc) return null
+
+          const summaryLines: string[] = []
+          summaryLines.push(gc.time ? `${gc.date} at ${gc.time}` : gc.date)
+          if (gc.hostNames) summaryLines.push(`Host: ${gc.hostNames}`)
+          if (gc.address) summaryLines.push(`Location: ${gc.address}`)
+          if (gc.topic) summaryLines.push(`Topic: ${gc.topic}`)
+
+          const locations = (gc.hostNames || gc.address) ? [{
+            label: gc.eventTypeName,
+            hostName: gc.hostNames || undefined,
+            address: gc.address || undefined,
+          }] : undefined
+
+          const previewHtml = buildGenericEventCard({
+            title: gc.title,
+            date: gc.date,
+            time: gc.time || undefined,
+            topic: gc.topic || undefined,
+            locations,
+            primaryColor: gc.color,
+          })
+
+          return (
+            <WeeklyCommunicationCard
+              key={`generic:${gc.eventTypeId}`}
+              title={gc.eventTypeName}
+              accentColor={gc.color}
+              icon={CalendarDays}
+              status="draft"
+              summaryLines={summaryLines}
+              previewHtml={previewHtml}
+              onSchedule={() => {}}
+              onSendNow={() => {}}
+            />
           )
         })()}
         </>
