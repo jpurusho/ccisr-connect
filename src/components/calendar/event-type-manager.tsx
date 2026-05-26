@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Settings2, Plus, Save, Loader2, X, Link2 } from "lucide-react"
+import { IconPicker, getIconComponent } from "@/components/ui/icon-picker"
 import { CustomSectionsEditor, type CustomSection } from "@/components/dashboard/communication-edit-forms"
 import type { SignupFieldMap, SignupFieldMapping } from "@/lib/signup/auto-fill"
 import type { SignupFieldConfig } from "@/lib/signup/field-registry"
@@ -29,6 +30,7 @@ import type { SignupFieldConfig } from "@/lib/signup/field-registry"
 interface TypeRow {
   id: string
   name: string
+  icon: string | null
   is_active: boolean
   default_template_id: string | null
   color: string
@@ -62,11 +64,13 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
   const [newName, setNewName] = useState("")
   const [newTemplateId, setNewTemplateId] = useState("")
   const [newColor, setNewColor] = useState("#6B7280")
+  const [newIcon, setNewIcon] = useState("CalendarDays")
 
   const [editId, setEditId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
   const [editTemplateId, setEditTemplateId] = useState("")
   const [editColor, setEditColor] = useState("")
+  const [editIcon, setEditIcon] = useState("")
   const [editSections, setEditSections] = useState<CustomSection[]>([])
   const [newSections, setNewSections] = useState<CustomSection[]>([])
 
@@ -82,9 +86,9 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
     const [typesRes, templatesRes, formsRes] = await Promise.all([
       supabase
         .from("event_types")
-        .select("id, name, color_scheme, is_active, default_template_id, info_sections, linked_signup_form_id, signup_field_map")
+        .select("id, name, icon, color_scheme, is_active, default_template_id, info_sections, linked_signup_form_id, signup_field_map")
         .order("name")
-        .returns<{ id: string; name: string; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; info_sections: CustomSection[] | null; linked_signup_form_id: string | null; signup_field_map: SignupFieldMap | null }[]>(),
+        .returns<{ id: string; name: string; icon: string | null; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; info_sections: CustomSection[] | null; linked_signup_form_id: string | null; signup_field_map: SignupFieldMap | null }[]>(),
       supabase
         .from("email_templates")
         .select("id, name, is_default")
@@ -101,6 +105,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
       (typesRes.data ?? []).map((t) => ({
         id: t.id,
         name: t.name,
+        icon: t.icon,
         is_active: t.is_active,
         default_template_id: t.default_template_id,
         color: t.color_scheme?.primary ?? "#6B7280",
@@ -123,6 +128,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
       const supabase = createClient()
       const { error } = await supabase.from("event_types").insert({
         name: newName.trim(),
+        icon: newIcon || null,
         default_template_id: newTemplateId && newTemplateId !== "none" ? newTemplateId : null,
         color_scheme: { primary: newColor },
         info_sections: newSections.length > 0 ? newSections : null,
@@ -151,6 +157,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
       const supabase = createClient()
       const { error } = await supabase.from("event_types").update({
         name: editName.trim(),
+        icon: editIcon || null,
         default_template_id: editTemplateId && editTemplateId !== "none" ? editTemplateId : null,
         color_scheme: { primary: editColor },
         info_sections: editSections.length > 0 ? editSections : null,
@@ -227,16 +234,19 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                           ))}
                         </SelectContent>
                       </Select>
-                      <div className="flex items-center gap-1">
-                        {COLOR_PRESETS.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            className={`size-5 rounded-full border-2 transition-transform hover:scale-110 ${editColor === c ? "border-foreground scale-110" : "border-transparent"}`}
-                            style={{ backgroundColor: c }}
-                            onClick={() => setEditColor(c)}
-                          />
-                        ))}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          {COLOR_PRESETS.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              className={`size-5 rounded-full border-2 transition-transform hover:scale-110 ${editColor === c ? "border-foreground scale-110" : "border-transparent"}`}
+                              style={{ backgroundColor: c }}
+                              onClick={() => setEditColor(c)}
+                            />
+                          ))}
+                        </div>
+                        <IconPicker value={editIcon} onChange={setEditIcon} />
                       </div>
                       <CustomSectionsEditor
                         sections={editSections}
@@ -260,9 +270,12 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                   )
                 }
 
+                const TypeIcon = getIconComponent(t.icon)
                 return (
                   <div key={t.id} className="flex items-center gap-2 rounded-lg border px-2 py-1.5">
-                    <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                    <span className="flex size-6 items-center justify-center rounded-md shrink-0" style={{ backgroundColor: t.color + "20", color: t.color }}>
+                      <TypeIcon className="size-3.5" />
+                    </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate flex items-center gap-1">
                         {t.name}
@@ -273,7 +286,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                     <button
                       type="button"
                       className="text-[10px] text-muted-foreground hover:text-foreground"
-                      onClick={() => { setEditId(t.id); setEditName(t.name); setEditTemplateId(t.default_template_id || ""); setEditColor(t.color); setEditSections(t.info_sections ?? []); setEditLinkedFormId(t.linked_signup_form_id || ""); setEditFieldMap(t.signup_field_map) }}
+                      onClick={() => { setEditId(t.id); setEditName(t.name); setEditIcon(t.icon || "CalendarDays"); setEditTemplateId(t.default_template_id || ""); setEditColor(t.color); setEditSections(t.info_sections ?? []); setEditLinkedFormId(t.linked_signup_form_id || ""); setEditFieldMap(t.signup_field_map) }}
                     >
                       Edit
                     </button>
@@ -330,16 +343,19 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center gap-1">
-                    {COLOR_PRESETS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`size-5 rounded-full border-2 transition-transform hover:scale-110 ${newColor === c ? "border-foreground scale-110" : "border-transparent"}`}
-                        style={{ backgroundColor: c }}
-                        onClick={() => setNewColor(c)}
-                      />
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      {COLOR_PRESETS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          className={`size-5 rounded-full border-2 transition-transform hover:scale-110 ${newColor === c ? "border-foreground scale-110" : "border-transparent"}`}
+                          style={{ backgroundColor: c }}
+                          onClick={() => setNewColor(c)}
+                        />
+                      ))}
+                    </div>
+                    <IconPicker value={newIcon} onChange={setNewIcon} />
                   </div>
                   <CustomSectionsEditor
                     sections={newSections}
