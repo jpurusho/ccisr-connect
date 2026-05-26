@@ -545,16 +545,6 @@ ${commonTrailingHtml(data, colors, undefined, style)}`,
 
 // ---------- Bible Study Invite (multi-location) ----------
 
-export interface BibleStudyLocation {
-  label: string;
-  hostNames?: string;
-  address?: string;
-  city?: string;
-  phone?: string;
-  onVacation?: boolean;
-  vacationMessage?: string;
-}
-
 export interface ResourceLink {
   label: string;
   url: string;
@@ -566,7 +556,10 @@ export interface BibleStudyCardData extends BaseCardData {
   time: string;
   topic?: string;
   resourceLink?: ResourceLink;
-  locations: BibleStudyLocation[];
+  hostNames?: string;
+  address?: string;
+  city?: string;
+  phone?: string;
 }
 
 export function buildBibleStudyCard(data: BibleStudyCardData, style?: StyleContext): string {
@@ -579,48 +572,31 @@ export function buildBibleStudyCard(data: BibleStudyCardData, style?: StyleConte
 <td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
 </tr>`;
 
-  const locationBlocks = data.locations
-    .map((loc) => {
-      const locationHeader = data.locations.length > 1
-        ? `<p style="margin:0 0 8px;font-size:${sz.body}px;font-weight:700;color:${colors.primary}">${loc.label}</p>`
-        : "";
+  const isBreakDate = data.date.toLowerCase().includes("no ") || data.date.toLowerCase().includes("on break");
 
-      if (loc.onVacation) {
-        const msg = loc.vacationMessage || `${loc.label} Bible Study is on break`;
-        return `${locationHeader}<div style="background:${colors.bgLight};border-radius:8px;padding:12px 16px;text-align:center">
-<p style="margin:0;font-size:${sz.label + 1}px;color:${colors.textLight};font-style:italic">${msg}</p>
-</div>`;
-      }
+  let details = "";
+  details += isBreakDate
+    ? detailRow("When", data.date)
+    : detailRow("When", `${data.date} at ${data.time}`);
+  if (data.topic) details += detailRow("Topic", data.topic);
 
-      let details = "";
-      if (loc.hostNames) details += detailRow("Host", loc.hostNames);
-      const addrParts = [loc.address, loc.city].filter(Boolean).join("<br/>");
-      if (addrParts) details += detailRow("Where", addrParts);
-      if (loc.phone) details += detailRow("Contact", loc.phone);
+  const detailsHtml = `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">\n${details}\n</table>`;
 
-      if (!details) return "";
+  // Host/address/phone block (like prayer meeting pattern)
+  let hostBlock = "";
+  if (!isBreakDate) {
+    let hostDetails = "";
+    if (data.hostNames) hostDetails += detailRow("Host", data.hostNames);
+    const addrParts = [data.address, data.city].filter(Boolean).join("<br/>");
+    if (addrParts) hostDetails += detailRow("Where", addrParts);
+    if (data.phone) hostDetails += detailRow("Contact", data.phone);
 
-      return `${locationHeader}<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
-${details}
+    if (hostDetails) {
+      hostBlock = `<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
+${hostDetails}
 </table>`;
-    })
-    .filter(Boolean)
-    .join(`<div style="height:16px"></div>`);
-
-  const allOnVacation = data.locations.length > 0 && data.locations.every((loc) => loc.onVacation);
-
-  let sharedDetails = "";
-  if (!allOnVacation) {
-    const isBreakDate = data.date.toLowerCase().includes("no ") || data.date.toLowerCase().includes("on break");
-    sharedDetails = isBreakDate
-      ? detailRow("When", data.date)
-      : detailRow("When", `${data.date} at ${data.time}`);
-    if (data.topic) sharedDetails += detailRow("Topic", data.topic);
+    }
   }
-
-  const sharedDetailsHtml = sharedDetails
-    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">\n${sharedDetails}\n</table>`
-    : "";
 
   const content =
     headerRow(
@@ -634,8 +610,8 @@ ${details}
     ) +
     contentRow(
       `${data.message ? msgBlock(data.message, data.messageBgColor, colors, "0 0 16px", style, data.messageTextColor) : ""}
-${sharedDetailsHtml}
-${locationBlocks}
+${detailsHtml}
+${hostBlock}
 ${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined, style)}`,
       colors
     ) +

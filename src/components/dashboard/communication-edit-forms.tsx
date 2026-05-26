@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Expand, ImagePlus, Loader2, Minimize2, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
@@ -1154,23 +1153,15 @@ export function AnniversaryEditForm({
 // Bible Study Edit Form (inline)
 // ---------------------------------------------------------------------------
 
-export interface BibleStudyLocationData {
-  label: string
-  hostNames: string
-  address: string
-  city: string
-  phone: string
-  onVacation: boolean
-  vacationMessage: string
-  breaks?: { from: string; to: string; message: string }[]
-}
-
 export interface BibleStudyFormData extends BaseFormData {
   title: string
   date: string
   time: string
   topic: string
-  locations: BibleStudyLocationData[]
+  hostNames: string
+  address: string
+  city: string
+  phone: string
 }
 
 export function BibleStudyEditForm({
@@ -1180,28 +1171,11 @@ export function BibleStudyEditForm({
   data: BibleStudyFormData
   onChange: (data: BibleStudyFormData) => void
 }) {
-  function set<K extends keyof Omit<BibleStudyFormData, "locations">>(
+  function set<K extends keyof BibleStudyFormData>(
     field: K,
     value: BibleStudyFormData[K]
   ) {
     onChange({ ...data, [field]: value })
-  }
-
-  function updateLocation(index: number, field: keyof BibleStudyLocationData, value: string) {
-    const updated = [...data.locations]
-    updated[index] = { ...updated[index], [field]: value }
-    onChange({ ...data, locations: updated })
-  }
-
-  function removeLocation(index: number) {
-    onChange({ ...data, locations: data.locations.filter((_, i) => i !== index) })
-  }
-
-  function addLocation() {
-    onChange({
-      ...data,
-      locations: [...data.locations, { label: "", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" }],
-    })
   }
 
   return (
@@ -1238,154 +1212,44 @@ export function BibleStudyEditForm({
         />
       </Field>
 
-      {/* Locations */}
-      <div className="space-y-3">
-        <Label>Locations</Label>
-        {data.locations.map((loc, i) => (
-          <div key={i} className="space-y-2 rounded-md border border-border p-3">
-            <div className="flex items-center justify-between">
-              <Input
-                placeholder="Location name (e.g., San Ramon)"
-                value={loc.label}
-                onChange={(e) => updateLocation(i, "label", e.target.value)}
-                className="flex-1 font-medium"
-              />
-              {data.locations.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="ml-2 shrink-0"
-                  onClick={() => removeLocation(i)}
-                  title="Remove location"
-                >
-                  <Trash2 className="size-3.5 text-muted-foreground" />
-                </Button>
-              )}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <HostFamilyInput
-                value={loc.hostNames}
-                onChange={(v) => updateLocation(i, "hostNames", v)}
-                onSelect={(f) => {
-                  const locs = [...data.locations]
-                  locs[i] = {
-                    ...locs[i],
-                    hostNames: `${f.family_name}'s Residence`,
-                    address: f.street ?? f.full_address ?? locs[i].address,
-                    city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || locs[i].city,
-                    phone: formatPhone(f.home_phone) || locs[i].phone,
-                  }
-                  onChange({ ...data, locations: locs })
-                }}
-              />
-              <Input
-                placeholder="Phone"
-                value={loc.phone}
-                onChange={(e) => updateLocation(i, "phone", e.target.value)}
-              />
-            </div>
-            <Input
-              placeholder="Address"
-              value={loc.address}
-              onChange={(e) => updateLocation(i, "address", e.target.value)}
-            />
-            <Input
-              placeholder="City, State ZIP"
-              value={loc.city}
-              onChange={(e) => updateLocation(i, "city", e.target.value)}
-            />
-            <div className="flex items-center gap-2 pt-1">
-              <Switch
-                size="sm"
-                checked={loc.onVacation}
-                onCheckedChange={(checked) => {
-                  const locs = [...data.locations]
-                  locs[i] = { ...locs[i], onVacation: checked }
-                  onChange({ ...data, locations: locs })
-                }}
-              />
-              <Label className="text-xs text-muted-foreground">On vacation / break</Label>
-            </div>
-            {loc.onVacation && (
-              <Input
-                placeholder="e.g., Bible Study will resume on September 12th"
-                value={loc.vacationMessage}
-                onChange={(e) => {
-                  const locs = [...data.locations]
-                  locs[i] = { ...locs[i], vacationMessage: e.target.value }
-                  onChange({ ...data, locations: locs })
-                }}
-              />
-            )}
-            {/* Scheduled breaks */}
-            <div className="space-y-1.5">
-              <p className="text-[10px] text-muted-foreground font-medium">Scheduled Breaks</p>
-              {(loc.breaks ?? []).map((brk, bIdx) => (
-                <div key={bIdx} className="flex items-center gap-1.5">
-                  <Input
-                    type="date"
-                    value={brk.from}
-                    onChange={(e) => {
-                      const locs = [...data.locations]
-                      const breaks = [...(locs[i].breaks ?? [])]
-                      breaks[bIdx] = { ...breaks[bIdx], from: e.target.value }
-                      locs[i] = { ...locs[i], breaks }
-                      onChange({ ...data, locations: locs })
-                    }}
-                    className="w-32 text-xs h-7"
-                  />
-                  <span className="text-xs text-muted-foreground">to</span>
-                  <Input
-                    type="date"
-                    value={brk.to}
-                    onChange={(e) => {
-                      const locs = [...data.locations]
-                      const breaks = [...(locs[i].breaks ?? [])]
-                      breaks[bIdx] = { ...breaks[bIdx], to: e.target.value }
-                      locs[i] = { ...locs[i], breaks }
-                      onChange({ ...data, locations: locs })
-                    }}
-                    className="w-32 text-xs h-7"
-                  />
-                  <Input
-                    placeholder="Break message"
-                    value={brk.message}
-                    onChange={(e) => {
-                      const locs = [...data.locations]
-                      const breaks = [...(locs[i].breaks ?? [])]
-                      breaks[bIdx] = { ...breaks[bIdx], message: e.target.value }
-                      locs[i] = { ...locs[i], breaks }
-                      onChange({ ...data, locations: locs })
-                    }}
-                    className="flex-1 text-xs h-7"
-                  />
-                  <Button variant="ghost" size="icon-sm" title="Remove break" onClick={() => {
-                    const locs = [...data.locations]
-                    const breaks = (locs[i].breaks ?? []).filter((_, j) => j !== bIdx)
-                    locs[i] = { ...locs[i], breaks: breaks.length > 0 ? breaks : undefined }
-                    onChange({ ...data, locations: locs })
-                  }}>
-                    <Trash2 className="size-3 text-muted-foreground" />
-                  </Button>
-                </div>
-              ))}
-              <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
-                const locs = [...data.locations]
-                const breaks = [...(locs[i].breaks ?? []), { from: "", to: "", message: "" }]
-                locs[i] = { ...locs[i], breaks }
-                onChange({ ...data, locations: locs })
-              }}>
-                <Plus className="size-3" />
-                Add break period
-              </Button>
-            </div>
-          </div>
-        ))}
-        <Button variant="outline" size="sm" onClick={addLocation}>
-          <Plus className="size-3.5" />
-          Add Location
-        </Button>
+      {/* Host / Location */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <HostFamilyInput
+          value={data.hostNames}
+          onChange={(v) => set("hostNames", v)}
+          onSelect={(f) => {
+            onChange({
+              ...data,
+              hostNames: `${f.family_name}'s Residence`,
+              address: f.street ?? f.full_address ?? data.address,
+              city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || data.city,
+              phone: formatPhone(f.home_phone) || data.phone,
+            })
+          }}
+        />
+        <Field label="Phone" htmlFor="bs-i-phone">
+          <Input
+            id="bs-i-phone"
+            value={data.phone}
+            onChange={(e) => set("phone", e.target.value)}
+          />
+        </Field>
       </div>
+      <Field label="Address" htmlFor="bs-i-addr">
+        <Input
+          id="bs-i-addr"
+          value={data.address}
+          onChange={(e) => set("address", e.target.value)}
+          placeholder="123 Main St"
+        />
+      </Field>
+      <Field label="City, State ZIP" htmlFor="bs-i-city">
+        <Input
+          id="bs-i-city"
+          value={data.city}
+          onChange={(e) => set("city", e.target.value)}
+        />
+      </Field>
 
       <CommonFieldsEditor data={data} onChange={onChange} idPrefix="bs-i" />
     </div>

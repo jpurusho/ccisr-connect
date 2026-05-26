@@ -4,17 +4,6 @@ export interface LocationBreak {
   message: string
 }
 
-export interface BibleStudyLocationDefault {
-  label: string
-  hostNames: string
-  address: string
-  city: string
-  phone: string
-  onVacation?: boolean
-  vacationMessage?: string
-  breaks?: LocationBreak[]
-}
-
 export interface ResourceLinkDefault {
   label: string
   url: string
@@ -51,7 +40,10 @@ export interface BibleStudyDefaults extends CommonCardFields {
   title?: string
   topic?: string
   time?: string
-  locations?: BibleStudyLocationDefault[]
+  hostNames?: string
+  address?: string
+  city?: string
+  phone?: string
 }
 
 export interface WomensStudyDefaults extends CommonCardFields {
@@ -163,10 +155,10 @@ export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
       title: "Bible Study This Friday",
       topic: "Studying the Book of Acts",
       time: "7:30 PM",
-      locations: [
-        { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
-        { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "Mountain House, CA", phone: "", onVacation: false, vacationMessage: "" },
-      ],
+      hostNames: "TBD",
+      address: "TBD",
+      city: "",
+      phone: "",
     },
   },
   womens_study: {

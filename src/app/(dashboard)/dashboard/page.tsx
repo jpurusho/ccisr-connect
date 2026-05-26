@@ -418,6 +418,10 @@ export default function DashboardPage() {
     date: "",
     time: "7:30 PM",
     topic: "Studying the Book of Acts",
+    hostNames: "TBD",
+    address: "TBD",
+    city: "",
+    phone: "",
     message: "",
     headerTitle: "",
     headerSubtitle: "",
@@ -426,10 +430,6 @@ export default function DashboardPage() {
     footerVerse: "",
     resourceLinks: [],
     customSections: [],
-    locations: [
-      { label: "San Ramon", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
-      { label: "Mountain House", hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" },
-    ],
   })
   const [womensStudyForm, setWomensStudyForm] = useState<WomensStudyFormData>({
     title: "Women's Bible Study",
@@ -1116,90 +1116,35 @@ export default function DashboardPage() {
       const bsDateStr = bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"
       const bsTimeStr = bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : null
 
-      // Compute location break status from DB (event_locations + event_breaks are source of truth)
+      // Break detection: query event_breaks for this event+date
       const bsBreakCheckDate = bsRawDate ? format(bsRawDate, "yyyy-MM-dd") : format(wkSun, "yyyy-MM-dd")
-
-      let dbBreaks: { location_id: string | null; message: string | null; loc_label: string | null }[] = []
-      let dbEventLocs: { id: string; label: string }[] = []
-      if (bsEvent) {
-        const [breakRes, locsRes] = await Promise.all([
-          supabase
-            .from("event_breaks")
-            .select("location_id, message, event_locations(label)")
-            .eq("event_id", bsEvent.id)
-            .lte("start_date", bsBreakCheckDate)
-            .gte("end_date", bsBreakCheckDate)
-            .returns<{ location_id: string | null; message: string | null; event_locations: { label: string } | null }[]>(),
-          supabase
-            .from("event_locations")
-            .select("id, label")
-            .eq("event_id", bsEvent.id)
-            .order("sort_order")
-            .returns<{ id: string; label: string }[]>(),
-        ])
-        if (breakRes.data && breakRes.data.length > 0) {
-          dbBreaks = breakRes.data.map((r) => ({
-            location_id: r.location_id,
-            message: r.message,
-            loc_label: r.event_locations?.label ?? null,
-          }))
-        }
-        dbEventLocs = locsRes.data ?? []
+      let bsOnBreak = bsCancelled
+      if (!bsOnBreak && bsEvent) {
+        const { data: breakRows } = await supabase
+          .from("event_breaks")
+          .select("id")
+          .eq("event_id", bsEvent.id)
+          .lte("start_date", bsBreakCheckDate)
+          .gte("end_date", bsBreakCheckDate)
+          .limit(1)
+        if (breakRows && breakRows.length > 0) bsOnBreak = true
       }
-
-      const hasDbBreaks = dbBreaks.length > 0
-      const hasWholeEventBreak = dbBreaks.some((b) => b.location_id === null)
-
-      // Use event_locations from DB as source of truth for break status
-      const bsSavedLocs = bsDef.locations ?? (FALLBACK_DEFAULTS.bible_study.data as BibleStudyDefaults).locations ?? []
-      const bsLocSource = dbEventLocs.length > 0
-        ? dbEventLocs.map((el) => ({ label: el.label, ...(bsSavedLocs.find((s) => s.label.toLowerCase() === el.label.toLowerCase()) ?? {}) }))
-        : bsSavedLocs
-
-      const bsLocBreakStatus = bsLocSource.map((loc) => {
-        if (bsCancelled) return { label: loc.label, onVacation: true }
-        if (hasWholeEventBreak) return { label: loc.label, onVacation: true }
-        if (hasDbBreaks) {
-          const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
-          if (locBreak) return { label: loc.label, onVacation: true }
-        }
-        return { label: loc.label, onVacation: false }
-      })
-      const bsAllOnBreak = bsLocBreakStatus.length > 0 && bsLocBreakStatus.every((l) => l.onVacation)
 
       if (hasBsDraft) {
         const fd = composedMap["bible_study"].form_data as Record<string, unknown>
-        const draftLocs = (fd.locations as BibleStudyFormData["locations"]) ?? bsDef.locations ?? []
-        // Use DB event_locations as source of truth, merge with draft data where labels match
-        const locsToUse = dbEventLocs.length > 0
-          ? dbEventLocs.map((el) => {
-              const existing = draftLocs.find((d) => d.label.toLowerCase() === el.label.toLowerCase())
-              return existing ?? { label: el.label, hostNames: "TBD", address: "TBD", city: "", phone: "", onVacation: false, vacationMessage: "" }
-            })
-          : draftLocs
-        // Apply break detection to locations
-        const mergedDraftLocs = locsToUse.map((loc) => {
-          if (bsCancelled) return { ...loc, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
-          if (hasWholeEventBreak) {
-            const msg = dbBreaks.find((b) => b.location_id === null)?.message
-            return { ...loc, onVacation: true, vacationMessage: msg || `${loc.label} Bible Study is on break` }
-          }
-          if (hasDbBreaks) {
-            const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
-            if (locBreak) return { ...loc, onVacation: true, vacationMessage: locBreak.message || `${loc.label} Bible Study is on break` }
-          }
-          return loc
-        })
         setBibleStudyForm({
           title: (fd.title as string) ?? bsDef.title ?? "Bible Study This Friday",
-          date: bsAllOnBreak ? "No bible study this week" : bsDateStr,
+          date: bsOnBreak ? "No bible study this week" : bsDateStr,
           time: bsTimeStr ?? (fd.time as string) ?? bsDef.time ?? "7:30 PM",
           topic: (fd.topic as string) ?? bsDef.topic ?? "Studying the Book of Acts",
-          locations: mergedDraftLocs,
+          hostNames: (fd.hostNames as string) ?? bsDef.hostNames ?? "TBD",
+          address: (fd.address as string) ?? bsDef.address ?? "TBD",
+          city: (fd.city as string) ?? bsDef.city ?? "",
+          phone: (fd.phone as string) ?? bsDef.phone ?? "",
           ...bsCommon,
         })
       } else {
-        let bsHostData = { hostName: "TBD", address: "TBD", city: "", phone: "" }
+        let bsHostData = { hostName: bsDef.hostNames ?? "TBD", address: bsDef.address ?? "TBD", city: bsDef.city ?? "", phone: bsDef.phone ?? "" }
 
         // Try signup auto-fill first (most specific — user signed up for this month)
         const bsSignup = etSignupLinks["bible_study"]
@@ -1235,71 +1180,16 @@ export default function DashboardPage() {
           autoFills["bible_study"] = bsAutoFill
         }
 
-        // Query per-location host overrides from event_instance_locations
-        let dbLocHosts: { loc_label: string; host_name: string | null; address: string | null; city: string | null; phone: string | null; loc_status: string }[] = []
-        if (bsInstance) {
-          const { data: eilRows } = await supabase
-            .from("event_instance_locations")
-            .select("location_id, host_family_id, address_override, phone_override, status, event_locations(label), families(family_name, home_phone), addresses:families(addresses(full_address, city, state, zip))")
-            .eq("instance_id", bsInstance.id)
-            .returns<{ location_id: string; host_family_id: string | null; address_override: string | null; phone_override: string | null; status: string; event_locations: { label: string } | null; families: { family_name: string; home_phone: string | null; addresses: { full_address: string | null; city: string | null; state: string | null; zip: string | null }[] | null } | null }[]>()
-
-          if (eilRows && eilRows.length > 0) {
-            dbLocHosts = eilRows.map((r) => {
-              const addr = r.families?.addresses?.[0]
-              return {
-                loc_label: r.event_locations?.label ?? "",
-                host_name: r.families?.family_name ?? null,
-                address: r.address_override ?? addr?.full_address ?? null,
-                city: addr ? [addr.city, addr.state, addr.zip].filter(Boolean).join(", ") : null,
-                phone: r.phone_override ?? r.families?.home_phone ?? null,
-                loc_status: r.status,
-              }
-            })
-          }
-        }
-
-        const locIdx = bsSignup?.fieldMap.location_index ?? 0
-        const mergedLocs = bsSavedLocs.map((loc, i) => {
-          const base = { onVacation: false, vacationMessage: "", ...loc }
-          if (bsCancelled) {
-            return { ...base, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
-          }
-          // Check per-location cancellation from DB
-          const dbLocHost = dbLocHosts.find((h) => h.loc_label.toLowerCase() === loc.label.toLowerCase())
-          if (dbLocHost?.loc_status === "cancelled") {
-            return { ...base, onVacation: true, vacationMessage: `No ${loc.label} Bible Study this week` }
-          }
-          // Check DB breaks
-          if (hasWholeEventBreak) {
-            const msg = dbBreaks.find((b) => b.location_id === null)?.message
-            return { ...base, onVacation: true, vacationMessage: msg || `${loc.label} Bible Study is on break` }
-          }
-          if (hasDbBreaks) {
-            const locBreak = dbBreaks.find((b) => b.loc_label?.toLowerCase() === loc.label.toLowerCase())
-            if (locBreak) {
-              return { ...base, onVacation: true, vacationMessage: locBreak.message || `${loc.label} Bible Study is on break` }
-            }
-          }
-          // Apply per-location host from DB (takes priority over signup auto-fill)
-          if (dbLocHost?.host_name && dbLocHost.host_name !== "TBD") {
-            return { ...base, hostNames: dbLocHost.host_name, address: dbLocHost.address ?? base.address, city: dbLocHost.city ?? base.city, phone: dbLocHost.phone ?? base.phone }
-          }
-          if (i === locIdx && bsHostData.hostName !== "TBD" && !base.onVacation) {
-            return { ...base, hostNames: bsHostData.hostName, address: bsHostData.address, city: bsHostData.city, phone: bsHostData.phone }
-          }
-          return base
-        })
-
         setBibleStudyForm({
           title: bsDef.title ?? "Bible Study This Friday",
-          date: bsAllOnBreak ? "No bible study this week" : (bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"),
-          time: bsInstance?.instance_time
-            ? formatTime(bsInstance.instance_time)
-            : bsDef.time ?? "7:30 PM",
+          date: bsOnBreak ? "No bible study this week" : bsDateStr,
+          time: bsTimeStr ?? bsDef.time ?? "7:30 PM",
           topic: bsDef.topic ?? "Studying the Book of Acts",
+          hostNames: bsOnBreak ? "" : bsHostData.hostName,
+          address: bsOnBreak ? "" : bsHostData.address,
+          city: bsOnBreak ? "" : bsHostData.city,
+          phone: bsOnBreak ? "" : bsHostData.phone,
           ...bsCommon,
-          locations: mergedLocs,
         })
       }
 
@@ -1443,67 +1333,20 @@ export default function DashboardPage() {
             const inst = weekInstances.find((wi) => wi.event_id === evt.id && wi.instance_date === format(occ, "yyyy-MM-dd"))
             if (inst?.status === "cancelled") continue
             const occDateStr = format(occ, "yyyy-MM-dd")
+            // Check if event has a break for this date — if so, skip it
             const { data: occBreaks } = await supabase
               .from("event_breaks")
-              .select("id, location_id, message, event_locations(label)")
+              .select("id, message")
               .eq("event_id", evt.id)
               .lte("start_date", occDateStr)
               .gte("end_date", occDateStr)
-              .returns<{ id: string; location_id: string | null; message: string | null; event_locations: { label: string } | null }[]>()
-            if (occBreaks && occBreaks.length > 0) {
-              const hasGlobalBreak = occBreaks.some((b) => b.location_id === null)
-              if (hasGlobalBreak) continue
-              // Per-location breaks: check if ALL locations are covered
-              const { data: allLocs } = await supabase.from("event_locations").select("id, label").eq("event_id", evt.id).returns<{ id: string; label: string }[]>()
-              const brokenLocIds = new Set(occBreaks.filter((b) => b.location_id).map((b) => b.location_id))
-              if (allLocs && allLocs.length > 0 && brokenLocIds.size >= allLocs.length) continue
-              // Some locations on break, some active — show per-location status
-              if (allLocs && allLocs.length > 0) {
-                const details = buildBulletinDetails(evt, occ, inst)
-                // Build a "clean" title by stripping any location name from it
-                const cleanTitle = allLocs.reduce(
-                  (t, l) => t.replace(new RegExp(l.label, "gi"), "").replace(/\s{2,}/g, " ").trim(),
-                  evt.title
-                )
-                for (const loc of allLocs) {
-                  const titleHasLoc = evt.title.toLowerCase().includes(loc.label.toLowerCase())
-                  if (brokenLocIds.has(loc.id)) {
-                    const brk = occBreaks.find((b) => b.location_id === loc.id)
-                    bulletinAutoEvents.push({
-                      title: `No ${loc.label} ${cleanTitle} this week`,
-                      details: brk?.message || "On break",
-                    })
-                  } else {
-                    bulletinAutoEvents.push({
-                      title: titleHasLoc ? evt.title : `${loc.label} ${cleanTitle}`,
-                      details,
-                    })
-                  }
-                }
-                continue
-              }
-            }
-            // No breaks — check if event has multiple locations to show per-location entries
-            const { data: evtLocs } = await supabase.from("event_locations").select("id, label").eq("event_id", evt.id).order("sort_order").returns<{ id: string; label: string }[]>()
-            if (evtLocs && evtLocs.length > 1) {
-              const details = buildBulletinDetails(evt, occ, inst)
-              const cleanTitle = evtLocs.reduce(
-                (t, l) => t.replace(new RegExp(l.label, "gi"), "").replace(/\s{2,}/g, " ").trim(),
-                evt.title
-              )
-              for (const loc of evtLocs) {
-                const titleHasLoc = evt.title.toLowerCase().includes(loc.label.toLowerCase())
-                bulletinAutoEvents.push({
-                  title: titleHasLoc ? evt.title : `${loc.label} ${cleanTitle}`,
-                  details,
-                })
-              }
-            } else {
-              bulletinAutoEvents.push({
-                title: evt.title,
-                details: buildBulletinDetails(evt, occ, inst),
-              })
-            }
+              .limit(1)
+            if (occBreaks && occBreaks.length > 0) continue
+            // One bulletin entry per event occurrence
+            bulletinAutoEvents.push({
+              title: evt.title,
+              details: buildBulletinDetails(evt, occ, inst),
+            })
           }
         } else {
           // One-time / date-range events — check if they overlap this week
@@ -1872,18 +1715,7 @@ export default function DashboardPage() {
         eventDate: null,
         eventTime: null,
         topic: null,
-        locations: bsSavedLocs.map((loc) => {
-          const locBreakStatus = bsLocBreakStatus.find((s) => s.label === loc.label)
-          return {
-            label: loc.label,
-            hostName: loc.hostNames || null,
-            address: loc.address || null,
-            city: loc.city || null,
-            phone: loc.phone || null,
-            isOnBreak: locBreakStatus?.onVacation ?? false,
-            breakMessage: loc.vacationMessage || null,
-          }
-        }),
+        locations: [],
         virtual: null,
         birthdays: bdayEntries.map((b) => ({ name: b.name, date: b.date })),
         anniversaries: anniEntries.map((a) => ({ names: `${a.husbandName} & ${a.wifeName}`, date: a.date })),
@@ -1959,13 +1791,10 @@ export default function DashboardPage() {
       date: bibleStudyForm.date,
       time: bibleStudyForm.time,
       topic: interp(bibleStudyForm.topic, vars),
-      locations: bibleStudyForm.locations.map((loc) => ({
-        label: loc.label,
-        hostNames: loc.hostNames || undefined,
-        address: loc.address || undefined,
-        city: loc.city || undefined,
-        phone: loc.phone || undefined,
-      })),
+      hostNames: bibleStudyForm.hostNames || undefined,
+      address: bibleStudyForm.address || undefined,
+      city: bibleStudyForm.city || undefined,
+      phone: bibleStudyForm.phone || undefined,
       ...interpCommon(bibleStudyForm, vars),
     }, buildStyleContext(templateStyles.bible_study))
   }, [bibleStudyForm, weekLabel, templateStyles])
@@ -2820,8 +2649,8 @@ export default function DashboardPage() {
     const lines: string[] = []
     const isBreak = bibleStudyForm.date.toLowerCase().includes("no ")
     lines.push(isBreak ? bibleStudyForm.date : `${bibleStudyForm.date} at ${bibleStudyForm.time}`)
-    for (const loc of bibleStudyForm.locations) {
-      lines.push(`${loc.label}: ${loc.hostNames}${loc.address !== "TBD" ? ` — ${loc.address}` : ""}`)
+    if (bibleStudyForm.hostNames && bibleStudyForm.hostNames !== "TBD") {
+      lines.push(`Host: ${bibleStudyForm.hostNames}${bibleStudyForm.address !== "TBD" ? ` — ${bibleStudyForm.address}` : ""}`)
     }
     if (bibleStudyForm.topic) {
       lines.push(`Topic: ${bibleStudyForm.topic}`)

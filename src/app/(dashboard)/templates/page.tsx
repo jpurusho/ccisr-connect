@@ -52,7 +52,6 @@ import {
   type BirthdayDefaults,
   type AnniversaryDefaults,
   type BulletinDefaults,
-  type BibleStudyLocationDefault,
   type CommonCardFields,
   type PlaceholderDef,
   parseBodyTemplate,
@@ -651,13 +650,10 @@ export default function TemplatesPage() {
           time: bibleStudyData.time || "7:30 PM",
           title: interp(bibleStudyData.title, vars),
           topic: interp(bibleStudyData.topic, vars),
-          locations: (bibleStudyData.locations || []).map((loc) => ({
-            label: loc.label,
-            hostNames: loc.hostNames || undefined,
-            address: loc.address || undefined,
-            city: loc.city || undefined,
-            phone: loc.phone || undefined,
-          })),
+          hostNames: bibleStudyData.hostNames || undefined,
+          address: bibleStudyData.address || undefined,
+          city: bibleStudyData.city || undefined,
+          phone: bibleStudyData.phone || undefined,
           ...extractCommonCardData(bibleStudyData),
           message: interp(bibleStudyData.message, vars) || undefined,
           footerVerse: interp(bibleStudyData.footerVerse, vars) || undefined,
@@ -1191,94 +1187,37 @@ export default function TemplatesPage() {
                       <CommonTemplateFields data={bibleStudyData} onChange={setBibleStudyData} />
 
                       <div className="space-y-3">
-                        <Label>Default Locations</Label>
-                        {(bibleStudyData.locations || []).map((loc, i) => (
-                          <div key={i} className="space-y-2 rounded-md border p-3">
-                            <div className="flex items-center gap-2">
-                              <Input
-                                placeholder="Location name"
-                                value={loc.label}
-                                onChange={(e) => {
-                                  const locs = [...(bibleStudyData.locations || [])]
-                                  locs[i] = { ...locs[i], label: e.target.value }
-                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                }}
-                                className="flex-1 font-medium"
-                              />
-                              {(bibleStudyData.locations || []).length > 1 && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  onClick={() => {
-                                    const locs = (bibleStudyData.locations || []).filter((_, j) => j !== i)
-                                    setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                  }}
-                                >
-                                  <Trash2 className="size-3.5 text-muted-foreground" />
-                                </Button>
-                              )}
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <HostFamilyInput
-                                value={loc.hostNames}
-                                onChange={(v) => {
-                                  const locs = [...(bibleStudyData.locations || [])]
-                                  locs[i] = { ...locs[i], hostNames: v }
-                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                }}
-                                onSelect={(f) => {
-                                  const locs = [...(bibleStudyData.locations || [])]
-                                  locs[i] = {
-                                    ...locs[i],
-                                    hostNames: `${f.family_name}'s Residence`,
-                                    address: f.street ?? f.full_address ?? locs[i].address,
-                                    city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || locs[i].city,
-                                    phone: formatPhone(f.home_phone) || locs[i].phone,
-                                  }
-                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                }}
-                              />
-                              <Input
-                                placeholder="Phone"
-                                value={loc.phone}
-                                onChange={(e) => {
-                                  const locs = [...(bibleStudyData.locations || [])]
-                                  locs[i] = { ...locs[i], phone: e.target.value }
-                                  setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                                }}
-                              />
-                            </div>
-                            <Input
-                              placeholder="Address"
-                              value={loc.address}
-                              onChange={(e) => {
-                                const locs = [...(bibleStudyData.locations || [])]
-                                locs[i] = { ...locs[i], address: e.target.value }
-                                setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                              }}
-                            />
-                            <Input
-                              placeholder="City, State ZIP"
-                              value={loc.city}
-                              onChange={(e) => {
-                                const locs = [...(bibleStudyData.locations || [])]
-                                locs[i] = { ...locs[i], city: e.target.value }
-                                setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                              }}
-                            />
-                          </div>
-                        ))}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const locs = [...(bibleStudyData.locations || []), { label: "", hostNames: "", address: "", city: "", phone: "", onVacation: false, vacationMessage: "" }]
-                            setBibleStudyData((prev) => ({ ...prev, locations: locs }))
-                          }}
-                        >
-                          <Plus className="size-3.5" />
-                          Add Location
-                        </Button>
+                        <Label>Default Host / Location</Label>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <HostFamilyInput
+                            value={bibleStudyData.hostNames || ""}
+                            onChange={(v) => setBibleStudyData((prev) => ({ ...prev, hostNames: v }))}
+                            onSelect={(f) => {
+                              setBibleStudyData((prev) => ({
+                                ...prev,
+                                hostNames: `${f.family_name}'s Residence`,
+                                address: f.street ?? f.full_address ?? prev.address,
+                                city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || prev.city,
+                                phone: formatPhone(f.home_phone) || prev.phone,
+                              }))
+                            }}
+                          />
+                          <Input
+                            placeholder="Phone"
+                            value={bibleStudyData.phone || ""}
+                            onChange={(e) => setBibleStudyData((prev) => ({ ...prev, phone: e.target.value }))}
+                          />
+                        </div>
+                        <Input
+                          placeholder="Address"
+                          value={bibleStudyData.address || ""}
+                          onChange={(e) => setBibleStudyData((prev) => ({ ...prev, address: e.target.value }))}
+                        />
+                        <Input
+                          placeholder="City, State ZIP"
+                          value={bibleStudyData.city || ""}
+                          onChange={(e) => setBibleStudyData((prev) => ({ ...prev, city: e.target.value }))}
+                        />
                       </div>
                     </>
                   )}
