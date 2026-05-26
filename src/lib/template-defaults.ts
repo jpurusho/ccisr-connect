@@ -34,16 +34,18 @@ export interface CommonCardFields {
   onBreak?: boolean
   breakMessage?: string
   breaks?: LocationBreak[]
+  // Optional location fields — available on all event types
+  locationName?: string
+  hostNames?: string
+  address?: string
+  city?: string
+  phone?: string
 }
 
 export interface BibleStudyDefaults extends CommonCardFields {
   title?: string
   topic?: string
   time?: string
-  hostNames?: string
-  address?: string
-  city?: string
-  phone?: string
 }
 
 export interface WomensStudyDefaults extends CommonCardFields {
@@ -65,10 +67,6 @@ export interface BulletinDefaults extends CommonCardFields {
 }
 
 export interface PrayerMeetingDefaults extends CommonCardFields {
-  hostNames?: string
-  address?: string
-  city?: string
-  phone?: string
   date?: string
   time?: string
   dinnerNote?: string
