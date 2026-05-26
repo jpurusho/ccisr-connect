@@ -397,16 +397,29 @@ export function WeeklyCommunicationCard({
             </>
           )}
           {(status === "sent" || status === "scheduled") && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onSendNow}
-              disabled={!canDispatch}
-              title={dispatchTitle}
-            >
-              <RefreshCw className="size-3.5" data-icon="inline-start" />
-              Send Reminder
-            </Button>
+            <>
+              {onQueue && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onQueue}
+                  disabled={!canDispatch}
+                  title={dispatchTitle || "Queue reminder for review"}
+                >
+                  <Clock className="size-3.5" data-icon="inline-start" />
+                  Queue Reminder
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={onSendNow}
+                disabled={!canDispatch}
+                title={dispatchTitle}
+              >
+                <RefreshCw className="size-3.5" data-icon="inline-start" />
+                Send Reminder
+              </Button>
+            </>
           )}
           {status === "failed" && (
             <Button
