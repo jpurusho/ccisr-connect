@@ -412,8 +412,8 @@ export function EventDetailDialog({
             </div>
           )}
 
-          {/* Location override */}
-          {event.location && (
+          {/* Location override (only shown when host has no address) */}
+          {event.location && !event.hostFamily?.address && (
             <div className="flex items-start gap-3 text-sm">
               <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <span>{event.location}</span>

@@ -196,6 +196,7 @@ export default function ReportsPage() {
         dispatchRes,
         signupFormsRes,
         signupResponsesRes,
+        emailTemplatesRes,
       ] = await Promise.all([
         supabase
           .from("members")
@@ -238,6 +239,10 @@ export default function ReportsPage() {
           .lte("created_at", rangeEnd.toISOString())
           .order("created_at", { ascending: false })
           .returns<{ form_id: string; created_at: string }[]>(),
+        supabase
+          .from("email_templates")
+          .select("id, name")
+          .returns<{ id: string; name: string }[]>(),
       ])
 
       // Birthdays
@@ -355,12 +360,20 @@ export default function ReportsPage() {
           else dMap[key].queued++
         }
         const etNames = new Map(eventTypes.map((et) => [et.comm_type ?? et.name, et.name]))
+        const templateNames = new Map((emailTemplatesRes.data ?? []).map((t) => [t.id, t.name]))
         setDispatches(
-          Object.entries(dMap).map(([key, counts]) => ({
-            templateType: key,
-            label: etNames.get(key) ?? key.replace("custom:", ""),
-            ...counts,
-          }))
+          Object.entries(dMap).map(([key, counts]) => {
+            let label = etNames.get(key)
+            if (!label && key.startsWith("custom:")) {
+              const tmplId = key.slice(7)
+              label = templateNames.get(tmplId) ?? tmplId
+            }
+            return {
+              templateType: key,
+              label: label ?? key,
+              ...counts,
+            }
+          })
         )
       }
 
