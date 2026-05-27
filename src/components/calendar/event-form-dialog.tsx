@@ -93,6 +93,7 @@ export function EventFormDialog({
   const [newExceptDate, setNewExceptDate] = useState("")
   const [rangeFrom, setRangeFrom] = useState("")
   const [rangeTo, setRangeTo] = useState("")
+  const [breaks, setBreaks] = useState<{ id: string; start_date: string; end_date: string; message: string | null }[]>([])
 
   const resetForm = useCallback(() => {
     setTitle("")
@@ -112,6 +113,7 @@ export function EventFormDialog({
     setNewExceptDate("")
     setRangeFrom("")
     setRangeTo("")
+    setBreaks([])
     setLoaded(false)
   }, [initialDate])
 
@@ -181,6 +183,14 @@ export function EventFormDialog({
           } else {
             setRecurrenceFreq("NONE")
           }
+
+          const { data: breaksData } = await supabase
+            .from("event_breaks")
+            .select("id, start_date, end_date, message")
+            .eq("event_id", eventId)
+            .order("start_date")
+            .returns<{ id: string; start_date: string; end_date: string; message: string | null }[]>()
+          setBreaks(breaksData ?? [])
         }
       } else if (mode === "create" && initialDate) {
         setRecurrenceDay(dayCodeFromDate(initialDate))
@@ -615,6 +625,25 @@ export function EventFormDialog({
                 placeholder="https://zoom.us/j/..."
               />
             </div>
+
+            {/* Scheduled Breaks (read-only) */}
+            {mode === "edit" && breaks.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Scheduled Breaks</Label>
+                  {breaks.map((b) => (
+                    <div key={b.id} className="flex items-center gap-2 rounded-md bg-orange-50 dark:bg-orange-950/20 px-3 py-2 text-sm">
+                      <span className="font-medium text-orange-700 dark:text-orange-400">
+                        {format(new Date(b.start_date + "T00:00:00"), "MMM d")} – {format(new Date(b.end_date + "T00:00:00"), "MMM d, yyyy")}
+                      </span>
+                      {b.message && <span className="text-xs text-muted-foreground">({b.message})</span>}
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-muted-foreground">Manage breaks from the event detail view on the calendar.</p>
+                </div>
+              </>
+            )}
           </div>
         )}
 
