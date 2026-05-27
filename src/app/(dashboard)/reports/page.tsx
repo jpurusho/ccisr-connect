@@ -392,6 +392,9 @@ export default function ReportsPage() {
             if (!label) {
               label = templateNames.get(key)
             }
+            if (!label && (key.startsWith("custom:") || /^[0-9a-f]{8}-/.test(key))) {
+              label = "(Deleted template)"
+            }
             return {
               templateType: key,
               label: label ?? key,
