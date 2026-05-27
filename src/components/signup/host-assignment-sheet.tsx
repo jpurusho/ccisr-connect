@@ -113,22 +113,76 @@ export function HostAssignmentSheet({
 
       const resolved: ResponseWithFamily[] = []
       for (const r of respRows ?? []) {
-        if (!r.member_id) continue
-        const { data: member } = await supabase
-          .from("members")
-          .select("full_name, family_id, families(family_name)")
-          .eq("id", r.member_id)
-          .returns<{ full_name: string; family_id: string; families: { family_name: string } | null }[]>()
-          .single()
-        if (member) {
-          const matchVal = r.data[matchField]
-          resolved.push({
-            responseId: r.id,
-            familyId: member.family_id,
-            familyName: member.families?.family_name ?? member.full_name,
-            memberName: member.full_name,
-            matchValue: typeof matchVal === "number" ? matchVal : String(matchVal ?? ""),
-          })
+        const matchVal = r.data[matchField]
+        const matchStr = typeof matchVal === "number" ? matchVal : String(matchVal ?? "")
+
+        if (r.member_id) {
+          const { data: member } = await supabase
+            .from("members")
+            .select("full_name, family_id, families(family_name)")
+            .eq("id", r.member_id)
+            .returns<{ full_name: string; family_id: string; families: { family_name: string } | null }[]>()
+            .single()
+          if (member) {
+            resolved.push({
+              responseId: r.id,
+              familyId: member.family_id,
+              familyName: member.families?.family_name ?? member.full_name,
+              memberName: member.full_name,
+              matchValue: matchStr,
+            })
+          }
+        } else {
+          // No member_id — try to find family from _memberId in data or use name fields
+          const embeddedMemberId = r.data._memberId as string | undefined
+          if (embeddedMemberId) {
+            const { data: member } = await supabase
+              .from("members")
+              .select("full_name, family_id, families(family_name)")
+              .eq("id", embeddedMemberId)
+              .returns<{ full_name: string; family_id: string; families: { family_name: string } | null }[]>()
+              .single()
+            if (member) {
+              resolved.push({
+                responseId: r.id,
+                familyId: member.family_id,
+                familyName: member.families?.family_name ?? member.full_name,
+                memberName: member.full_name,
+                matchValue: matchStr,
+              })
+              continue
+            }
+          }
+          // Fallback: use any name-like field from response data
+          const nameVal = r.data._memberName as string ?? r.data.name as string ?? r.data.host_name as string ?? ""
+          if (nameVal) {
+            // Try to find member by name
+            const { data: memberMatch } = await supabase
+              .from("members")
+              .select("full_name, family_id, families(family_name)")
+              .ilike("full_name", nameVal)
+              .eq("is_active", true)
+              .returns<{ full_name: string; family_id: string; families: { family_name: string } | null }[]>()
+              .limit(1)
+            if (memberMatch?.length) {
+              resolved.push({
+                responseId: r.id,
+                familyId: memberMatch[0].family_id,
+                familyName: memberMatch[0].families?.family_name ?? memberMatch[0].full_name,
+                memberName: memberMatch[0].full_name,
+                matchValue: matchStr,
+              })
+            } else {
+              // Can't resolve family — include with empty familyId so admin sees it
+              resolved.push({
+                responseId: r.id,
+                familyId: "",
+                familyName: nameVal,
+                memberName: nameVal,
+                matchValue: matchStr,
+              })
+            }
+          }
         }
       }
 
