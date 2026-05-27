@@ -64,12 +64,16 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
     city: string
     state: string
     zip: string
+    anniversaryMonth: string
+    anniversaryDay: string
+    anniversaryYear: string
     members: { id: string; firstName: string; lastName: string; cellPhone: string; email: string; role: string; birthMonth: string; birthDay: string; birthYear: string }[]
   } | null>(null)
   const [saving, setSaving] = useState(false)
 
   function openEditDialog(family: FamilyWithDetails) {
     const addr = family.addresses.find((a) => a.is_current)
+    const anniv = family.wedding_anniversaries[0]
     const roleOrder: Record<string, number> = { husband: 0, wife: 1, child: 2 }
     const sorted = [...family.members].sort((a, b) => (roleOrder[a.role_in_family] ?? 3) - (roleOrder[b.role_in_family] ?? 3))
     setEditForm({
@@ -79,6 +83,9 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
       city: addr?.city ?? "",
       state: addr?.state ?? "",
       zip: addr?.zip ?? "",
+      anniversaryMonth: anniv?.anniversary_month?.toString() ?? "",
+      anniversaryDay: anniv?.anniversary_day?.toString() ?? "",
+      anniversaryYear: anniv?.anniversary_year?.toString() ?? "",
       members: sorted.map((m) => ({
         id: m.id,
         firstName: m.first_name,
@@ -152,6 +159,32 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
         birth_day: mf.birthDay ? parseInt(mf.birthDay, 10) : null,
         birth_year: mf.birthYear ? parseInt(mf.birthYear, 10) : null,
       } as never).eq("id", mf.id)
+    }
+
+    // Upsert anniversary
+    const annivMonth = editForm.anniversaryMonth ? parseInt(editForm.anniversaryMonth, 10) : null
+    const annivDay = editForm.anniversaryDay ? parseInt(editForm.anniversaryDay, 10) : null
+    const annivYear = editForm.anniversaryYear ? parseInt(editForm.anniversaryYear, 10) : null
+    const existingAnniv = editFamily.wedding_anniversaries[0]
+    const husband = editForm.members.find((m) => m.role === "husband")
+    const wife = editForm.members.find((m) => m.role === "wife")
+
+    if (annivMonth && annivDay) {
+      const annivPayload = {
+        family_id: editFamily.id,
+        husband_member_id: husband?.id ?? editForm.members[0]?.id,
+        wife_member_id: wife?.id ?? editForm.members[1]?.id ?? editForm.members[0]?.id,
+        anniversary_month: annivMonth,
+        anniversary_day: annivDay,
+        anniversary_year: annivYear,
+      }
+      if (existingAnniv) {
+        await supabase.from("wedding_anniversaries").update(annivPayload as never).eq("id", existingAnniv.id)
+      } else {
+        await supabase.from("wedding_anniversaries").insert(annivPayload as never)
+      }
+    } else if (existingAnniv && !annivMonth && !annivDay) {
+      await supabase.from("wedding_anniversaries").delete().eq("id", existingAnniv.id)
     }
 
     // Refresh local state
@@ -476,6 +509,37 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
                   <Input value={editForm.zip} onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })} placeholder="ZIP" />
                 </div>
               </div>
+            </section>
+
+            <Separator />
+
+            {/* Anniversary */}
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Wedding Anniversary</h3>
+              <div className="flex items-center gap-2">
+                <Heart className="size-3.5 shrink-0 text-pink-500" />
+                <div className="grid flex-1 grid-cols-3 gap-1.5">
+                  <Input
+                    value={editForm.anniversaryMonth}
+                    onChange={(e) => setEditForm({ ...editForm, anniversaryMonth: e.target.value })}
+                    placeholder="MM"
+                    className="text-center text-sm"
+                  />
+                  <Input
+                    value={editForm.anniversaryDay}
+                    onChange={(e) => setEditForm({ ...editForm, anniversaryDay: e.target.value })}
+                    placeholder="DD"
+                    className="text-center text-sm"
+                  />
+                  <Input
+                    value={editForm.anniversaryYear}
+                    onChange={(e) => setEditForm({ ...editForm, anniversaryYear: e.target.value })}
+                    placeholder="YYYY"
+                    className="text-center text-sm"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Leave blank to remove. Used for anniversary cards and reports.</p>
             </section>
 
             <Separator />
