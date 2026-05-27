@@ -41,9 +41,11 @@ import {
   Users,
   Copy,
   ExternalLink,
+  CalendarCheck,
 } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { HostAssignmentSheet } from "@/components/signup/host-assignment-sheet"
 
 interface FormInfo {
   id: string
@@ -75,6 +77,7 @@ export default function SignupResponsesPage() {
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortAsc, setSortAsc] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [assignOpen, setAssignOpen] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -276,6 +279,12 @@ export default function SignupResponsesPage() {
             Export CSV
           </Button>
         )}
+        {responses.length > 0 && form.fields.some((f) => f.type === "month_picker" || f.type === "date") && (
+          <Button size="sm" onClick={() => setAssignOpen(true)}>
+            <CalendarCheck className="size-3.5" />
+            Assign to Calendar
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -359,6 +368,18 @@ export default function SignupResponsesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Host assignment sheet */}
+      {form && (
+        <HostAssignmentSheet
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+          formId={formId}
+          formTitle={form.title}
+          matchField={form.fields.find((f) => f.type === "month_picker" || f.type === "date")?.id ?? ""}
+          onSuccess={fetchData}
+        />
+      )}
     </div>
   )
 }
