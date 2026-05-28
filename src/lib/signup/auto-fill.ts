@@ -125,7 +125,7 @@ export async function resolveSignupAutoFill(
         if (typeof val === "object" && val !== null) {
           const addr = val as { street?: string; city?: string; state?: string; zip?: string }
           result.address = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(", ")
-          if (addr.city) result.city = [addr.city, addr.state, addr.zip].filter(Boolean).join(", ")
+          if (addr.city && !result.city) result.city = addr.city
         } else if (typeof val === "string") {
           result.address = val
         }

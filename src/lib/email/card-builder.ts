@@ -709,7 +709,8 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData, style?: Styl
 
   let details = detailRow("When", `${data.date} at ${data.time}`);
   details += detailRow("Host", data.hostNames);
-  details += detailRow("Where", data.address + (data.city ? `<br/>${data.city}` : ""));
+  const showCity = data.city && !data.address.toLowerCase().includes(data.city.toLowerCase())
+  details += detailRow("Where", data.address + (showCity ? `<br/>${data.city}` : ""));
   if (data.phone) details += detailRow("Contact", data.phone);
   if (data.dinnerNote) details += detailRow("Dinner", data.dinnerNote);
 
