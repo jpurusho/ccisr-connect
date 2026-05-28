@@ -195,32 +195,79 @@ export function HostAssignmentSheet({
 
   // Recompute preview when month or responses change
   useEffect(() => {
-    if (!recurrenceRule || loading) return
+    if (!recurrenceRule || loading || !eventId) return
 
-    const occurrences = computeOccurrencesForMonth(recurrenceRule, targetYear, targetMonth)
+    async function buildPreview() {
+      const evtId = eventId!
+      const supabase = createClient()
+      const occurrences = computeOccurrencesForMonth(recurrenceRule!, targetYear, targetMonth)
+      if (occurrences.length === 0) { setPreview([]); return }
 
-    // Filter responses matching target month
-    const monthResponses = responses.filter((r) => {
-      if (typeof r.matchValue === "number") return r.matchValue === targetMonth
-      const idx = MONTHS.findIndex((m) => m.toLowerCase() === String(r.matchValue).toLowerCase())
-      return idx === targetMonth
-    })
+      const startStr = format(occurrences[0], "yyyy-MM-dd")
+      const endStr = format(occurrences[occurrences.length - 1], "yyyy-MM-dd")
 
-    const p = buildRotationPreview(
-      occurrences,
-      monthResponses,
-      []
-    )
+      // Fetch existing instances for this month
+      const { data: existingRows } = await supabase
+        .from("event_instances")
+        .select("instance_date, host_family_id, signup_response_id")
+        .eq("event_id", evtId)
+        .gte("instance_date", startStr)
+        .lte("instance_date", endStr)
+        .returns<{ instance_date: string; host_family_id: string | null; signup_response_id: string | null }[]>()
 
-    // Resolve family names for non-existing entries
-    const withNames = p.map((item) => {
-      if (item.existing) return item
-      const resp = monthResponses.find((r) => r.responseId === item.responseId)
-      return { ...item, familyName: resp?.familyName ?? null, memberName: resp?.memberName ?? null }
-    })
+      const existingInstances = (existingRows ?? []).map((r) => ({
+        date: r.instance_date,
+        hostFamilyId: r.host_family_id,
+        responseId: r.signup_response_id,
+      }))
 
-    setPreview(withNames)
-  }, [targetMonth, targetYear, responses, recurrenceRule, loading])
+      // Also fetch husband/wife names for existing hosts
+      const hostFamilyIds = [...new Set((existingRows ?? []).filter((r) => r.host_family_id).map((r) => r.host_family_id!))]
+      const familyNameMap = new Map<string, string>()
+      if (hostFamilyIds.length > 0) {
+        const { data: members } = await supabase
+          .from("members")
+          .select("family_id, first_name, role_in_family")
+          .in("family_id", hostFamilyIds)
+          .in("role_in_family", ["husband", "wife"])
+          .eq("is_active", true)
+          .returns<{ family_id: string; first_name: string; role_in_family: string }[]>()
+        if (members) {
+          const byFamily = new Map<string, { husband?: string; wife?: string }>()
+          for (const m of members) {
+            if (!byFamily.has(m.family_id)) byFamily.set(m.family_id, {})
+            byFamily.get(m.family_id)![m.role_in_family as "husband" | "wife"] = m.first_name
+          }
+          for (const [fid, names] of byFamily) {
+            if (names.husband && names.wife) familyNameMap.set(fid, `${names.husband} & ${names.wife}`)
+            else familyNameMap.set(fid, names.husband || names.wife || "")
+          }
+        }
+      }
+
+      // Filter responses matching target month
+      const monthResponses = responses.filter((r) => {
+        if (typeof r.matchValue === "number") return r.matchValue === targetMonth
+        const idx = MONTHS.findIndex((m) => m.toLowerCase() === String(r.matchValue).toLowerCase())
+        return idx === targetMonth
+      })
+
+      const p = buildRotationPreview(occurrences, monthResponses, existingInstances)
+
+      // Resolve names
+      const withNames = p.map((item) => {
+        if (item.existing && item.familyId) {
+          return { ...item, familyName: familyNameMap.get(item.familyId) ?? item.familyId, memberName: null }
+        }
+        const resp = monthResponses.find((r) => r.responseId === item.responseId)
+        return { ...item, familyName: resp?.familyName ?? null, memberName: resp?.memberName ?? null }
+      })
+
+      setPreview(withNames)
+    }
+
+    buildPreview()
+  }, [targetMonth, targetYear, responses, recurrenceRule, loading, eventId])
 
   function handleShuffle() {
     if (!recurrenceRule) return
@@ -336,11 +383,15 @@ export function HostAssignmentSheet({
               <p className="text-sm text-muted-foreground py-4">No occurrences this month for this event.</p>
             ) : (
               <div className="space-y-2">
-                {preview.map((item) => (
+                {preview.map((item) => {
+                  const isPast = new Date(item.date + "T23:59:59") < new Date()
+                  return (
                   <div
                     key={item.date}
                     className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
-                      item.existing
+                      isPast
+                        ? "opacity-40"
+                        : item.existing
                         ? "bg-muted/30 border-dashed"
                         : item.familyId
                         ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/40"
@@ -355,6 +406,8 @@ export function HostAssignmentSheet({
                     <div className="flex-1 min-w-0">
                       {item.familyName ? (
                         <p className="text-sm truncate">{item.familyName}</p>
+                      ) : isPast ? (
+                        <p className="text-sm text-muted-foreground italic">Past</p>
                       ) : (
                         <p className="text-sm text-muted-foreground italic">Unassigned</p>
                       )}
@@ -365,11 +418,15 @@ export function HostAssignmentSheet({
                     {item.existing && (
                       <Badge variant="secondary" className="text-[10px] shrink-0">Already set</Badge>
                     )}
-                    {!item.existing && item.familyId && (
+                    {!item.existing && item.familyId && !isPast && (
                       <UserCheck className="size-3.5 text-green-600 shrink-0" />
                     )}
+                    {isPast && !item.existing && (
+                      <Badge variant="outline" className="text-[10px] shrink-0 opacity-60">Past</Badge>
+                    )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
