@@ -1094,17 +1094,27 @@ export default function DashboardPage() {
       // Helper: resolve host family info from an instance
       async function resolveHostFamily(hostFamilyId: string | null) {
         if (!hostFamilyId) return { hostName: "TBD", address: "TBD", city: "", phone: "" }
-        const [familyRes, addrRes] = await Promise.all([
+        const [familyRes, addrRes, membersRes] = await Promise.all([
           supabase.from("families").select("family_name, home_phone").eq("id", hostFamilyId)
             .returns<{ family_name: string; home_phone: string | null }[]>().single(),
           supabase.from("addresses").select("full_address, city, state, zip").eq("family_id", hostFamilyId).eq("is_current", true)
             .returns<{ full_address: string; city: string | null; state: string | null; zip: string | null }[]>().limit(1).single(),
+          supabase.from("members").select("first_name, role_in_family, cell_phone").eq("family_id", hostFamilyId).eq("is_active", true)
+            .in("role_in_family", ["husband", "wife"]).order("role_in_family")
+            .returns<{ first_name: string; role_in_family: string; cell_phone: string | null }[]>(),
         ])
+        const husband = membersRes.data?.find((m) => m.role_in_family === "husband")
+        const wife = membersRes.data?.find((m) => m.role_in_family === "wife")
+        let hostName = familyRes.data?.family_name ?? "TBD"
+        if (husband && wife) hostName = `${husband.first_name} & ${wife.first_name}`
+        else if (husband) hostName = husband.first_name
+        else if (wife) hostName = wife.first_name
+        const phone = husband?.cell_phone ?? wife?.cell_phone ?? familyRes.data?.home_phone ?? ""
         return {
-          hostName: familyRes.data?.family_name ?? "TBD",
+          hostName,
           address: addrRes.data?.full_address ?? "TBD",
           city: [addrRes.data?.city, addrRes.data?.state, addrRes.data?.zip].filter(Boolean).join(", "),
-          phone: familyRes.data?.home_phone ?? "",
+          phone,
         }
       }
 
