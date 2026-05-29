@@ -257,8 +257,6 @@ export default function ReportsPage() {
         supabase
           .from("signup_responses")
           .select("form_id, created_at")
-          .gte("created_at", startStr + "T00:00:00")
-          .lte("created_at", endStr + "T23:59:59")
           .order("created_at", { ascending: false })
           .returns<{ form_id: string; created_at: string }[]>(),
         supabase
@@ -748,12 +746,12 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <ClipboardList className="size-5 text-indigo-600" />
-                Signup Activity
+                Signup Forms
               </CardTitle>
               <ChevronDown className={`size-4 text-muted-foreground transition-transform ${collapsedSections.has("signups") ? "-rotate-90" : ""}`} />
             </div>
             <CardDescription>
-              Form submissions this {periodMode}
+              Total responses per form
             </CardDescription>
           </CardHeader>
           {!collapsedSections.has("signups") && (
@@ -761,7 +759,7 @@ export default function ReportsPage() {
               {!signups ? (
                 <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
               ) : signups.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No signups this {periodMode}.</p>
+                <p className="text-sm text-muted-foreground">No signup responses yet.</p>
               ) : (
                 <div className="space-y-2">
                   {signups.map((s) => (
