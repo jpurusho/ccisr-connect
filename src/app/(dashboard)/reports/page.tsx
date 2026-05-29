@@ -251,7 +251,7 @@ export default function ReportsPage() {
           .from("dispatch_queue")
           .select("template_type, status")
           .not("status", "eq", "cancelled")
-          .or(`week_start.gte.${startStr},week_start.lte.${endStr},and(week_start.is.null,created_at.gte.${startStr},created_at.lte.${endStr}T23:59:59)`)
+          .or(`and(week_start.gte.${startStr},week_start.lte.${endStr}),and(week_start.is.null,created_at.gte.${startStr},created_at.lte.${endStr}T23:59:59)`)
           .returns<{ template_type: string | null; status: string }[]>(),
         supabase.from("signup_forms").select("id, title").eq("is_active", true).returns<{ id: string; title: string }[]>(),
         supabase

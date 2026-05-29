@@ -1199,11 +1199,11 @@ export default function DashboardPage() {
           }
         }
 
-        // Fall back to event/instance host assignment if no signup match
-        if (bsHostData.hostName === "TBD") {
-          if (bsInstance?.host_family_id) {
-            bsHostData = await resolveHostFamily(bsInstance.host_family_id)
-          } else if (bsEvent?.host_family_id) {
+        // Instance/event host_family_id is authoritative (overrides signup raw name)
+        if (bsInstance?.host_family_id) {
+          bsHostData = await resolveHostFamily(bsInstance.host_family_id)
+        } else if (bsHostData.hostName === "TBD") {
+          if (bsEvent?.host_family_id) {
             const expired = bsEvent.host_until ? new Date(bsEvent.host_until + "T23:59:59") < new Date() : false
             if (!expired) bsHostData = await resolveHostFamily(bsEvent.host_family_id)
           }
@@ -1314,11 +1314,11 @@ export default function DashboardPage() {
           }
         }
 
-        // Fall back to event/instance host
-        if (pmHostData.hostName === "TBD") {
-          if (pmInstance?.host_family_id) {
-            pmHostData = await resolveHostFamily(pmInstance.host_family_id)
-          } else if (pmEvent?.host_family_id) {
+        // Instance/event host_family_id is authoritative
+        if (pmInstance?.host_family_id) {
+          pmHostData = await resolveHostFamily(pmInstance.host_family_id)
+        } else if (pmHostData.hostName === "TBD") {
+          if (pmEvent?.host_family_id) {
             const expired = pmEvent.host_until ? new Date(pmEvent.host_until + "T23:59:59") < new Date() : false
             if (!expired) pmHostData = await resolveHostFamily(pmEvent.host_family_id)
           }
