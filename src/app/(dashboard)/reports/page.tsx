@@ -257,8 +257,8 @@ export default function ReportsPage() {
         supabase
           .from("signup_responses")
           .select("form_id, created_at")
-          .gte("created_at", rangeStart.toISOString())
-          .lte("created_at", rangeEnd.toISOString())
+          .gte("created_at", startStr + "T00:00:00")
+          .lte("created_at", endStr + "T23:59:59")
           .order("created_at", { ascending: false })
           .returns<{ form_id: string; created_at: string }[]>(),
         supabase
