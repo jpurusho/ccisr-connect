@@ -253,7 +253,7 @@ export default function ReportsPage() {
           .not("status", "eq", "cancelled")
           .or(`and(week_start.gte.${startStr},week_start.lte.${endStr}),and(week_start.is.null,created_at.gte.${startStr},created_at.lte.${endStr}T23:59:59)`)
           .returns<{ template_type: string | null; status: string }[]>(),
-        supabase.from("signup_forms").select("id, title").eq("is_active", true).returns<{ id: string; title: string }[]>(),
+        supabase.from("signup_forms").select("id, title").in("status", ["active", "closed"]).returns<{ id: string; title: string }[]>(),
         supabase
           .from("signup_responses")
           .select("form_id, created_at")
