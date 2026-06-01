@@ -1135,11 +1135,18 @@ export default function DashboardPage() {
       // ---- Signup auto-fill accumulator ----
       const autoFills: Partial<Record<CommType, AutoFillResult>> = {}
 
-      // ---- Process Bible Study (recurrence-based) ----
+      // ---- Process Bible Study ----
       const hasBsDraft = !!composedMap["bible_study"]
       const bsEvent = findEventByType("bible_study")
       const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, wkSun, wkSat) : []
-      const bsRawDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
+      let bsRawDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
+      if (!bsRawDate && bsEvent && !bsEvent.recurrence_rule) {
+        const evtAny = bsEvent as typeof bsEvent & { start_date?: string | null }
+        if (evtAny.start_date) {
+          const sd = new Date(evtAny.start_date + "T00:00:00")
+          if (sd >= wkSun && sd <= wkSat) bsRawDate = sd
+        }
+      }
       const bsInstance = bsRawDate && bsEvent ? findInstance(bsEvent.id, format(bsRawDate, "yyyy-MM-dd")) : null
       const bsCancelled = bsInstance?.status === "cancelled"
       const bsDate = bsCancelled ? null : bsRawDate
@@ -1235,7 +1242,14 @@ export default function DashboardPage() {
       const hasWsDraft = !!composedMap["womens_study"]
       const wsEvent = findEventByType("womens_study")
       const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, wkSun, wkSat) : []
-      const wsRawDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
+      let wsRawDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
+      if (!wsRawDate && wsEvent && !wsEvent.recurrence_rule) {
+        const evtAny = wsEvent as typeof wsEvent & { start_date?: string | null }
+        if (evtAny.start_date) {
+          const sd = new Date(evtAny.start_date + "T00:00:00")
+          if (sd >= wkSun && sd <= wkSat) wsRawDate = sd
+        }
+      }
       const wsInstance = wsRawDate && wsEvent ? findInstance(wsEvent.id, format(wsRawDate, "yyyy-MM-dd")) : null
       const wsCancelled = wsInstance?.status === "cancelled"
       const wsDate = wsCancelled ? null : wsRawDate
@@ -1270,11 +1284,18 @@ export default function DashboardPage() {
         })
       }
 
-      // ---- Prayer Meeting (recurrence-based) ----
+      // ---- Prayer Meeting ----
       const hasPmDraft = !!composedMap["prayer_meeting"]
       const pmEvent = findEventByType("prayer_meeting")
       const pmOccurrences = pmEvent ? getOccurrences(pmEvent.recurrence_rule, wkSun, wkSat) : []
-      const pmRawDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
+      let pmRawDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
+      if (!pmRawDate && pmEvent && !pmEvent.recurrence_rule) {
+        const evtAny = pmEvent as typeof pmEvent & { start_date?: string | null }
+        if (evtAny.start_date) {
+          const sd = new Date(evtAny.start_date + "T00:00:00")
+          if (sd >= wkSun && sd <= wkSat) pmRawDate = sd
+        }
+      }
       const pmInstance = pmRawDate && pmEvent ? findInstance(pmEvent.id, format(pmRawDate, "yyyy-MM-dd")) : null
       const pmCancelled = pmInstance?.status === "cancelled"
       const pmDate = pmCancelled ? null : pmRawDate
