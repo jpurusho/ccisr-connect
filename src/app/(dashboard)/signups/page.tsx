@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu"
 import {
   Plus,
   Save,
@@ -238,7 +239,9 @@ export default function SignupsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {forms.map((form) => (
-            <Card key={form.id} className="relative group">
+            <ContextMenu key={form.id}>
+              <ContextMenuTrigger>
+            <Card className="relative group">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -298,6 +301,29 @@ export default function SignupsPage() {
                 </div>
               </CardContent>
             </Card>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onSelect={() => handleEdit(form)}>
+                  <Pencil className="size-3.5" /> Edit
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => router.push(`/signups/${form.id}`)}>
+                  <Eye className="size-3.5" /> View Responses
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => copyLink(form.slug)}>
+                  <Copy className="size-3.5" /> Copy Link
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => previewForm(form.slug)}>
+                  <ExternalLink className="size-3.5" /> Preview
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem variant="destructive" onSelect={() => toggleStatus(form)}>
+                  {form.status === "active" ? "Deactivate" : "Activate"}
+                </ContextMenuItem>
+                <ContextMenuItem variant="destructive" onSelect={() => handleDelete(form)}>
+                  <Trash2 className="size-3.5" /> Delete
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           ))}
         </div>
       )}
