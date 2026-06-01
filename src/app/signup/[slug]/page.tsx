@@ -664,9 +664,11 @@ function FieldRenderer({
                     className="rounded border-gray-300"
                   />
                   <span>{opt.label}</span>
-                  <span className={`text-xs ${full ? "text-red-500" : "text-gray-400"}`}>
-                    ({taken}/{opt.capacity})
-                  </span>
+                  {taken > 0 && (
+                    <span className={`text-xs ${full ? "text-red-500" : "text-gray-400"}`}>
+                      {opt.capacity < 50 ? `(${taken}/${opt.capacity})` : `(${taken} signed up)`}
+                    </span>
+                  )}
                 </label>
               )
             })}
@@ -932,12 +934,21 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
   const addrStr = addr ? [addr.street, addr.city, [addr.state, addr.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") : undefined
   const phoneField = fields.find((f) => f.type === "phone")
   const phone = phoneField ? (data[phoneField.id] as string) : undefined
+  const claimField = fields.find((f) => f.type === "claim_select")
+  const claimedItems = claimField ? (data[claimField.id] as string[] | undefined) : undefined
+  const numberFields = fields.filter((f) => f.type === "number")
+  const attendees = numberFields.map((f) => ({ label: f.label, value: data[f.id] as number })).filter((a) => a.value > 0)
 
   return (
     <div className="rounded-lg border px-4 py-3" style={{ borderColor: colors.border, backgroundColor: colors.bgLight }}>
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold text-sm" style={{ color: colors.textDark }}>{name}</span>
         <div className="flex items-center gap-2">
+          {attendees.length > 0 && (
+            <span className="text-xs text-gray-500">
+              {attendees.map((a) => `${a.value}`).join("+")}
+            </span>
+          )}
           {month && (
             <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.primary, color: "#fff" }}>
               {month}
@@ -956,8 +967,16 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
           )}
         </div>
       </div>
-      {(addrStr || phone) && (
+      {(claimedItems?.length || addrStr || phone) && (
         <div className="mt-1.5 space-y-0.5">
+          {claimedItems && claimedItems.length > 0 && (
+            <p className="text-xs font-medium" style={{ color: colors.primary }}>
+              Bringing: {claimedItems.map((item) => {
+                const opt = claimField && "options" in claimField ? (claimField as { options: { value: string; label: string }[] }).options.find((o) => o.value === item) : null
+                return opt?.label ?? item
+              }).join(", ")}
+            </p>
+          )}
           {addrStr && <p className="text-xs" style={{ color: colors.textLight }}>{addrStr}</p>}
           {phone && <p className="text-xs" style={{ color: colors.textLight }}>{phone}</p>}
         </div>
