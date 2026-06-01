@@ -409,18 +409,22 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    @apply font-sans;
+    font-size: 15px;
+    line-height: 1.6;
+    letter-spacing: -0.01em;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-  }
-  html {
-    @apply font-sans;
-    font-size: 15px;
-    line-height: 1.6;
-    letter-spacing: -0.01em;
+    overflow: hidden;
+    height: 100dvh;
   }
   h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.025em;
