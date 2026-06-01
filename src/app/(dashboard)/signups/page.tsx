@@ -303,23 +303,23 @@ export default function SignupsPage() {
             </Card>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onSelect={() => handleEdit(form)}>
+                <ContextMenuItem onClick={() => handleEdit(form)}>
                   <Pencil className="size-3.5" /> Edit
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => router.push(`/signups/${form.id}`)}>
+                <ContextMenuItem onClick={() => router.push(`/signups/${form.id}`)}>
                   <Eye className="size-3.5" /> View Responses
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => copyLink(form.slug)}>
+                <ContextMenuItem onClick={() => copyLink(form.slug)}>
                   <Copy className="size-3.5" /> Copy Link
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => previewForm(form.slug)}>
+                <ContextMenuItem onClick={() => previewForm(form.slug)}>
                   <ExternalLink className="size-3.5" /> Preview
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem variant="destructive" onSelect={() => toggleStatus(form)}>
+                <ContextMenuItem variant="destructive" onClick={() => toggleStatus(form)}>
                   {form.status === "active" ? "Deactivate" : "Activate"}
                 </ContextMenuItem>
-                <ContextMenuItem variant="destructive" onSelect={() => handleDelete(form)}>
+                <ContextMenuItem variant="destructive" onClick={() => handleDelete(form)}>
                   <Trash2 className="size-3.5" /> Delete
                 </ContextMenuItem>
               </ContextMenuContent>

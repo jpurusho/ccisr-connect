@@ -473,21 +473,21 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
           </Card>
           </ContextMenuTrigger>
           <ContextMenuContent>
-            <ContextMenuItem onSelect={() => openEditDialog(family)}>
+            <ContextMenuItem onClick={() => openEditDialog(family)}>
               <Pencil className="size-3.5" /> Edit Family
             </ContextMenuItem>
-            <ContextMenuItem onSelect={() => router.push(`/members/${family.members[0]?.id}`)}>
+            <ContextMenuItem onClick={() => router.push(`/members/${family.members[0]?.id}`)}>
               View Members
             </ContextMenuItem>
             <ContextMenuSeparator />
-            <ContextMenuItem onSelect={() => {
+            <ContextMenuItem onClick={() => {
               const addr = family.addresses.find((a) => a.is_current)
               if (addr?.full_address) navigator.clipboard.writeText(addr.full_address)
             }}>
               Copy Address
             </ContextMenuItem>
             {family.home_phone && (
-              <ContextMenuItem onSelect={() => navigator.clipboard.writeText(family.home_phone!)}>
+              <ContextMenuItem onClick={() => navigator.clipboard.writeText(family.home_phone!)}>
                 Copy Phone
               </ContextMenuItem>
             )}

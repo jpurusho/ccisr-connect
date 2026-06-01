@@ -132,20 +132,20 @@ export function WeekView({ days, events, onEventClick, onDayClick, onEditEvent, 
                   </ContextMenuTrigger>
                   {event.kind === "event" && (
                     <ContextMenuContent>
-                      <ContextMenuItem onSelect={() => onEventClick(event)}>
+                      <ContextMenuItem onClick={() => onEventClick(event)}>
                         <CalendarDays className="size-3.5" /> View Details
                       </ContextMenuItem>
                       {onEditEvent && event.eventId && (
-                        <ContextMenuItem onSelect={() => onEditEvent(event)}>
+                        <ContextMenuItem onClick={() => onEditEvent(event)}>
                           <Pencil className="size-3.5" /> Edit Series
                         </ContextMenuItem>
                       )}
                       <ContextMenuSeparator />
-                      <ContextMenuItem onSelect={() => navigator.clipboard.writeText(event.title)}>
+                      <ContextMenuItem onClick={() => navigator.clipboard.writeText(event.title)}>
                         <Copy className="size-3.5" /> Copy Title
                       </ContextMenuItem>
                       {onCancelInstance && event.status !== "cancelled" && (
-                        <ContextMenuItem variant="destructive" onSelect={() => onCancelInstance(event)}>
+                        <ContextMenuItem variant="destructive" onClick={() => onCancelInstance(event)}>
                           <Ban className="size-3.5" /> Cancel This Week
                         </ContextMenuItem>
                       )}
