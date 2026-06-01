@@ -244,8 +244,8 @@ export default function PublicSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 text-gray-900">
-      <div className="mx-auto w-full max-w-lg md:max-w-2xl">
+    <div className="min-h-screen bg-slate-50 py-8 px-4 text-gray-900 overflow-x-hidden">
+      <div className="mx-auto w-full max-w-lg md:max-w-2xl overflow-hidden">
         {/* Header */}
         <div
           className="rounded-t-xl p-6 text-center"
