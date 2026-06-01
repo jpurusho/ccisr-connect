@@ -639,11 +639,16 @@ function FieldRenderer({
     case "claim_select": {
       const selected = (value as string[]) || []
       const claimCounts: Record<string, number> = {}
+      const optionValues = new Set(field.options.map((o) => o.value))
+      const customItems = new Map<string, number>()
       for (const r of responses) {
         const items = r.data[field.id]
         if (Array.isArray(items)) {
           for (const item of items) {
-            if (typeof item === "string") claimCounts[item] = (claimCounts[item] || 0) + 1
+            if (typeof item === "string") {
+              claimCounts[item] = (claimCounts[item] || 0) + 1
+              if (!optionValues.has(item)) customItems.set(item, (customItems.get(item) || 0) + 1)
+            }
           }
         }
       }
@@ -680,6 +685,30 @@ function FieldRenderer({
                 </label>
               )
             })}
+            {customItems.size > 0 && (
+              <>
+                <div className="border-t my-2" />
+                {Array.from(customItems.entries()).map(([item, count]) => {
+                  const checked = selected.includes(item)
+                  return (
+                    <label key={item} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={atMax && !checked}
+                        onChange={() => {
+                          if (checked) onChange(selected.filter((v) => v !== item))
+                          else onChange([...selected, item])
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <span>{item}</span>
+                      <span className="text-xs text-gray-400">({count} signed up)</span>
+                    </label>
+                  )
+                })}
+              </>
+            )}
           </div>
           {field.allowCustom && (
             <div className="flex gap-2 mt-2">
