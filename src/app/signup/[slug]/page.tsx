@@ -245,7 +245,7 @@ export default function PublicSignupPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 text-gray-900">
-      <div className="mx-auto w-full max-w-lg">
+      <div className="mx-auto w-full max-w-lg md:max-w-2xl">
         {/* Header */}
         <div
           className="rounded-t-xl p-6 text-center"
@@ -285,10 +285,13 @@ export default function PublicSignupPage() {
             <input type="text" id="__hp_website" name="website" tabIndex={-1} autoComplete="off" />
           </div>
 
-          <div className="space-y-5">
-            {form.fields.filter((f) => !f.hidden).map((field) => (
+          <div className="grid gap-5 md:grid-cols-2">
+            {form.fields.filter((f) => !f.hidden).map((field) => {
+              const wideTypes = ["textarea", "claim_select", "address", "multi_select"]
+              const isWide = wideTypes.includes(field.type)
+              return (
+              <div key={field.id} className={isWide ? "md:col-span-2" : ""}>
               <FieldRenderer
-                key={field.id}
                 field={field}
                 allFields={form.fields}
                 value={values[field.id]}
@@ -303,7 +306,9 @@ export default function PublicSignupPage() {
                 onMemberSelect={(m) => selectMember(m, form.fields)}
                 selectedMember={selectedMember}
               />
-            ))}
+              </div>
+              )
+            })}
           </div>
 
           {/* Signed up list — inline within form (only if show_responses enabled) */}
