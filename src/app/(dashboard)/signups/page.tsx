@@ -787,13 +787,14 @@ function FormEditor({
 
             {/* Add Field */}
             <Select onValueChange={(v) => addField(v as SignupFieldType)}>
-              <SelectTrigger className="h-8 text-xs border-dashed">
+              <SelectTrigger className="h-9 border-dashed w-48">
                 <SelectValue placeholder="+ Add field..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="min-w-[280px]">
                 {FIELD_TYPE_META.map((meta) => (
                   <SelectItem key={meta.type} value={meta.type}>
-                    {meta.label} — {meta.description}
+                    <span className="font-medium">{meta.label}</span>
+                    <span className="text-muted-foreground"> — {meta.description}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
