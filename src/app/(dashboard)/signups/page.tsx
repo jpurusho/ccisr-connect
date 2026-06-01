@@ -1051,9 +1051,19 @@ function ClaimOptionsEditor({
   options: { value: string; label: string; capacity: number }[]
   onChange: (opts: { value: string; label: string; capacity: number }[]) => void
 }) {
+  const hasLimits = options.some((o) => o.capacity < 50)
+
+  function toggleLimits(enabled: boolean) {
+    if (enabled) {
+      onChange(options.map((o) => ({ ...o, capacity: o.capacity >= 50 ? 2 : o.capacity })))
+    } else {
+      onChange(options.map((o) => ({ ...o, capacity: 99 })))
+    }
+  }
+
   function addOption() {
     const num = options.length + 1
-    onChange([...options, { value: `item${num}`, label: `Item ${num}`, capacity: 2 }])
+    onChange([...options, { value: `item${num}`, label: `Item ${num}`, capacity: hasLimits ? 2 : 99 }])
   }
 
   function removeOption(index: number) {
@@ -1070,7 +1080,13 @@ function ClaimOptionsEditor({
 
   return (
     <div className="space-y-1.5 pl-3 border-l-2 border-muted">
-      <p className="text-xs text-muted-foreground font-medium">Items (label + capacity)</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground font-medium">Items</p>
+        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
+          <input type="checkbox" checked={hasLimits} onChange={(e) => toggleLimits(e.target.checked)} className="rounded" />
+          Limit per item
+        </label>
+      </div>
       {options.map((opt, i) => (
         <div key={i} className="flex items-center gap-2">
           <Input
@@ -1079,14 +1095,16 @@ function ClaimOptionsEditor({
             className="h-7 text-sm flex-1"
             placeholder="Item name"
           />
-          <Input
-            type="number"
-            value={opt.capacity}
-            onChange={(e) => updateCapacity(i, parseInt(e.target.value) || 1)}
-            className="h-7 text-sm w-16 text-center"
-            min={1}
-            title="Max capacity (use 99 for unlimited)"
-          />
+          {hasLimits && (
+            <Input
+              type="number"
+              value={opt.capacity}
+              onChange={(e) => updateCapacity(i, parseInt(e.target.value) || 1)}
+              className="h-7 text-sm w-16 text-center"
+              min={1}
+              title="Max capacity per item"
+            />
+          )}
           <button type="button" onClick={() => removeOption(i)} className="p-1 text-muted-foreground hover:text-destructive">
             <X className="size-3.5" />
           </button>
