@@ -727,7 +727,7 @@ export default function CalendarPage() {
         </div>
 
         {/* View toggle + Create button */}
-        <div className="flex items-center gap-2">
+        <div className="relative flex items-center gap-2">
           <Tabs
             value={view}
             onValueChange={(val) => {

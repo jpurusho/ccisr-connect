@@ -3,13 +3,6 @@
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -190,18 +183,19 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+      <Button variant="outline" size="sm" onClick={() => setDialogOpen(!dialogOpen)}>
         <Settings2 className="size-3.5" />
         Event Types
       </Button>
-      <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
-          <SheetHeader>
-            <SheetTitle>Event Types</SheetTitle>
-            <SheetDescription>
-              Manage categories, template associations, and info sections.
-            </SheetDescription>
-          </SheetHeader>
+      {dialogOpen && (
+        <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-xl border bg-popover p-4 shadow-lg sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-semibold">Event Types</h2>
+              <p className="text-xs text-muted-foreground">Manage categories, template associations, and info sections.</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setDialogOpen(false)}>Close</Button>
+          </div>
 
           <div className="space-y-3">
           {loading ? (
@@ -389,8 +383,8 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
             </>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+        </div>
+      )}
     </>
   )
 }

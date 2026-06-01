@@ -20,15 +20,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -305,29 +296,32 @@ export default function SignupsPage() {
         </div>
       )}
 
-      {/* Create/Edit Dialog */}
-      <FormDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        editForm={editingForm}
-        onSaved={() => { setDialogOpen(false); fetchForms() }}
-      />
+      {/* Inline Create/Edit Form */}
+      {dialogOpen && (
+        <Card className="border-primary/30 ring-1 ring-primary/20">
+          <CardContent className="p-4 sm:p-6">
+            <FormEditor
+              editForm={editingForm}
+              onSaved={() => { setDialogOpen(false); fetchForms() }}
+              onCancel={() => { setDialogOpen(false); setEditingForm(null) }}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
 
-// ── Form Dialog ────────────────────────────────────────────────────────────────
+// ── Form Editor (inline) ──────────────────────────────────────────────────────
 
-function FormDialog({
-  open,
-  onOpenChange,
+function FormEditor({
   editForm,
   onSaved,
+  onCancel,
 }: {
-  open: boolean
-  onOpenChange: (v: boolean) => void
   editForm: FormRow | null
   onSaved: () => void
+  onCancel: () => void
 }) {
   const isEdit = !!editForm
 
@@ -476,16 +470,11 @@ function FormDialog({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
-        <SheetHeader>
-          <SheetTitle>{isEdit ? "Edit Form" : "New Signup Form"}</SheetTitle>
-          <SheetDescription>
-            {isEdit ? "Update the form configuration" : "Create a new public signup form"}
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="space-y-6 px-4 pb-8">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">{isEdit ? "Edit Form" : "New Signup Form"}</h2>
+            <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+          </div>
           {/* Title & Description */}
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <div className="space-y-1.5">
@@ -736,18 +725,16 @@ function FormDialog({
           </div>
 
           {/* Save */}
-          <SheetFooter>
-            <Button size="sm" onClick={handleSave} disabled={saving || !title.trim()}>
-              {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
-              {isEdit ? "Update" : "Create"}
+          <div className="flex items-center gap-3 pt-4 border-t">
+            <Button onClick={handleSave} disabled={saving || !title.trim()}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {isEdit ? "Update Form" : "Create Form"}
             </Button>
-            <SheetClose render={<Button size="sm" variant="outline" />}>
+            <Button variant="outline" onClick={onCancel}>
               Cancel
-            </SheetClose>
-          </SheetFooter>
+            </Button>
+          </div>
         </div>
-      </SheetContent>
-    </Sheet>
   )
 }
 
