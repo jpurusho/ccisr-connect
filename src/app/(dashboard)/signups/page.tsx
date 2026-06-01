@@ -485,45 +485,43 @@ function FormDialog({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 px-4">
+        <div className="space-y-6 px-4 pb-8">
           {/* Title & Description */}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <div className="space-y-1.5">
-              <Label className="text-xs">Title</Label>
+              <Label>Title</Label>
               <Input
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
                 placeholder="e.g. Sunday Service Signup"
-                className="h-8 text-sm"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Slug</Label>
+              <Label>Slug</Label>
               <Input
                 value={slug}
                 onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                 placeholder="auto-generated"
-                className="h-8 text-sm font-mono"
+                className="font-mono"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Description</Label>
+            <Label>Description</Label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description shown on the form"
               rows={2}
-              className="text-sm"
             />
           </div>
 
           {/* Duration */}
           <div className="space-y-2">
-            <Label className="text-xs">Duration Type</Label>
+            <Label>Duration Type</Label>
             <Select value={durationType} onValueChange={(v) => setDurationType(v as typeof durationType)}>
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -581,11 +579,11 @@ function FormDialog({
           </div>
 
           {/* Status & Visibility */}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Status</Label>
+              <Label>Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -596,9 +594,9 @@ function FormDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Visibility</Label>
+              <Label>Visibility</Label>
               <Select value={visibility} onValueChange={(v) => setVisibility(v as typeof visibility)}>
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -607,41 +605,40 @@ function FormDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          {/* Toggles */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex items-center gap-2">
-              <Switch checked={memberAutocomplete} onCheckedChange={setMemberAutocomplete} id="member-auto" />
-              <Label htmlFor="member-auto" className="text-xs">Member Autocomplete</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={allowDuplicates} onCheckedChange={setAllowDuplicates} id="allow-dup" />
-              <Label htmlFor="allow-dup" className="text-xs">Allow Duplicates</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={showResponses} onCheckedChange={setShowResponses} id="show-resp" />
-              <Label htmlFor="show-resp" className="text-xs">Show Signups Publicly</Label>
-            </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Max Submissions</Label>
-              <Input
-                type="number"
-                value={maxSubmissions}
-                onChange={(e) => setMaxSubmissions(e.target.value)}
-                placeholder="Unlimited"
-                className="h-8 text-xs"
-                min={1}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Rate Limit / hr</Label>
+              <Label>Rate Limit / hr</Label>
               <Input
                 type="number"
                 value={rateLimitPerHour}
                 onChange={(e) => setRateLimitPerHour(e.target.value)}
                 placeholder="10"
-                className="h-8 text-xs"
+                min={1}
+              />
+            </div>
+          </div>
+
+          {/* Toggles */}
+          <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+            <div className="flex items-center gap-2">
+              <Switch checked={memberAutocomplete} onCheckedChange={setMemberAutocomplete} id="member-auto" />
+              <Label htmlFor="member-auto">Member Autocomplete</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={allowDuplicates} onCheckedChange={setAllowDuplicates} id="allow-dup" />
+              <Label htmlFor="allow-dup">Allow Duplicates</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={showResponses} onCheckedChange={setShowResponses} id="show-resp" />
+              <Label htmlFor="show-resp">Show Signups Publicly</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="shrink-0">Max Submissions</Label>
+              <Input
+                type="number"
+                value={maxSubmissions}
+                onChange={(e) => setMaxSubmissions(e.target.value)}
+                placeholder="Unlim"
+                className="w-20"
                 min={1}
               />
             </div>
@@ -649,7 +646,7 @@ function FormDialog({
 
           {/* Theme */}
           <div className="space-y-2">
-            <Label className="text-xs">Theme</Label>
+            <Label>Theme</Label>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
                 {COLOR_PRESETS.map((c) => (
@@ -674,19 +671,17 @@ function FormDialog({
 
           {/* Bible Verse / Quote */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Verse / Quote (optional)</Label>
+            <Label>Verse / Quote (optional)</Label>
             <Input
               value={verse}
               onChange={(e) => setVerse(e.target.value)}
               placeholder="e.g., Do not neglect to show hospitality..."
-              className="h-8 text-xs"
             />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-[1fr_auto] gap-2">
               <Input
                 value={verseRef}
                 onChange={(e) => setVerseRef(e.target.value)}
                 placeholder="Reference (e.g., Hebrews 13:2)"
-                className="h-8 text-xs"
               />
               <Input
                 type="color"
@@ -700,9 +695,9 @@ function FormDialog({
           </div>
 
           {/* Fields Builder */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium">Fields ({fields.length})</Label>
+              <Label className="font-medium">Fields ({fields.length})</Label>
             </div>
 
             {fields.length === 0 && (
