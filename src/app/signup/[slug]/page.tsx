@@ -229,10 +229,13 @@ export default function PublicSignupPage() {
             </button>
             <button
               type="button"
-              onClick={() => window.history.back()}
+              onClick={() => {
+                if (window.history.length > 1) window.history.back()
+                else window.close()
+              }}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
             >
-              Go Back
+              Close
             </button>
           </div>
         </div>

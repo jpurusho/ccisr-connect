@@ -75,7 +75,10 @@ interface FormRow {
   response_count?: number
 }
 
-const COLOR_PRESETS = ["#7C3AED", "#0D9488", "#D97706", "#DB2777", "#059669", "#4F46E5", "#DC2626", "#6B7280"]
+const COLOR_PRESETS = [
+  "#7C3AED", "#0D9488", "#D97706", "#DB2777", "#059669", "#4F46E5", "#DC2626", "#6B7280",
+  "#E11D48", "#0EA5E9", "#8B5CF6", "#F59E0B", "#14B8A6", "#6366F1", "#EC4899", "#10B981",
+]
 
 const STATUS_COLORS: Record<string, "default" | "secondary" | "outline"> = {
   active: "default",
@@ -637,24 +640,34 @@ function FormEditor({
           <div className="space-y-2">
             <Label>Theme</Label>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {COLOR_PRESETS.map((c) => (
                   <button
                     key={c}
                     type="button"
-                    className={`size-5 rounded-full border-2 transition-transform hover:scale-110 ${primaryColor === c ? "border-foreground scale-110" : "border-transparent"}`}
+                    className={`size-6 rounded-full border-2 transition-transform hover:scale-110 ${primaryColor === c ? "border-foreground scale-110" : "border-transparent"}`}
                     style={{ backgroundColor: c }}
                     onClick={() => setPrimaryColor(c)}
                   />
                 ))}
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="size-6 cursor-pointer rounded-full border-0 p-0 appearance-none bg-transparent"
+                  title="Custom color"
+                />
               </div>
-              <Input
-                value={emoji}
-                onChange={(e) => setEmoji(e.target.value)}
-                placeholder="Emoji"
-                className="h-8 text-sm w-16"
-                maxLength={2}
-              />
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  value={emoji}
+                  onChange={(e) => setEmoji(e.target.value)}
+                  placeholder="Emoji"
+                  className="w-16 text-center"
+                  maxLength={2}
+                />
+                <span className="text-xs text-muted-foreground">Form emoji/icon</span>
+              </div>
             </div>
           </div>
 
