@@ -166,8 +166,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to save response" }, { status: 500 })
   }
 
-  // Notify admin (best-effort, don't fail the response)
-  notifyAdmin(supabase, form.title || form.slug, sanitized, fields).catch(() => {})
+  // Notify (best-effort, don't fail the response)
+  if (form.notify_on_submit && form.notify_smtp_config_id) {
+    notifyAdmin(supabase, form.title || form.slug, sanitized, fields, form.notify_smtp_config_id, form.notify_mailing_list_id).catch(() => {})
+  }
 
   return NextResponse.json({ success: true }, { status: 201 })
 }
@@ -179,22 +181,36 @@ async function notifyAdmin(
   supabase: any,
   formTitle: string,
   data: Record<string, unknown>,
-  fields: SignupFieldConfig[]
+  fields: SignupFieldConfig[],
+  smtpConfigId: string,
+  mailingListId: string | null
 ) {
   const { data: smtpRaw } = await supabase
     .from("smtp_configs")
     .select("*")
-    .limit(1)
+    .eq("id", smtpConfigId)
     .single()
   const smtp = smtpRaw as unknown as SmtpRow | null
   if (!smtp) return
 
-  const { data: admins } = await supabase
-    .from("app_users")
-    .select("email")
-    .in("role", ["super_admin", "admin"])
-    .limit(3)
-  if (!admins || admins.length === 0) return
+  // Get recipients: from mailing list or fallback to admins
+  let recipients: string[] = []
+  if (mailingListId) {
+    const { data: members } = await supabase
+      .from("mailing_list_members")
+      .select("email")
+      .eq("mailing_list_id", mailingListId)
+    recipients = (members ?? []).map((m: { email: string }) => m.email).filter(Boolean)
+  }
+  if (recipients.length === 0) {
+    const { data: admins } = await supabase
+      .from("app_users")
+      .select("email")
+      .in("role", ["super_admin", "admin"])
+      .limit(5)
+    recipients = (admins ?? []).map((a: { email: string }) => a.email).filter(Boolean)
+  }
+  if (recipients.length === 0) return
 
   const nameField = fields.find((f) => f.type === "member_lookup" || f.type === "text")
   const submitterName = nameField ? (data[nameField.id] as string) || "Someone" : "Someone"
@@ -208,7 +224,7 @@ async function notifyAdmin(
 
   await transporter.sendMail({
     from: smtp.from_name ? `"${smtp.from_name}" <${smtp.from_email}>` : smtp.from_email,
-    to: admins.map((a: { email: string }) => a.email).join(", "),
+    to: recipients.join(", "),
     subject: `New Signup: ${formTitle}`,
     text: `${submitterName} signed up for "${formTitle}".\n\nView responses in CCISR Connect → Signups.`,
   })

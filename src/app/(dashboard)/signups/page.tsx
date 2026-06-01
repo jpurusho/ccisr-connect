@@ -70,6 +70,9 @@ interface FormRow {
   max_submissions: number | null
   allow_duplicates: boolean
   show_responses: boolean
+  notify_on_submit: boolean
+  notify_smtp_config_id: string | null
+  notify_mailing_list_id: string | null
   rate_limit_per_hour: number | null
   created_at: string
   response_count?: number
@@ -344,7 +347,18 @@ function FormEditor({
   const [maxSubmissions, setMaxSubmissions] = useState<string>("")
   const [allowDuplicates, setAllowDuplicates] = useState(false)
   const [showResponses, setShowResponses] = useState(true)
+  const [notifyOnSubmit, setNotifyOnSubmit] = useState(false)
+  const [notifySmtpConfigId, setNotifySmtpConfigId] = useState("")
+  const [notifyMailingListId, setNotifyMailingListId] = useState("")
   const [rateLimitPerHour, setRateLimitPerHour] = useState<string>("10")
+  const [smtpConfigs, setSmtpConfigs] = useState<{ id: string; from_email: string }[]>([])
+  const [mailingLists, setMailingLists] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from("smtp_configs").select("id, from_email").then(({ data }) => { if (data) setSmtpConfigs(data) })
+    supabase.from("mailing_lists").select("id, name").order("name").then(({ data }) => { if (data) setMailingLists(data) })
+  }, [])
   const [primaryColor, setPrimaryColor] = useState("#7C3AED")
   const [emoji, setEmoji] = useState("")
   const [verse, setVerse] = useState("")
@@ -370,6 +384,9 @@ function FormEditor({
       setMaxSubmissions(editForm.max_submissions ? String(editForm.max_submissions) : "")
       setAllowDuplicates(editForm.allow_duplicates)
       setShowResponses(editForm.show_responses ?? true)
+      setNotifyOnSubmit(editForm.notify_on_submit ?? false)
+      setNotifySmtpConfigId(editForm.notify_smtp_config_id || "")
+      setNotifyMailingListId(editForm.notify_mailing_list_id || "")
       setRateLimitPerHour(editForm.rate_limit_per_hour ? String(editForm.rate_limit_per_hour) : "10")
       setPrimaryColor(editForm.theme.primaryColor || "#7C3AED")
       setEmoji(editForm.theme.emoji || "")
@@ -430,6 +447,9 @@ function FormEditor({
         max_submissions: maxSubmissions ? parseInt(maxSubmissions, 10) : null,
         allow_duplicates: allowDuplicates,
         show_responses: showResponses,
+        notify_on_submit: notifyOnSubmit,
+        notify_smtp_config_id: notifySmtpConfigId || null,
+        notify_mailing_list_id: notifyMailingListId || null,
         rate_limit_per_hour: rateLimitPerHour ? parseInt(rateLimitPerHour, 10) : 10,
       }
 
@@ -634,6 +654,49 @@ function FormEditor({
                 min={1}
               />
             </div>
+          </div>
+
+          {/* Notifications */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Switch checked={notifyOnSubmit} onCheckedChange={setNotifyOnSubmit} id="notify-submit" />
+              <Label htmlFor="notify-submit">Notify on new submission</Label>
+            </div>
+            {notifyOnSubmit && (
+              <div className="grid gap-3 sm:grid-cols-2 pl-6">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Send From</Label>
+                  <Select value={notifySmtpConfigId} onValueChange={(v) => setNotifySmtpConfigId(v ?? "")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select account...">
+                        {smtpConfigs.find((s) => s.id === notifySmtpConfigId)?.from_email || "Select account..."}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {smtpConfigs.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.from_email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Notify Recipients</Label>
+                  <Select value={notifyMailingListId} onValueChange={(v) => setNotifyMailingListId(v ?? "")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Admins (default)">
+                        {mailingLists.find((m) => m.id === notifyMailingListId)?.name || "Admins (default)"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Admins (default)</SelectItem>
+                      {mailingLists.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Theme */}
