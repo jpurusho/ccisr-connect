@@ -768,13 +768,23 @@ function FieldEditor({
           className="h-7 text-xs flex-1"
           placeholder="Field label"
         />
-        <div className="flex items-center gap-1 shrink-0">
-          <Switch
-            checked={field.required}
-            onCheckedChange={(v) => onUpdate({ required: v })}
-            className="scale-75"
-          />
-          <span className="text-[10px] text-muted-foreground">Req</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1">
+            <Switch
+              checked={!field.hidden}
+              onCheckedChange={(v) => onUpdate({ hidden: !v })}
+              className="scale-75"
+            />
+            <span className="text-[10px] text-muted-foreground">Show</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Switch
+              checked={field.required}
+              onCheckedChange={(v) => onUpdate({ required: v })}
+              className="scale-75"
+            />
+            <span className="text-[10px] text-muted-foreground">Req</span>
+          </div>
         </div>
         <div className="flex shrink-0">
           <button
@@ -982,26 +992,26 @@ function ClaimOptionsEditor({
   }
 
   return (
-    <div className="space-y-1 pl-2 border-l-2 border-muted">
-      <p className="text-[10px] text-muted-foreground font-medium">Items (label + capacity)</p>
+    <div className="space-y-1.5 pl-3 border-l-2 border-muted">
+      <p className="text-xs text-muted-foreground font-medium">Items (label + capacity)</p>
       {options.map((opt, i) => (
-        <div key={i} className="flex items-center gap-1">
+        <div key={i} className="flex items-center gap-2">
           <Input
             value={opt.label}
             onChange={(e) => updateOption(i, e.target.value)}
-            className="h-6 text-xs flex-1"
+            className="h-7 text-sm flex-1"
             placeholder="Item name"
           />
           <Input
             type="number"
             value={opt.capacity}
             onChange={(e) => updateCapacity(i, parseInt(e.target.value) || 1)}
-            className="h-6 text-xs w-12"
+            className="h-7 text-sm w-16 text-center"
             min={1}
-            title="Capacity"
+            title="Max capacity (use 99 for unlimited)"
           />
-          <button type="button" onClick={() => removeOption(i)} className="p-0.5 text-muted-foreground hover:text-destructive">
-            <X className="size-3" />
+          <button type="button" onClick={() => removeOption(i)} className="p-1 text-muted-foreground hover:text-destructive">
+            <X className="size-3.5" />
           </button>
         </div>
       ))}

@@ -283,7 +283,7 @@ export default function PublicSignupPage() {
           </div>
 
           <div className="space-y-5">
-            {form.fields.map((field) => (
+            {form.fields.filter((f) => !f.hidden).map((field) => (
               <FieldRenderer
                 key={field.id}
                 field={field}

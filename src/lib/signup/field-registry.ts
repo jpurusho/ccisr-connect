@@ -25,6 +25,7 @@ interface BaseFieldConfig {
   label: string
   placeholder?: string
   required: boolean
+  hidden?: boolean
   helpText?: string
   order: number
 }
