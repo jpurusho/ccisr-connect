@@ -812,8 +812,8 @@ function FieldRenderer({
           <Input
             type="number"
             value={(value as number) || ""}
-            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : 0)}
-            min={field.min}
+            onChange={(e) => onChange(e.target.value ? Math.max(0, Number(e.target.value)) : 0)}
+            min={field.min ?? 0}
             max={field.max}
             placeholder={field.placeholder}
             required={field.required}
