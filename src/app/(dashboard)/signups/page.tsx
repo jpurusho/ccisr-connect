@@ -721,15 +721,29 @@ function FormEditor({
                   title="Custom color"
                 />
               </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Input
-                  value={emoji}
-                  onChange={(e) => setEmoji(e.target.value)}
-                  placeholder="Emoji"
-                  className="w-16 text-center"
-                  maxLength={2}
-                />
-                <span className="text-xs text-muted-foreground">Form emoji/icon</span>
+              <div className="mt-2 space-y-1.5">
+                <div className="flex flex-wrap gap-1">
+                  {["🙏", "✝️", "⛪", "📖", "🕊️", "🎂", "💒", "❤️", "🎵", "👶", "🎓", "🔥", "⭐", "☀️", "🌙", "☕", "🍽️", "🎁", "🌲", "⛺", "🌍", "📢", "📅", "✨", "👑", "🎨", "🎭", "🏆", "📋", "🤝"].map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      className={`size-8 rounded-md text-lg flex items-center justify-center transition-all hover:scale-110 ${emoji === e ? "ring-2 ring-primary bg-primary/10 scale-110" : "hover:bg-muted"}`}
+                      onClick={() => setEmoji(e)}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={emoji}
+                    onChange={(e) => setEmoji(e.target.value)}
+                    placeholder="Or type custom..."
+                    className="w-24 text-center"
+                    maxLength={2}
+                  />
+                  <span className="text-xs text-muted-foreground">Form emoji</span>
+                </div>
               </div>
             </div>
           </div>
