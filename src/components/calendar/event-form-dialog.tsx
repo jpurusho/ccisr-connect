@@ -423,35 +423,67 @@ export function EventFormDialog({
               />
             </div>
 
-            {/* Recurrence */}
+            {/* Schedule */}
             <div className="space-y-3 rounded-lg border p-3">
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Recurrence
+                Schedule
               </Label>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Frequency</Label>
-                  <Select
-                    value={recurrenceFreq}
-                    onValueChange={(v) => {
-                      const freq = (v ?? "WEEKLY") as "NONE" | "WEEKLY" | "MONTHLY"
-                      setRecurrenceFreq(freq)
-                      if (freq === "WEEKLY") setRecurrenceNth("")
-                      if (freq === "MONTHLY" && !recurrenceNth) setRecurrenceNth("1")
-                    }}
-                  >
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NONE">One-time / Date Range</SelectItem>
-                      <SelectItem value="WEEKLY">Weekly</SelectItem>
-                      <SelectItem value="MONTHLY">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                {recurrenceFreq !== "NONE" && (
+              {/* Type toggle */}
+              <div className="flex rounded-lg border p-0.5">
+                <button
+                  type="button"
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${recurrenceFreq === "NONE" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  onClick={() => setRecurrenceFreq("NONE")}
+                >
+                  One-time
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${recurrenceFreq === "WEEKLY" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  onClick={() => { setRecurrenceFreq("WEEKLY"); setRecurrenceNth("") }}
+                >
+                  Weekly
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${recurrenceFreq === "MONTHLY" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  onClick={() => { setRecurrenceFreq("MONTHLY"); if (!recurrenceNth) setRecurrenceNth("1") }}
+                >
+                  Monthly
+                </button>
+              </div>
+
+              {/* One-time: Event Date */}
+              {recurrenceFreq === "NONE" && (
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Day</Label>
+                    <Label className="text-xs">Event Date *</Label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">End Date (multi-day)</Label>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Only for multi-day events (e.g., VBS).
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Recurring: Day + pattern */}
+              {recurrenceFreq !== "NONE" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Day of Week</Label>
                     <Select value={recurrenceDay} onValueChange={(v) => setRecurrenceDay(v ?? "FR")}>
                       <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -461,114 +493,96 @@ export function EventFormDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                )}
 
-                {recurrenceFreq === "MONTHLY" && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Which week</Label>
-                    <Select value={recurrenceNth || "1"} onValueChange={(v) => setRecurrenceNth(v ?? "1")}>
-                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {NTH_OPTIONS.filter((n) => n.value).map((n) => (
-                          <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
+                  {recurrenceFreq === "MONTHLY" && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Which Week</Label>
+                      <Select value={recurrenceNth || "1"} onValueChange={(v) => setRecurrenceNth(v ?? "1")}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {NTH_OPTIONS.filter((n) => n.value).map((n) => (
+                            <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {recurrenceFreq === "NONE" && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Start Date</Label>
+              {/* Recurring: End date */}
+              {recurrenceFreq !== "NONE" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Runs Until (optional)</Label>
+                  <div className="flex items-center gap-2">
                     <Input
                       type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      value={untilDate}
+                      onChange={(e) => setUntilDate(e.target.value)}
+                      className="w-44"
                     />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">End Date (optional)</Label>
-                    <Input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      Leave blank for a single-day event.
-                    </p>
+                    {untilDate && (
+                      <button
+                        type="button"
+                        className="text-[11px] text-muted-foreground hover:text-foreground"
+                        onClick={() => setUntilDate("")}
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
 
-              {recurrenceFreq !== "NONE" && (
-                <>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">End Date (optional)</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="date"
-                        value={untilDate}
-                        onChange={(e) => setUntilDate(e.target.value)}
-                        className="w-44"
-                      />
-                      {untilDate && (
-                        <button
-                          type="button"
-                          className="text-[11px] text-muted-foreground hover:text-foreground"
-                          onClick={() => setUntilDate("")}
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Exception dates */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Skip Dates</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="date"
-                        value={newExceptDate}
-                        onChange={(e) => setNewExceptDate(e.target.value)}
-                        className="w-44"
-                      />
-                      <Button variant="outline" size="sm" onClick={addException} disabled={!newExceptDate}>
-                        <Plus className="size-3" />
-                        Add
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Input type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} className="w-36" />
-                      <span className="text-xs text-muted-foreground">to</span>
-                      <Input type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} className="w-36" />
-                      <Button variant="outline" size="sm" onClick={addExceptionRange} disabled={!rangeFrom || !rangeTo}>
-                        <Plus className="size-3" />
-                        Range
-                      </Button>
-                    </div>
-                    {exceptDates.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {exceptDates.map((date) => (
-                          <Badge key={date} variant="secondary" className="gap-1 pr-1">
-                            {format(new Date(date + "T00:00:00"), "MMM d, yyyy")}
-                            <button type="button" onClick={() => removeException(date)} className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20">
-                              <X className="size-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              <p className="text-xs text-muted-foreground">
+              {/* Preview */}
+              <p className="text-xs text-muted-foreground italic">
                 {previewRule}{time ? ` at ${formatTime(time)}` : ""}
               </p>
             </div>
+
+            {/* Skip Dates — only for recurring, collapsible */}
+            {recurrenceFreq !== "NONE" && (
+              <details className="rounded-lg border p-3">
+                <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Skip Dates {exceptDates.length > 0 ? `(${exceptDates.length})` : ""}
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      value={newExceptDate}
+                      onChange={(e) => setNewExceptDate(e.target.value)}
+                      className="w-44"
+                    />
+                    <Button variant="outline" size="sm" onClick={addException} disabled={!newExceptDate}>
+                      <Plus className="size-3" />
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Input type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} className="w-36" />
+                    <span className="text-xs text-muted-foreground">to</span>
+                    <Input type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} className="w-36" />
+                    <Button variant="outline" size="sm" onClick={addExceptionRange} disabled={!rangeFrom || !rangeTo}>
+                      <Plus className="size-3" />
+                      Range
+                    </Button>
+                  </div>
+                  {exceptDates.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {exceptDates.map((date) => (
+                        <Badge key={date} variant="secondary" className="gap-1 pr-1">
+                          {format(new Date(date + "T00:00:00"), "MMM d, yyyy")}
+                          <button type="button" onClick={() => removeException(date)} className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20">
+                            <X className="size-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
 
             {/* Host Family — only for recurring events */}
             {recurrenceFreq !== "NONE" && (
