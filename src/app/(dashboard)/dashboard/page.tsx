@@ -1697,10 +1697,16 @@ export default function DashboardPage() {
         if (linkedEt.icon) ct.iconName = linkedEt.icon
 
         for (const evt of linkedEvents) {
-          if (!evt.recurrence_rule) continue
-          const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
-          if (occs.length > 0) {
-            const occ = occs[0]
+          let occ: Date | null = null
+          if (evt.recurrence_rule) {
+            const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
+            if (occs.length > 0) occ = occs[0]
+          } else if (evt.start_date) {
+            const sd = new Date(evt.start_date + "T00:00:00")
+            if (sd >= wkSun && sd <= wkSat) occ = sd
+          }
+          if (!occ) continue
+          {
             const dateStr = format(occ, "yyyy-MM-dd")
             const inst = weekInstances.find((i) => i.event_id === evt.id && i.instance_date === dateStr)
             let hostName: string | null = null
