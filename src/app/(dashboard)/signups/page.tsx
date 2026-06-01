@@ -63,7 +63,7 @@ interface FormRow {
   target_year: number | null
   start_date: string | null
   end_date: string | null
-  theme: { primaryColor?: string; headerGradient?: string; emoji?: string; eventDateText?: string; hostInfo?: string; verse?: string; verseRef?: string; verseBgColor?: string }
+  theme: { primaryColor?: string; headerGradient?: string; fontFamily?: string; verseTextColor?: string; bodyTextColor?: string; emoji?: string; eventDateText?: string; hostInfo?: string; verse?: string; verseRef?: string; verseBgColor?: string }
   fields: SignupFieldConfig[]
   status: "draft" | "active" | "closed" | "archived"
   visibility: "public_link" | "admin_only"
@@ -388,6 +388,9 @@ function FormEditor({
   const [primaryColor, setPrimaryColor] = useState("#7C3AED")
   const [emoji, setEmoji] = useState("")
   const [headerGradient, setHeaderGradient] = useState("")
+  const [fontFamily, setFontFamily] = useState("")
+  const [verseTextColor, setVerseTextColor] = useState("")
+  const [bodyTextColor, setBodyTextColor] = useState("")
   const [eventDateText, setEventDateText] = useState("")
   const [hostInfo, setHostInfo] = useState("")
   const [verse, setVerse] = useState("")
@@ -419,6 +422,9 @@ function FormEditor({
       setRateLimitPerHour(editForm.rate_limit_per_hour ? String(editForm.rate_limit_per_hour) : "10")
       setPrimaryColor(editForm.theme.primaryColor || "#7C3AED")
       setHeaderGradient(editForm.theme.headerGradient || "")
+      setFontFamily(editForm.theme.fontFamily || "")
+      setVerseTextColor(editForm.theme.verseTextColor || "")
+      setBodyTextColor(editForm.theme.bodyTextColor || "")
       setEmoji(editForm.theme.emoji || "")
       setEventDateText(editForm.theme.eventDateText || "")
       setHostInfo(editForm.theme.hostInfo || "")
@@ -471,7 +477,7 @@ function FormEditor({
         target_year: durationType === "month" ? targetYear : null,
         start_date: durationType === "date_range" ? startDate || null : null,
         end_date: durationType === "date_range" ? endDate || null : null,
-        theme: { primaryColor, headerGradient: headerGradient || undefined, emoji: emoji || undefined, eventDateText: eventDateText || undefined, hostInfo: hostInfo || undefined, verse: verse || undefined, verseRef: verseRef || undefined, verseBgColor: verseBgColor || undefined },
+        theme: { primaryColor, headerGradient: headerGradient || undefined, fontFamily: fontFamily || undefined, verseTextColor: verseTextColor || undefined, bodyTextColor: bodyTextColor || undefined, emoji: emoji || undefined, eventDateText: eventDateText || undefined, hostInfo: hostInfo || undefined, verse: verse || undefined, verseRef: verseRef || undefined, verseBgColor: verseBgColor || undefined },
         fields,
         status,
         visibility,
@@ -817,6 +823,42 @@ function FormEditor({
               ].map((g) => (
                 <button key={g.label} type="button" onClick={() => setHeaderGradient(g.value)} className={`size-8 rounded-lg border-2 transition-transform hover:scale-110 ${headerGradient === g.value ? "border-foreground scale-110" : "border-transparent"}`} style={{ background: g.value }} title={g.label} />
               ))}
+            </div>
+          </div>
+
+          {/* Font & Text Colors */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Font</Label>
+              <Select value={fontFamily} onValueChange={(v) => setFontFamily(v ?? "")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Default (System)</SelectItem>
+                  <SelectItem value="'Georgia', serif">Georgia (Serif)</SelectItem>
+                  <SelectItem value="'Merriweather', Georgia, serif">Merriweather</SelectItem>
+                  <SelectItem value="'Nunito', sans-serif">Nunito (Rounded)</SelectItem>
+                  <SelectItem value="'Playfair Display', serif">Playfair Display</SelectItem>
+                  <SelectItem value="'Inter', sans-serif">Inter</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Verse Text Color</Label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={verseTextColor || "#1e293b"} onChange={(e) => setVerseTextColor(e.target.value)} className="size-8 cursor-pointer rounded border-0 p-0" />
+                <span className="text-xs text-muted-foreground">{verseTextColor || "Auto"}</span>
+                {verseTextColor && <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setVerseTextColor("")}>Reset</button>}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Body Text Color</Label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={bodyTextColor || "#1e293b"} onChange={(e) => setBodyTextColor(e.target.value)} className="size-8 cursor-pointer rounded border-0 p-0" />
+                <span className="text-xs text-muted-foreground">{bodyTextColor || "Auto"}</span>
+                {bodyTextColor && <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setBodyTextColor("")}>Reset</button>}
+              </div>
             </div>
           </div>
 

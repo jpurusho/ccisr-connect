@@ -5,6 +5,8 @@ export interface SignupFormTheme {
   headerGradient?: string
   headerStyle?: "band" | "top-border" | "side-accent"
   fontFamily?: string
+  verseTextColor?: string
+  bodyTextColor?: string
   emoji?: string
   headerTitle?: string
   headerSubtitle?: string

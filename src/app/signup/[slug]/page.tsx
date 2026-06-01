@@ -281,11 +281,11 @@ export default function PublicSignupPage() {
               borderColor: colors.border,
             }}
           >
-            <p className="text-sm italic leading-relaxed" style={{ color: colors.textDark }}>
+            <p className="text-sm italic leading-relaxed" style={{ color: form.theme.verseTextColor || colors.textDark }}>
               &ldquo;{form.theme.verse}&rdquo;
             </p>
             {form.theme.verseRef && (
-              <p className="mt-1.5 text-xs font-medium" style={{ color: colors.primary }}>
+              <p className="mt-1.5 text-xs font-medium" style={{ color: form.theme.verseTextColor || colors.primary }}>
                 — {form.theme.verseRef}
               </p>
             )}
@@ -293,7 +293,14 @@ export default function PublicSignupPage() {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className={`${form.theme.verse ? "border border-t-0" : "rounded-b-xl border border-t-0"} bg-white p-6 shadow-sm rounded-b-xl`}>
+        <form
+          onSubmit={handleSubmit}
+          className={`${form.theme.verse ? "border border-t-0" : "rounded-b-xl border border-t-0"} bg-white p-6 shadow-sm rounded-b-xl`}
+          style={{
+            fontFamily: form.theme.fontFamily || undefined,
+            color: form.theme.bodyTextColor || undefined,
+          }}
+        >
           {/* Honeypot - hidden from humans */}
           <div className="absolute -left-[9999px]" aria-hidden="true">
             <input type="text" id="__hp_website" name="website" tabIndex={-1} autoComplete="off" />
