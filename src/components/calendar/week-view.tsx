@@ -2,7 +2,8 @@
 
 import { format, isSameDay, isToday } from "date-fns"
 import { cn } from "@/lib/utils"
-import { Cake, Heart, CalendarDays, Send, Check, Clock, Plus } from "lucide-react"
+import { Cake, Heart, CalendarDays, Send, Check, Clock, Plus, Pencil, Ban, Copy } from "lucide-react"
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu"
 import type { CalendarEvent } from "./types"
 
 interface WeekViewProps {
@@ -10,6 +11,8 @@ interface WeekViewProps {
   events: CalendarEvent[]
   onEventClick: (event: CalendarEvent) => void
   onDayClick?: (day: Date) => void
+  onEditEvent?: (event: CalendarEvent) => void
+  onCancelInstance?: (event: CalendarEvent) => void
 }
 
 function EventPill({
@@ -70,7 +73,7 @@ function EventPill({
   )
 }
 
-export function WeekView({ days, events, onEventClick, onDayClick }: WeekViewProps) {
+export function WeekView({ days, events, onEventClick, onDayClick, onEditEvent, onCancelInstance }: WeekViewProps) {
   return (
     <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-border ring-1 ring-border sm:grid-cols-7">
       {days.map((day) => {
@@ -120,11 +123,35 @@ export function WeekView({ days, events, onEventClick, onDayClick }: WeekViewPro
                 </p>
               )}
               {dayEvents.map((event) => (
-                <EventPill
-                  key={event.id}
-                  event={event}
-                  onClick={() => onEventClick(event)}
-                />
+                <ContextMenu key={event.id}>
+                  <ContextMenuTrigger>
+                    <EventPill
+                      event={event}
+                      onClick={() => onEventClick(event)}
+                    />
+                  </ContextMenuTrigger>
+                  {event.kind === "event" && (
+                    <ContextMenuContent>
+                      <ContextMenuItem onSelect={() => onEventClick(event)}>
+                        <CalendarDays className="size-3.5" /> View Details
+                      </ContextMenuItem>
+                      {onEditEvent && event.eventId && (
+                        <ContextMenuItem onSelect={() => onEditEvent(event)}>
+                          <Pencil className="size-3.5" /> Edit Series
+                        </ContextMenuItem>
+                      )}
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onSelect={() => navigator.clipboard.writeText(event.title)}>
+                        <Copy className="size-3.5" /> Copy Title
+                      </ContextMenuItem>
+                      {onCancelInstance && event.status !== "cancelled" && (
+                        <ContextMenuItem variant="destructive" onSelect={() => onCancelInstance(event)}>
+                          <Ban className="size-3.5" /> Cancel This Week
+                        </ContextMenuItem>
+                      )}
+                    </ContextMenuContent>
+                  )}
+                </ContextMenu>
               ))}
             </div>
           </div>

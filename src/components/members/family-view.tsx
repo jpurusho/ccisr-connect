@@ -29,6 +29,7 @@ import { toast } from "sonner"
 import { logAudit } from "@/lib/audit"
 import { formatPhone } from "@/lib/utils"
 import { MapPin, Phone, Mail, Heart, Cake, Pencil, Loader2 } from "lucide-react"
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu"
 import {
   Select,
   SelectContent,
@@ -312,7 +313,9 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
         )
 
         return (
-          <Card key={family.id} className="group">
+          <ContextMenu key={family.id}>
+          <ContextMenuTrigger>
+          <Card className="group">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
@@ -468,6 +471,28 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
               </div>
             </CardContent>
           </Card>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onSelect={() => openEditDialog(family)}>
+              <Pencil className="size-3.5" /> Edit Family
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => router.push(`/members/${family.members[0]?.id}`)}>
+              View Members
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => {
+              const addr = family.addresses.find((a) => a.is_current)
+              if (addr?.full_address) navigator.clipboard.writeText(addr.full_address)
+            }}>
+              Copy Address
+            </ContextMenuItem>
+            {family.home_phone && (
+              <ContextMenuItem onSelect={() => navigator.clipboard.writeText(family.home_phone!)}>
+                Copy Phone
+              </ContextMenuItem>
+            )}
+          </ContextMenuContent>
+          </ContextMenu>
         )
       })}
     </div>
