@@ -467,7 +467,7 @@ export function MemberFormDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Edit Member" : "Add Member"}</SheetTitle>
           <SheetDescription>

@@ -473,7 +473,7 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
     </div>
 
     <Sheet open={!!editFamily} onOpenChange={(open) => { if (!open) { setEditFamily(null); setEditForm(null) } }}>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Edit Family</SheetTitle>
           <p className="text-sm text-muted-foreground">{editFamily?.family_name}</p>

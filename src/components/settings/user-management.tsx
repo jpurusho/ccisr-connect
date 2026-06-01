@@ -321,7 +321,7 @@ export function UserManagementPanel() {
       </Card>
 
       <Sheet open={isSuperAdmin && dialogOpen} onOpenChange={setDialogOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>Invite User</SheetTitle>
             <SheetDescription>

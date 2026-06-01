@@ -659,7 +659,7 @@ export default function MailingListsPage() {
 
       {/* Create/Edit List Sheet */}
       <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>
               {editingList ? "Edit Mailing List" : "Create Mailing List"}
