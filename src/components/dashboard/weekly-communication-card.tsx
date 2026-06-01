@@ -12,14 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-  SheetClose,
-} from "@/components/ui/sheet"
-import {
   Pencil,
   Eye,
   Clock,
@@ -549,56 +541,37 @@ export function WeeklyCommunicationCard({
         )}
       </Card>
 
-      {/* Preview panel */}
-      <Sheet open={previewing} onOpenChange={setPreviewing}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
-          <SheetHeader>
-            <SheetTitle>Preview: {title}</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 px-4 pb-4">
+      {/* Inline Preview */}
+      {previewing && previewHtml && (
+        <div className="border-t">
+          <div className="flex items-center justify-between px-4 py-2 bg-muted/30">
+            <span className="text-xs font-medium text-muted-foreground">Email Preview</span>
+            <div className="flex items-center gap-2">
+              {status === "draft" && onQueue && (
+                <Button variant="outline" size="sm" onClick={() => { setPreviewing(false); onQueue() }} disabled={!canDispatch}>
+                  <Clock className="size-3.5" data-icon="inline-start" />
+                  Queue
+                </Button>
+              )}
+              {status === "draft" && (
+                <Button size="sm" onClick={() => { setPreviewing(false); onSendNow() }} style={canDispatch ? { backgroundColor: accentColor } : undefined} className="text-white hover:opacity-90" disabled={!canDispatch}>
+                  <Send className="size-3.5" data-icon="inline-start" />
+                  Send Now
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setPreviewing(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+          <div className="p-4">
             <div
-              className="rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml ?? "") }}
+              className="mx-auto max-w-2xl rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
             />
           </div>
-          <SheetFooter>
-            {status === "draft" && onQueue && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setPreviewing(false)
-                  onQueue()
-                }}
-                disabled={!canDispatch}
-                title={dispatchTitle || "Queue for review"}
-              >
-                <Clock className="size-3.5" data-icon="inline-start" />
-                Queue
-              </Button>
-            )}
-            {status === "draft" && (
-              <Button
-                size="sm"
-                onClick={() => {
-                  setPreviewing(false)
-                  onSendNow()
-                }}
-                style={canDispatch ? { backgroundColor: accentColor } : undefined}
-                className="text-white hover:opacity-90"
-                disabled={!canDispatch}
-                title={dispatchTitle}
-              >
-                <Send className="size-3.5" data-icon="inline-start" />
-                Send Now
-              </Button>
-            )}
-            <SheetClose render={<Button variant="outline" size="sm" />}>
-              Close
-            </SheetClose>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+        </div>
+      )}
     </>
   )
 }
