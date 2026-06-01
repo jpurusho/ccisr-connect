@@ -2,11 +2,14 @@ import { deriveColorsFromPrimary, type CardColors } from "@/lib/email/card-build
 
 export interface SignupFormTheme {
   primaryColor?: string
+  headerGradient?: string
   headerStyle?: "band" | "top-border" | "side-accent"
   fontFamily?: string
   emoji?: string
   headerTitle?: string
   headerSubtitle?: string
+  eventDateText?: string
+  hostInfo?: string
   verse?: string
   verseRef?: string
   verseBgColor?: string

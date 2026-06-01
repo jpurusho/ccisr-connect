@@ -63,7 +63,7 @@ interface FormRow {
   target_year: number | null
   start_date: string | null
   end_date: string | null
-  theme: { primaryColor?: string; emoji?: string; verse?: string; verseRef?: string; verseBgColor?: string }
+  theme: { primaryColor?: string; headerGradient?: string; emoji?: string; eventDateText?: string; hostInfo?: string; verse?: string; verseRef?: string; verseBgColor?: string }
   fields: SignupFieldConfig[]
   status: "draft" | "active" | "closed" | "archived"
   visibility: "public_link" | "admin_only"
@@ -387,6 +387,9 @@ function FormEditor({
   }, [])
   const [primaryColor, setPrimaryColor] = useState("#7C3AED")
   const [emoji, setEmoji] = useState("")
+  const [headerGradient, setHeaderGradient] = useState("")
+  const [eventDateText, setEventDateText] = useState("")
+  const [hostInfo, setHostInfo] = useState("")
   const [verse, setVerse] = useState("")
   const [verseRef, setVerseRef] = useState("")
   const [verseBgColor, setVerseBgColor] = useState("")
@@ -415,7 +418,10 @@ function FormEditor({
       setNotifyMailingListId(editForm.notify_mailing_list_id || "")
       setRateLimitPerHour(editForm.rate_limit_per_hour ? String(editForm.rate_limit_per_hour) : "10")
       setPrimaryColor(editForm.theme.primaryColor || "#7C3AED")
+      setHeaderGradient(editForm.theme.headerGradient || "")
       setEmoji(editForm.theme.emoji || "")
+      setEventDateText(editForm.theme.eventDateText || "")
+      setHostInfo(editForm.theme.hostInfo || "")
       setVerse(editForm.theme.verse || "")
       setVerseRef(editForm.theme.verseRef || "")
       setVerseBgColor(editForm.theme.verseBgColor || "")
@@ -465,7 +471,7 @@ function FormEditor({
         target_year: durationType === "month" ? targetYear : null,
         start_date: durationType === "date_range" ? startDate || null : null,
         end_date: durationType === "date_range" ? endDate || null : null,
-        theme: { primaryColor, emoji: emoji || undefined, verse: verse || undefined, verseRef: verseRef || undefined, verseBgColor: verseBgColor || undefined },
+        theme: { primaryColor, headerGradient: headerGradient || undefined, emoji: emoji || undefined, eventDateText: eventDateText || undefined, hostInfo: hostInfo || undefined, verse: verse || undefined, verseRef: verseRef || undefined, verseBgColor: verseBgColor || undefined },
         fields,
         status,
         visibility,
@@ -771,6 +777,46 @@ function FormEditor({
                   <span className="text-xs text-muted-foreground">Form emoji</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Event Info (shown in form header) */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Event Date (shown to users)</Label>
+              <Input
+                value={eventDateText}
+                onChange={(e) => setEventDateText(e.target.value)}
+                placeholder="e.g., Friday, June 13 at 6:30 PM"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Host / Location (shown to users)</Label>
+              <Input
+                value={hostInfo}
+                onChange={(e) => setHostInfo(e.target.value)}
+                placeholder="e.g., Samuel & Salomi — Dublin"
+              />
+            </div>
+          </div>
+
+          {/* Header Gradient */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Header Style</Label>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setHeaderGradient("")} className={`size-8 rounded-lg border-2 transition-transform hover:scale-110 ${!headerGradient ? "border-foreground scale-110" : "border-transparent"}`} style={{ backgroundColor: primaryColor }} title="Solid color" />
+              {[
+                { label: "Sunset", value: `linear-gradient(135deg, ${primaryColor}, #F59E0B)` },
+                { label: "Ocean", value: `linear-gradient(135deg, ${primaryColor}, #0EA5E9)` },
+                { label: "Berry", value: `linear-gradient(135deg, ${primaryColor}, #EC4899)` },
+                { label: "Forest", value: `linear-gradient(135deg, ${primaryColor}, #10B981)` },
+                { label: "Night", value: `linear-gradient(135deg, #1e1b4b, ${primaryColor})` },
+                { label: "Warm", value: `linear-gradient(135deg, #DC2626, #F59E0B)` },
+                { label: "Cool", value: `linear-gradient(135deg, #6366F1, #06B6D4)` },
+                { label: "Royal", value: `linear-gradient(135deg, #7C3AED, #2563EB)` },
+              ].map((g) => (
+                <button key={g.label} type="button" onClick={() => setHeaderGradient(g.value)} className={`size-8 rounded-lg border-2 transition-transform hover:scale-110 ${headerGradient === g.value ? "border-foreground scale-110" : "border-transparent"}`} style={{ background: g.value }} title={g.label} />
+              ))}
             </div>
           </div>
 

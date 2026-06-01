@@ -249,12 +249,26 @@ export default function PublicSignupPage() {
         {/* Header */}
         <div
           className="rounded-t-xl p-6 text-center"
-          style={{ backgroundColor: colors.primary }}
+          style={{ background: form.theme.headerGradient || colors.primary }}
         >
           <p className="text-3xl">{emoji}</p>
           <h1 className="mt-2 text-xl font-bold text-white">{form.title}</h1>
           {form.description && (
             <p className="mt-1 text-sm text-white/80">{form.description}</p>
+          )}
+          {(form.theme.eventDateText || form.theme.hostInfo) && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-sm text-white/90">
+              {form.theme.eventDateText && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-medium">
+                  📅 {form.theme.eventDateText}
+                </span>
+              )}
+              {form.theme.hostInfo && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-medium">
+                  🏠 {form.theme.hostInfo}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
