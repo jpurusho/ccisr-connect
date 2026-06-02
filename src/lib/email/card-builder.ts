@@ -25,7 +25,7 @@ export interface CardColors {
 
 // ── Style Settings Types ────────────────────────────────────────────────────
 
-export type FontFamily = "sans-serif" | "serif" | "rounded" | "monospace"
+export type FontFamily = "sans-serif" | "serif" | "rounded" | "monospace" | "script"
 export type FontSizeScale = "compact" | "default" | "large"
 export type HeaderStyle = "band" | "top-border" | "side-accent"
 export type SectionLayout = "table" | "paragraph" | "list"
@@ -49,6 +49,7 @@ export const HEADER_GRADIENTS: Record<Exclude<HeaderGradient, "none" | "custom">
 
 export interface TemplateStyleSettings {
   fontFamily?: FontFamily
+  headerFontFamily?: FontFamily
   fontSizeScale?: FontSizeScale
   headerColor?: string
   headerGradient?: HeaderGradient
@@ -58,10 +59,14 @@ export interface TemplateStyleSettings {
   headerStyle?: HeaderStyle
   darkModeEnabled?: boolean
   footerText?: string
+  headerTextColor?: string
+  bodyTextColor?: string
+  footerTextColor?: string
 }
 
 export interface StyleContext {
   fontStack: string
+  headerFontStack?: string
   sizes: { header: number; body: number; label: number; footer: number }
   headerStyle: HeaderStyle
   sectionLayout: SectionLayout
@@ -69,6 +74,9 @@ export interface StyleContext {
   footerText?: string
   customPastels?: { bg: string; border: string }[]
   headerGradientCss?: string
+  headerTextColor?: string
+  bodyTextColor?: string
+  footerTextColor?: string
 }
 
 export const FONT_STACKS: Record<FontFamily, string> = {
@@ -76,6 +84,7 @@ export const FONT_STACKS: Record<FontFamily, string> = {
   "serif": "Georgia, 'Times New Roman', serif",
   "rounded": "'Nunito', 'Segoe UI', system-ui, sans-serif",
   "monospace": "'Courier New', Courier, monospace",
+  "script": "'Brush Script MT', 'Dancing Script', 'Segoe Script', cursive",
 }
 
 export const SIZE_SCALES: Record<FontSizeScale, { header: number; body: number; label: number; footer: number }> = {
@@ -96,6 +105,7 @@ export function buildStyleContext(settings?: TemplateStyleSettings): StyleContex
   }
   return {
     fontStack: FONT_STACKS[s.fontFamily ?? "sans-serif"],
+    headerFontStack: s.headerFontFamily ? FONT_STACKS[s.headerFontFamily] : undefined,
     sizes: SIZE_SCALES[s.fontSizeScale ?? "default"],
     headerStyle: s.headerStyle ?? "band",
     sectionLayout: s.sectionLayout ?? "table",
@@ -103,6 +113,9 @@ export function buildStyleContext(settings?: TemplateStyleSettings): StyleContex
     footerText: s.footerText,
     customPastels: s.customPastels,
     headerGradientCss,
+    headerTextColor: s.headerTextColor,
+    bodyTextColor: s.bodyTextColor,
+    footerTextColor: s.footerTextColor,
   }
 }
 
@@ -155,7 +168,7 @@ export function pastelBoxHtml(content: string, bgColor: string | undefined, oute
 
 function msgBlock(message: string, bgColor: string | undefined, colors: CardColors, margin = "0 0 16px", style?: StyleContext, textColor?: string): string {
   const sz = style?.sizes.body ?? 14;
-  const color = textColor || colors.textDark;
+  const color = textColor || style?.bodyTextColor || colors.textDark;
   const p = `<p style="margin:0;font-size:${sz}px;color:${color};text-align:center;line-height:1.6;white-space:pre-wrap">${message}</p>`;
   return bgColor
     ? pastelBoxHtml(p, bgColor, `margin:${margin}`, style?.customPastels)
@@ -392,22 +405,24 @@ function headerRow(
 ): string {
   const sz = style?.sizes ?? SIZE_SCALES.default;
   const variant = style?.headerStyle ?? "band";
+  const hFont = style?.headerFontStack ? `;font-family:${style.headerFontStack}` : "";
+  const hTextColor = titleColor || style?.headerTextColor;
 
   if (variant === "top-border") {
-    return `<tr><td style="border-top:4px solid ${colors.primary};padding:24px 28px;text-align:center;background:#ffffff">
+    return `<tr><td style="border-top:4px solid ${colors.primary};padding:24px 28px;text-align:center;background:#ffffff${hFont}">
 <p style="margin:0;font-size:32px;line-height:1">${emoji}</p>
-<p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:${titleColor || colors.textDark};letter-spacing:-0.3px">${title}</p>
-<p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:${subtitleColor || colors.textLight};font-weight:500">${subtitle}</p>
+<p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:${hTextColor || colors.textDark};letter-spacing:-0.3px">${title}</p>
+<p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:${subtitleColor || style?.headerTextColor || colors.textLight};font-weight:500">${subtitle}</p>
 </td></tr>`;
   }
 
   if (variant === "side-accent") {
-    return `<tr><td style="border-left:6px solid ${colors.primary};padding:20px 24px;background:#ffffff">
+    return `<tr><td style="border-left:6px solid ${colors.primary};padding:20px 24px;background:#ffffff${hFont}">
 <table cellpadding="0" cellspacing="0"><tr>
 <td style="padding-right:14px;vertical-align:middle"><span style="font-size:28px">${emoji}</span></td>
 <td style="vertical-align:middle">
-<p style="margin:0;font-size:${sz.header - 2}px;font-weight:700;color:${titleColor || colors.textDark};letter-spacing:-0.3px">${title}</p>
-<p style="margin:4px 0 0;font-size:${sz.label + 1}px;color:${subtitleColor || colors.textLight};font-weight:500">${subtitle}</p>
+<p style="margin:0;font-size:${sz.header - 2}px;font-weight:700;color:${hTextColor || colors.textDark};letter-spacing:-0.3px">${title}</p>
+<p style="margin:4px 0 0;font-size:${sz.label + 1}px;color:${subtitleColor || style?.headerTextColor || colors.textLight};font-weight:500">${subtitle}</p>
 </td></tr></table>
 </td></tr>`;
   }
@@ -415,10 +430,10 @@ function headerRow(
   const bgStyle = style?.headerGradientCss
     ? `background-color:${colors.primary};background:${style.headerGradientCss}`
     : `background:${colors.primary}`;
-  return `<tr><td style="${bgStyle};padding:24px 28px;text-align:center">
+  return `<tr><td style="${bgStyle};padding:24px 28px;text-align:center${hFont}">
 <p style="margin:0;font-size:32px;line-height:1">${emoji}</p>
-<p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:${titleColor || "#ffffff"};letter-spacing:-0.3px">${title}</p>
-<p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:${subtitleColor || "rgba(255,255,255,0.85)"};font-weight:500">${subtitle}</p>
+<p style="margin:8px 0 0;font-size:${sz.header}px;font-weight:700;color:${hTextColor || "#ffffff"};letter-spacing:-0.3px">${title}</p>
+<p style="margin:6px 0 0;font-size:${sz.label + 1}px;color:${subtitleColor || style?.headerTextColor || "rgba(255,255,255,0.85)"};font-weight:500">${subtitle}</p>
 </td></tr>`;
 }
 
@@ -443,8 +458,10 @@ function footerRow(text: string, colors: CardColors, bgColor?: string, style?: S
   const map = style?.customPastels ? getPastelBorderMap(style.customPastels) : PASTEL_BORDER_MAP;
   const border = bgColor ? (map[bgColor] ?? colors.border) : colors.border;
   const glow = bgColor && map[bgColor] ? `;box-shadow:0 0 8px ${map[bgColor]}50` : "";
-  return `<tr><td style="background:${bg};padding:14px 28px;text-align:center;border-top:1.5px solid ${border}${glow}">
-<p style="margin:0;font-size:${sz}px;color:${textColor || colors.textLight}">${footerText}</p>
+  const fFont = style?.headerFontStack ? `;font-family:${style.headerFontStack}` : "";
+  const fColor = textColor || style?.footerTextColor || colors.textLight;
+  return `<tr><td style="background:${bg};padding:14px 28px;text-align:center;border-top:1.5px solid ${border}${glow}${fFont}">
+<p style="margin:0;font-size:${sz}px;color:${fColor}">${footerText}</p>
 </td></tr>`;
 }
 

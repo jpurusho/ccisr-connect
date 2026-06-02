@@ -33,6 +33,7 @@ const FONT_OPTIONS: { value: FontFamily; label: string; preview: string }[] = [
   { value: "serif", label: "Serif", preview: "Aa" },
   { value: "rounded", label: "Rounded", preview: "Aa" },
   { value: "monospace", label: "Monospace", preview: "Aa" },
+  { value: "script", label: "Script", preview: "Aa" },
 ]
 
 const SIZE_OPTIONS: { value: FontSizeScale; label: string }[] = [
@@ -52,6 +53,15 @@ const LAYOUT_OPTIONS: { value: SectionLayout; label: string; desc: string }[] = 
   { value: "paragraph", label: "Paragraph", desc: "Flowing text" },
   { value: "list", label: "List", desc: "Bullet points" },
 ]
+
+function fontPreviewStyle(v: FontFamily): string {
+  switch (v) {
+    case "serif": return "Georgia, serif"
+    case "monospace": return "'Courier New', monospace"
+    case "script": return "'Brush Script MT', cursive"
+    default: return "inherit"
+  }
+}
 
 export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProps) {
   const [expanded, setExpanded] = useState(false)
@@ -91,7 +101,7 @@ export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProp
       >
         {expanded ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
         Style & Appearance
-        {(value.fontFamily || value.headerStyle || value.sectionLayout || value.footerText || (value.headerGradient && value.headerGradient !== "none")) && (
+        {(value.fontFamily || value.headerFontFamily || value.headerTextColor || value.bodyTextColor || value.footerTextColor || value.headerStyle || value.sectionLayout || value.footerText || (value.headerGradient && value.headerGradient !== "none")) && (
           <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">customized</span>
         )}
       </button>
@@ -126,9 +136,9 @@ export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProp
           {/* Typography */}
           <div className="pt-3 space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Typography</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <div>
-                <Label className="text-xs">Font</Label>
+                <Label className="text-xs">Body Font</Label>
                 <Select
                   value={value.fontFamily ?? "sans-serif"}
                   onValueChange={(v) => update({ fontFamily: v as FontFamily })}
@@ -139,7 +149,27 @@ export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProp
                   <SelectContent>
                     {FONT_OPTIONS.map((f) => (
                       <SelectItem key={f.value} value={f.value}>
-                        <span style={{ fontFamily: f.value === "serif" ? "Georgia, serif" : f.value === "monospace" ? "'Courier New', monospace" : "inherit" }}>
+                        <span style={{ fontFamily: fontPreviewStyle(f.value) }}>
+                          {f.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Header/Footer Font</Label>
+                <Select
+                  value={value.headerFontFamily ?? value.fontFamily ?? "sans-serif"}
+                  onValueChange={(v) => update({ headerFontFamily: v === (value.fontFamily ?? "sans-serif") ? undefined : v as FontFamily })}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_OPTIONS.map((f) => (
+                      <SelectItem key={f.value} value={f.value}>
+                        <span style={{ fontFamily: fontPreviewStyle(f.value) }}>
                           {f.label}
                         </span>
                       </SelectItem>
@@ -162,6 +192,61 @@ export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProp
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Text Colors */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Text Colors</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label className="text-xs">Header</Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="color"
+                    value={value.headerTextColor || "#ffffff"}
+                    onChange={(e) => update({ headerTextColor: e.target.value })}
+                    className="h-8 w-10 p-0.5"
+                  />
+                  {value.headerTextColor && (
+                    <button type="button" onClick={() => update({ headerTextColor: undefined })} className="text-muted-foreground hover:text-destructive">
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Body</Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="color"
+                    value={value.bodyTextColor || "#1E293B"}
+                    onChange={(e) => update({ bodyTextColor: e.target.value })}
+                    className="h-8 w-10 p-0.5"
+                  />
+                  {value.bodyTextColor && (
+                    <button type="button" onClick={() => update({ bodyTextColor: undefined })} className="text-muted-foreground hover:text-destructive">
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Footer</Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="color"
+                    value={value.footerTextColor || "#64748B"}
+                    onChange={(e) => update({ footerTextColor: e.target.value })}
+                    className="h-8 w-10 p-0.5"
+                  />
+                  {value.footerTextColor && (
+                    <button type="button" onClick={() => update({ footerTextColor: undefined })} className="text-muted-foreground hover:text-destructive">
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
