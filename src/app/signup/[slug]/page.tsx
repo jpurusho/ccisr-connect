@@ -539,7 +539,7 @@ function FieldRenderer({
   responses: ResponseEntry[]
 }) {
   const labelEl = (
-    <Label className="text-sm font-medium">
+    <Label className="text-sm font-medium text-gray-700">
       {field.label}
       {field.required && <span className="text-red-500 ml-0.5">*</span>}
     </Label>
