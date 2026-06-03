@@ -1406,7 +1406,7 @@ export default function DashboardPage() {
                 const breakMsg = occBreaks[0].message || "On scheduled break"
                 bulletinAutoEvents.push({
                   title: evt.title,
-                  details: `⏸ ${breakMsg}`,
+                  details: breakMsg,
                 })
               }
               continue
@@ -1442,7 +1442,7 @@ export default function DashboardPage() {
               if (oneTimeBreaks && oneTimeBreaks.length > 0) {
                 if (evt.show_break_in_bulletin !== false) {
                   const breakMsg = oneTimeBreaks[0].message || "On scheduled break"
-                  bulletinAutoEvents.push({ title: evt.title, details: `⏸ ${breakMsg}` })
+                  bulletinAutoEvents.push({ title: evt.title, details: breakMsg })
                 }
                 continue
               }
