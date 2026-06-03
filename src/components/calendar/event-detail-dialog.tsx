@@ -177,7 +177,7 @@ interface BreakRecord {
   location_id: string | null
 }
 
-function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakChanged?: () => void }) {
+function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string; eventDate: Date; onBreakChanged?: () => void }) {
   const [breaks, setBreaks] = useState<BreakRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -245,9 +245,9 @@ function BreakManager({ eventId, onBreakChanged }: { eventId: string; onBreakCha
 
   if (loading) return null
 
-  const today = format(new Date(), "yyyy-MM-dd")
-  const activeBreaks = breaks.filter((b) => b.end_date >= today)
-  const pastBreaks = breaks.filter((b) => b.end_date < today)
+  const refDate = format(eventDate, "yyyy-MM-dd")
+  const activeBreaks = breaks.filter((b) => b.end_date >= refDate)
+  const pastBreaks = breaks.filter((b) => b.end_date < refDate)
   const visibleBreaks = showPastBreaks ? breaks : activeBreaks
 
   return (
@@ -490,7 +490,7 @@ export function EventDetailDialog({
 
           {/* Break management for recurring events */}
           {event.kind === "event" && event.eventId && event.recurrenceRule && (
-            <BreakManager eventId={event.eventId} onBreakChanged={onDateUpdated} />
+            <BreakManager eventId={event.eventId} eventDate={event.date} onBreakChanged={onDateUpdated} />
           )}
 
           {/* Birthday-specific info */}
