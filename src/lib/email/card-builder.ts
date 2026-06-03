@@ -324,21 +324,37 @@ function dataListHtml(
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
   if (layout === "paragraph") {
-    const text = entries.map((e) => `<strong>${e.primary}</strong> (${e.secondary})`).join(", ");
+    const text = entries.map((e) => {
+      const isBreak = e.secondary.startsWith("⏸")
+      return isBreak
+        ? `<em style="color:${colors.accent}">${e.primary} — ${e.secondary}</em>`
+        : `<strong>${e.primary}</strong> (${e.secondary})`
+    }).join(", ");
     return `<div style="background:${colors.bgLight};border-radius:8px;padding:14px 16px;margin-top:8px;font-size:${sz.body}px;color:${colors.textDark};line-height:1.8">${text}</div>`;
   }
 
   if (layout === "list") {
-    const items = entries.map((e) => `<li style="padding:4px 0;font-size:${sz.body}px;color:${colors.textDark}"><strong>${e.primary}</strong> <span style="color:${colors.accent}">${e.secondary}</span></li>`).join("");
+    const items = entries.map((e) => {
+      const isBreak = e.secondary.startsWith("⏸")
+      return isBreak
+        ? `<li style="padding:4px 0;font-size:${sz.body}px;color:${colors.textDark};font-style:italic;opacity:0.8"><strong>${e.primary}</strong> <span style="color:${colors.accent}">${e.secondary}</span></li>`
+        : `<li style="padding:4px 0;font-size:${sz.body}px;color:${colors.textDark}"><strong>${e.primary}</strong> <span style="color:${colors.accent}">${e.secondary}</span></li>`
+    }).join("");
     return `<ul style="margin:8px 0 0;padding-left:20px;list-style:disc;color:${colors.textDark}">${items}</ul>`;
   }
 
-  const rows = entries.map((e) =>
-    `<tr>
+  const rows = entries.map((e) => {
+    const isBreak = e.secondary.startsWith("⏸")
+    return isBreak
+      ? `<tr>
+<td style="padding:10px 16px;font-size:${sz.body + 2}px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border};font-style:italic;opacity:0.7">${e.primary}</td>
+<td style="padding:10px 16px;font-size:${sz.body}px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-style:italic;opacity:0.7">${e.secondary}</td>
+</tr>`
+      : `<tr>
 <td style="padding:10px 16px;font-size:${sz.body + 2}px;font-weight:600;color:${colors.textDark};border-bottom:1px solid ${colors.border}">${e.primary}</td>
 <td style="padding:10px 16px;font-size:${sz.body}px;color:${colors.accent};text-align:right;border-bottom:1px solid ${colors.border};font-weight:500">${e.secondary}</td>
 </tr>`
-  ).join("");
+  }).join("");
   return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;overflow:hidden;margin-top:8px">${rows}</table>`;
 }
 

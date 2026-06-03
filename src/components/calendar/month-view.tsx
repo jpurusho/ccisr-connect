@@ -122,10 +122,14 @@ export function MonthView({
                         "bg-amber-500 text-white dark:bg-amber-600",
                       event.kind === "dispatch" &&
                         "border border-dashed",
+                      event.isOnBreak && event.status !== "cancelled" &&
+                        "border border-dashed",
                       event.status === "cancelled" && "opacity-60 line-through"
                     )}
                     style={
-                      event.kind === "dispatch"
+                      event.isOnBreak && event.status !== "cancelled"
+                        ? { borderColor: event.color, color: event.color, backgroundColor: event.color + "15", opacity: 0.75 }
+                        : event.kind === "dispatch"
                         ? { borderColor: event.color, color: event.color, backgroundColor: event.color + "12" }
                         : event.status === "cancelled"
                         ? { backgroundColor: "#9CA3AF30", color: "#6B7280" }
@@ -221,10 +225,14 @@ export function DayDetailPanel({
                   event.kind === "anniversary" &&
                     "bg-amber-50 dark:bg-amber-950/20",
                   event.kind === "dispatch" &&
-                    "border border-dashed"
+                    "border border-dashed",
+                  event.isOnBreak && event.status !== "cancelled" &&
+                    "border border-dashed opacity-75"
                 )}
                 style={
-                  event.kind === "dispatch"
+                  event.isOnBreak && event.status !== "cancelled"
+                    ? { borderColor: event.color, backgroundColor: `${event.color}08` }
+                    : event.kind === "dispatch"
                     ? { borderColor: event.color, backgroundColor: `${event.color}08` }
                     : event.kind === "event"
                     ? { backgroundColor: `${event.color}08` }
@@ -246,6 +254,11 @@ export function DayDetailPanel({
                 <span className="flex-1 truncate font-medium">
                   {event.title}
                 </span>
+                {event.isOnBreak && event.status !== "cancelled" && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400">
+                    Break
+                  </span>
+                )}
                 {event.kind === "dispatch" && event.dispatchStatus && (
                   <span className={cn(
                     "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
@@ -254,7 +267,7 @@ export function DayDetailPanel({
                     {event.dispatchStatus === "sent" ? "Sent" : event.dispatchStatus}
                   </span>
                 )}
-                {event.kind !== "dispatch" && event.time && (
+                {event.kind !== "dispatch" && !event.isOnBreak && event.time && (
                   <span className="text-xs text-muted-foreground">
                     {event.time}
                   </span>

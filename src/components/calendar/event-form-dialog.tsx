@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import {
   Select,
@@ -84,6 +85,7 @@ export function EventFormDialog({
   const [hostUntil, setHostUntil] = useState("")
   const [description, setDescription] = useState("")
   const [zoomLink, setZoomLink] = useState("")
+  const [showBreakInBulletin, setShowBreakInBulletin] = useState(true)
 
   const [eventTypes, setEventTypes] = useState<EventTypeOption[]>([])
   const [families, setFamilies] = useState<FamilyOption[]>([])
@@ -114,6 +116,7 @@ export function EventFormDialog({
     setRangeFrom("")
     setRangeTo("")
     setBreaks([])
+    setShowBreakInBulletin(true)
     setLoaded(false)
   }, [initialDate])
 
@@ -154,6 +157,7 @@ export function EventFormDialog({
           recurrence_rule: string | null; default_time: string | null; zoom_link: string | null
           host_family_id: string | null; host_until: string | null
           start_date: string | null; end_date: string | null; is_active: boolean
+          show_break_in_bulletin: boolean
         }
         const { data: event } = await supabase
           .from("events")
@@ -168,6 +172,7 @@ export function EventFormDialog({
           setTime(event.default_time ?? "")
           setDescription(event.description ?? "")
           setZoomLink(event.zoom_link ?? "")
+          setShowBreakInBulletin(event.show_break_in_bulletin !== false)
           setHostFamilyId(event.host_family_id ?? "")
           setHostUntil(event.host_until ?? "")
           setStartDate(event.start_date ?? "")
@@ -232,6 +237,7 @@ export function EventFormDialog({
         host_until: recurrenceFreq !== "NONE" && hostFamilyId && hostFamilyId !== "none" && hostUntil ? hostUntil : null,
         start_date: recurrenceFreq === "NONE" && startDate ? startDate : null,
         end_date: recurrenceFreq === "NONE" && endDate ? endDate : null,
+        show_break_in_bulletin: showBreakInBulletin,
         is_active: true,
       }
 
@@ -637,6 +643,18 @@ export function EventFormDialog({
                 value={zoomLink}
                 onChange={(e) => setZoomLink(e.target.value)}
                 placeholder="https://zoom.us/j/..."
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+              <div className="space-y-0.5">
+                <Label htmlFor="ef-break-bulletin" className="text-sm font-medium">Show in bulletin when on break</Label>
+                <p className="text-[11px] text-muted-foreground">Include this event with break message in the weekly bulletin</p>
+              </div>
+              <Switch
+                id="ef-break-bulletin"
+                checked={showBreakInBulletin}
+                onCheckedChange={setShowBreakInBulletin}
               />
             </div>
 

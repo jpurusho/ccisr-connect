@@ -133,6 +133,7 @@ export default function CalendarPage() {
       anniversariesResult,
       dispatchesResult,
       customTemplatesResult,
+      breaksResult,
     ] = await Promise.all([
       // Event instances in date range (include cancelled to prevent regeneration)
       supabase
@@ -179,6 +180,14 @@ export default function CalendarPage() {
         .select("id, name, body_template")
         .eq("is_default", false)
         .returns<{ id: string; name: string; body_template: string }[]>(),
+
+      // Event breaks overlapping visible range
+      supabase
+        .from("event_breaks")
+        .select("id, event_id, start_date, end_date, message")
+        .lte("start_date", endStr)
+        .gte("end_date", startStr)
+        .returns<{ id: string; event_id: string; start_date: string; end_date: string; message: string | null }[]>(),
     ])
 
     const instances = (instancesResult.data ?? []) as EventInstance[]
@@ -187,6 +196,20 @@ export default function CalendarPage() {
     const birthdays = (birthdaysResult.data ?? []) as Member[]
     const anniversaries = (anniversariesResult.data ?? []) as WeddingAnniversary[]
     const dispatches = dispatchesResult.data ?? []
+    const breaks = breaksResult.data ?? []
+
+    // Build break lookup: event_id → array of { start_date, end_date, message }
+    const breaksMap = new Map<string, { start_date: string; end_date: string; message: string | null }[]>()
+    for (const b of breaks) {
+      if (!breaksMap.has(b.event_id)) breaksMap.set(b.event_id, [])
+      breaksMap.get(b.event_id)!.push(b)
+    }
+    function getBreakMessage(eventId: string, dateStr: string): string | null {
+      const eventBreaks = breaksMap.get(eventId)
+      if (!eventBreaks) return null
+      const match = eventBreaks.find((b) => b.start_date <= dateStr && b.end_date >= dateStr)
+      return match ? (match.message || "On Break") : null
+    }
 
     // Build lookup maps
     const eventsMap = new Map(eventsData.map((e) => [e.id, e]))
@@ -284,6 +307,8 @@ export default function CalendarPage() {
         ? addressMap.get(instance.host_family_id)
         : null
 
+      const instBreakMsg = getBreakMessage(event.id, instance.instance_date)
+
       calEvents.push({
         id: instance.id,
         kind: "event",
@@ -310,6 +335,8 @@ export default function CalendarPage() {
         instanceId: instance.id,
         recurrenceRule: event.recurrence_rule,
         hostFamilyId: instance.host_family_id,
+        isOnBreak: !!instBreakMsg,
+        breakMessage: instBreakMsg,
         isRecurrenceGenerated: false,
       })
     }
@@ -353,6 +380,8 @@ export default function CalendarPage() {
         const dateStr = format(occ, "yyyy-MM-dd")
         if (instanceDates.has(`${event.id}:${dateStr}`)) continue
 
+        const recBreakMsg = getBreakMessage(event.id, dateStr)
+
         calEvents.push({
           id: `recurring-${event.id}-${dateStr}`,
           kind: "event",
@@ -373,6 +402,8 @@ export default function CalendarPage() {
           recurrenceRule: event.recurrence_rule,
           hostFamilyId: hostId,
           hostUntil: evtAny.host_until ?? null,
+          isOnBreak: !!recBreakMsg,
+          breakMessage: recBreakMsg,
           isRecurrenceGenerated: true,
         })
       }

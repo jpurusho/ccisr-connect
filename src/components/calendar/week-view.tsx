@@ -28,6 +28,7 @@ function EventPill({
   const isSent = isDispatch && event.dispatchStatus === "sent"
 
   const isCancelled = event.kind === "event" && event.status === "cancelled"
+  const isOnBreak = event.kind === "event" && event.isOnBreak && !isCancelled
 
   return (
     <button
@@ -38,10 +39,13 @@ function EventPill({
         isBirthday && "bg-purple-500 text-white",
         isAnniversary && "bg-amber-500 text-white",
         isDispatch && "border border-dashed",
+        isOnBreak && "border border-dashed",
         isCancelled && "opacity-60"
       )}
       style={
-        isDispatch
+        isOnBreak
+          ? { borderColor: event.color, color: event.color, backgroundColor: event.color + "15", opacity: 0.75 }
+          : isDispatch
           ? { borderColor: event.color, color: event.color, backgroundColor: event.color + "12" }
           : isCancelled
           ? { backgroundColor: "#9CA3AF30", color: "#6B7280" }
@@ -52,19 +56,23 @@ function EventPill({
     >
       {isBirthday && <Cake className="size-3 shrink-0" />}
       {isAnniversary && <Heart className="size-3 shrink-0" />}
-      {event.kind === "event" && <CalendarDays className="size-3 shrink-0" />}
+      {event.kind === "event" && !isOnBreak && <CalendarDays className="size-3 shrink-0" />}
+      {isOnBreak && <Clock className="size-3 shrink-0" />}
       {isDispatch && (isSent
         ? <Check className="size-3 shrink-0" />
         : <Send className="size-3 shrink-0" />
       )}
       <span className={cn("truncate font-medium", isCancelled && "line-through")}>{event.title}</span>
+      {isOnBreak && (
+        <span className="ml-auto shrink-0 text-[10px] font-medium opacity-80">Break</span>
+      )}
       {isDispatch && isSent && (
         <span className="ml-auto shrink-0 text-[10px] opacity-70">Sent</span>
       )}
       {isDispatch && !isSent && event.dispatchStatus && (
         <span className="ml-auto shrink-0 text-[10px] opacity-70">{event.dispatchStatus}</span>
       )}
-      {!isDispatch && event.time && (
+      {!isDispatch && !isOnBreak && event.time && (
         <span className="ml-auto shrink-0 text-[10px] opacity-70">
           {event.time}
         </span>

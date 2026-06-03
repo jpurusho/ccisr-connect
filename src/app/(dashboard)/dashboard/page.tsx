@@ -793,7 +793,7 @@ export default function DashboardPage() {
           .from("events")
           .select("*")
           .eq("is_active", true)
-          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean; description?: string | null; zoom_link?: string | null }[]>(),
+          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean; description?: string | null; zoom_link?: string | null; show_break_in_bulletin?: boolean }[]>(),
 
         // Event instances for current week (including cancelled — needed for break/cancel detection)
         supabase
@@ -1392,7 +1392,7 @@ export default function DashboardPage() {
             const inst = weekInstances.find((wi) => wi.event_id === evt.id && wi.instance_date === format(occ, "yyyy-MM-dd"))
             if (inst?.status === "cancelled") continue
             const occDateStr = format(occ, "yyyy-MM-dd")
-            // Check if event has a break for this date — if so, skip it
+            // Check if event has a break for this date
             const { data: occBreaks } = await supabase
               .from("event_breaks")
               .select("id, message")
@@ -1400,7 +1400,17 @@ export default function DashboardPage() {
               .lte("start_date", occDateStr)
               .gte("end_date", occDateStr)
               .limit(1)
-            if (occBreaks && occBreaks.length > 0) continue
+              .returns<{ id: string; message: string | null }[]>()
+            if (occBreaks && occBreaks.length > 0) {
+              if (evt.show_break_in_bulletin !== false) {
+                const breakMsg = occBreaks[0].message || "On scheduled break"
+                bulletinAutoEvents.push({
+                  title: evt.title,
+                  details: `⏸ ${breakMsg}`,
+                })
+              }
+              continue
+            }
             // One bulletin entry per event occurrence
             bulletinAutoEvents.push({
               title: evt.title,
@@ -1418,6 +1428,26 @@ export default function DashboardPage() {
             || (evtStart && !evtEnd && evtStart >= wkSun && evtStart <= wkSat)
 
           if (overlapsWeek) {
+            // Check break for the event date
+            const checkDate = inst?.instance_date ?? (evtStart ? format(evtStart, "yyyy-MM-dd") : "")
+            if (checkDate) {
+              const { data: oneTimeBreaks } = await supabase
+                .from("event_breaks")
+                .select("id, message")
+                .eq("event_id", evt.id)
+                .lte("start_date", checkDate)
+                .gte("end_date", checkDate)
+                .limit(1)
+                .returns<{ id: string; message: string | null }[]>()
+              if (oneTimeBreaks && oneTimeBreaks.length > 0) {
+                if (evt.show_break_in_bulletin !== false) {
+                  const breakMsg = oneTimeBreaks[0].message || "On scheduled break"
+                  bulletinAutoEvents.push({ title: evt.title, details: `⏸ ${breakMsg}` })
+                }
+                continue
+              }
+            }
+
             const timeStr = inst?.instance_time ? formatTime(inst.instance_time) : (evt.default_time ? formatTime(evt.default_time) : null)
             let details: string
             if (evtStart && evtEnd && evtStart.getTime() !== evtEnd.getTime()) {

@@ -28,6 +28,8 @@ export type CalendarEvent = {
   recurrenceRule?: string | null
   hostFamilyId?: string | null
   hostUntil?: string | null
+  isOnBreak?: boolean
+  breakMessage?: string | null
   isRecurrenceGenerated?: boolean
   infoSections?: { title: string; emoji: string; color?: string; entries: { label: string; name: string }[] }[]
   memberId?: string | null

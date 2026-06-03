@@ -99,6 +99,7 @@ export type Event = {
   host_until: string | null
   start_date: string | null
   end_date: string | null
+  show_break_in_bulletin: boolean
   is_active: boolean
   created_at: string
   updated_at: string

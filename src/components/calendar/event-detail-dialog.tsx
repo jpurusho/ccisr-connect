@@ -66,6 +66,7 @@ const statusColors: Record<string, string> = {
   confirmed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
   draft: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  on_break: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
 }
 
 const MONTHS = [
@@ -369,7 +370,13 @@ export function EventDetailDialog({
           {event.kind === "event" && event.eventTypeName && (
             <div className="mt-1">
               <Badge variant="secondary">{event.eventTypeName}</Badge>
-              {event.status && (
+              {event.isOnBreak && event.status !== "cancelled" ? (
+                <span
+                  className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusColors.on_break}`}
+                >
+                  On Break
+                </span>
+              ) : event.status && (
                 <span
                   className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[event.status] ?? ""}`}
                 >
@@ -381,6 +388,13 @@ export function EventDetailDialog({
         </SheetHeader>
 
         <div className="space-y-3">
+          {/* Break message banner */}
+          {event.isOnBreak && event.breakMessage && event.status !== "cancelled" && (
+            <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm italic text-orange-800 dark:border-orange-800/40 dark:bg-orange-900/20 dark:text-orange-300">
+              {event.breakMessage}
+            </div>
+          )}
+
           {/* Date */}
           <div className="flex items-start gap-3 text-sm">
             <CalendarDays className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
