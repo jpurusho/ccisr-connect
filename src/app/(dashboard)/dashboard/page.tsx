@@ -1666,13 +1666,13 @@ export default function DashboardPage() {
       setGenericCards(resolvedGenericCards)
 
       // ---- Custom dashboard templates ----
-      const { data: customTmpls } = await supabase
+      const { data: customTmplsRaw } = await supabase
         .from("email_templates")
-        .select("id, name, subject_template, body_template, style_settings")
+        .select("*")
         .eq("is_default", false)
-        .eq("is_active", true)
         .order("name")
-        .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>()
+        .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null; is_active?: boolean }[]>()
+      const customTmpls = (customTmplsRaw ?? []).filter((ct) => ct.is_active !== false)
 
       const dashCustom: DashboardCustomTemplate[] = []
       const customFormInit: Record<string, CustomDashFormData> = {}
@@ -3222,35 +3222,37 @@ export default function DashboardPage() {
                 const wkEnd = format(endOfWeek(baseDate, { weekStartsOn: 0 }), "yyyy-MM-dd")
 
                 // Always fetch promoted events (promote_from based)
-                const { data: promoEvents } = await supabase
-                  .from("events")
-                  .select("id, title, default_time, promote_from")
-                  .eq("is_active", true)
-                  .not("promote_from", "is", null)
-                  .lte("promote_from", wkEnd)
-                  .returns<{ id: string; title: string; default_time: string | null; promote_from: string }[]>()
-                const promoIds = (promoEvents ?? []).map((e) => e.id)
                 let promoItems: { title: string; details: string }[] = []
-                if (promoIds.length > 0) {
-                  const { data: promoInst } = await supabase
-                    .from("event_instances")
-                    .select("event_id, instance_date, instance_time, status")
-                    .in("event_id", promoIds)
-                    .gt("instance_date", wkEnd)
-                    .neq("status", "cancelled")
-                    .order("instance_date")
-                    .returns<{ event_id: string; instance_date: string; instance_time: string | null; status: string }[]>()
-                  const seen = new Set<string>()
-                  for (const inst of promoInst ?? []) {
-                    if (seen.has(inst.event_id)) continue
-                    seen.add(inst.event_id)
-                    const evt = promoEvents!.find((e) => e.id === inst.event_id)
-                    if (!evt) continue
-                    const time = inst.instance_time ?? evt.default_time
-                    const dateStr = format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")
-                    promoItems.push({ title: evt.title, details: time ? `${dateStr} at ${formatTime(time)}` : dateStr })
+                try {
+                  const { data: promoEvents } = await supabase
+                    .from("events")
+                    .select("id, title, default_time, promote_from")
+                    .eq("is_active", true)
+                    .not("promote_from", "is", null)
+                    .lte("promote_from", wkEnd)
+                    .returns<{ id: string; title: string; default_time: string | null; promote_from: string }[]>()
+                  const promoIds = (promoEvents ?? []).map((e) => e.id)
+                  if (promoIds.length > 0) {
+                    const { data: promoInst } = await supabase
+                      .from("event_instances")
+                      .select("event_id, instance_date, instance_time, status")
+                      .in("event_id", promoIds)
+                      .gt("instance_date", wkEnd)
+                      .neq("status", "cancelled")
+                      .order("instance_date")
+                      .returns<{ event_id: string; instance_date: string; instance_time: string | null; status: string }[]>()
+                    const seen = new Set<string>()
+                    for (const inst of promoInst ?? []) {
+                      if (seen.has(inst.event_id)) continue
+                      seen.add(inst.event_id)
+                      const evt = promoEvents!.find((e) => e.id === inst.event_id)
+                      if (!evt) continue
+                      const time = inst.instance_time ?? evt.default_time
+                      const dateStr = format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")
+                      promoItems.push({ title: evt.title, details: time ? `${dateStr} at ${formatTime(time)}` : dateStr })
+                    }
                   }
-                }
+                } catch { /* promote_from column may not exist yet */ }
 
                 if (weeks <= 1) {
                   setBulletinForm((prev) => ({ ...prev, upcomingEvents: promoItems }))

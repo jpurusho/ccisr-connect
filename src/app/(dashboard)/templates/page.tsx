@@ -211,6 +211,7 @@ export default function TemplatesPage() {
 
   // Custom templates
   const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string; style_settings?: Record<string, unknown>; is_active: boolean }[]>([])
+
   const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown>; styleSettings: TemplateStyleSettings } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
   const [newCustomStyleSettings, setNewCustomStyleSettings] = useState<TemplateStyleSettings>({})
@@ -253,13 +254,13 @@ export default function TemplatesPage() {
         .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
       supabase
         .from("email_templates")
-        .select("id, name, subject_template, body_template, style_settings, is_active")
+        .select("*")
         .eq("is_default", false)
         .order("name")
-        .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null; is_active: boolean }[]>(),
+        .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null; is_active?: boolean }[]>(),
     ])
 
-    if (customRes.data) setCustomTemplates(customRes.data.map((ct) => ({ ...ct, style_settings: ct.style_settings ?? undefined })))
+    if (customRes.data) setCustomTemplates(customRes.data.map((ct) => ({ ...ct, style_settings: ct.style_settings ?? undefined, is_active: ct.is_active !== false })))
 
     // Build event type maps — keyed by comm_type directly
     const idToTabName: Record<string, string> = {}
