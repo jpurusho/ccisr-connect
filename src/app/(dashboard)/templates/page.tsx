@@ -719,6 +719,7 @@ export default function TemplatesPage() {
         color: (parsed.primaryColor as string) || "#6B7280",
         hasSaved: true,
         isCustom: true,
+        isActive: ct.is_active,
       }
     }),
   ]
@@ -765,7 +766,7 @@ export default function TemplatesPage() {
                     setActiveTab(card.id)
                   }
                 }}
-                className="flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all hover:shadow-md hover:border-primary/30 active:scale-95"
+                className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all hover:shadow-md hover:border-primary/30 active:scale-95 ${"isActive" in card && !card.isActive ? "opacity-50" : ""}`}
               >
                 <div
                   className="flex size-10 items-center justify-center rounded-lg"
@@ -774,9 +775,11 @@ export default function TemplatesPage() {
                   <Icon className="size-5" />
                 </div>
                 <span className="text-sm font-medium">{card.label}</span>
-                {card.hasSaved && (
+                {"isActive" in card && !card.isActive ? (
+                  <Badge variant="secondary" className="text-[10px]">Inactive</Badge>
+                ) : card.hasSaved ? (
                   <span className="size-1.5 rounded-full" style={{ backgroundColor: card.color }} />
-                )}
+                ) : null}
               </button>
             )
           })}
