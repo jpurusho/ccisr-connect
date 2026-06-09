@@ -1670,6 +1670,7 @@ export default function DashboardPage() {
         .from("email_templates")
         .select("id, name, subject_template, body_template, style_settings")
         .eq("is_default", false)
+        .eq("is_active", true)
         .order("name")
         .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>()
 

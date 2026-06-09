@@ -35,6 +35,8 @@ import {
   Send,
   CalendarDays,
   Copy,
+  Ban,
+  RotateCcw,
 } from "lucide-react"
 import {
   buildBirthdayCard,
@@ -208,7 +210,7 @@ export default function TemplatesPage() {
   const [previewing, setPreviewing] = useState(false)
 
   // Custom templates
-  const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string; style_settings?: Record<string, unknown> }[]>([])
+  const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string; style_settings?: Record<string, unknown>; is_active: boolean }[]>([])
   const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown>; styleSettings: TemplateStyleSettings } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
   const [newCustomStyleSettings, setNewCustomStyleSettings] = useState<TemplateStyleSettings>({})
@@ -251,10 +253,10 @@ export default function TemplatesPage() {
         .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
       supabase
         .from("email_templates")
-        .select("id, name, subject_template, body_template, style_settings")
+        .select("id, name, subject_template, body_template, style_settings, is_active")
         .eq("is_default", false)
         .order("name")
-        .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
+        .returns<{ id: string; name: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null; is_active: boolean }[]>(),
     ])
 
     if (customRes.data) setCustomTemplates(customRes.data.map((ct) => ({ ...ct, style_settings: ct.style_settings ?? undefined })))
@@ -1928,12 +1930,15 @@ export default function TemplatesPage() {
                         let parsed: Record<string, unknown> = {}
                         try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
                         return (
-                          <div key={ct.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                          <div key={ct.id} className={`flex items-center justify-between rounded-lg border px-4 py-3 ${!ct.is_active ? "opacity-50" : ""}`}>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-sm truncate">{ct.name}</p>
                               <p className="text-xs text-muted-foreground truncate">{ct.subject_template}</p>
                               {typeof parsed.title === "string" && parsed.title && (
                                 <p className="text-xs text-muted-foreground/70 truncate mt-0.5">Card: {parsed.title}</p>
+                              )}
+                              {!ct.is_active && (
+                                <Badge variant="secondary" className="mt-1 text-[10px]">Inactive</Badge>
                               )}
                             </div>
                             <div className="flex gap-1 shrink-0 ml-2">
@@ -1952,6 +1957,25 @@ export default function TemplatesPage() {
                                 }}
                               >
                                 <Pencil className="size-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title={ct.is_active ? "Deactivate" : "Activate"}
+                                onClick={async () => {
+                                  const supabase = createClient()
+                                  const newActive = !ct.is_active
+                                  const { error } = await supabase.from("email_templates").update({ is_active: newActive } as never).eq("id", ct.id)
+                                  if (error) {
+                                    toast.error(`Failed: ${error.message}`)
+                                  } else {
+                                    toast.success(newActive ? `"${ct.name}" activated` : `"${ct.name}" deactivated`)
+                                    logAudit("custom_template_toggled_active", "email_templates", ct.id, { name: ct.name, is_active: newActive })
+                                    fetchTemplates()
+                                  }
+                                }}
+                              >
+                                {ct.is_active ? <Ban className="size-3.5 text-muted-foreground" /> : <RotateCcw className="size-3.5 text-green-600" />}
                               </Button>
                               <Button
                                 variant="ghost"
