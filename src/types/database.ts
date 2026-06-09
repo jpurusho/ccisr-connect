@@ -100,6 +100,7 @@ export type Event = {
   start_date: string | null
   end_date: string | null
   show_break_in_bulletin: boolean
+  promote_from: string | null
   is_active: boolean
   created_at: string
   updated_at: string

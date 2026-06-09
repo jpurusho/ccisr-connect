@@ -86,6 +86,7 @@ export function EventFormDialog({
   const [description, setDescription] = useState("")
   const [zoomLink, setZoomLink] = useState("")
   const [showBreakInBulletin, setShowBreakInBulletin] = useState(true)
+  const [promoteFrom, setPromoteFrom] = useState("")
 
   const [eventTypes, setEventTypes] = useState<EventTypeOption[]>([])
   const [families, setFamilies] = useState<FamilyOption[]>([])
@@ -117,6 +118,7 @@ export function EventFormDialog({
     setRangeTo("")
     setBreaks([])
     setShowBreakInBulletin(true)
+    setPromoteFrom("")
     setLoaded(false)
   }, [initialDate])
 
@@ -157,7 +159,7 @@ export function EventFormDialog({
           recurrence_rule: string | null; default_time: string | null; zoom_link: string | null
           host_family_id: string | null; host_until: string | null
           start_date: string | null; end_date: string | null; is_active: boolean
-          show_break_in_bulletin: boolean
+          show_break_in_bulletin: boolean; promote_from: string | null
         }
         const { data: event } = await supabase
           .from("events")
@@ -173,6 +175,7 @@ export function EventFormDialog({
           setDescription(event.description ?? "")
           setZoomLink(event.zoom_link ?? "")
           setShowBreakInBulletin(event.show_break_in_bulletin !== false)
+          setPromoteFrom(event.promote_from ?? "")
           setHostFamilyId(event.host_family_id ?? "")
           setHostUntil(event.host_until ?? "")
           setStartDate(event.start_date ?? "")
@@ -238,6 +241,7 @@ export function EventFormDialog({
         start_date: recurrenceFreq === "NONE" && startDate ? startDate : null,
         end_date: recurrenceFreq === "NONE" && endDate ? endDate : null,
         show_break_in_bulletin: showBreakInBulletin,
+        promote_from: promoteFrom || null,
         is_active: true,
       }
 
@@ -656,6 +660,19 @@ export function EventFormDialog({
                 checked={showBreakInBulletin}
                 onCheckedChange={setShowBreakInBulletin}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="ef-promote-from" className="text-sm font-medium">Promote in bulletin from</Label>
+              <Input
+                id="ef-promote-from"
+                type="date"
+                value={promoteFrom}
+                onChange={(e) => setPromoteFrom(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Event appears in weekly bulletin &quot;Upcoming&quot; section starting this date until the event passes. Leave blank to not promote.
+              </p>
             </div>
 
             {/* Scheduled Breaks (read-only) */}

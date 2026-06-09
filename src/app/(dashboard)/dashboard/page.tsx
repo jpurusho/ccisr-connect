@@ -793,7 +793,7 @@ export default function DashboardPage() {
           .from("events")
           .select("*")
           .eq("is_active", true)
-          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean; description?: string | null; zoom_link?: string | null; show_break_in_bulletin?: boolean }[]>(),
+          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean; description?: string | null; zoom_link?: string | null; show_break_in_bulletin?: boolean; promote_from?: string | null }[]>(),
 
         // Event instances for current week (including cancelled — needed for break/cancel detection)
         supabase
@@ -1508,6 +1508,33 @@ export default function DashboardPage() {
       // Live events always come from DB (current state), not from stale drafts
       const liveEvents = [...bulletinAutoEvents, ...manualBulletinItems]
 
+      // Auto-populate upcoming events from events with promote_from set
+      const promotedEvents = activeEvents.filter(
+        (e) => e.promote_from && e.promote_from <= wkSatISO
+      )
+      let autoUpcoming: { title: string; details: string }[] = []
+      if (promotedEvents.length > 0) {
+        const promotedIds = promotedEvents.map((e) => e.id)
+        const { data: futureInst } = await supabase
+          .from("event_instances")
+          .select("event_id, instance_date, instance_time, status")
+          .in("event_id", promotedIds)
+          .gt("instance_date", wkSatISO)
+          .neq("status", "cancelled")
+          .order("instance_date")
+          .returns<{ event_id: string; instance_date: string; instance_time: string | null; status: string }[]>()
+        const seen = new Set<string>()
+        for (const inst of futureInst ?? []) {
+          if (seen.has(inst.event_id)) continue
+          seen.add(inst.event_id)
+          const evt = promotedEvents.find((e) => e.id === inst.event_id)
+          if (!evt) continue
+          const time = inst.instance_time ?? evt.default_time
+          const dateStr = format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")
+          autoUpcoming.push({ title: evt.title, details: time ? `${dateStr} at ${formatTime(time)}` : dateStr })
+        }
+      }
+
       if (hasBulDraft) {
         const fd = composedMap["bulletin"].form_data as Record<string, unknown>
         // Merge: keep only user-added draft events not covered by live events or active calendar events
@@ -1526,6 +1553,7 @@ export default function DashboardPage() {
           anniversaries: (fd.anniversaries as BulletinFormData["anniversaries"]) ?? anniEntries.map((a) => ({ names: `${a.husbandName} & ${a.wifeName}`, date: a.date })),
           helpers: (fd.helpers as BulletinFormData["helpers"]) ?? autoFilledHelpers,
           events: [...liveEvents, ...manualDraftEvents],
+          upcomingEvents: autoUpcoming,
           sectionOrder: (fd.sectionOrder as BulletinFormData["sectionOrder"]) ?? undefined,
           ...bulCommon,
         })
@@ -1542,6 +1570,7 @@ export default function DashboardPage() {
           })),
           helpers: bulHelpers,
           events: liveEvents,
+          upcomingEvents: autoUpcoming,
           ...bulCommon,
         })
       }
@@ -3187,12 +3216,47 @@ export default function DashboardPage() {
               prayer_meeting: <PrayerMeetingEditForm data={prayerMeetingForm} onChange={setPrayerMeetingForm} />,
               bulletin: <BulletinEditForm data={bulletinForm} onChange={setBulletinForm} onWeeksChange={async (weeks) => {
                 setBulletinForm((prev) => ({ ...prev, weeksAhead: weeks }))
-                if (weeks <= 1) {
-                  setBulletinForm((prev) => ({ ...prev, upcomingEvents: [] }))
-                  return
-                }
                 const supabase = createClient()
                 const baseDate = addDays(new Date(), weekOffset * 7)
+                const wkEnd = format(endOfWeek(baseDate, { weekStartsOn: 0 }), "yyyy-MM-dd")
+
+                // Always fetch promoted events (promote_from based)
+                const { data: promoEvents } = await supabase
+                  .from("events")
+                  .select("id, title, default_time, promote_from")
+                  .eq("is_active", true)
+                  .not("promote_from", "is", null)
+                  .lte("promote_from", wkEnd)
+                  .returns<{ id: string; title: string; default_time: string | null; promote_from: string }[]>()
+                const promoIds = (promoEvents ?? []).map((e) => e.id)
+                let promoItems: { title: string; details: string }[] = []
+                if (promoIds.length > 0) {
+                  const { data: promoInst } = await supabase
+                    .from("event_instances")
+                    .select("event_id, instance_date, instance_time, status")
+                    .in("event_id", promoIds)
+                    .gt("instance_date", wkEnd)
+                    .neq("status", "cancelled")
+                    .order("instance_date")
+                    .returns<{ event_id: string; instance_date: string; instance_time: string | null; status: string }[]>()
+                  const seen = new Set<string>()
+                  for (const inst of promoInst ?? []) {
+                    if (seen.has(inst.event_id)) continue
+                    seen.add(inst.event_id)
+                    const evt = promoEvents!.find((e) => e.id === inst.event_id)
+                    if (!evt) continue
+                    const time = inst.instance_time ?? evt.default_time
+                    const dateStr = format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")
+                    promoItems.push({ title: evt.title, details: time ? `${dateStr} at ${formatTime(time)}` : dateStr })
+                  }
+                }
+
+                if (weeks <= 1) {
+                  setBulletinForm((prev) => ({ ...prev, upcomingEvents: promoItems }))
+                  return
+                }
+
+                // Also fetch slider-based future instances
                 const nextStart = format(addDays(startOfWeek(baseDate, { weekStartsOn: 0 }), 7), "yyyy-MM-dd")
                 const futureEnd = format(addDays(startOfWeek(baseDate, { weekStartsOn: 0 }), weeks * 7 - 1), "yyyy-MM-dd")
                 const { data: futureInstances } = await supabase
@@ -3202,16 +3266,20 @@ export default function DashboardPage() {
                   .lte("instance_date", futureEnd)
                   .neq("status", "cancelled")
                   .returns<{ event_id: string; instance_date: string; instance_time: string | null; status: string; events: { title: string; default_time: string | null; event_type_id: string; event_types: { name: string } | null } | null }[]>()
-                const upcomingItems: { title: string; details: string }[] = []
+                const sliderItems: { title: string; details: string }[] = []
                 for (const inst of futureInstances ?? []) {
                   if (!inst.events) continue
                   const etName = inst.events.event_types?.name ?? ""
                   if (["birthday", "anniversary", "bulletin"].includes(etName)) continue
                   const time = inst.instance_time ?? inst.events.default_time
                   const dateStr = format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")
-                  upcomingItems.push({ title: inst.events.title, details: time ? `${dateStr} at ${time}` : dateStr })
+                  sliderItems.push({ title: inst.events.title, details: time ? `${dateStr} at ${time}` : dateStr })
                 }
-                setBulletinForm((prev) => ({ ...prev, upcomingEvents: upcomingItems }))
+
+                // Merge: promoted first, then slider items (deduped by title)
+                const promoTitles = new Set(promoItems.map((p) => p.title))
+                const merged = [...promoItems, ...sliderItems.filter((s) => !promoTitles.has(s.title))]
+                setBulletinForm((prev) => ({ ...prev, upcomingEvents: merged }))
               }} onRefreshFromDb={() => {
                 setBulletinForm((prev) => ({
                   ...prev,
