@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import {
   Cake,
@@ -1751,6 +1752,26 @@ export default function TemplatesPage() {
                     >
                       Visual Builder
                     </Button>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {customTemplates.find((t) => t.id === editingCustom.id)?.is_active !== false ? "Active" : "Inactive"}
+                      </span>
+                      <Switch
+                        size="sm"
+                        checked={customTemplates.find((t) => t.id === editingCustom.id)?.is_active !== false}
+                        onCheckedChange={async (checked) => {
+                          const supabase = createClient()
+                          const { error } = await supabase.from("email_templates").update({ is_active: checked } as never).eq("id", editingCustom.id)
+                          if (error) {
+                            toast.error(`Failed: ${error.message}`)
+                          } else {
+                            toast.success(checked ? `"${editingCustom.name}" activated` : `"${editingCustom.name}" deactivated — hidden from dashboard`)
+                            logAudit("custom_template_toggled_active", "email_templates", editingCustom.id, { name: editingCustom.name, is_active: checked })
+                            fetchTemplates()
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {editingCustom.data._useVisualBuilder ? (
