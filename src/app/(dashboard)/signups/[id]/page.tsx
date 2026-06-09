@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useBreadcrumbTitle } from "@/components/layout/breadcrumb-context"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import { type SignupFieldConfig } from "@/lib/signup/field-registry"
@@ -68,6 +69,7 @@ const MONTHS = ["", "January", "February", "March", "April", "May", "June", "Jul
 export default function SignupResponsesPage() {
   const params = useParams()
   const router = useRouter()
+  const { setPageTitle } = useBreadcrumbTitle()
   const formId = params.id as string
 
   const [form, setForm] = useState<FormInfo | null>(null)
@@ -97,12 +99,18 @@ export default function SignupResponsesPage() {
       .order("created_at", { ascending: false })
       .returns<ResponseRow[]>()
 
-    if (formRes.data) setForm(formRes.data)
+    if (formRes.data) {
+      setForm(formRes.data)
+      setPageTitle(formRes.data.title)
+    }
     if (respRes.data) setResponses(respRes.data)
     setLoading(false)
   }, [formId])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData()
+    return () => setPageTitle(null)
+  }, [fetchData])
 
   async function confirmDelete() {
     if (!deleteTarget) return
@@ -215,7 +223,7 @@ export default function SignupResponsesPage() {
     <div className="space-y-4 p-4 sm:p-6">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon-sm" onClick={() => router.push("/signups")} title="Back to signups">
+        <Button variant="ghost" size="icon-sm" onClick={() => router.back()} title="Back">
           <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">

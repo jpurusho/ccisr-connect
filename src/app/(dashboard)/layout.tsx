@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { CommandPalette } from "@/components/layout/command-palette"
 import { Toaster } from "@/components/ui/sonner"
 import { AppUserProvider } from "@/hooks/use-app-user"
+import { BreadcrumbProvider } from "@/components/layout/breadcrumb-context"
 
 export default function DashboardLayout({
   children,
@@ -13,6 +14,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
+    <BreadcrumbProvider>
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
@@ -36,5 +38,6 @@ export default function DashboardLayout({
       <CommandPalette />
       <Toaster />
     </SidebarProvider>
+    </BreadcrumbProvider>
   )
 }

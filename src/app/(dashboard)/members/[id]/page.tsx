@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useBreadcrumbTitle } from "@/components/layout/breadcrumb-context"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import { formatPhone } from "@/lib/utils"
@@ -53,6 +54,7 @@ import { MONTH_NAMES_FULL as MONTH_NAMES } from "@/lib/date-utils"
 export default function MemberDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { setPageTitle } = useBreadcrumbTitle()
   const memberId = params.id as string
 
   const [member, setMember] = useState<MemberDetail | null>(null)
@@ -90,6 +92,7 @@ export default function MemberDetailPage() {
 
     const detail = memberData as MemberDetail
     setMember(detail)
+    setPageTitle(detail.full_name)
 
     // Fetch related data in parallel
     const [familyMembersResult, addressResult, anniversaryResult, tagsResult, memberTagsResult, tagHistoryResult] =
@@ -161,6 +164,7 @@ export default function MemberDetailPage() {
 
   useEffect(() => {
     fetchMember()
+    return () => setPageTitle(null)
   }, [fetchMember])
 
   async function handleDelete() {
@@ -329,6 +333,9 @@ export default function MemberDetailPage() {
       {/* Top bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon-sm" onClick={() => router.back()} title="Back">
+            <ArrowLeft className="size-4" />
+          </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
               {member.full_name}
