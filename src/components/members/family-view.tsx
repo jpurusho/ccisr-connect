@@ -327,7 +327,7 @@ export function FamilyView({ searchQuery, filter, cityFilter }: FamilyViewProps)
                         e.stopPropagation()
                         openEditDialog(family)
                       }}
-                      className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                      className="rounded p-0.5 text-muted-foreground opacity-100 transition-opacity hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
                       title="Edit family"
                     >
                       <Pencil className="size-3.5" />
