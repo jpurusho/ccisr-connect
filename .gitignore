@@ -50,3 +50,7 @@ supabase/.temp
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.claude/settings.local.json
+.claude/log_token_usage.py
+.claude/token_usage.log
+# .claude/state/
