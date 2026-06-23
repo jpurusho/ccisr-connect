@@ -206,6 +206,7 @@ export interface CustomSection {
   emoji: string
   color?: string
   layout?: "table" | "paragraph" | "list"
+  dividerAbove?: boolean
   entries: { label: string; name: string }[]
 }
 
@@ -448,6 +449,19 @@ export function CustomSectionsEditor({
                     {l}
                   </button>
                 ))}
+                <span className="mx-2 h-3 border-l border-border" />
+                <button
+                  type="button"
+                  className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${sec.dividerAbove ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => {
+                    const updated = [...sections]
+                    updated[sIdx] = { ...updated[sIdx], dividerAbove: !sec.dividerAbove }
+                    onChange(updated)
+                  }}
+                  title="Show a horizontal line above this section"
+                >
+                  ─ divider
+                </button>
               </div>
               {sec.entries.map((entry, eIdx) => (
                 <div key={eIdx} className="space-y-1">

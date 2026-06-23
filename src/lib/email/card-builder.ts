@@ -237,6 +237,7 @@ export interface CardCustomSection {
   emoji: string;
   color?: string;
   layout?: SectionLayout;
+  dividerAbove?: boolean;
   entries: { label: string; name: string }[];
 }
 
@@ -272,6 +273,7 @@ function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: C
   return sections
     .filter((s) => s.title)
     .map((s) => {
+      const divider = s.dividerAbove ? `<div style="border-top:1px solid ${colors.border};margin:16px 0"></div>` : "";
       const sColor = s.color || colors.primary;
       const sBg = s.color ? deriveColorsFromPrimary(s.color).bgLight : "";
       const bgStyle = sBg ? `background:${sBg};border-radius:8px;padding:4px 16px;` : "";
@@ -281,12 +283,12 @@ function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: C
 
       if (layout === "paragraph") {
         const text = validEntries.map((e) => e.label ? `${e.label}: ${e.name}` : e.name).join(", ");
-        return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr><tr><td style="padding:4px 12px 12px;font-size:${sz.body}px;color:${colors.textDark};line-height:1.6">${text}</td></tr></table>`;
+        return `${divider}<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr><tr><td style="padding:4px 12px 12px;font-size:${sz.body}px;color:${colors.textDark};line-height:1.6">${text}</td></tr></table>`;
       }
 
       if (layout === "list") {
         const items = validEntries.map((e) => `<li style="padding:2px 0;font-size:${sz.body}px;color:${colors.textDark}">${e.label ? `<strong>${e.label}:</strong> ` : ""}${e.name}</li>`).join("");
-        return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr><tr><td style="padding:4px 12px 12px"><ul style="margin:0;padding-left:20px;color:${colors.textDark}">${items}</ul></td></tr></table>`;
+        return `${divider}<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr><tr><td style="padding:4px 12px 12px"><ul style="margin:0;padding-left:20px;color:${colors.textDark}">${items}</ul></td></tr></table>`;
       }
 
       const rows = validEntries
@@ -295,7 +297,7 @@ function customSectionsHtml(sections: CardCustomSection[] | undefined, colors: C
             `<tr><td style="padding:4px 0 4px 12px;font-size:${sz.body}px;color:${colors.textDark}">${e.label || ""}</td><td style="padding:4px 12px 4px 0;font-size:${sz.body - 1}px;color:${colors.textLight};text-align:right;font-weight:500">${e.name || ""}</td></tr>`
         )
         .join("");
-      return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr>${rows}</table>`;
+      return `${divider}<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;${bgStyle}"><tr>${headerHtml}</tr>${rows}</table>`;
     })
     .join("");
 }
