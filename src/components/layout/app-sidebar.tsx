@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Palette,
   BarChart3,
+  Tag,
 } from "lucide-react"
 
 import {
@@ -32,6 +33,7 @@ import { APP_VERSION } from "@/lib/version"
 const opsItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Calendar", href: "/calendar", icon: CalendarDays },
+  { title: "Event Types", href: "/event-types", icon: Tag },
   { title: "Members", href: "/members", icon: Users },
 ]
 

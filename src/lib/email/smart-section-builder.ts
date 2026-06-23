@@ -158,7 +158,9 @@ function buildDetailsAuto(
     rows += detailRow("When", ctx.eventDate, colors, style)
   }
   if (ctx.topic) {
-    rows += detailRow("Topic", ctx.topic, colors, style)
+    // Allow custom label via section config, default to "Topic"
+    const topicLabel = (section.config.topicLabel as string) || "Topic"
+    rows += detailRow(topicLabel, ctx.topic, colors, style)
   }
   if (!rows) return ""
 

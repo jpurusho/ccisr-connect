@@ -54,6 +54,7 @@ export function InstanceEditDialog({
 }: InstanceEditDialogProps) {
   const [hostFamilyId, setHostFamilyId] = useState("")
   const [instanceTime, setInstanceTime] = useState("")
+  const [instanceEndTime, setInstanceEndTime] = useState("")
   const [locationOverride, setLocationOverride] = useState("")
   const [notes, setNotes] = useState("")
   const [status, setStatus] = useState<"draft" | "confirmed" | "cancelled">("confirmed")
@@ -65,6 +66,7 @@ export function InstanceEditDialog({
   const resetForm = useCallback(() => {
     setHostFamilyId("")
     setInstanceTime("")
+    setInstanceEndTime("")
     setLocationOverride("")
     setNotes("")
     setStatus("confirmed")
@@ -90,6 +92,7 @@ export function InstanceEditDialog({
       if (instanceId) {
         type Row = {
           instance_time: string | null
+          instance_end_time: string | null
           host_family_id: string | null
           location_override: string | null
           notes: string | null
@@ -97,7 +100,7 @@ export function InstanceEditDialog({
         }
         const { data } = await supabase
           .from("event_instances")
-          .select("instance_time, host_family_id, location_override, notes, status")
+          .select("instance_time, instance_end_time, host_family_id, location_override, notes, status")
           .eq("id", instanceId)
           .returns<Row[]>()
           .single()
@@ -105,21 +108,23 @@ export function InstanceEditDialog({
         if (data) {
           setHostFamilyId(data.host_family_id ?? "")
           setInstanceTime(data.instance_time ?? "")
+          setInstanceEndTime(data.instance_end_time ?? "")
           setLocationOverride(data.location_override ?? "")
           setNotes(data.notes ?? "")
           setStatus(data.status)
         }
       } else {
-        type EventRow = { default_time: string | null; host_family_id: string | null; host_until: string | null }
+        type EventRow = { default_time: string | null; default_end_time: string | null; host_family_id: string | null; host_until: string | null }
         const { data: evt } = await supabase
           .from("events")
-          .select("default_time, host_family_id, host_until")
+          .select("default_time, default_end_time, host_family_id, host_until")
           .eq("id", eventId)
           .returns<EventRow[]>()
           .single()
 
         if (evt) {
           setInstanceTime(evt.default_time ?? "")
+          setInstanceEndTime(evt.default_end_time ?? "")
           const expired = evt.host_until ? new Date(evt.host_until + "T23:59:59") < new Date() : false
           if (!expired && evt.host_family_id) setHostFamilyId(evt.host_family_id)
         }
@@ -139,6 +144,7 @@ export function InstanceEditDialog({
 
       const payload = {
         instance_time: instanceTime || null,
+        instance_end_time: instanceEndTime || null,
         host_family_id: hostFamilyId && hostFamilyId !== "none" ? hostFamilyId : null,
         location_override: locationOverride.trim() || null,
         notes: notes.trim() || null,
@@ -249,7 +255,7 @@ export function InstanceEditDialog({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ie-time">Time</Label>
+                <Label htmlFor="ie-time">Start Time</Label>
                 <Input
                   id="ie-time"
                   type="time"
@@ -260,6 +266,19 @@ export function InstanceEditDialog({
                   <p className="text-[11px] text-muted-foreground">{formatTime(instanceTime)}</p>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="ie-end-time">End Time</Label>
+              <Input
+                id="ie-end-time"
+                type="time"
+                value={instanceEndTime}
+                onChange={(e) => setInstanceEndTime(e.target.value)}
+              />
+              {instanceEndTime && (
+                <p className="text-[11px] text-muted-foreground">{formatTime(instanceEndTime)}</p>
+              )}
             </div>
 
             <div className="space-y-1.5">

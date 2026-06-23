@@ -25,7 +25,6 @@ import { MonthView, DayDetailPanel } from "@/components/calendar/month-view"
 import { EventDetailDialog } from "@/components/calendar/event-detail-dialog"
 import { EventFormDialog } from "@/components/calendar/event-form-dialog"
 import { InstanceEditDialog } from "@/components/calendar/instance-edit-dialog"
-import { EventTypeManager } from "@/components/calendar/event-type-manager"
 import {
   Dialog,
   DialogContent,
@@ -772,7 +771,6 @@ export default function CalendarPage() {
               <TabsTrigger value="agenda">Agenda</TabsTrigger>
             </TabsList>
           </Tabs>
-          <EventTypeManager onTypesChanged={fetchData} />
           <Button size="sm" onClick={() => openCreateForm()}>
             <Plus className="size-3.5" />
             Create Event

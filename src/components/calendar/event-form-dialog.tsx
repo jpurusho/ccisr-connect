@@ -74,6 +74,9 @@ export function EventFormDialog({
   const [title, setTitle] = useState("")
   const [eventTypeId, setEventTypeId] = useState("")
   const [time, setTime] = useState("")
+  const [endTime, setEndTime] = useState("")
+  const [originalTime, setOriginalTime] = useState<string | null>(null)
+  const [originalEndTime, setOriginalEndTime] = useState<string | null>(null)
   const [recurrenceFreq, setRecurrenceFreq] = useState<"NONE" | "WEEKLY" | "MONTHLY">("WEEKLY")
   const [recurrenceDay, setRecurrenceDay] = useState("FR")
   const [recurrenceNth, setRecurrenceNth] = useState("")
@@ -102,6 +105,7 @@ export function EventFormDialog({
     setTitle("")
     setEventTypeId("")
     setTime("")
+    setEndTime("")
     setRecurrenceFreq("WEEKLY")
     setRecurrenceDay(initialDate ? dayCodeFromDate(initialDate) : "FR")
     setRecurrenceNth("")
@@ -156,7 +160,7 @@ export function EventFormDialog({
       if (mode === "edit" && eventId) {
         type EventRow = {
           id: string; title: string; event_type_id: string; description: string | null
-          recurrence_rule: string | null; default_time: string | null; zoom_link: string | null
+          recurrence_rule: string | null; default_time: string | null; default_end_time: string | null; zoom_link: string | null
           host_family_id: string | null; host_until: string | null
           start_date: string | null; end_date: string | null; is_active: boolean
           show_break_in_bulletin: boolean; promote_from: string | null
@@ -172,6 +176,9 @@ export function EventFormDialog({
           setTitle(event.title ?? "")
           setEventTypeId(event.event_type_id ?? "")
           setTime(event.default_time ?? "")
+          setEndTime(event.default_end_time ?? "")
+          setOriginalTime(event.default_time)
+          setOriginalEndTime(event.default_end_time)
           setDescription(event.description ?? "")
           setZoomLink(event.zoom_link ?? "")
           setShowBreakInBulletin(event.show_break_in_bulletin !== false)
@@ -234,6 +241,7 @@ export function EventFormDialog({
         event_type_id: eventTypeId,
         recurrence_rule: recurrenceRule,
         default_time: time || null,
+        default_end_time: endTime || null,
         description: description.trim() || null,
         zoom_link: zoomLink.trim() || null,
         host_family_id: recurrenceFreq !== "NONE" && hostFamilyId && hostFamilyId !== "none" ? hostFamilyId : null,
@@ -263,13 +271,58 @@ export function EventFormDialog({
       }
 
       if (mode === "edit" && eventId) {
+        // If default time changed, ask user whether to update future instances
+        const timeChanged = (time || null) !== (originalTime || null) || (endTime || null) !== (originalEndTime || null)
+        let updateFutureInstances = false
+
+        if (timeChanged) {
+          // Check if there are future instances (today or later)
+          const today = format(new Date(), "yyyy-MM-dd")
+          const { data: futureInst, error: instCheckError } = await supabase
+            .from("event_instances")
+            .select("id")
+            .eq("event_id", eventId)
+            .gte("instance_date", today)
+            .limit(1)
+
+          if (!instCheckError && futureInst && futureInst.length > 0) {
+            updateFutureInstances = confirm(
+              "You changed the event time.\n\n" +
+              "Update all FUTURE instances to the new time?\n\n" +
+              "• Click OK to update future occurrences\n" +
+              "• Click Cancel to keep existing times"
+            )
+          }
+        }
+
         const { error } = await supabase
           .from("events")
           .update(payload as never)
           .eq("id", eventId)
 
         if (error) { toast.error(`Failed: ${error.message}`); return }
-        toast.success(`"${title}" updated`)
+
+        // Update future instances if user confirmed
+        if (updateFutureInstances) {
+          const today = format(new Date(), "yyyy-MM-dd")
+          const { error: updateError } = await supabase
+            .from("event_instances")
+            .update({
+              instance_time: time || null,
+              instance_end_time: endTime || null,
+            } as never)
+            .eq("event_id", eventId)
+            .gte("instance_date", today)
+
+          if (updateError) {
+            toast.error(`Event updated but instances failed: ${updateError.message}`)
+          } else {
+            toast.success(`"${title}" and future instances updated`)
+          }
+        } else {
+          toast.success(`"${title}" updated`)
+        }
+
         const etName = eventTypes.find((t) => t.id === eventTypeId)?.name
         logAudit("event_updated", "events", eventId, { title: title.trim(), event_type: etName, recurrence: recurrenceFreq !== "NONE" ? recurrenceFreq : undefined })
       } else {
@@ -422,15 +475,25 @@ export function EventFormDialog({
             </div>
 
             {/* Time */}
-            <div className="space-y-1.5">
-              <Label htmlFor="ef-time">Default Time</Label>
-              <Input
-                id="ef-time"
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="w-40"
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ef-time">Start Time</Label>
+                <Input
+                  id="ef-time"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ef-end-time">End Time</Label>
+                <Input
+                  id="ef-end-time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
             </div>
 
             {/* Schedule */}

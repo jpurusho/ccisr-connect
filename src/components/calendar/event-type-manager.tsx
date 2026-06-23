@@ -28,6 +28,7 @@ interface TypeRow {
   default_template_id: string | null
   color: string
   info_sections: CustomSection[]
+  show_info_in_bulletin: boolean
   linked_signup_form_id: string | null
   signup_field_map: SignupFieldMap | null
 }
@@ -65,7 +66,9 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
   const [editColor, setEditColor] = useState("")
   const [editIcon, setEditIcon] = useState("")
   const [editSections, setEditSections] = useState<CustomSection[]>([])
+  const [editShowInfoInBulletin, setEditShowInfoInBulletin] = useState(false)
   const [newSections, setNewSections] = useState<CustomSection[]>([])
+  const [newShowInfoInBulletin, setNewShowInfoInBulletin] = useState(false)
 
   const [signupForms, setSignupForms] = useState<SignupFormOption[]>([])
   const [editLinkedFormId, setEditLinkedFormId] = useState("")
@@ -79,9 +82,9 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
     const [typesRes, templatesRes, formsRes] = await Promise.all([
       supabase
         .from("event_types")
-        .select("id, name, icon, color_scheme, is_active, default_template_id, info_sections, linked_signup_form_id, signup_field_map")
+        .select("id, name, icon, color_scheme, is_active, default_template_id, info_sections, show_info_in_bulletin, linked_signup_form_id, signup_field_map")
         .order("name")
-        .returns<{ id: string; name: string; icon: string | null; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; info_sections: CustomSection[] | null; linked_signup_form_id: string | null; signup_field_map: SignupFieldMap | null }[]>(),
+        .returns<{ id: string; name: string; icon: string | null; color_scheme: { primary: string } | null; is_active: boolean; default_template_id: string | null; info_sections: CustomSection[] | null; show_info_in_bulletin: boolean; linked_signup_form_id: string | null; signup_field_map: SignupFieldMap | null }[]>(),
       supabase
         .from("email_templates")
         .select("id, name, is_default")
@@ -103,6 +106,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
         default_template_id: t.default_template_id,
         color: t.color_scheme?.primary ?? "#6B7280",
         info_sections: t.info_sections ?? [],
+        show_info_in_bulletin: t.show_info_in_bulletin,
         linked_signup_form_id: t.linked_signup_form_id,
         signup_field_map: t.signup_field_map,
       }))
@@ -125,6 +129,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
         default_template_id: newTemplateId && newTemplateId !== "none" ? newTemplateId : null,
         color_scheme: { primary: newColor },
         info_sections: newSections.length > 0 ? newSections : null,
+        show_info_in_bulletin: newShowInfoInBulletin,
         linked_signup_form_id: newLinkedFormId && newLinkedFormId !== "none" ? newLinkedFormId : null,
         signup_field_map: newFieldMap,
         is_active: true,
@@ -137,6 +142,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
       setNewTemplateId("")
       setNewColor("#6B7280")
       setNewSections([])
+      setNewShowInfoInBulletin(false)
       setNewLinkedFormId("")
       setNewFieldMap(null)
       fetchTypes()
@@ -154,6 +160,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
         default_template_id: editTemplateId && editTemplateId !== "none" ? editTemplateId : null,
         color_scheme: { primary: editColor },
         info_sections: editSections.length > 0 ? editSections : null,
+        show_info_in_bulletin: editShowInfoInBulletin,
         linked_signup_form_id: editLinkedFormId && editLinkedFormId !== "none" ? editLinkedFormId : null,
         signup_field_map: editFieldMap,
       } as never).eq("id", id)
@@ -246,6 +253,18 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                         sections={editSections}
                         onChange={setEditSections}
                       />
+                      <div className="flex items-center gap-2 rounded-lg border p-3 bg-muted/30">
+                        <input
+                          type="checkbox"
+                          id={`show-info-bulletin-${t.id}`}
+                          checked={editShowInfoInBulletin}
+                          onChange={(e) => setEditShowInfoInBulletin(e.target.checked)}
+                          className="size-4 rounded"
+                        />
+                        <Label htmlFor={`show-info-bulletin-${t.id}`} className="text-sm cursor-pointer">
+                          Include info sections in bulletin
+                        </Label>
+                      </div>
                       <SignupLinkEditor
                         forms={signupForms}
                         selectedFormId={editLinkedFormId}
@@ -280,7 +299,7 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                     <button
                       type="button"
                       className="text-[10px] text-muted-foreground hover:text-foreground"
-                      onClick={() => { setEditId(t.id); setEditName(t.name); setEditIcon(t.icon || "CalendarDays"); setEditTemplateId(t.default_template_id || ""); setEditColor(t.color); setEditSections(t.info_sections ?? []); setEditLinkedFormId(t.linked_signup_form_id || ""); setEditFieldMap(t.signup_field_map) }}
+                      onClick={() => { setEditId(t.id); setEditName(t.name); setEditIcon(t.icon || "CalendarDays"); setEditTemplateId(t.default_template_id || ""); setEditColor(t.color); setEditSections(t.info_sections ?? []); setEditShowInfoInBulletin(t.show_info_in_bulletin); setEditLinkedFormId(t.linked_signup_form_id || ""); setEditFieldMap(t.signup_field_map) }}
                     >
                       Edit
                     </button>
@@ -355,6 +374,18 @@ export function EventTypeManager({ onTypesChanged }: { onTypesChanged?: () => vo
                     sections={newSections}
                     onChange={setNewSections}
                   />
+                  <div className="flex items-center gap-2 rounded-lg border p-3 bg-muted/30">
+                    <input
+                      type="checkbox"
+                      id="new-show-info-bulletin"
+                      checked={newShowInfoInBulletin}
+                      onChange={(e) => setNewShowInfoInBulletin(e.target.checked)}
+                      className="size-4 rounded"
+                    />
+                    <Label htmlFor="new-show-info-bulletin" className="text-sm cursor-pointer">
+                      Include info sections in bulletin
+                    </Label>
+                  </div>
                   <SignupLinkEditor
                     forms={signupForms}
                     selectedFormId={newLinkedFormId}

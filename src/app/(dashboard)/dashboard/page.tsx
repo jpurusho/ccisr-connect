@@ -165,6 +165,55 @@ function formatTime(time: string): string {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`
 }
 
+function formatTimeRange(startTime: string | null, endTime: string | null): string {
+  if (!startTime) return ""
+  if (!endTime) return formatTime(startTime)
+
+  const [startH, startM] = startTime.split(":").map(Number)
+  const [endH, endM] = endTime.split(":").map(Number)
+
+  const startAmPm = startH >= 12 ? "PM" : "AM"
+  const endAmPm = endH >= 12 ? "PM" : "AM"
+
+  const startHour12 = startH % 12 || 12
+  const endHour12 = endH % 12 || 12
+
+  const startFormatted = `${startHour12}:${String(startM).padStart(2, "0")}`
+  const endFormatted = `${endHour12}:${String(endM).padStart(2, "0")}`
+
+  if (startAmPm === endAmPm) {
+    return `${startFormatted} - ${endFormatted} ${endAmPm}`
+  }
+
+  return `${startFormatted} ${startAmPm} - ${endFormatted} ${endAmPm}`
+}
+
+function formatInfoSectionsInline(sections: unknown): string {
+  if (!sections || !Array.isArray(sections)) return ""
+
+  const parts: string[] = []
+  for (const section of sections) {
+    if (!section || typeof section !== "object") continue
+    const sec = section as { title?: string; entries?: Array<{ label?: string; name?: string }> }
+    if (!sec.entries || !Array.isArray(sec.entries)) continue
+
+    const entryTexts = sec.entries
+      .filter((e) => e && (e.label || e.name))
+      .map((e) => {
+        if (e.label && e.name) return `${e.label}: ${e.name}`
+        return e.name || e.label || ""
+      })
+      .filter(Boolean)
+
+    if (entryTexts.length > 0) {
+      const sectionText = sec.title ? `${sec.title} — ${entryTexts.join(", ")}` : entryTexts.join(", ")
+      parts.push(sectionText)
+    }
+  }
+
+  return parts.join(" • ")
+}
+
 // ── Custom dashboard template form data ──────────────────────────────────
 
 interface CustomDashFormData extends BaseFormData {
@@ -522,6 +571,7 @@ export default function DashboardPage() {
     address: string
     topic: string
     color: string
+    emoji?: string
   }
   const [genericCards, setGenericCards] = useState<GenericCardData[]>([])
 
@@ -793,12 +843,12 @@ export default function DashboardPage() {
           .from("events")
           .select("*")
           .eq("is_active", true)
-          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean; description?: string | null; zoom_link?: string | null; show_break_in_bulletin?: boolean; promote_from?: string | null }[]>(),
+          .returns<{ id: string; title: string; event_type_id: string; recurrence_rule: string | null; default_time: string | null; default_end_time?: string | null; host_family_id?: string | null; host_until?: string | null; start_date?: string | null; end_date?: string | null; is_active: boolean; description?: string | null; zoom_link?: string | null; show_break_in_bulletin?: boolean; promote_from?: string | null }[]>(),
 
         // Event instances for current week (including cancelled — needed for break/cancel detection)
         supabase
           .from("event_instances")
-          .select("id, event_id, instance_date, instance_time, location_override, notes, host_family_id, status")
+          .select("id, event_id, instance_date, instance_time, instance_end_time, location_override, notes, host_family_id, status")
           .gte("instance_date", wkSunISO)
           .lte("instance_date", wkSatISO)
           .returns<{
@@ -806,6 +856,7 @@ export default function DashboardPage() {
             event_id: string
             instance_date: string
             instance_time: string | null
+            instance_end_time: string | null
             location_override: string | null
             notes: string | null
             host_family_id: string | null
@@ -843,11 +894,11 @@ export default function DashboardPage() {
           .eq("is_default", true)
           .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
 
-        // Event type id-to-name map (+ template link, color, icon, signup link, bulletin detail template, comm_type)
+        // Event type id-to-name map (+ template link, color, icon, signup link, bulletin detail template, comm_type, info sections)
         supabase
           .from("event_types")
-          .select("id, name, icon, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template, comm_type")
-          .returns<{ id: string; name: string; icon: string | null; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null; comm_type: string | null }[]>(),
+          .select("id, name, icon, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template, comm_type, info_sections, show_info_in_bulletin")
+          .returns<{ id: string; name: string; icon: string | null; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null; comm_type: string | null; info_sections: unknown; show_info_in_bulletin: boolean }[]>(),
 
         // Composed instances: match current week, bulletin week, or recurring
         supabase
@@ -890,6 +941,7 @@ export default function DashboardPage() {
       }
       setCommTypeIcons(iconOverrides)
 
+      const etInfoSections: Record<string, { sections: unknown; showInBulletin: boolean }> = {}
       if (eventTypesRes.data) {
         for (const et of eventTypesRes.data) {
           etIdToName[et.id] = et.name
@@ -900,6 +952,9 @@ export default function DashboardPage() {
           }
           if (et.bulletin_detail_template) {
             etBulletinTemplates[et.id] = et.bulletin_detail_template
+          }
+          if (et.info_sections && et.show_info_in_bulletin) {
+            etInfoSections[et.id] = { sections: et.info_sections, showInBulletin: et.show_info_in_bulletin }
           }
         }
       }
@@ -1366,11 +1421,34 @@ export default function DashboardPage() {
       // Helper: build bulletin details from template or fallback to date+time
       function buildBulletinDetails(evt: typeof activeEvents[0], occ: Date, inst: typeof weekInstances[0] | undefined): string {
         const time = inst?.instance_time ?? evt.default_time
-        const timeStr = time ? formatTime(time) : null
+        const evtAny = evt as typeof evt & { description?: string | null; zoom_link?: string | null; default_end_time?: string | null }
+        const endTime = inst?.instance_end_time ?? evtAny.default_end_time
+        const timeStr = formatTimeRange(time, endTime ?? null)
         const dateStr = format(occ, "EEEE, MMM d")
         const tmpl = etBulletinTemplates[evt.event_type_id]
-        if (!tmpl) return timeStr ? `${dateStr} at ${timeStr}` : dateStr
-        const evtAny = evt as typeof evt & { description?: string | null; zoom_link?: string | null }
+
+        // Build base date/time string
+        let baseDetails = timeStr ? `${dateStr} at ${timeStr}` : dateStr
+
+        // Add instance notes or event description if available
+        const additionalInfo = inst?.notes?.trim() || evtAny.description?.trim()
+        if (additionalInfo) {
+          baseDetails += ` — ${additionalInfo}`
+        }
+
+        // Add info sections if enabled for this event type (instance overrides event type)
+        const etInfo = etInfoSections[evt.event_type_id]
+        if (etInfo && etInfo.showInBulletin) {
+          const instAny = inst as typeof inst & { info_sections?: unknown }
+          const sectionsToShow = instAny?.info_sections ?? etInfo.sections
+          const infoText = formatInfoSectionsInline(sectionsToShow)
+          if (infoText) {
+            baseDetails += ` • ${infoText}`
+          }
+        }
+
+        if (!tmpl) return baseDetails
+
         const vars: Record<string, string> = {
           date: dateStr,
           time: timeStr ?? "",
@@ -1378,8 +1456,10 @@ export default function DashboardPage() {
           location: inst?.location_override ?? "",
           zoom: evtAny.zoom_link ?? "",
           host: "",
+          notes: inst?.notes ?? "",
         }
-        return tmpl.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "").replace(/\s{2,}/g, " ").trim() || (timeStr ? `${dateStr} at ${timeStr}` : dateStr)
+        const rendered = tmpl.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "").replace(/\s{2,}/g, " ").trim()
+        return rendered || baseDetails
       }
 
       for (const evt of activeEvents) {
@@ -1448,28 +1528,78 @@ export default function DashboardPage() {
               }
             }
 
-            const timeStr = inst?.instance_time ? formatTime(inst.instance_time) : (evt.default_time ? formatTime(evt.default_time) : null)
             let details: string
             if (evtStart && evtEnd && evtStart.getTime() !== evtEnd.getTime()) {
-              // Multi-day event — show visible portion relative to this week
-              const visibleStart = evtStart >= wkSun ? evtStart : wkSun
-              const visibleEnd = evtEnd <= wkSat ? evtEnd : wkSat
-              const startsThisWeek = evtStart >= wkSun
-              if (startsThisWeek) {
-                details = timeStr
-                  ? `${format(visibleStart, "EEEE, MMM d")} – ${format(visibleEnd, "EEEE, MMM d")} at ${timeStr}`
-                  : `${format(visibleStart, "EEEE, MMM d")} – ${format(visibleEnd, "EEEE, MMM d")}`
+              // Multi-day event — show date range
+              const startMonth = evtStart.getMonth() + 1
+              const endMonth = evtEnd.getMonth() + 1
+              const startDay = evtStart.getDate()
+              const endDay = evtEnd.getDate()
+              const MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+              let dateRangeStr: string
+              if (startMonth === endMonth) {
+                // Same month: "Aug 14-16"
+                dateRangeStr = `${MONTHS[startMonth]} ${startDay}-${endDay}`
               } else {
-                details = timeStr
-                  ? `Continues through ${format(visibleEnd, "EEEE, MMM d")} at ${timeStr}`
-                  : `Continues through ${format(visibleEnd, "EEEE, MMM d")}`
+                // Different months: "Aug 30 - Sep 2"
+                dateRangeStr = `${MONTHS[startMonth]} ${startDay} - ${MONTHS[endMonth]} ${endDay}`
               }
+
+              // For multi-day events, check all instances to determine time display
+              const evtStartISO = format(evtStart, "yyyy-MM-dd")
+              const evtEndISO = format(evtEnd, "yyyy-MM-dd")
+              const eventInstances = weekInstances.filter(
+                (i) => i.event_id === evt.id && i.instance_date >= evtStartISO && i.instance_date <= evtEndISO
+              )
+              let timeStr: string | null = null
+              if (eventInstances.length > 0) {
+                const times = eventInstances.map((i) => i.instance_time ?? evt.default_time).filter(Boolean) as string[]
+                const uniqueTimes = [...new Set(times)]
+                if (uniqueTimes.length === 1) {
+                  // All days have the same time
+                  timeStr = formatTime(uniqueTimes[0])
+                } else if (uniqueTimes.length > 1) {
+                  // Different times - show the earliest start time
+                  timeStr = formatTime(uniqueTimes.sort()[0])
+                }
+              } else if (evt.default_time) {
+                timeStr = formatTime(evt.default_time)
+              }
+
+              details = timeStr ? `${dateRangeStr} at ${timeStr}` : dateRangeStr
             } else {
               const displayDate = inst ? new Date(inst.instance_date + "T00:00:00") : evtStart!
+              const dayName = format(displayDate, "EEEE")
+              const shortDate = format(displayDate, "MMM d")
+              const evtAny2 = evt as typeof evt & { default_end_time?: string | null }
+              const timeStr = formatTimeRange(
+                inst?.instance_time ?? evt.default_time,
+                inst?.instance_end_time ?? evtAny2.default_end_time ?? null
+              )
               details = timeStr
-                ? `${format(displayDate, "EEEE, MMM d")} at ${timeStr}`
-                : format(displayDate, "EEEE, MMM d")
+                ? `${dayName}, ${shortDate} at ${timeStr}`
+                : `${dayName}, ${shortDate}`
             }
+
+            // Add instance notes or event description if available
+            const evtAny = evt as typeof evt & { description?: string | null }
+            const additionalInfo = inst?.notes?.trim() || evtAny.description?.trim()
+            if (additionalInfo) {
+              details += ` — ${additionalInfo}`
+            }
+
+            // Add info sections if enabled for this event type
+            const etInfo = etInfoSections[evt.event_type_id]
+            if (etInfo && etInfo.showInBulletin) {
+              const instAny = inst as typeof inst & { info_sections?: unknown }
+              const sectionsToShow = instAny?.info_sections ?? etInfo.sections
+              const infoText = formatInfoSectionsInline(sectionsToShow)
+              if (infoText) {
+                details += ` • ${infoText}`
+              }
+            }
+
             bulletinAutoEvents.push({ title: evt.title, details })
           }
         }
@@ -1517,21 +1647,78 @@ export default function DashboardPage() {
         const promotedIds = promotedEvents.map((e) => e.id)
         const { data: futureInst } = await supabase
           .from("event_instances")
-          .select("event_id, instance_date, instance_time, status")
+          .select("event_id, instance_date, instance_time, instance_end_time, status, notes")
           .in("event_id", promotedIds)
           .gt("instance_date", wkSatISO)
           .neq("status", "cancelled")
           .order("instance_date")
-          .returns<{ event_id: string; instance_date: string; instance_time: string | null; status: string }[]>()
+          .returns<{ event_id: string; instance_date: string; instance_time: string | null; instance_end_time: string | null; status: string; notes: string | null }[]>()
         const seen = new Set<string>()
         for (const inst of futureInst ?? []) {
           if (seen.has(inst.event_id)) continue
           seen.add(inst.event_id)
           const evt = promotedEvents.find((e) => e.id === inst.event_id)
           if (!evt) continue
-          const time = inst.instance_time ?? evt.default_time
-          const dateStr = format(new Date(inst.instance_date + "T00:00:00"), "EEEE, MMM d")
-          autoUpcoming.push({ title: evt.title, details: time ? `${dateStr} at ${formatTime(time)}` : dateStr })
+
+          // Handle multi-day events
+          const evtStart = evt.start_date ? new Date(evt.start_date + "T00:00:00") : new Date(inst.instance_date + "T00:00:00")
+          const evtEnd = evt.end_date ? new Date(evt.end_date + "T00:00:00") : evtStart
+          const isMultiDay = evtStart.getTime() !== evtEnd.getTime()
+
+          let dateStr: string
+          let timeStr: string | null = null
+          if (isMultiDay) {
+            // Format as "Aug 14-16" or "Aug 30 - Sep 2"
+            const startMonth = evtStart.getMonth() + 1
+            const endMonth = evtEnd.getMonth() + 1
+            const startDay = evtStart.getDate()
+            const endDay = evtEnd.getDate()
+            const MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+            if (startMonth === endMonth) {
+              dateStr = `${MONTHS[startMonth]} ${startDay}-${endDay}`
+            } else {
+              dateStr = `${MONTHS[startMonth]} ${startDay} - ${MONTHS[endMonth]} ${endDay}`
+            }
+
+            // For multi-day events, check all instances to determine time display
+            const evtStartISO = format(evtStart, "yyyy-MM-dd")
+            const evtEndISO = format(evtEnd, "yyyy-MM-dd")
+            const allInstances = (futureInst ?? []).filter(
+              (i) => i.event_id === evt.id && i.instance_date >= evtStartISO && i.instance_date <= evtEndISO
+            )
+            if (allInstances.length > 0) {
+              const times = allInstances.map((i) => i.instance_time ?? evt.default_time).filter(Boolean) as string[]
+              const uniqueTimes = [...new Set(times)]
+              if (uniqueTimes.length === 1) {
+                // All days have the same time
+                timeStr = formatTime(uniqueTimes[0])
+              } else if (uniqueTimes.length > 1) {
+                // Different times - show the earliest start time
+                timeStr = formatTime(uniqueTimes.sort()[0])
+              }
+            } else if (evt.default_time) {
+              timeStr = formatTime(evt.default_time)
+            }
+          } else {
+            dateStr = format(new Date(inst.instance_date + "T00:00:00"), "MMM d")
+            const evtAny3 = evt as typeof evt & { default_end_time?: string | null }
+            timeStr = formatTimeRange(
+              inst.instance_time ?? evt.default_time,
+              inst.instance_end_time ?? evtAny3.default_end_time ?? null
+            )
+          }
+
+          let details = timeStr ? `${dateStr} at ${timeStr}` : dateStr
+
+          // Add instance notes or event description if available
+          const evtAny = evt as typeof evt & { description?: string | null }
+          const additionalInfo = inst.notes?.trim() || evtAny.description?.trim()
+          if (additionalInfo) {
+            details += ` — ${additionalInfo}`
+          }
+
+          autoUpcoming.push({ title: evt.title, details })
         }
       }
 
@@ -1647,7 +1834,9 @@ export default function DashboardPage() {
         }
         if (instForOcc?.location_override) address = instForOcc.location_override
 
-        const etColor = (eventTypesRes.data ?? []).find((et) => et.id === evt.event_type_id)?.color_scheme?.primary || "#6B7280"
+        const eventType = (eventTypesRes.data ?? []).find((et) => et.id === evt.event_type_id)
+        const etColor = eventType?.color_scheme?.primary || "#6B7280"
+        const etIcon = eventType?.icon || undefined
         const timeStr = instForOcc?.instance_time ? formatTime(instForOcc.instance_time) : (evt.default_time ? formatTime(evt.default_time) : "")
 
         resolvedGenericCards.push({
@@ -1661,6 +1850,7 @@ export default function DashboardPage() {
           address: address,
           topic: evt.description ?? "",
           color: etColor,
+          emoji: etIcon,
         })
       }
       setGenericCards(resolvedGenericCards)
@@ -3669,6 +3859,7 @@ export default function DashboardPage() {
             topic: gc.topic || undefined,
             locations,
             primaryColor: gc.color,
+            headerEmoji: gc.emoji,
           })
 
           return (

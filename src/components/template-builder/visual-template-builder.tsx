@@ -324,7 +324,16 @@ function SectionEditor({ section, onChange }: { section: VisualSection; onChange
 
     case "details_auto":
       return (
-        <p className="text-xs text-muted-foreground">Event date, time, and topic are auto-filled from the calendar at compose time.</p>
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Event date, time, and topic/description are auto-filled from the calendar at compose time.</p>
+          <Field
+            label="Topic Label"
+            value={(config.topicLabel as string) ?? "Topic"}
+            onChange={(v) => onChange({ topicLabel: v || "Topic" })}
+            placeholder="Topic"
+          />
+          <p className="text-[10px] text-muted-foreground">Customize the label for the event description field (e.g., "Location", "Theme", "Topic")</p>
+        </div>
       )
 
     case "birthdays_auto":

@@ -25,6 +25,36 @@ export function formatTime(timeStr: string | null): string {
   return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`
 }
 
+/**
+ * Format a time range for display.
+ * Single time: "6:00 PM"
+ * Time range: "6:00 PM - 8:00 PM" or "6:00 - 8:00 PM" (smart formatting)
+ */
+export function formatTimeRange(startTime: string | null, endTime: string | null): string {
+  if (!startTime) return ""
+  if (!endTime) return formatTime(startTime)
+
+  const [startH, startM] = startTime.split(":").map(Number)
+  const [endH, endM] = endTime.split(":").map(Number)
+
+  const startAmPm = startH >= 12 ? "PM" : "AM"
+  const endAmPm = endH >= 12 ? "PM" : "AM"
+
+  const startHour12 = startH % 12 || 12
+  const endHour12 = endH % 12 || 12
+
+  const startFormatted = `${startHour12}:${String(startM).padStart(2, "0")}`
+  const endFormatted = `${endHour12}:${String(endM).padStart(2, "0")}`
+
+  // If same AM/PM period, only show it once: "6:00 - 8:00 PM"
+  if (startAmPm === endAmPm) {
+    return `${startFormatted} - ${endFormatted} ${endAmPm}`
+  }
+
+  // Different AM/PM periods: "11:00 AM - 1:00 PM"
+  return `${startFormatted} ${startAmPm} - ${endFormatted} ${endAmPm}`
+}
+
 export function getCurrentWeekBounds(today: Date): { monday: Date; sunday: Date } {
   const d = new Date(today)
   d.setHours(0, 0, 0, 0)
@@ -97,5 +127,30 @@ export function statusLabel(status: string): string {
     case "sent": return "Sent"
     case "failed": return "Failed"
     default: return status.charAt(0).toUpperCase() + status.slice(1)
+  }
+}
+
+/**
+ * Format a date range for bulletin display.
+ * Single day: "Aug 14"
+ * Multi-day same month: "Aug 14-16"
+ * Multi-day different months: "Aug 30 - Sep 2"
+ */
+export function formatDateRange(startDate: Date, endDate: Date | null): string {
+  if (!endDate || startDate.getTime() === endDate.getTime()) {
+    return `${MONTH_NAMES_SHORT[startDate.getMonth() + 1]} ${startDate.getDate()}`
+  }
+
+  const startMonth = startDate.getMonth() + 1
+  const endMonth = endDate.getMonth() + 1
+  const startDay = startDate.getDate()
+  const endDay = endDate.getDate()
+
+  if (startMonth === endMonth) {
+    // Same month: "Aug 14-16"
+    return `${MONTH_NAMES_SHORT[startMonth]} ${startDay}-${endDay}`
+  } else {
+    // Different months: "Aug 30 - Sep 2"
+    return `${MONTH_NAMES_SHORT[startMonth]} ${startDay} - ${MONTH_NAMES_SHORT[endMonth]} ${endDay}`
   }
 }
