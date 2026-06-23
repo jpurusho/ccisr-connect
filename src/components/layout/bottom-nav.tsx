@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Users,
   Menu,
+  ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/components/ui/sidebar"
@@ -26,6 +27,11 @@ const navItems = [
     title: "Members",
     href: "/members",
     icon: Users,
+  },
+  {
+    title: "Signups",
+    href: "/signups",
+    icon: ClipboardList,
   },
   {
     title: "More",
@@ -48,7 +54,7 @@ export function BottomNav() {
 
   return (
     <nav className="lg:hidden border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="flex items-center justify-around h-16 px-2">
+      <div className="flex items-center justify-around h-16 px-1">
         {navItems.map((item) => {
           const isActive = item.href === "/dashboard"
             ? pathname === "/dashboard"
@@ -62,7 +68,7 @@ export function BottomNav() {
               href={item.href}
               onClick={(e) => handleClick(e, item)}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 min-w-[60px] h-full rounded-lg transition-colors",
+                "flex flex-col items-center justify-center gap-1 min-w-[64px] h-full rounded-lg transition-colors",
                 "active:scale-95 active:bg-accent/50",
                 isActive
                   ? "text-primary"

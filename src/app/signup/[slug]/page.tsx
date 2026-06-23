@@ -47,6 +47,38 @@ interface ResponseEntry {
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
+// Calculate attendance statistics from responses
+function calculateAttendanceStats(
+  responses: ResponseEntry[],
+  fields: SignupFieldConfig[]
+): { adults: number; kids: number; total: number } {
+  let adults = 0
+  let kids = 0
+
+  // Look for number fields with labels containing "adult" or "kid"/"child"
+  const numberFields = fields.filter((f) => f.type === "number")
+
+  for (const response of responses) {
+    for (const field of numberFields) {
+      const value = response.data[field.id] as number
+      if (typeof value === "number" && value > 0) {
+        const label = field.label.toLowerCase()
+        if (label.includes("adult") || label.includes("grown")) {
+          adults += value
+        } else if (label.includes("kid") || label.includes("child") || label.includes("youth") || label.includes("teen")) {
+          kids += value
+        }
+      }
+    }
+  }
+
+  return {
+    adults,
+    kids,
+    total: adults + kids,
+  }
+}
+
 export default function PublicSignupPage() {
   const params = useParams()
   const slug = params.slug as string
@@ -243,6 +275,9 @@ export default function PublicSignupPage() {
     )
   }
 
+  // Calculate attendance statistics from responses
+  const stats = calculateAttendanceStats(responses, form.fields)
+
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 text-gray-900 overflow-x-hidden">
       <div className="mx-auto w-full max-w-lg md:max-w-2xl overflow-hidden">
@@ -271,6 +306,33 @@ export default function PublicSignupPage() {
             </div>
           )}
         </div>
+
+        {/* Statistics Card */}
+        {responses.length > 0 && stats.total > 0 && (
+          <div className="border border-t-0 bg-white px-5 py-4" style={{ borderColor: colors.border }}>
+            <div className="flex items-center justify-center gap-6">
+              {stats.adults > 0 && (
+                <div className="text-center">
+                  <div className="text-2xl font-bold" style={{ color: colors.primary }}>{stats.adults}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Adult{stats.adults !== 1 ? 's' : ''}</div>
+                </div>
+              )}
+              {stats.kids > 0 && (
+                <div className="text-center">
+                  <div className="text-2xl font-bold" style={{ color: colors.primary }}>{stats.kids}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Kid{stats.kids !== 1 ? 's' : ''}</div>
+                </div>
+              )}
+              {stats.total > 0 && (stats.adults > 0 || stats.kids > 0) && (
+                <div className="h-10 w-px bg-border" />
+              )}
+              <div className="text-center">
+                <div className="text-2xl font-bold" style={{ color: colors.primary }}>{stats.total}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Total</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Bible verse / quote */}
         {form.theme.verse && (
