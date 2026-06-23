@@ -77,6 +77,7 @@ interface FormRow {
   rate_limit_per_hour: number | null
   created_at: string
   response_count?: number
+  stats?: { adults: number; kids: number; total: number }
 }
 
 const COLOR_PRESETS = [
@@ -96,6 +97,39 @@ const MONTHS_LIST = [
   "July", "August", "September", "October", "November", "December",
 ]
 
+// ── Helper: Calculate attendance statistics ───────────────────────────────────
+
+function calculateAttendanceStats(
+  responses: Array<{ data: Record<string, unknown> }>,
+  fields: SignupFieldConfig[]
+): { adults: number; kids: number; total: number } {
+  let adults = 0
+  let kids = 0
+
+  // Look for number fields with labels containing "adult" or "kid"/"child"
+  const numberFields = fields.filter((f) => f.type === "number")
+
+  for (const response of responses) {
+    for (const field of numberFields) {
+      const value = response.data[field.id] as number
+      if (typeof value === "number" && value > 0) {
+        const label = field.label.toLowerCase()
+        if (label.includes("adult") || label.includes("grown")) {
+          adults += value
+        } else if (label.includes("kid") || label.includes("child") || label.includes("youth") || label.includes("teen")) {
+          kids += value
+        }
+      }
+    }
+  }
+
+  return {
+    adults,
+    kids,
+    total: adults + kids,
+  }
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function SignupsPage() {
@@ -114,26 +148,36 @@ export default function SignupsPage() {
       .order("created_at", { ascending: false })
 
     if (formsData) {
-      // Get response counts
-      const { data: counts } = await supabase
+      // Get response data (including form_id and data fields)
+      const { data: responses } = await supabase
         .from("signup_responses")
-        .select("form_id")
-        .returns<{ form_id: string }[]>()
+        .select("form_id, data")
+        .returns<{ form_id: string; data: Record<string, unknown> }[]>()
 
-      const countMap: Record<string, number> = {}
-      if (counts) {
-        for (const r of counts) {
-          countMap[r.form_id] = (countMap[r.form_id] || 0) + 1
+      // Group responses by form_id and calculate stats
+      const responsesByForm: Record<string, Array<{ data: Record<string, unknown> }>> = {}
+      if (responses) {
+        for (const r of responses) {
+          if (!responsesByForm[r.form_id]) {
+            responsesByForm[r.form_id] = []
+          }
+          responsesByForm[r.form_id].push({ data: r.data })
         }
       }
 
       setForms(
-        (formsData as unknown as FormRow[]).map((f) => ({
-          ...f,
-          theme: f.theme ?? {},
-          fields: f.fields ?? [],
-          response_count: countMap[f.id] || 0,
-        }))
+        (formsData as unknown as FormRow[]).map((f) => {
+          const formResponses = responsesByForm[f.id] || []
+          const stats = formResponses.length > 0 ? calculateAttendanceStats(formResponses, f.fields ?? []) : undefined
+
+          return {
+            ...f,
+            theme: f.theme ?? {},
+            fields: f.fields ?? [],
+            response_count: formResponses.length,
+            stats,
+          }
+        })
       )
     }
     setLoading(false)
@@ -257,6 +301,31 @@ export default function SignupsPage() {
                         {form.response_count} response{form.response_count !== 1 ? "s" : ""}
                       </span>
                     </div>
+                    {form.stats && form.stats.total > 0 && (
+                      <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+                        {form.stats.adults > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-primary">{form.stats.adults}</span>
+                            <span className="text-[10px] text-muted-foreground">Adult{form.stats.adults !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                        {form.stats.kids > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-primary">{form.stats.kids}</span>
+                            <span className="text-[10px] text-muted-foreground">Kid{form.stats.kids !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                        {(form.stats.adults > 0 || form.stats.kids > 0) && (
+                          <>
+                            <span className="text-[10px] text-muted-foreground">•</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-semibold text-primary">{form.stats.total}</span>
+                              <span className="text-[10px] text-muted-foreground">Total</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {form.theme.primaryColor && (
                     <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: form.theme.primaryColor }} />
