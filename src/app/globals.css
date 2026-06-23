@@ -442,6 +442,33 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  /* iOS Safe Area Insets Support */
+  .safe-area-insets {
+    /* Add padding using CSS environment variables for safe areas */
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+
+  /* Top safe area bar - respects notch/status bar height */
+  .safe-top {
+    height: env(safe-area-inset-top);
+    min-height: env(safe-area-inset-top);
+  }
+
+  /* Bottom safe area bar - respects home indicator area */
+  .safe-bottom {
+    height: env(safe-area-inset-bottom);
+    min-height: env(safe-area-inset-bottom);
+  }
+
+  /* Ensure sidebar respects safe areas too */
+  [data-slot="sidebar-wrapper"] {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+  }
 }
 
 /* Fix native date/time pickers in dark mode */

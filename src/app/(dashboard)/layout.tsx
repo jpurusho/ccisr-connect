@@ -17,7 +17,10 @@ export default function DashboardLayout({
     <BreadcrumbProvider>
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="flex flex-col">
+        {/* Top safe area spacer for iOS notch/status bar */}
+        <div className="safe-top bg-background border-b" />
+
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -29,11 +32,15 @@ export default function DashboardLayout({
             <ThemeToggle />
           </div>
         </header>
+
         <AppUserProvider>
-          <div className="flex-1 p-4 md:p-6">
+          <div className="flex-1 overflow-auto p-4 md:p-6">
             {children}
           </div>
         </AppUserProvider>
+
+        {/* Bottom safe area spacer for iOS home indicator */}
+        <div className="safe-bottom bg-background" />
       </SidebarInset>
       <CommandPalette />
       <Toaster />
