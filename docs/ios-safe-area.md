@@ -33,13 +33,31 @@ iOS provides these CSS variables when `viewport-fit=cover` is set:
 - `.safe-top` - Top bar matching notch/status height
 - `.safe-bottom` - Bottom bar matching home indicator height
 
+## Bottom Navigation Bar
+Added iOS-style bottom tab bar for mobile devices (hidden on desktop):
+
+### Features
+- **4 quick-access tabs**: Dashboard, Calendar, Members, More
+- **More button**: Opens full sidebar for access to Templates, Signups, Reports, Settings
+- **Active state indicators**: Highlighted icon and text for current page
+- **Touch-optimized**: Large tap targets (60px wide) with active press feedback
+- **Auto-hiding**: Only visible on mobile/tablet (lg: breakpoint hides it)
+
+### Implementation (`src/components/layout/bottom-nav.tsx`)
+- Uses sidebar context to toggle full menu
+- Pathname-aware active states
+- Backdrop blur effect for modern iOS feel
+- Respects safe area at bottom
+
 ## Result
 When users add CCISR Connect to their home screen:
 - ✅ Navigation trigger is not obscured by iPhone notch
 - ✅ Content doesn't hide behind status bar
+- ✅ Bottom tab bar for quick navigation between main sections
 - ✅ Bottom content doesn't overlap home indicator
 - ✅ App feels like a native iOS application
 - ✅ Works on both iPhone and iPad
+- ✅ Desktop users see traditional sidebar (no bottom nav)
 
 ## Testing
 Best tested by:

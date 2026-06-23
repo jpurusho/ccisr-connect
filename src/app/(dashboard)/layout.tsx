@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { DynamicBreadcrumb } from "@/components/layout/dynamic-breadcrumb"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { CommandPalette } from "@/components/layout/command-palette"
+import { BottomNav } from "@/components/layout/bottom-nav"
 import { Toaster } from "@/components/ui/sonner"
 import { AppUserProvider } from "@/hooks/use-app-user"
 import { BreadcrumbProvider } from "@/components/layout/breadcrumb-context"
@@ -34,10 +35,13 @@ export default function DashboardLayout({
         </header>
 
         <AppUserProvider>
-          <div className="flex-1 overflow-auto p-4 md:p-6">
+          <div className="flex-1 overflow-auto p-4 md:p-6 pb-20 lg:pb-6">
             {children}
           </div>
         </AppUserProvider>
+
+        {/* Bottom navigation bar (mobile only) */}
+        <BottomNav />
 
         {/* Bottom safe area spacer for iOS home indicator */}
         <div className="safe-bottom bg-background" />
