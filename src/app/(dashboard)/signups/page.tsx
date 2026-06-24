@@ -190,20 +190,35 @@ export default function SignupsPage() {
     setDialogOpen(true)
   }
 
-  function handleEdit(form: FormRow) {
+  async function handleEdit(form: FormRow) {
     setEditingForm(form)
     setDialogOpen(true)
   }
 
   async function handleDelete(form: FormRow) {
-    if (!confirm(`Delete "${form.title}"? This will also delete all responses.`)) return
+    const responseCount = form.response_count ?? 0
+    const message = responseCount > 0
+      ? `⚠️ Delete "${form.title}"?\n\n` +
+        `This will permanently delete:\n` +
+        `• ${responseCount} response${responseCount > 1 ? 's' : ''}\n` +
+        `• All custom items added by users\n` +
+        `• All associated data\n\n` +
+        `This action CANNOT be undone!`
+      : `Delete "${form.title}"?\n\nThis action cannot be undone.`
+
+    if (!confirm(message)) return
+
     const supabase = createClient()
     const { error } = await supabase.from("signup_forms").delete().eq("id", form.id)
     if (error) {
       toast.error(`Failed: ${error.message}`)
     } else {
       toast.success("Form deleted")
-      logAudit("signup_form_deleted", "signup_forms", form.id, { title: form.title })
+      logAudit("signup_form_deleted", "signup_forms", form.id, {
+        title: form.title,
+        responseCount,
+        fieldCount: form.fields.length,
+      })
       setForms((prev) => prev.filter((f) => f.id !== form.id))
     }
   }
@@ -403,6 +418,7 @@ export default function SignupsPage() {
           <CardContent className="p-4 sm:p-6">
             <FormEditor
               editForm={editingForm}
+              existingResponses={editingForm ? forms.find(f => f.id === editingForm.id)?.response_count ?? 0 : 0}
               onSaved={() => { setDialogOpen(false); fetchForms() }}
               onCancel={() => { setDialogOpen(false); setEditingForm(null) }}
             />
@@ -417,10 +433,12 @@ export default function SignupsPage() {
 
 function FormEditor({
   editForm,
+  existingResponses,
   onSaved,
   onCancel,
 }: {
   editForm: FormRow | null
+  existingResponses: number
   onSaved: () => void
   onCancel: () => void
 }) {
@@ -466,6 +484,41 @@ function FormEditor({
   const [verseRef, setVerseRef] = useState("")
   const [verseBgColor, setVerseBgColor] = useState("")
   const [fields, setFields] = useState<SignupFieldConfig[]>([])
+  const [customItemsByField, setCustomItemsByField] = useState<Record<string, Set<string>>>({})
+
+  // Load responses and extract custom items when editing
+  useEffect(() => {
+    if (!editForm || !existingResponses) return
+    const supabase = createClient()
+    supabase
+      .from("signup_responses")
+      .select("data")
+      .eq("form_id", editForm.id)
+      .returns<{ data: Record<string, unknown> }[]>()
+      .then(({ data: responses }) => {
+        if (!responses) return
+        const customItems: Record<string, Set<string>> = {}
+
+        for (const field of editForm.fields) {
+          if (field.type === "claim_select" && field.allowCustom) {
+            const predefinedValues = new Set(field.options.map(o => o.value))
+            customItems[field.id] = new Set()
+
+            for (const response of responses) {
+              const items = response.data[field.id]
+              if (Array.isArray(items)) {
+                for (const item of items) {
+                  if (typeof item === "string" && !predefinedValues.has(item)) {
+                    customItems[field.id].add(item)
+                  }
+                }
+              }
+            }
+          }
+        }
+        setCustomItemsByField(customItems)
+      })
+  }, [editForm, existingResponses])
 
   // Populate form when editForm changes
   useEffect(() => {
@@ -533,6 +586,66 @@ function FormEditor({
     if (!title.trim()) { toast.error("Title is required"); return }
     if (!slug.trim()) { toast.error("Slug is required"); return }
 
+    // Warn about destructive changes when form has responses
+    if (isEdit && editForm && existingResponses > 0) {
+      const warnings: string[] = []
+
+      // Check for removed fields
+      const oldFieldIds = new Set(editForm.fields.map(f => f.id))
+      const newFieldIds = new Set(fields.map(f => f.id))
+      const removedFields = editForm.fields.filter(f => !newFieldIds.has(f.id))
+      if (removedFields.length > 0) {
+        warnings.push(`• ${removedFields.length} field${removedFields.length > 1 ? 's' : ''} will be removed: ${removedFields.map(f => f.label).join(", ")}`)
+      }
+
+      // Check for removed custom items in claim_select fields
+      let removedCustomCount = 0
+      for (const field of fields) {
+        if (field.type === "claim_select" && customItemsByField[field.id]) {
+          const oldField = editForm.fields.find(f => f.id === field.id)
+          if (oldField && oldField.type === "claim_select") {
+            const newOptionValues = new Set(field.options.map(o => o.value))
+            const oldCustomItems = customItemsByField[field.id]
+            for (const customItem of oldCustomItems) {
+              if (!newOptionValues.has(customItem)) {
+                removedCustomCount++
+              }
+            }
+          }
+        }
+      }
+      if (removedCustomCount > 0) {
+        warnings.push(`• ${removedCustomCount} custom item${removedCustomCount > 1 ? 's' : ''} will no longer be editable (they remain in ${existingResponses} existing response${existingResponses > 1 ? 's' : ''})`)
+      }
+
+      // Check for removed predefined options in claim_select fields
+      for (const field of fields) {
+        if (field.type === "claim_select") {
+          const oldField = editForm.fields.find(f => f.id === field.id)
+          if (oldField && oldField.type === "claim_select") {
+            const newOptionValues = new Set(field.options.map(o => o.value))
+            const removedOptions = oldField.options.filter(o => !newOptionValues.has(o.value))
+            if (removedOptions.length > 0) {
+              warnings.push(`• ${removedOptions.length} predefined option${removedOptions.length > 1 ? 's' : ''} removed from "${field.label}": ${removedOptions.map(o => o.label).join(", ")}`)
+            }
+          }
+        }
+      }
+
+      if (warnings.length > 0) {
+        const proceed = confirm(
+          `⚠️ Warning: This form has ${existingResponses} existing response${existingResponses > 1 ? 's' : ''}.\n\n` +
+          `The following changes will affect existing data:\n\n${warnings.join("\n")}\n\n` +
+          `Data in existing responses will be preserved but may become inaccessible.\n\n` +
+          `Continue with update?`
+        )
+        if (!proceed) {
+          setSaving(false)
+          return
+        }
+      }
+    }
+
     setSaving(true)
     try {
       const supabase = createClient()
@@ -564,7 +677,17 @@ function FormEditor({
         const { error } = await supabase.from("signup_forms").update(payload as never).eq("id", editForm.id)
         if (error) { toast.error(`Failed: ${error.message}`); return }
         toast.success("Form updated")
-        logAudit("signup_form_updated", "signup_forms", editForm.id, { title: title.trim() })
+
+        // Enhanced audit log with field changes
+        const removedFieldIds = editForm.fields.filter(f => !fields.find(nf => nf.id === f.id)).map(f => f.id)
+        const addedFieldIds = fields.filter(f => !editForm.fields.find(of => of.id === f.id)).map(f => f.id)
+        logAudit("signup_form_updated", "signup_forms", editForm.id, {
+          title: title.trim(),
+          responseCount: existingResponses,
+          fieldCount: { before: editForm.fields.length, after: fields.length },
+          removedFields: removedFieldIds.length > 0 ? editForm.fields.filter(f => removedFieldIds.includes(f.id)).map(f => ({ id: f.id, label: f.label, type: f.type })) : undefined,
+          addedFields: addedFieldIds.length > 0 ? fields.filter(f => addedFieldIds.includes(f.id)).map(f => ({ id: f.id, label: f.label, type: f.type })) : undefined,
+        })
       } else {
         const { error } = await supabase.from("signup_forms").insert(payload as never)
         if (error) { toast.error(`Failed: ${error.message}`); return }
@@ -975,6 +1098,7 @@ function FormEditor({
                   field={field}
                   index={index}
                   total={fields.length}
+                  customItems={field.type === "claim_select" ? customItemsByField[field.id] : undefined}
                   onUpdate={(updates) => updateField(index, updates)}
                   onRemove={() => removeField(index)}
                   onMove={(dir) => moveField(index, dir)}
@@ -1018,6 +1142,7 @@ function FieldEditor({
   field,
   index,
   total,
+  customItems,
   onUpdate,
   onRemove,
   onMove,
@@ -1025,6 +1150,7 @@ function FieldEditor({
   field: SignupFieldConfig
   index: number
   total: number
+  customItems?: Set<string>
   onUpdate: (updates: Partial<SignupFieldConfig>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
@@ -1095,6 +1221,7 @@ function FieldEditor({
         <div className="space-y-2">
           <ClaimOptionsEditor
             options={field.options}
+            customItems={customItems}
             onChange={(opts) => onUpdate({ options: opts } as Partial<SignupFieldConfig>)}
           />
           <div className="flex items-center gap-3">
@@ -1243,9 +1370,11 @@ function OptionsEditor({
 
 function ClaimOptionsEditor({
   options,
+  customItems,
   onChange,
 }: {
   options: { value: string; label: string; capacity: number }[]
+  customItems?: Set<string>
   onChange: (opts: { value: string; label: string; capacity: number }[]) => void
 }) {
   const hasLimits = options.some((o) => o.capacity < 50)
@@ -1273,6 +1402,11 @@ function ClaimOptionsEditor({
 
   function updateCapacity(index: number, cap: number) {
     onChange(options.map((o, i) => i === index ? { ...o, capacity: Math.max(1, cap) } : o))
+  }
+
+  function promoteCustomItem(customValue: string) {
+    // Add custom item to official options
+    onChange([...options, { value: customValue, label: customValue, capacity: hasLimits ? 2 : 99 }])
   }
 
   return (
@@ -1314,6 +1448,27 @@ function ClaimOptionsEditor({
       >
         + Add item
       </button>
+
+      {customItems && customItems.size > 0 && (
+        <div className="mt-3 pt-3 border-t space-y-1.5">
+          <p className="text-xs text-muted-foreground font-medium">Custom items from responses ({customItems.size})</p>
+          <p className="text-[10px] text-muted-foreground">These were added by users. Click "Add to list" to make them official options.</p>
+          {Array.from(customItems).map((item) => (
+            <div key={item} className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 px-2 py-1.5 rounded">
+              <span className="text-sm flex-1 text-amber-900 dark:text-amber-100">{item}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 text-[10px] text-primary hover:text-primary"
+                onClick={() => promoteCustomItem(item)}
+              >
+                Add to list
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
