@@ -722,6 +722,18 @@ function FormEditor({
     })
   }
 
+  function removeCustomItemFromField(fieldId: string, customValue: string) {
+    setCustomItemsByField((prev) => {
+      const updated = new Set(prev[fieldId])
+      updated.delete(customValue)
+      if (updated.size === 0) {
+        const { [fieldId]: _, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [fieldId]: updated }
+    })
+  }
+
   return (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -1102,6 +1114,7 @@ function FormEditor({
                   onUpdate={(updates) => updateField(index, updates)}
                   onRemove={() => removeField(index)}
                   onMove={(dir) => moveField(index, dir)}
+                  onRemoveCustomItem={removeCustomItemFromField}
                 />
               ))}
             </div>
@@ -1146,6 +1159,7 @@ function FieldEditor({
   onUpdate,
   onRemove,
   onMove,
+  onRemoveCustomItem,
 }: {
   field: SignupFieldConfig
   index: number
@@ -1154,6 +1168,7 @@ function FieldEditor({
   onUpdate: (updates: Partial<SignupFieldConfig>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
+  onRemoveCustomItem?: (fieldId: string, customValue: string) => void
 }) {
   const meta = FIELD_TYPE_META.find((m) => m.type === field.type)
 
@@ -1222,7 +1237,9 @@ function FieldEditor({
           <ClaimOptionsEditor
             options={field.options}
             customItems={customItems}
+            fieldId={field.id}
             onChange={(opts) => onUpdate({ options: opts } as Partial<SignupFieldConfig>)}
+            onRemoveCustomItem={onRemoveCustomItem}
           />
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -1371,11 +1388,15 @@ function OptionsEditor({
 function ClaimOptionsEditor({
   options,
   customItems,
+  fieldId,
   onChange,
+  onRemoveCustomItem,
 }: {
   options: { value: string; label: string; capacity: number }[]
   customItems?: Set<string>
+  fieldId: string
   onChange: (opts: { value: string; label: string; capacity: number }[]) => void
+  onRemoveCustomItem?: (fieldId: string, customValue: string) => void
 }) {
   const hasLimits = options.some((o) => o.capacity < 50)
 
@@ -1407,6 +1428,8 @@ function ClaimOptionsEditor({
   function promoteCustomItem(customValue: string) {
     // Add custom item to official options
     onChange([...options, { value: customValue, label: customValue, capacity: hasLimits ? 2 : 99 }])
+    // Remove from custom items display
+    onRemoveCustomItem?.(fieldId, customValue)
   }
 
   return (
@@ -1465,6 +1488,14 @@ function ClaimOptionsEditor({
               >
                 Add to list
               </Button>
+              <button
+                type="button"
+                className="p-1 text-muted-foreground hover:text-destructive"
+                onClick={() => onRemoveCustomItem?.(fieldId, item)}
+                title="Remove custom item"
+              >
+                <X className="size-3.5" />
+              </button>
             </div>
           ))}
         </div>
