@@ -27,6 +27,7 @@ interface FormData {
   visibility: string
   member_autocomplete: boolean
   show_responses?: boolean
+  hidden_custom_items?: Record<string, string[]>
 }
 
 interface MemberResult {
@@ -388,6 +389,7 @@ export default function PublicSignupPage() {
                 onLookupSearch={(q) => handleMemberSearch(q, form.id)}
                 onMemberSelect={(m) => selectMember(m, form.fields)}
                 selectedMember={selectedMember}
+                hiddenCustomItems={form.hidden_custom_items}
               />
               </div>
               )
@@ -585,6 +587,7 @@ function FieldRenderer({
   onMemberSelect,
   selectedMember,
   responses,
+  hiddenCustomItems,
 }: {
   field: SignupFieldConfig
   allFields: SignupFieldConfig[]
@@ -599,6 +602,7 @@ function FieldRenderer({
   onMemberSelect: (m: MemberResult) => void
   selectedMember: MemberResult | null
   responses: ResponseEntry[]
+  hiddenCustomItems?: Record<string, string[]>
 }) {
   const labelEl = (
     <Label className="text-sm font-medium text-gray-700">
@@ -723,6 +727,7 @@ function FieldRenderer({
       const selected = (value as string[]) || []
       const claimCounts: Record<string, number> = {}
       const optionValues = new Set(field.options.map((o) => o.value))
+      const hiddenForField = new Set(hiddenCustomItems?.[field.id] || [])
       const customItems = new Map<string, number>()
       for (const r of responses) {
         const items = r.data[field.id]
@@ -730,7 +735,10 @@ function FieldRenderer({
           for (const item of items) {
             if (typeof item === "string") {
               claimCounts[item] = (claimCounts[item] || 0) + 1
-              if (!optionValues.has(item)) customItems.set(item, (customItems.get(item) || 0) + 1)
+              // Only show custom items that are not in the official options AND not hidden
+              if (!optionValues.has(item) && !hiddenForField.has(item)) {
+                customItems.set(item, (customItems.get(item) || 0) + 1)
+              }
             }
           }
         }
