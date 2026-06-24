@@ -75,6 +75,7 @@ interface FormRow {
   notify_smtp_config_id: string | null
   notify_mailing_list_id: string | null
   rate_limit_per_hour: number | null
+  hidden_custom_items: Record<string, string[]>
   created_at: string
   response_count?: number
   stats?: { adults: number; kids: number; total: number }
@@ -144,7 +145,7 @@ export default function SignupsPage() {
     const supabase = createClient()
     const { data: formsData } = await supabase
       .from("signup_forms")
-      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, show_responses, rate_limit_per_hour, created_at")
+      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, show_responses, rate_limit_per_hour, hidden_custom_items, created_at")
       .order("created_at", { ascending: false })
 
     if (formsData) {
@@ -485,6 +486,7 @@ function FormEditor({
   const [verseBgColor, setVerseBgColor] = useState("")
   const [fields, setFields] = useState<SignupFieldConfig[]>([])
   const [customItemsByField, setCustomItemsByField] = useState<Record<string, Set<string>>>({})
+  const [hiddenCustomItems, setHiddenCustomItems] = useState<Record<string, string[]>>({})
 
   // Load responses and extract custom items when editing
   useEffect(() => {
@@ -498,17 +500,19 @@ function FormEditor({
       .then(({ data: responses }) => {
         if (!responses) return
         const customItems: Record<string, Set<string>> = {}
+        const hiddenItems = editForm.hidden_custom_items || {}
 
         for (const field of editForm.fields) {
           if (field.type === "claim_select" && field.allowCustom) {
             const predefinedValues = new Set(field.options.map(o => o.value))
+            const hiddenForField = new Set(hiddenItems[field.id] || [])
             customItems[field.id] = new Set()
 
             for (const response of responses) {
               const items = response.data[field.id]
               if (Array.isArray(items)) {
                 for (const item of items) {
-                  if (typeof item === "string" && !predefinedValues.has(item)) {
+                  if (typeof item === "string" && !predefinedValues.has(item) && !hiddenForField.has(item)) {
                     customItems[field.id].add(item)
                   }
                 }
@@ -554,6 +558,7 @@ function FormEditor({
       setVerseRef(editForm.theme.verseRef || "")
       setVerseBgColor(editForm.theme.verseBgColor || "")
       setFields(editForm.fields || [])
+      setHiddenCustomItems(editForm.hidden_custom_items || {})
     } else {
       setTitle("")
       setDescription("")
@@ -572,6 +577,7 @@ function FormEditor({
       setPrimaryColor("#7C3AED")
       setEmoji("")
       setFields([])
+      setHiddenCustomItems({})
     }
   }, [editForm, open])
 
@@ -671,6 +677,7 @@ function FormEditor({
         notify_smtp_config_id: notifySmtpConfigId || null,
         notify_mailing_list_id: notifyMailingListId || null,
         rate_limit_per_hour: rateLimitPerHour ? parseInt(rateLimitPerHour, 10) : 10,
+        hidden_custom_items: hiddenCustomItems,
       }
 
       if (isEdit) {
@@ -723,6 +730,7 @@ function FormEditor({
   }
 
   function removeCustomItemFromField(fieldId: string, customValue: string) {
+    // Remove from display
     setCustomItemsByField((prev) => {
       const updated = new Set(prev[fieldId])
       updated.delete(customValue)
@@ -731,6 +739,13 @@ function FormEditor({
         return rest
       }
       return { ...prev, [fieldId]: updated }
+    })
+
+    // Add to hidden items so it doesn't reappear
+    setHiddenCustomItems((prev) => {
+      const fieldHidden = prev[fieldId] || []
+      if (fieldHidden.includes(customValue)) return prev
+      return { ...prev, [fieldId]: [...fieldHidden, customValue] }
     })
   }
 
