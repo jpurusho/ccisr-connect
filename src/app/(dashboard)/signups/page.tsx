@@ -505,6 +505,8 @@ function FormEditor({
         for (const field of editForm.fields) {
           if (field.type === "claim_select" && field.allowCustom) {
             const predefinedValues = new Set(field.options.map(o => o.value))
+            const predefinedLowerValues = new Set(field.options.map(o => o.value.toLowerCase()))
+            const predefinedLowerLabels = new Set(field.options.map(o => o.label.toLowerCase()))
             const hiddenForField = new Set(hiddenItems[field.id] || [])
             customItems[field.id] = new Set()
 
@@ -512,8 +514,15 @@ function FormEditor({
               const items = response.data[field.id]
               if (Array.isArray(items)) {
                 for (const item of items) {
-                  if (typeof item === "string" && !predefinedValues.has(item) && !hiddenForField.has(item)) {
-                    customItems[field.id].add(item)
+                  if (typeof item === "string") {
+                    const itemClean = item.trim()
+                    const itemLower = itemClean.toLowerCase()
+                    const isOfficial = predefinedValues.has(itemClean) ||
+                                      predefinedLowerValues.has(itemLower) ||
+                                      predefinedLowerLabels.has(itemLower)
+                    if (!isOfficial && !hiddenForField.has(itemClean)) {
+                      customItems[field.id].add(itemClean)
+                    }
                   }
                 }
               }

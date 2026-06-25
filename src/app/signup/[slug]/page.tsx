@@ -725,19 +725,34 @@ function FieldRenderer({
 
     case "claim_select": {
       const selected = (value as string[]) || []
-      const claimCounts: Record<string, number> = {}
+      // Build maps for case-insensitive matching
       const optionValues = new Set(field.options.map((o) => o.value))
+      const optionByLowerValue = new Map(field.options.map((o) => [o.value.toLowerCase(), o.value]))
+      const optionByLowerLabel = new Map(field.options.map((o) => [o.label.toLowerCase(), o.value]))
+
+      // Count claims by canonical option value (aggregating case variations)
+      const claimCounts: Record<string, number> = {}
       const hiddenForField = new Set(hiddenCustomItems?.[field.id] || [])
       const customItems = new Map<string, number>()
+
       for (const r of responses) {
         const items = r.data[field.id]
         if (Array.isArray(items)) {
           for (const item of items) {
             if (typeof item === "string") {
-              claimCounts[item] = (claimCounts[item] || 0) + 1
-              // Only show custom items that are not in the official options AND not hidden
-              if (!optionValues.has(item) && !hiddenForField.has(item)) {
-                customItems.set(item, (customItems.get(item) || 0) + 1)
+              const itemClean = item.trim()
+              const itemLower = itemClean.toLowerCase()
+              // Try to map to official option (by value or label, case-insensitive, trimmed)
+              const canonicalValue = optionValues.has(itemClean) ? itemClean :
+                                    optionByLowerValue.get(itemLower) ||
+                                    optionByLowerLabel.get(itemLower)
+
+              if (canonicalValue) {
+                // This is an official option (or variation thereof)
+                claimCounts[canonicalValue] = (claimCounts[canonicalValue] || 0) + 1
+              } else if (!hiddenForField.has(itemClean)) {
+                // This is a true custom item (not matching any official option)
+                customItems.set(itemClean, (customItems.get(itemClean) || 0) + 1)
               }
             }
           }
