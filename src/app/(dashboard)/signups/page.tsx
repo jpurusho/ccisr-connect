@@ -49,6 +49,7 @@ import {
   Eye,
   Pencil,
   Files,
+  Archive,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -141,6 +142,7 @@ export default function SignupsPage() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingForm, setEditingForm] = useState<FormRow | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const fetchForms = useCallback(async () => {
     setLoading(true)
@@ -268,6 +270,22 @@ export default function SignupsPage() {
     setForms((prev) => prev.map((f) => f.id === form.id ? { ...f, muted: newMuted } : f))
   }
 
+  async function handleArchive(form: FormRow) {
+    const newStatus = form.status === "archived" ? "draft" : "archived"
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("signup_forms")
+      .update({ status: newStatus } as never)
+      .eq("id", form.id)
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+      return
+    }
+    toast.success(newStatus === "archived" ? "Form archived" : "Form unarchived")
+    logAudit("signup_form_status_changed", "signup_forms", form.id, { title: form.title, from: form.status, to: newStatus })
+    setForms((prev) => prev.map((f) => f.id === form.id ? { ...f, status: newStatus } : f))
+  }
+
   async function handleDuplicate(form: FormRow) {
     const supabase = createClient()
 
@@ -353,10 +371,22 @@ export default function SignupsPage() {
             Create and manage public signup forms
           </p>
         </div>
-        <Button size="sm" onClick={handleCreate}>
-          <Plus className="size-3.5" />
-          New Form
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={showArchived}
+              onCheckedChange={setShowArchived}
+              id="show-archived"
+            />
+            <Label htmlFor="show-archived" className="text-sm cursor-pointer">
+              Show Archived
+            </Label>
+          </div>
+          <Button size="sm" onClick={handleCreate}>
+            <Plus className="size-3.5" />
+            New Form
+          </Button>
+        </div>
       </div>
 
       {/* List */}
@@ -388,7 +418,9 @@ export default function SignupsPage() {
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {forms.map((form) => (
+          {forms
+            .filter((form) => showArchived || form.status !== "archived")
+            .map((form) => (
             <ContextMenu key={form.id}>
               <ContextMenuTrigger>
             <Card className="relative group">
@@ -487,6 +519,9 @@ export default function SignupsPage() {
                   <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => handleDuplicate(form)} title="Duplicate form">
                     <Files className="size-3" />
                   </Button>
+                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => handleArchive(form)} title={form.status === "archived" ? "Unarchive" : "Archive"}>
+                    <Archive className="size-3" />
+                  </Button>
                   <Button variant="ghost" size="icon-sm" className="h-7 w-7 text-destructive" onClick={() => handleDelete(form)} title="Delete">
                     <Trash2 className="size-3" />
                   </Button>
@@ -516,6 +551,9 @@ export default function SignupsPage() {
                 </ContextMenuItem>
                 <ContextMenuItem onClick={() => toggleMuted(form)}>
                   {form.muted ? "Unmute (Enable Interactions)" : "Mute (Read-Only)"}
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => handleArchive(form)}>
+                  <Archive className="size-3.5" /> {form.status === "archived" ? "Unarchive" : "Archive"}
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem variant="destructive" onClick={() => handleDelete(form)}>
@@ -569,7 +607,7 @@ function FormEditor({
   const [targetYear, setTargetYear] = useState<number>(new Date().getFullYear())
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
-  const [status, setStatus] = useState<"draft" | "active" | "closed">("draft")
+  const [status, setStatus] = useState<"draft" | "active" | "closed" | "archived">("draft")
   const [visibility, setVisibility] = useState<"public_link" | "admin_only">("admin_only")
   const [memberAutocomplete, setMemberAutocomplete] = useState(false)
   const [maxSubmissions, setMaxSubmissions] = useState<string>("")
@@ -660,7 +698,7 @@ function FormEditor({
       setTargetYear(editForm.target_year || new Date().getFullYear())
       setStartDate(editForm.start_date || "")
       setEndDate(editForm.end_date || "")
-      setStatus(editForm.status === "archived" ? "closed" : editForm.status)
+      setStatus(editForm.status)
       setVisibility(editForm.visibility)
       setMemberAutocomplete(editForm.member_autocomplete)
       setMaxSubmissions(editForm.max_submissions ? String(editForm.max_submissions) : "")
@@ -987,6 +1025,7 @@ function FormEditor({
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
             </div>
