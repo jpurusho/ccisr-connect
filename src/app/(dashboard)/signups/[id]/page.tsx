@@ -197,9 +197,9 @@ export default function SignupResponsesPage() {
       options: Array<{ value: unknown; label: string; count: number }>
     }> = []
 
-    // Only include checkbox, select, radio, and multi_select fields
+    // Only include checkbox, select, and multi_select fields
     const filterableFields = form.fields.filter((f) =>
-      ["checkbox", "select", "radio", "multi_select"].includes(f.type)
+      ["checkbox", "select", "multi_select"].includes(f.type)
     )
 
     for (const field of filterableFields) {
@@ -215,7 +215,7 @@ export default function SignupResponsesPage() {
             { value: false, label: "No", count: noCount },
           ],
         })
-      } else if (field.type === "select" || field.type === "radio") {
+      } else if (field.type === "select" || field.type === "multi_select") {
         const counts = new Map<string, number>()
 
         for (const response of responses) {
