@@ -89,11 +89,19 @@ const COLOR_PRESETS = [
   "#E11D48", "#0EA5E9", "#8B5CF6", "#F59E0B", "#14B8A6", "#6366F1", "#EC4899", "#10B981",
 ]
 
-const STATUS_COLORS: Record<string, "default" | "secondary" | "outline"> = {
-  active: "default",
-  draft: "secondary",
-  closed: "outline",
-  archived: "outline",
+// Traffic light colors for status badges
+function getStatusStyle(status: string): { bg: string; text: string; border: string } {
+  switch (status) {
+    case "active":
+      return { bg: "bg-emerald-100 dark:bg-emerald-950", text: "text-emerald-700 dark:text-emerald-400", border: "border-emerald-300 dark:border-emerald-800" }
+    case "closed":
+      return { bg: "bg-red-100 dark:bg-red-950", text: "text-red-700 dark:text-red-400", border: "border-red-300 dark:border-red-800" }
+    case "archived":
+      return { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400", border: "border-gray-300 dark:border-gray-700" }
+    case "draft":
+    default:
+      return { bg: "bg-amber-100 dark:bg-amber-950", text: "text-amber-700 dark:text-amber-400", border: "border-amber-300 dark:border-amber-800" }
+  }
 }
 
 const MONTHS_LIST = [
@@ -432,7 +440,10 @@ export default function SignupsPage() {
                       <h3 className="text-sm font-medium truncate">{form.title}</h3>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={STATUS_COLORS[form.status] || "secondary"} className="text-[10px]">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] ${getStatusStyle(form.status).bg} ${getStatusStyle(form.status).text} ${getStatusStyle(form.status).border}`}
+                      >
                         {form.status}
                       </Badge>
                       {form.muted && (
