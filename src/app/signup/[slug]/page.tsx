@@ -941,7 +941,11 @@ function FieldRenderer({
                         onChange([...selected, opt.value])
                       }
                     }}
-                    className="rounded border-gray-300"
+                    className="size-4 rounded border-2 text-white accent-current cursor-pointer"
+                    style={{
+                      accentColor: colors.primary,
+                      borderColor: checked ? colors.primary : "#9CA3AF",
+                    }}
                   />
                   {opt.label}
                 </label>
@@ -1008,7 +1012,11 @@ function FieldRenderer({
                         onChange([...selected, opt.value])
                       }
                     }}
-                    className="rounded border-gray-300"
+                    className="size-4 rounded border-2 text-white accent-current cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      accentColor: colors.primary,
+                      borderColor: checked ? colors.primary : "#9CA3AF",
+                    }}
                   />
                   <span>{opt.label}</span>
                   {taken > 0 && (
@@ -1034,7 +1042,11 @@ function FieldRenderer({
                           if (checked) onChange(selected.filter((v) => v !== item))
                           else onChange([...selected, item])
                         }}
-                        className="rounded border-gray-300"
+                        className="size-4 rounded border-2 text-white accent-current cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          accentColor: colors.primary,
+                          borderColor: checked ? colors.primary : "#9CA3AF",
+                        }}
                       />
                       <span>{item}</span>
                       <span className="text-xs text-gray-400">({count} signed up)</span>
