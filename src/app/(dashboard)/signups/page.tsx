@@ -48,6 +48,7 @@ import {
   X,
   Eye,
   Pencil,
+  Files,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -267,6 +268,78 @@ export default function SignupsPage() {
     setForms((prev) => prev.map((f) => f.id === form.id ? { ...f, muted: newMuted } : f))
   }
 
+  async function handleDuplicate(form: FormRow) {
+    const supabase = createClient()
+
+    // Generate new slug and title
+    const newTitle = `${form.title} (Copy)`
+    const baseSlug = form.slug.replace(/-copy(-\d+)?$/, "")
+    let newSlug = `${baseSlug}-copy`
+
+    // Check if slug exists, append number if needed
+    const { data: existingSlugs } = await supabase
+      .from("signup_forms")
+      .select("slug")
+      .like("slug", `${baseSlug}-copy%`)
+      .returns<{ slug: string }[]>()
+
+    if (existingSlugs && existingSlugs.length > 0) {
+      const numbers = existingSlugs
+        .map((s) => {
+          const match = s.slug.match(/-copy-(\d+)$/)
+          return match ? parseInt(match[1], 10) : 1
+        })
+      const maxNum = Math.max(...numbers)
+      newSlug = `${baseSlug}-copy-${maxNum + 1}`
+    }
+
+    // Create duplicate form (without responses)
+    const payload = {
+      title: newTitle,
+      slug: newSlug,
+      description: form.description,
+      duration_type: form.duration_type,
+      event_date: form.event_date,
+      target_month: form.target_month,
+      target_year: form.target_year,
+      start_date: form.start_date,
+      end_date: form.end_date,
+      theme: form.theme,
+      fields: form.fields,
+      status: "draft" as const,
+      visibility: form.visibility,
+      member_autocomplete: form.member_autocomplete,
+      max_submissions: form.max_submissions,
+      allow_duplicates: form.allow_duplicates,
+      show_responses: form.show_responses,
+      muted: false,
+      notify_on_submit: false,
+      notify_smtp_config_id: null,
+      notify_mailing_list_id: null,
+      rate_limit_per_hour: form.rate_limit_per_hour,
+      hidden_custom_items: {},
+    }
+
+    const { data, error } = await supabase
+      .from("signup_forms")
+      .insert(payload as never)
+      .select()
+      .returns<FormRow[]>()
+      .single()
+
+    if (error) {
+      toast.error(`Failed to duplicate: ${error.message}`)
+    } else if (data) {
+      toast.success(`Form duplicated as "${newTitle}"`)
+      logAudit("signup_form_duplicated", "signup_forms", data.id, {
+        originalId: form.id,
+        originalTitle: form.title,
+        newTitle,
+      })
+      fetchForms()
+    }
+  }
+
   return (
     <div className="space-y-4 p-4 sm:p-6">
       {/* Header */}
@@ -411,6 +484,9 @@ export default function SignupsPage() {
                   <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => copyLink(form.slug)} title="Copy link">
                     <Copy className="size-3" />
                   </Button>
+                  <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => handleDuplicate(form)} title="Duplicate form">
+                    <Files className="size-3" />
+                  </Button>
                   <Button variant="ghost" size="icon-sm" className="h-7 w-7 text-destructive" onClick={() => handleDelete(form)} title="Delete">
                     <Trash2 className="size-3" />
                   </Button>
@@ -430,6 +506,9 @@ export default function SignupsPage() {
                 </ContextMenuItem>
                 <ContextMenuItem onClick={() => previewForm(form.slug)}>
                   <ExternalLink className="size-3.5" /> Preview
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => handleDuplicate(form)}>
+                  <Files className="size-3.5" /> Duplicate Form
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem onClick={() => toggleStatus(form)}>
