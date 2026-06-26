@@ -390,6 +390,7 @@ export default function PublicSignupPage() {
                 onMemberSelect={(m) => selectMember(m, form.fields)}
                 selectedMember={selectedMember}
                 hiddenCustomItems={form.hidden_custom_items}
+                colors={colors}
               />
               </div>
               )
@@ -687,6 +688,7 @@ function FieldRenderer({
   selectedMember,
   responses,
   hiddenCustomItems,
+  colors,
 }: {
   field: SignupFieldConfig
   allFields: SignupFieldConfig[]
@@ -702,6 +704,7 @@ function FieldRenderer({
   selectedMember: MemberResult | null
   responses: ResponseEntry[]
   hiddenCustomItems?: Record<string, string[]>
+  colors: ReturnType<typeof getThemeColors>
 }) {
   const labelEl = (
     <Label className="text-sm font-medium text-gray-700">
@@ -1071,6 +1074,12 @@ function FieldRenderer({
           <Switch
             checked={(value as boolean) || false}
             onCheckedChange={(v) => onChange(v)}
+            style={
+              {
+                "--primary": colors.primary,
+              } as React.CSSProperties
+            }
+            className="data-checked:bg-[var(--primary)]"
           />
           <Label className="text-sm">{field.checkboxLabel || field.label}</Label>
         </div>
