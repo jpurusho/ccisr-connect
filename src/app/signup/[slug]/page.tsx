@@ -588,7 +588,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
 
   const phoneField = fields.find((f) => f.type === "phone")
   const monthField = fields.find((f) => f.type === "month_picker")
-  const claimField = fields.find((f) => f.type === "claim_select")
+  const claimFields = fields.filter((f) => f.type === "claim_select")
   const currentMonth = new Date().getMonth() + 1
 
   function initiateRemove(responseId: string, data: Record<string, unknown>) {
@@ -670,7 +670,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
             >
               All Signups
             </button>
-            {claimField && (
+            {claimFields.length > 0 && (
               <>
                 <button
                   type="button"
@@ -721,9 +721,43 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
                 })}
               </div>
             ) : activeTab === "items" ? (
-              <ItemsTable responses={responses} fields={fields} claimField={claimField!} colors={colors} showUnpicked={false} />
+              <div className="space-y-4">
+                {claimFields.map((claimField) => (
+                  <div key={claimField.id}>
+                    <div className="px-3 pt-3 pb-2 border-b" style={{ borderColor: colors.border }}>
+                      <h3 className="text-sm font-semibold" style={{ color: colors.textDark }}>
+                        {claimField.label}
+                      </h3>
+                    </div>
+                    <ItemsTable
+                      responses={responses}
+                      fields={fields}
+                      claimField={claimField}
+                      colors={colors}
+                      showUnpicked={false}
+                    />
+                  </div>
+                ))}
+              </div>
             ) : (
-              <ItemsTable responses={responses} fields={fields} claimField={claimField!} colors={colors} showUnpicked={true} />
+              <div className="space-y-4">
+                {claimFields.map((claimField) => (
+                  <div key={claimField.id}>
+                    <div className="px-3 pt-3 pb-2 border-b" style={{ borderColor: colors.border }}>
+                      <h3 className="text-sm font-semibold" style={{ color: colors.textDark }}>
+                        {claimField.label}
+                      </h3>
+                    </div>
+                    <ItemsTable
+                      responses={responses}
+                      fields={fields}
+                      claimField={claimField}
+                      colors={colors}
+                      showUnpicked={true}
+                    />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </>
