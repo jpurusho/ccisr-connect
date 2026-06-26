@@ -43,6 +43,8 @@ import {
   Copy,
   ExternalLink,
   CalendarCheck,
+  Filter,
+  X as XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -80,6 +82,7 @@ export default function SignupResponsesPage() {
   const [sortAsc, setSortAsc] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [assignOpen, setAssignOpen] = useState(false)
+  const [activeFieldFilter, setActiveFieldFilter] = useState<{ fieldId: string; value: unknown } | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -184,14 +187,86 @@ export default function SignupResponsesPage() {
     return ""
   }
 
-  let filtered = search.trim()
-    ? responses.filter((r) =>
-        Object.values(r.data).some((v) =>
-          String(v ?? "").toLowerCase().includes(search.toLowerCase())
-        )
-      )
+  // Generate summary statistics for filterable fields
+  function getFieldSummaries() {
+    if (!form) return []
+
+    const summaries: Array<{
+      fieldId: string
+      label: string
+      options: Array<{ value: unknown; label: string; count: number }>
+    }> = []
+
+    // Only include checkbox, select, radio, and multi_select fields
+    const filterableFields = form.fields.filter((f) =>
+      ["checkbox", "select", "radio", "multi_select"].includes(f.type)
+    )
+
+    for (const field of filterableFields) {
+      if (field.type === "checkbox") {
+        const yesCount = responses.filter((r) => r.data[field.id] === true).length
+        const noCount = responses.filter((r) => r.data[field.id] === false || !r.data[field.id]).length
+
+        summaries.push({
+          fieldId: field.id,
+          label: field.label,
+          options: [
+            { value: true, label: "Yes", count: yesCount },
+            { value: false, label: "No", count: noCount },
+          ],
+        })
+      } else if (field.type === "select" || field.type === "radio") {
+        const counts = new Map<string, number>()
+
+        for (const response of responses) {
+          const val = response.data[field.id]
+          if (val) {
+            const key = String(val)
+            counts.set(key, (counts.get(key) || 0) + 1)
+          }
+        }
+
+        summaries.push({
+          fieldId: field.id,
+          label: field.label,
+          options: Array.from(counts.entries()).map(([value, count]) => ({
+            value,
+            label: value,
+            count,
+          })),
+        })
+      }
+    }
+
+    return summaries
+  }
+
+  const fieldSummaries = getFieldSummaries()
+
+  // Apply field filter first
+  let filtered = activeFieldFilter
+    ? responses.filter((r) => {
+        const val = r.data[activeFieldFilter.fieldId]
+        // For checkboxes, match boolean
+        if (typeof activeFieldFilter.value === "boolean") return val === activeFieldFilter.value
+        // For select/radio, match string value
+        if (typeof activeFieldFilter.value === "string") return val === activeFieldFilter.value
+        // For multi-select, check if array includes value
+        if (Array.isArray(val)) return val.includes(activeFieldFilter.value)
+        return val === activeFieldFilter.value
+      })
     : [...responses]
 
+  // Then apply text search
+  if (search.trim()) {
+    filtered = filtered.filter((r) =>
+      Object.values(r.data).some((v) =>
+        String(v ?? "").toLowerCase().includes(search.toLowerCase())
+      )
+    )
+  }
+
+  // Finally apply sorting
   if (sortField) {
     filtered = [...filtered].sort((a, b) => {
       const av = getSortValue(a, sortField)
@@ -294,6 +369,80 @@ export default function SignupResponsesPage() {
           </Button>
         )}
       </div>
+
+      {/* Summary Cards */}
+      {fieldSummaries.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {fieldSummaries.map((summary) => (
+            <Card key={summary.fieldId} className="relative">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Filter className="size-3.5" />
+                  {summary.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {summary.options
+                  .filter((opt) => opt.count > 0)
+                  .map((opt) => {
+                    const isActive =
+                      activeFieldFilter?.fieldId === summary.fieldId &&
+                      activeFieldFilter?.value === opt.value
+                    return (
+                      <button
+                        key={String(opt.value)}
+                        onClick={() => {
+                          if (isActive) {
+                            setActiveFieldFilter(null)
+                          } else {
+                            setActiveFieldFilter({ fieldId: summary.fieldId, value: opt.value })
+                            setSearch("")
+                          }
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted hover:bg-muted/80"
+                        }`}
+                      >
+                        <span className="font-medium">{opt.label}</span>
+                        <Badge variant={isActive ? "secondary" : "outline"} className="ml-2">
+                          {opt.count}
+                        </Badge>
+                      </button>
+                    )
+                  })}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Active Filter Badge */}
+      {activeFieldFilter && (
+        <div className="flex items-center gap-2">
+          <Badge variant="default" className="gap-1 pl-2 pr-1">
+            <Filter className="size-3" />
+            <span>
+              {fieldSummaries.find((s) => s.fieldId === activeFieldFilter.fieldId)?.label}:{" "}
+              {String(
+                fieldSummaries
+                  .find((s) => s.fieldId === activeFieldFilter.fieldId)
+                  ?.options.find((o) => o.value === activeFieldFilter.value)?.label || activeFieldFilter.value
+              )}
+            </span>
+            <button
+              onClick={() => setActiveFieldFilter(null)}
+              className="ml-1 hover:bg-primary-foreground/20 rounded p-0.5"
+            >
+              <XIcon className="size-3" />
+            </button>
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            Showing {filtered.length} of {responses.length} responses
+          </span>
+        </div>
+      )}
 
       {/* Table */}
       <Card>
