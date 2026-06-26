@@ -588,11 +588,83 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
   )
 }
 
+// ── By Person View ───────────────────────────────────────────────────────────
+
+function ByPersonView({ responses, fields, claimFields, colors }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; claimFields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors> }) {
+  const nameField = fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
+
+  // Build person → items map
+  const personMap = new Map<string, Map<string, string[]>>() // person → (fieldLabel → [items])
+
+  for (const response of responses) {
+    const name = (nameField ? (response.data[nameField.id] as string) : null) || "Anonymous"
+
+    for (const claimField of claimFields) {
+      if (claimField.type !== "claim_select") continue
+
+      const items = response.data[claimField.id]
+      if (Array.isArray(items) && items.length > 0) {
+        if (!personMap.has(name)) {
+          personMap.set(name, new Map())
+        }
+        const fieldMap = personMap.get(name)!
+        if (!fieldMap.has(claimField.label)) {
+          fieldMap.set(claimField.label, [])
+        }
+        fieldMap.get(claimField.label)!.push(...items.filter((item): item is string => typeof item === "string"))
+      }
+    }
+  }
+
+  const sortedPeople = Array.from(personMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+
+  if (sortedPeople.length === 0) {
+    return (
+      <div className="p-6 text-center text-sm text-gray-500">
+        No items have been signed up yet.
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-3">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b" style={{ borderColor: colors.border }}>
+            <th className="text-left py-2 px-2 font-semibold text-gray-700">Person</th>
+            <th className="text-left py-2 px-2 font-semibold text-gray-700">Items</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedPeople.map(([person, fieldMap]) => {
+            // Build a string showing all items grouped by field
+            const itemsText = Array.from(fieldMap.entries())
+              .map(([fieldLabel, items]) => {
+                if (claimFields.length > 1) {
+                  return `${fieldLabel}: ${items.join(", ")}`
+                }
+                return items.join(", ")
+              })
+              .join(" • ")
+
+            return (
+              <tr key={person} className="border-b" style={{ borderColor: colors.border }}>
+                <td className="py-2 px-2 font-medium" style={{ color: colors.textDark }}>{person}</td>
+                <td className="py-2 px-2 text-gray-600">{itemsText}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // ── Collapsible Signup List ──────────────────────────────────────────────────
 
 function SignupList({ responses, fields, colors, formId, muted, onRemoved }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; muted: boolean; onRemoved: (id: string) => void }) {
   const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<"all" | "items" | "unpicked">("all")
+  const [activeTab, setActiveTab] = useState<"all" | "items" | "unpicked" | "person">("all")
   const [removing, setRemoving] = useState<string | null>(null)
   const [verifyPhone, setVerifyPhone] = useState("")
   const [verifyTarget, setVerifyTarget] = useState<{ id: string; phone: string } | null>(null)
@@ -709,6 +781,18 @@ function SignupList({ responses, fields, colors, formId, muted, onRemoved }: { r
                 >
                   Unpicked
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("person")}
+                  className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === "person"
+                      ? "border-b-2 text-gray-900"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                  style={activeTab === "person" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
+                >
+                  By Person
+                </button>
               </>
             )}
           </div>
@@ -752,7 +836,7 @@ function SignupList({ responses, fields, colors, formId, muted, onRemoved }: { r
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : activeTab === "unpicked" ? (
               <div className="space-y-4">
                 {claimFields.map((claimField) => (
                   <div key={claimField.id}>
@@ -771,6 +855,13 @@ function SignupList({ responses, fields, colors, formId, muted, onRemoved }: { r
                   </div>
                 ))}
               </div>
+            ) : (
+              <ByPersonView
+                responses={responses}
+                fields={fields}
+                claimFields={claimFields}
+                colors={colors}
+              />
             )}
           </div>
         </>
