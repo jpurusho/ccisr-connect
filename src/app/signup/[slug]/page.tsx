@@ -439,10 +439,71 @@ export default function PublicSignupPage() {
   )
 }
 
+// ── Items Table ──────────────────────────────────────────────────────────────
+
+function ItemsTable({ responses, fields, claimField, colors }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; claimField: SignupFieldConfig; colors: ReturnType<typeof getThemeColors> }) {
+  const nameField = fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
+
+  // Build item → people map
+  const itemMap = new Map<string, string[]>()
+
+  for (const response of responses) {
+    const items = response.data[claimField.id]
+    const name = nameField ? (response.data[nameField.id] as string) : "Anonymous"
+
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        if (typeof item === "string") {
+          const itemClean = item.trim()
+          if (!itemMap.has(itemClean)) {
+            itemMap.set(itemClean, [])
+          }
+          itemMap.get(itemClean)!.push(name || "Anonymous")
+        }
+      }
+    }
+  }
+
+  // Sort items alphabetically
+  const sortedItems = Array.from(itemMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+
+  if (sortedItems.length === 0) {
+    return (
+      <div className="p-6 text-center text-sm text-gray-500">
+        No items have been signed up yet.
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-3">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b" style={{ borderColor: colors.border }}>
+            <th className="text-left py-2 px-2 font-semibold text-gray-700">Item</th>
+            <th className="text-center py-2 px-2 font-semibold text-gray-700 w-16">Count</th>
+            <th className="text-left py-2 px-2 font-semibold text-gray-700">People</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedItems.map(([item, people]) => (
+            <tr key={item} className="border-b" style={{ borderColor: colors.border }}>
+              <td className="py-2 px-2 font-medium" style={{ color: colors.textDark }}>{item}</td>
+              <td className="py-2 px-2 text-center text-gray-600">{people.length}</td>
+              <td className="py-2 px-2 text-gray-600">{people.join(", ")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // ── Collapsible Signup List ──────────────────────────────────────────────────
 
 function SignupList({ responses, fields, colors, formId, onRemoved }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; onRemoved: (id: string) => void }) {
   const [open, setOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<"all" | "items">("all")
   const [removing, setRemoving] = useState<string | null>(null)
   const [verifyPhone, setVerifyPhone] = useState("")
   const [verifyTarget, setVerifyTarget] = useState<{ id: string; phone: string } | null>(null)
@@ -450,6 +511,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
 
   const phoneField = fields.find((f) => f.type === "phone")
   const monthField = fields.find((f) => f.type === "month_picker")
+  const claimField = fields.find((f) => f.type === "claim_select")
   const currentMonth = new Date().getMonth() + 1
 
   function initiateRemove(responseId: string, data: Record<string, unknown>) {
@@ -516,25 +578,62 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
         </svg>
       </button>
       {open && (
-        <div className="border-t max-h-64 overflow-y-auto">
-          <div className="p-2 space-y-1.5">
-            {responses.map((r) => {
-              const month = monthField ? (r.data[monthField.id] as number) : 0
-              const isPast = month > 0 && month < currentMonth
-              return (
-                <ResponseRow
-                  key={r.id}
-                  data={r.data}
-                  fields={fields}
-                  colors={colors}
-                  removing={removing === r.id}
-                  canRemove={!isPast}
-                  onRemove={() => initiateRemove(r.id, r.data)}
-                />
-              )
-            })}
+        <>
+          {/* Tabs */}
+          <div className="border-t flex border-b">
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === "all"
+                  ? "border-b-2 text-gray-900"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+              style={activeTab === "all" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
+            >
+              All Signups
+            </button>
+            {claimField && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("items")}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  activeTab === "items"
+                    ? "border-b-2 text-gray-900"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                style={activeTab === "items" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
+              >
+                By Item
+              </button>
+            )}
           </div>
-        </div>
+
+          {/* Tab Content */}
+          <div className="max-h-64 overflow-y-auto">
+            {activeTab === "all" ? (
+              <div className="p-2 space-y-1.5">
+                {responses.map((r) => {
+                  const month = monthField ? (r.data[monthField.id] as number) : 0
+                  const isPast = month > 0 && month < currentMonth
+                  return (
+                    <ResponseRow
+                      key={r.id}
+                      data={r.data}
+                      fields={fields}
+                      colors={colors}
+                      removing={removing === r.id}
+                      canRemove={!isPast}
+                      onRemove={() => initiateRemove(r.id, r.data)}
+                    />
+                  )
+                })}
+              </div>
+            ) : (
+              <ItemsTable responses={responses} fields={fields} claimField={claimField!} colors={colors} />
+            )}
+          </div>
+        </>
       )}
       {/* Phone verification dialog */}
       {verifyTarget && (
