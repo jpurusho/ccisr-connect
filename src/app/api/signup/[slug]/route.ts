@@ -18,7 +18,7 @@ export async function GET(
 
   const { data: form } = await supabase
     .from("signup_forms")
-    .select("id, title, description, theme, fields, status, visibility, member_autocomplete, show_responses, duration_type, event_date, target_month, target_year, start_date, end_date, max_submissions, hidden_custom_items")
+    .select("id, title, description, theme, fields, status, visibility, member_autocomplete, show_responses, duration_type, event_date, target_month, target_year, start_date, end_date, max_submissions, hidden_custom_items, muted")
     .eq("slug", slug)
     .single()
 
@@ -71,6 +71,7 @@ export async function GET(
       member_autocomplete: form.member_autocomplete,
       show_responses: showResponses,
       hidden_custom_items: form.hidden_custom_items || {},
+      muted: form.muted || false,
     },
     responses,
     responseCount: responses.length,

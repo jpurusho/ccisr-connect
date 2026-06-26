@@ -96,12 +96,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  // Fetch form to find the phone field
+  // Fetch form to find the phone field and check muted status
   const { data: form } = await supabase
     .from("signup_forms")
-    .select("fields")
+    .select("fields, muted")
     .eq("id", formId)
     .single()
+
+  // Check if form is muted (read-only mode)
+  if (form && form.muted) {
+    await logAttempt(supabase, ipHash, formId, false)
+    return NextResponse.json({ error: "This form is currently in read-only mode" }, { status: 403 })
+  }
 
   // Server-side phone verification — match last 4 digits
   let verificationMethod = "none"

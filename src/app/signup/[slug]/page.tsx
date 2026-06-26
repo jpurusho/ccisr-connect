@@ -28,6 +28,7 @@ interface FormData {
   member_autocomplete: boolean
   show_responses?: boolean
   hidden_custom_items?: Record<string, string[]>
+  muted?: boolean
 }
 
 interface MemberResult {
@@ -308,6 +309,15 @@ export default function PublicSignupPage() {
           )}
         </div>
 
+        {/* Muted banner */}
+        {form.muted && (
+          <div className="border border-t-0 bg-amber-50 border-amber-200 px-5 py-3 text-center" style={{ borderColor: colors.border }}>
+            <p className="text-sm font-medium text-amber-900">
+              📋 This form is currently in read-only mode. You can view signups but cannot make changes.
+            </p>
+          </div>
+        )}
+
         {/* Statistics Card */}
         {responses.length > 0 && stats.total > 0 && (
           <div className="border border-t-0 bg-white px-5 py-4" style={{ borderColor: colors.border }}>
@@ -391,6 +401,7 @@ export default function PublicSignupPage() {
                 selectedMember={selectedMember}
                 hiddenCustomItems={form.hidden_custom_items}
                 colors={colors}
+                disabled={form.muted || false}
               />
               </div>
               )
@@ -404,6 +415,7 @@ export default function PublicSignupPage() {
               fields={form.fields}
               colors={colors}
               formId={form.id}
+              muted={form.muted || false}
               onRemoved={(id) => setResponses((prev) => prev.filter((r) => r.id !== id))}
             />
           )}
@@ -421,7 +433,7 @@ export default function PublicSignupPage() {
             type="submit"
             className="mt-6 w-full"
             style={{ backgroundColor: colors.primary }}
-            disabled={submitting || (() => {
+            disabled={form.muted || submitting || (() => {
               const monthField = form.fields.find((f) => f.type === "month_picker")
               if (!monthField || !monthField.required) return false
               const excluded = new Set((monthField as { excludeMonths?: number[] }).excludeMonths ?? [])
@@ -431,7 +443,7 @@ export default function PublicSignupPage() {
               return !hasOpen
             })()}
           >
-            {submitting ? <Loader2 className="size-4 animate-spin" /> : "Submit"}
+            {submitting ? <Loader2 className="size-4 animate-spin" /> : form.muted ? "Form is Read-Only" : "Submit"}
           </Button>
         </form>
 
@@ -578,7 +590,7 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
 
 // ── Collapsible Signup List ──────────────────────────────────────────────────
 
-function SignupList({ responses, fields, colors, formId, onRemoved }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; onRemoved: (id: string) => void }) {
+function SignupList({ responses, fields, colors, formId, muted, onRemoved }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; muted: boolean; onRemoved: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "items" | "unpicked">("all")
   const [removing, setRemoving] = useState<string | null>(null)
@@ -592,6 +604,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
   const currentMonth = new Date().getMonth() + 1
 
   function initiateRemove(responseId: string, data: Record<string, unknown>) {
+    if (muted) return // can't remove when form is muted
     const phone = phoneField ? (data[phoneField.id] as string) : ""
     const month = monthField ? (data[monthField.id] as number) : 0
     if (month > 0 && month < currentMonth) return // can't remove past months
@@ -714,7 +727,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
                       fields={fields}
                       colors={colors}
                       removing={removing === r.id}
-                      canRemove={!isPast}
+                      canRemove={!isPast && !muted}
                       onRemove={() => initiateRemove(r.id, r.data)}
                     />
                   )
@@ -815,6 +828,7 @@ function FieldRenderer({
   responses,
   hiddenCustomItems,
   colors,
+  disabled,
 }: {
   field: SignupFieldConfig
   allFields: SignupFieldConfig[]
@@ -831,6 +845,7 @@ function FieldRenderer({
   responses: ResponseEntry[]
   hiddenCustomItems?: Record<string, string[]>
   colors: ReturnType<typeof getThemeColors>
+  disabled: boolean
 }) {
   const labelEl = (
     <Label className="text-sm font-medium text-gray-700">
@@ -850,6 +865,7 @@ function FieldRenderer({
             placeholder={field.placeholder}
             maxLength={field.maxLength ?? 1000}
             required={field.required}
+            disabled={disabled}
           />
           {field.helpText && <p className="text-xs text-muted-foreground">{field.helpText}</p>}
         </div>
@@ -865,6 +881,7 @@ function FieldRenderer({
             onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder || "email@example.com"}
             required={field.required}
+            disabled={disabled}
           />
         </div>
       )
@@ -879,6 +896,7 @@ function FieldRenderer({
             onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder || "(555) 123-4567"}
             required={field.required}
+            disabled={disabled}
             className="text-gray-900"
           />
         </div>
@@ -1000,11 +1018,11 @@ function FieldRenderer({
               const full = taken >= opt.capacity
               const checked = selected.includes(opt.value)
               return (
-                <label key={opt.value} className={`flex items-center gap-2 text-sm ${full && !checked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                <label key={opt.value} className={`flex items-center gap-2 text-sm ${(full && !checked) || disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                   <input
                     type="checkbox"
                     checked={checked}
-                    disabled={full && !checked || (atMax && !checked)}
+                    disabled={disabled || (full && !checked) || (atMax && !checked)}
                     onChange={() => {
                       if (checked) {
                         onChange(selected.filter((v) => v !== opt.value))
@@ -1033,11 +1051,11 @@ function FieldRenderer({
                 {Array.from(customItems.entries()).map(([item, count]) => {
                   const checked = selected.includes(item)
                   return (
-                    <label key={item} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <label key={item} className={`flex items-center gap-2 text-sm ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                       <input
                         type="checkbox"
                         checked={checked}
-                        disabled={atMax && !checked}
+                        disabled={disabled || (atMax && !checked)}
                         onChange={() => {
                           if (checked) onChange(selected.filter((v) => v !== item))
                           else onChange([...selected, item])
@@ -1056,12 +1074,13 @@ function FieldRenderer({
               </>
             )}
           </div>
-          {field.allowCustom && (
+          {field.allowCustom && !disabled && (
             <div className="flex gap-2 mt-2">
               <input
                 type="text"
                 placeholder="Add your own item..."
-                className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                disabled={disabled}
+                className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault()

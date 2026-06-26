@@ -76,6 +76,7 @@ interface FormRow {
   notify_mailing_list_id: string | null
   rate_limit_per_hour: number | null
   hidden_custom_items: Record<string, string[]>
+  muted: boolean
   created_at: string
   response_count?: number
   stats?: { adults: number; kids: number; total: number }
@@ -145,7 +146,7 @@ export default function SignupsPage() {
     const supabase = createClient()
     const { data: formsData } = await supabase
       .from("signup_forms")
-      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, show_responses, rate_limit_per_hour, hidden_custom_items, created_at")
+      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, show_responses, rate_limit_per_hour, hidden_custom_items, muted, created_at")
       .order("created_at", { ascending: false })
 
     if (formsData) {
@@ -250,6 +251,22 @@ export default function SignupsPage() {
     setForms((prev) => prev.map((f) => f.id === form.id ? { ...f, status: newStatus } : f))
   }
 
+  async function toggleMuted(form: FormRow) {
+    const newMuted = !form.muted
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("signup_forms")
+      .update({ muted: newMuted } as never)
+      .eq("id", form.id)
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+      return
+    }
+    toast.success(newMuted ? "Form muted (read-only)" : "Form unmuted")
+    logAudit("signup_form_muted_changed", "signup_forms", form.id, { title: form.title, muted: newMuted })
+    setForms((prev) => prev.map((f) => f.id === form.id ? { ...f, muted: newMuted } : f))
+  }
+
   return (
     <div className="space-y-4 p-4 sm:p-6">
       {/* Header */}
@@ -313,6 +330,11 @@ export default function SignupsPage() {
                       <Badge variant={STATUS_COLORS[form.status] || "secondary"} className="text-[10px]">
                         {form.status}
                       </Badge>
+                      {form.muted && (
+                        <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-700 bg-amber-50">
+                          Muted
+                        </Badge>
+                      )}
                       <span className="text-[10px] text-muted-foreground">
                         {form.response_count} response{form.response_count !== 1 ? "s" : ""}
                       </span>
@@ -366,6 +388,15 @@ export default function SignupsPage() {
                   >
                     {form.status === "active" ? "Deactivate" : "Activate"}
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`h-7 text-xs ${form.muted ? "text-emerald-600" : "text-amber-600"}`}
+                    onClick={() => toggleMuted(form)}
+                    title={form.muted ? "Unmute (enable interactions)" : "Mute (read-only)"}
+                  >
+                    {form.muted ? "Unmute" : "Mute"}
+                  </Button>
                   <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleEdit(form)}>
                     <Pencil className="size-3" />
                     Edit
@@ -401,9 +432,13 @@ export default function SignupsPage() {
                   <ExternalLink className="size-3.5" /> Preview
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem variant="destructive" onClick={() => toggleStatus(form)}>
+                <ContextMenuItem onClick={() => toggleStatus(form)}>
                   {form.status === "active" ? "Deactivate" : "Activate"}
                 </ContextMenuItem>
+                <ContextMenuItem onClick={() => toggleMuted(form)}>
+                  {form.muted ? "Unmute (Enable Interactions)" : "Mute (Read-Only)"}
+                </ContextMenuItem>
+                <ContextMenuSeparator />
                 <ContextMenuItem variant="destructive" onClick={() => handleDelete(form)}>
                   <Trash2 className="size-3.5" /> Delete
                 </ContextMenuItem>
@@ -461,6 +496,7 @@ function FormEditor({
   const [maxSubmissions, setMaxSubmissions] = useState<string>("")
   const [allowDuplicates, setAllowDuplicates] = useState(false)
   const [showResponses, setShowResponses] = useState(true)
+  const [muted, setMuted] = useState(false)
   const [notifyOnSubmit, setNotifyOnSubmit] = useState(false)
   const [notifySmtpConfigId, setNotifySmtpConfigId] = useState("")
   const [notifyMailingListId, setNotifyMailingListId] = useState("")
@@ -551,6 +587,7 @@ function FormEditor({
       setMaxSubmissions(editForm.max_submissions ? String(editForm.max_submissions) : "")
       setAllowDuplicates(editForm.allow_duplicates)
       setShowResponses(editForm.show_responses ?? true)
+      setMuted(editForm.muted ?? false)
       setNotifyOnSubmit(editForm.notify_on_submit ?? false)
       setNotifySmtpConfigId(editForm.notify_smtp_config_id || "")
       setNotifyMailingListId(editForm.notify_mailing_list_id || "")
@@ -583,6 +620,8 @@ function FormEditor({
       setMemberAutocomplete(false)
       setMaxSubmissions("")
       setAllowDuplicates(false)
+      setShowResponses(true)
+      setMuted(false)
       setPrimaryColor("#7C3AED")
       setEmoji("")
       setFields([])
@@ -682,6 +721,7 @@ function FormEditor({
         max_submissions: maxSubmissions ? parseInt(maxSubmissions, 10) : null,
         allow_duplicates: allowDuplicates,
         show_responses: showResponses,
+        muted,
         notify_on_submit: notifyOnSubmit,
         notify_smtp_config_id: notifySmtpConfigId || null,
         notify_mailing_list_id: notifyMailingListId || null,
@@ -908,6 +948,13 @@ function FormEditor({
             <div className="flex items-center gap-2">
               <Switch checked={showResponses} onCheckedChange={setShowResponses} id="show-resp" />
               <Label htmlFor="show-resp">Show Signups Publicly</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={muted} onCheckedChange={setMuted} id="muted" />
+              <Label htmlFor="muted" className="flex items-center gap-1">
+                Mute (Read-Only Mode)
+                <span className="text-xs text-muted-foreground">— Users can view but not interact</span>
+              </Label>
             </div>
             <div className="flex items-center gap-2">
               <Label className="shrink-0">Max Submissions</Label>

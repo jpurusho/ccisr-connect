@@ -55,6 +55,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "This form is no longer accepting responses" }, { status: 410 })
   }
 
+  if (form.muted) {
+    return NextResponse.json({ error: "This form is currently in read-only mode" }, { status: 403 })
+  }
+
   // Rate limiting: per-form configurable limit
   const rateLimit = (form.rate_limit_per_hour as number) || 10
   try {
