@@ -442,11 +442,20 @@ export default function PublicSignupPage() {
 
 // ── Items Table ──────────────────────────────────────────────────────────────
 
-function ItemsTable({ responses, fields, claimField, colors }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; claimField: SignupFieldConfig; colors: ReturnType<typeof getThemeColors> }) {
+function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; claimField: SignupFieldConfig; colors: ReturnType<typeof getThemeColors>; showUnpicked: boolean }) {
   const nameField = fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
 
-  // Build item → people map
-  const itemMap = new Map<string, string[]>()
+  // Type-safe access to claim_select options
+  if (claimField.type !== "claim_select") return null
+  const options = claimField.options
+
+  // Build maps for official options
+  const optionValues = new Set(options.map((o) => o.value))
+  const optionByLowerValue = new Map(options.map((o) => [o.value.toLowerCase(), o]))
+  const optionByLowerLabel = new Map(options.map((o) => [o.label.toLowerCase(), o]))
+
+  // Build item → people map (aggregating by canonical option value)
+  const itemMap = new Map<string, { people: string[]; option: typeof claimField.options[0] | null }>()
 
   for (const response of responses) {
     const items = response.data[claimField.id]
@@ -456,17 +465,73 @@ function ItemsTable({ responses, fields, claimField, colors }: { responses: Resp
       for (const item of items) {
         if (typeof item === "string") {
           const itemClean = item.trim()
-          if (!itemMap.has(itemClean)) {
-            itemMap.set(itemClean, [])
+          const itemLower = itemClean.toLowerCase()
+
+          // Try to map to official option
+          let canonicalValue = itemClean
+          let option = null
+
+          if (optionValues.has(itemClean)) {
+            option = options.find((o) => o.value === itemClean) || null
+          } else {
+            const matchedOption = optionByLowerValue.get(itemLower) || optionByLowerLabel.get(itemLower)
+            if (matchedOption) {
+              canonicalValue = matchedOption.value
+              option = matchedOption
+            }
           }
-          itemMap.get(itemClean)!.push(name || "Anonymous")
+
+          if (!itemMap.has(canonicalValue)) {
+            itemMap.set(canonicalValue, { people: [], option })
+          }
+          itemMap.get(canonicalValue)!.people.push(name || "Anonymous")
         }
       }
     }
   }
 
-  // Sort items alphabetically
-  const sortedItems = Array.from(itemMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  if (showUnpicked) {
+    // Show items that haven't been picked
+    const unpickedOptions = options.filter((opt) => !itemMap.has(opt.value))
+
+    if (unpickedOptions.length === 0) {
+      return (
+        <div className="p-6 text-center text-sm text-gray-500">
+          All items have been claimed!
+        </div>
+      )
+    }
+
+    return (
+      <div className="p-3">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b" style={{ borderColor: colors.border }}>
+              <th className="text-left py-2 px-2 font-semibold text-gray-700">Item</th>
+              <th className="text-center py-2 px-2 font-semibold text-gray-700 w-24">Capacity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {unpickedOptions.sort((a, b) => a.label.localeCompare(b.label)).map((opt) => (
+              <tr key={opt.value} className="border-b" style={{ borderColor: colors.border }}>
+                <td className="py-2 px-2 text-gray-600">{opt.label}</td>
+                <td className="py-2 px-2 text-center text-gray-500 text-xs">
+                  {opt.capacity < 50 ? `0/${opt.capacity}` : "Available"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  // Show picked items
+  const sortedItems = Array.from(itemMap.entries()).sort((a, b) => {
+    const labelA = a[1].option?.label || a[0]
+    const labelB = b[1].option?.label || b[0]
+    return labelA.localeCompare(labelB)
+  })
 
   if (sortedItems.length === 0) {
     return (
@@ -482,18 +547,29 @@ function ItemsTable({ responses, fields, claimField, colors }: { responses: Resp
         <thead>
           <tr className="border-b" style={{ borderColor: colors.border }}>
             <th className="text-left py-2 px-2 font-semibold text-gray-700">Item</th>
-            <th className="text-center py-2 px-2 font-semibold text-gray-700 w-16">Count</th>
+            <th className="text-center py-2 px-2 font-semibold text-gray-700 w-20">Claimed</th>
             <th className="text-left py-2 px-2 font-semibold text-gray-700">People</th>
           </tr>
         </thead>
         <tbody>
-          {sortedItems.map(([item, people]) => (
-            <tr key={item} className="border-b" style={{ borderColor: colors.border }}>
-              <td className="py-2 px-2 font-medium" style={{ color: colors.textDark }}>{item}</td>
-              <td className="py-2 px-2 text-center text-gray-600">{people.length}</td>
-              <td className="py-2 px-2 text-gray-600">{people.join(", ")}</td>
-            </tr>
-          ))}
+          {sortedItems.map(([canonicalValue, { people, option }]) => {
+            const label = option?.label || canonicalValue
+            const capacity = option?.capacity
+            const count = people.length
+            const isFull = capacity && count >= capacity
+
+            return (
+              <tr key={canonicalValue} className="border-b" style={{ borderColor: colors.border }}>
+                <td className="py-2 px-2 font-medium" style={{ color: colors.textDark }}>{label}</td>
+                <td className="py-2 px-2 text-center">
+                  <span className={`text-xs font-medium ${isFull ? "text-red-600" : "text-gray-600"}`}>
+                    {capacity && capacity < 50 ? `${count}/${capacity}` : count}
+                  </span>
+                </td>
+                <td className="py-2 px-2 text-gray-600">{people.join(", ")}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -504,7 +580,7 @@ function ItemsTable({ responses, fields, claimField, colors }: { responses: Resp
 
 function SignupList({ responses, fields, colors, formId, onRemoved }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; onRemoved: (id: string) => void }) {
   const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<"all" | "items">("all")
+  const [activeTab, setActiveTab] = useState<"all" | "items" | "unpicked">("all")
   const [removing, setRemoving] = useState<string | null>(null)
   const [verifyPhone, setVerifyPhone] = useState("")
   const [verifyTarget, setVerifyTarget] = useState<{ id: string; phone: string } | null>(null)
@@ -585,7 +661,7 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
             <button
               type="button"
               onClick={() => setActiveTab("all")}
-              className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === "all"
                   ? "border-b-2 text-gray-900"
                   : "text-gray-500 hover:text-gray-700"
@@ -595,18 +671,32 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
               All Signups
             </button>
             {claimField && (
-              <button
-                type="button"
-                onClick={() => setActiveTab("items")}
-                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  activeTab === "items"
-                    ? "border-b-2 text-gray-900"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-                style={activeTab === "items" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
-              >
-                By Item
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("items")}
+                  className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === "items"
+                      ? "border-b-2 text-gray-900"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                  style={activeTab === "items" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
+                >
+                  By Item
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("unpicked")}
+                  className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === "unpicked"
+                      ? "border-b-2 text-gray-900"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                  style={activeTab === "unpicked" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
+                >
+                  Unpicked
+                </button>
+              </>
             )}
           </div>
 
@@ -630,8 +720,10 @@ function SignupList({ responses, fields, colors, formId, onRemoved }: { response
                   )
                 })}
               </div>
+            ) : activeTab === "items" ? (
+              <ItemsTable responses={responses} fields={fields} claimField={claimField!} colors={colors} showUnpicked={false} />
             ) : (
-              <ItemsTable responses={responses} fields={fields} claimField={claimField!} colors={colors} />
+              <ItemsTable responses={responses} fields={fields} claimField={claimField!} colors={colors} showUnpicked={true} />
             )}
           </div>
         </>
