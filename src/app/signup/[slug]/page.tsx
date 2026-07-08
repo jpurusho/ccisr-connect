@@ -1236,10 +1236,10 @@ function FieldRenderer({
               })}
             </div>
           )}
-            {!useCountSelection && customItems.size > 0 && (
-              <>
-                <div className="border-t my-2" />
-                {Array.from(customItems.entries()).map(([item, count]) => {
+          {!useCountSelection && customItems.size > 0 && (
+            <>
+              <div className="border-t my-2" />
+              {Array.from(customItems.entries()).map(([item, count]) => {
                   const checked = (selected as string[]).includes(item)
                   return (
                     <label key={item} className={`flex items-center gap-2 text-sm ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
@@ -1260,11 +1260,10 @@ function FieldRenderer({
                       <span>{item}</span>
                       <span className="text-xs text-gray-400">({count} signed up)</span>
                     </label>
-                  )
-                })}
-              </>
-            )}
-          </div>
+                )
+              })}
+            </>
+          )}
           {field.allowCustom && !disabled && !useCountSelection && (
             <div className="flex gap-2 mt-2">
               <input

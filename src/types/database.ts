@@ -1714,3 +1714,13 @@ export const Constants = {
 <claude-code-hint v="1" type="plugin" value="supabase@claude-plugins-official" />
 A new version of Supabase CLI is available: v2.109.1 (currently installed v2.98.2)
 We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+
+// Helper type exports for common database row types
+export type EventInstance = Database["public"]["Tables"]["event_instances"]["Row"]
+export type Event = Database["public"]["Tables"]["events"]["Row"]
+export type EventType = Database["public"]["Tables"]["event_types"]["Row"]
+export type Member = Database["public"]["Tables"]["members"]["Row"]
+export type Family = Database["public"]["Tables"]["families"]["Row"]
+export type MailingList = Database["public"]["Tables"]["mailing_lists"]["Row"]
+export type SignupForm = Database["public"]["Tables"]["signup_forms"]["Row"]
+export type SignupResponse = Database["public"]["Tables"]["signup_responses"]["Row"]
