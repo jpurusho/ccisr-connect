@@ -469,11 +469,11 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
   const optionByLowerLabel = new Map(options.map((o) => [o.label.toLowerCase(), o]))
 
   // Build item → people map (aggregating by canonical option value)
-  const itemMap = new Map<string, { people: string[]; option: typeof claimField.options[0] | null }>()
+  const itemMap = new Map<string, { people: { name: string; count: number }[]; totalCount: number; option: typeof claimField.options[0] | null }>()
 
   for (const response of responses) {
     const items = response.data[claimField.id]
-    const name = nameField ? (response.data[nameField.id] as string) : "Anonymous"
+    const name = nameField ? (response.data[nameField.id] as string) || "Anonymous" : "Anonymous"
 
     if (Array.isArray(items)) {
       for (const item of items) {
@@ -481,7 +481,6 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
           const itemClean = item.trim()
           const itemLower = itemClean.toLowerCase()
 
-          // Try to map to official option
           let canonicalValue = itemClean
           let option = null
 
@@ -496,10 +495,38 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
           }
 
           if (!itemMap.has(canonicalValue)) {
-            itemMap.set(canonicalValue, { people: [], option })
+            itemMap.set(canonicalValue, { people: [], totalCount: 0, option })
           }
-          itemMap.get(canonicalValue)!.people.push(name || "Anonymous")
+          const entry = itemMap.get(canonicalValue)!
+          entry.people.push({ name, count: 1 })
+          entry.totalCount += 1
         }
+      }
+    } else if (items && typeof items === "object" && !Array.isArray(items)) {
+      for (const [itemValue, count] of Object.entries(items as Record<string, number>)) {
+        if (typeof count !== "number" || count <= 0) continue
+        const itemClean = itemValue.trim()
+        const itemLower = itemClean.toLowerCase()
+
+        let canonicalValue = itemClean
+        let option = null
+
+        if (optionValues.has(itemClean)) {
+          option = options.find((o) => o.value === itemClean) || null
+        } else {
+          const matchedOption = optionByLowerValue.get(itemLower) || optionByLowerLabel.get(itemLower)
+          if (matchedOption) {
+            canonicalValue = matchedOption.value
+            option = matchedOption
+          }
+        }
+
+        if (!itemMap.has(canonicalValue)) {
+          itemMap.set(canonicalValue, { people: [], totalCount: 0, option })
+        }
+        const entry = itemMap.get(canonicalValue)!
+        entry.people.push({ name, count })
+        entry.totalCount += count
       }
     }
   }
@@ -530,7 +557,7 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
               <tr key={opt.value} className="border-b" style={{ borderColor: colors.border }}>
                 <td className="py-2 px-2 text-gray-600">{opt.label}</td>
                 <td className="py-2 px-2 text-center text-gray-500 text-xs">
-                  {opt.capacity < 50 ? `0/${opt.capacity}` : "Available"}
+                  {((opt as { current_capacity?: number }).current_capacity ?? opt.capacity) < 50 ? `0/${(opt as { current_capacity?: number }).current_capacity ?? opt.capacity}` : "Available"}
                 </td>
               </tr>
             ))}
@@ -566,21 +593,24 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
           </tr>
         </thead>
         <tbody>
-          {sortedItems.map(([canonicalValue, { people, option }]) => {
+          {sortedItems.map(([canonicalValue, { people, totalCount, option }]) => {
             const label = option?.label || canonicalValue
-            const capacity = option?.capacity
-            const count = people.length
-            const isFull = capacity && count >= capacity
+            const currentCapacity = (option as { current_capacity?: number } | null)?.current_capacity ?? option?.capacity
+            const isFull = currentCapacity && totalCount >= currentCapacity
 
             return (
               <tr key={canonicalValue} className="border-b" style={{ borderColor: colors.border }}>
                 <td className="py-2 px-2 font-medium" style={{ color: colors.textDark }}>{label}</td>
                 <td className="py-2 px-2 text-center">
                   <span className={`text-xs font-medium ${isFull ? "text-red-600" : "text-gray-600"}`}>
-                    {capacity && capacity < 50 ? `${count}/${capacity}` : count}
+                    {currentCapacity && currentCapacity < 50 ? `${totalCount}/${currentCapacity}` : totalCount}
                   </span>
                 </td>
-                <td className="py-2 px-2 text-gray-600">{people.join(", ")}</td>
+                <td className="py-2 px-2 text-gray-600">
+                  {people.map((p, i) => (
+                    <span key={i}>{i > 0 && ", "}{p.name}{p.count > 1 && ` (×${p.count})`}</span>
+                  ))}
+                </td>
               </tr>
             )
           })}
@@ -614,6 +644,20 @@ function ByPersonView({ responses, fields, claimFields, colors }: { responses: R
           fieldMap.set(claimField.label, [])
         }
         fieldMap.get(claimField.label)!.push(...items.filter((item): item is string => typeof item === "string"))
+      } else if (items && typeof items === "object" && !Array.isArray(items)) {
+        const countItems = Object.entries(items as Record<string, number>)
+          .filter(([, count]) => typeof count === "number" && count > 0)
+          .map(([item, count]) => count > 1 ? `${item} (×${count})` : item)
+        if (countItems.length > 0) {
+          if (!personMap.has(name)) {
+            personMap.set(name, new Map())
+          }
+          const fieldMap = personMap.get(name)!
+          if (!fieldMap.has(claimField.label)) {
+            fieldMap.set(claimField.label, [])
+          }
+          fieldMap.get(claimField.label)!.push(...countItems)
+        }
       }
     }
   }
@@ -1644,7 +1688,14 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
   const phoneField = fields.find((f) => f.type === "phone")
   const phone = phoneField ? (data[phoneField.id] as string) : undefined
   const claimField = fields.find((f) => f.type === "claim_select")
-  const claimedItems = claimField ? (data[claimField.id] as string[] | undefined) : undefined
+  const claimedRaw = claimField ? data[claimField.id] : undefined
+  const claimedItems: string[] | undefined = Array.isArray(claimedRaw)
+    ? claimedRaw
+    : claimedRaw && typeof claimedRaw === "object"
+      ? Object.entries(claimedRaw as Record<string, number>)
+          .filter(([, count]) => typeof count === "number" && count > 0)
+          .map(([item, count]) => count > 1 ? `${item}::${count}` : item)
+      : undefined
   const numberFields = fields.filter((f) => f.type === "number")
   const attendees = numberFields.map((f) => ({ label: f.label, value: data[f.id] as number })).filter((a) => a.value > 0)
 
@@ -1681,8 +1732,11 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
           {claimedItems && claimedItems.length > 0 && (
             <p className="text-xs font-medium" style={{ color: colors.primary }}>
               Bringing: {claimedItems.map((item) => {
-                const opt = claimField && "options" in claimField ? (claimField as { options: { value: string; label: string }[] }).options.find((o) => o.value === item) : null
-                return opt?.label ?? item
+                const [value, countStr] = item.split("::")
+                const count = countStr ? parseInt(countStr) : 1
+                const opt = claimField && "options" in claimField ? (claimField as { options: { value: string; label: string }[] }).options.find((o) => o.value === value) : null
+                const label = opt?.label ?? value
+                return count > 1 ? `${label} (×${count})` : label
               }).join(", ")}
             </p>
           )}
