@@ -66,7 +66,8 @@ export interface ClaimSelectFieldConfig extends BaseFieldConfig {
   options: { value: string; label: string; capacity: number }[]
   allowCustom: boolean
   maxSelections?: number
-  allowCountSelection?: boolean  // Allow selecting multiple counts per item
+  allowCountSelection?: boolean
+  allowCapacityIncrease?: boolean  // Let users increase item capacity beyond original count
 }
 
 export interface DateFieldConfig extends BaseFieldConfig {
@@ -177,6 +178,14 @@ function fieldSchema(field: SignupFieldConfig): z.ZodTypeAny {
       return field.required ? s.min(1, "Select at least one option") : s
     }
     case "claim_select": {
+      if (field.allowCountSelection) {
+        // Count format: { itemValue: count }
+        const countSchema = z.record(z.string(), z.number().int().min(1))
+        if (field.required) {
+          return countSchema.refine((obj) => Object.keys(obj).length > 0, { message: "Select at least one item" })
+        }
+        return countSchema
+      }
       let s = z.array(z.string().min(1))
       if (field.maxSelections) s = s.max(field.maxSelections)
       return field.required ? s.min(1, "Select at least one item") : s

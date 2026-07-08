@@ -1133,15 +1133,17 @@ function FieldRenderer({
                 const taken = claimCounts[opt.value] || 0
                 const available = opt.capacity - taken
                 const currentCount = (selected as Record<string, number>)[opt.value] || 0
-                const maxAllowed = Math.min(available + currentCount, opt.capacity)
+                const canIncrease = field.allowCapacityIncrease ?? false
+                const maxAllowed = canIncrease ? 99 : Math.min(available + currentCount, opt.capacity)
+                const isFull = !canIncrease && available <= 0 && currentCount === 0
 
                 return (
-                  <div key={opt.value} className={`flex items-center gap-3 p-2 border rounded-lg ${disabled || available <= 0 && currentCount === 0 ? "opacity-50 bg-gray-50" : "bg-white"}`}>
+                  <div key={opt.value} className={`flex items-center gap-3 p-2 border rounded-lg ${disabled || isFull ? "opacity-50 bg-gray-50" : "bg-white"}`}>
                     <div className="flex-1">
                       <div className="font-medium text-sm">{opt.label}</div>
                       <div className="text-xs text-muted-foreground">
                         {opt.capacity < 50 ? `${taken}/${opt.capacity} claimed` : `${taken} claimed`}
-                        {available > 0 && ` • ${available} available`}
+                        {!canIncrease && available > 0 && ` • ${available} available`}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1167,7 +1169,7 @@ function FieldRenderer({
                         value={currentCount || ""}
                         min={0}
                         max={maxAllowed}
-                        disabled={disabled || available <= 0 && currentCount === 0}
+                        disabled={disabled || isFull}
                         onChange={(e) => {
                           const val = parseInt(e.target.value) || 0
                           const clamped = Math.min(Math.max(0, val), maxAllowed)
@@ -1184,7 +1186,7 @@ function FieldRenderer({
                       />
                       <button
                         type="button"
-                        disabled={disabled || currentCount >= maxAllowed || available <= 0 && currentCount === 0}
+                        disabled={disabled || isFull || currentCount >= maxAllowed}
                         onClick={() => {
                           const newSelected = { ...(selected as Record<string, number>) }
                           newSelected[opt.value] = currentCount + 1

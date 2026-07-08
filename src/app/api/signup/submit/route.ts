@@ -98,16 +98,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", errors }, { status: 422 })
   }
 
-  // Capacity check for claim_select fields
+  // Capacity and maxSelections check for claim_select fields
   const claimFields = fields.filter((f) => f.type === "claim_select") as Extract<SignupFieldConfig, { type: "claim_select" }>[]
   for (const cf of claimFields) {
     const selectedItems = sanitized[cf.id]
-    if (!Array.isArray(selectedItems) || selectedItems.length === 0) continue
 
-    const predefinedValues = cf.options.map((o) => o.value)
-    const predefinedSelected = selectedItems.filter((item) => predefinedValues.includes(item as string))
-    if (predefinedSelected.length === 0) continue
+    // Determine if this is count format (object) or array format
+    const isCountFormat = selectedItems && typeof selectedItems === "object" && !Array.isArray(selectedItems)
+    const isArrayFormat = Array.isArray(selectedItems)
 
+    if (!isCountFormat && !isArrayFormat) continue
+    if (isArrayFormat && (selectedItems as unknown[]).length === 0) continue
+    if (isCountFormat && Object.keys(selectedItems as object).length === 0) continue
+
+    // Validate maxSelections
+    if (cf.maxSelections) {
+      const pickCount = isCountFormat
+        ? Object.keys(selectedItems as object).length
+        : (selectedItems as unknown[]).length
+      if (pickCount > cf.maxSelections) {
+        return NextResponse.json(
+          { error: `Maximum ${cf.maxSelections} items allowed for "${cf.label}"` },
+          { status: 422 }
+        )
+      }
+    }
+
+    // Skip capacity check if admin allows users to increase capacity
+    if (cf.allowCapacityIncrease) continue
+
+    const predefinedValues = new Set(cf.options.map((o) => o.value))
+
+    // Get existing claim counts from all responses
     const { data: existingResponses } = await supabase
       .from("signup_responses")
       .select("data")
@@ -121,16 +143,40 @@ export async function POST(req: NextRequest) {
         for (const item of items) {
           if (typeof item === "string") claimCounts[item] = (claimCounts[item] || 0) + 1
         }
+      } else if (items && typeof items === "object") {
+        for (const [item, count] of Object.entries(items)) {
+          if (typeof count === "number" && count > 0) {
+            claimCounts[item] = (claimCounts[item] || 0) + count
+          }
+        }
       }
     }
 
-    for (const item of predefinedSelected) {
-      const opt = cf.options.find((o) => o.value === item)
-      if (opt && (claimCounts[item as string] || 0) >= opt.capacity) {
-        return NextResponse.json(
-          { error: `"${opt.label}" is full (${opt.capacity}/${opt.capacity} claimed)` },
-          { status: 409 }
-        )
+    // Validate capacity for each claimed item
+    if (isCountFormat) {
+      for (const [item, count] of Object.entries(selectedItems as Record<string, number>)) {
+        if (!predefinedValues.has(item)) continue
+        const opt = cf.options.find((o) => o.value === item)
+        if (opt && typeof count === "number") {
+          const existingCount = claimCounts[item] || 0
+          if (existingCount + count > opt.capacity) {
+            return NextResponse.json(
+              { error: `"${opt.label}" only has ${opt.capacity - existingCount} remaining (you requested ${count})` },
+              { status: 409 }
+            )
+          }
+        }
+      }
+    } else {
+      for (const item of selectedItems as string[]) {
+        if (!predefinedValues.has(item as string)) continue
+        const opt = cf.options.find((o) => o.value === item)
+        if (opt && (claimCounts[item as string] || 0) >= opt.capacity) {
+          return NextResponse.json(
+            { error: `"${opt.label}" is full (${opt.capacity}/${opt.capacity} claimed)` },
+            { status: 409 }
+          )
+        }
       }
     }
   }

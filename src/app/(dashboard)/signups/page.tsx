@@ -1491,6 +1491,14 @@ function FieldEditor({
               />
               <Label htmlFor={`allow-count-${field.id}`} className="text-[10px]">Allow Count Selection</Label>
             </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={field.allowCapacityIncrease ?? false}
+                onCheckedChange={(v) => onUpdate({ allowCapacityIncrease: v } as Partial<SignupFieldConfig>)}
+                id={`allow-cap-increase-${field.id}`}
+              />
+              <Label htmlFor={`allow-cap-increase-${field.id}`} className="text-[10px]">Users Can Increase Count</Label>
+            </div>
             <div className="flex items-center gap-1">
               <Label className="text-[10px] text-muted-foreground">Max picks</Label>
               <Input
