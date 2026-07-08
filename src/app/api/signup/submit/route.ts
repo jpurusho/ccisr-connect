@@ -158,10 +158,11 @@ export async function POST(req: NextRequest) {
         if (!predefinedValues.has(item)) continue
         const opt = cf.options.find((o) => o.value === item)
         if (opt && typeof count === "number") {
+          const currentCapacity = (opt as { current_capacity?: number }).current_capacity ?? opt.capacity
           const existingCount = claimCounts[item] || 0
-          if (existingCount + count > opt.capacity) {
+          if (existingCount + count > currentCapacity) {
             return NextResponse.json(
-              { error: `"${opt.label}" only has ${opt.capacity - existingCount} remaining (you requested ${count})` },
+              { error: `"${opt.label}" only has ${currentCapacity - existingCount} remaining (you requested ${count})` },
               { status: 409 }
             )
           }
@@ -171,11 +172,14 @@ export async function POST(req: NextRequest) {
       for (const item of selectedItems as string[]) {
         if (!predefinedValues.has(item as string)) continue
         const opt = cf.options.find((o) => o.value === item)
-        if (opt && (claimCounts[item as string] || 0) >= opt.capacity) {
-          return NextResponse.json(
-            { error: `"${opt.label}" is full (${opt.capacity}/${opt.capacity} claimed)` },
-            { status: 409 }
-          )
+        if (opt) {
+          const currentCapacity = (opt as { current_capacity?: number }).current_capacity ?? opt.capacity
+          if ((claimCounts[item as string] || 0) >= currentCapacity) {
+            return NextResponse.json(
+              { error: `"${opt.label}" is full (${currentCapacity}/${currentCapacity} claimed)` },
+              { status: 409 }
+            )
+          }
         }
       }
     }

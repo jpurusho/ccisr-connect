@@ -63,11 +63,11 @@ export interface MultiSelectFieldConfig extends BaseFieldConfig {
 
 export interface ClaimSelectFieldConfig extends BaseFieldConfig {
   type: "claim_select"
-  options: { value: string; label: string; capacity: number }[]
+  options: { value: string; label: string; capacity: number; current_capacity?: number }[]
   allowCustom: boolean
   maxSelections?: number
   allowCountSelection?: boolean
-  allowCapacityIncrease?: boolean  // Let users increase item capacity beyond original count
+  allowCapacityIncrease?: boolean  // Let users dynamically adjust item capacity
 }
 
 export interface DateFieldConfig extends BaseFieldConfig {

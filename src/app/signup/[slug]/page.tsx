@@ -393,6 +393,7 @@ export default function PublicSignupPage() {
                 onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
                 responses={responses}
                 formId={form.id}
+                form={form}
                 memberAutocomplete={form.member_autocomplete}
                 lookupQuery={lookupQuery}
                 lookupResults={lookupResults}
@@ -910,6 +911,7 @@ function FieldRenderer({
   value,
   onChange,
   formId,
+  form,
   memberAutocomplete,
   lookupQuery,
   lookupResults,
@@ -927,6 +929,7 @@ function FieldRenderer({
   value: unknown
   onChange: (v: unknown) => void
   formId: string
+  form: FormData
   memberAutocomplete: boolean
   lookupQuery: string
   lookupResults: MemberResult[]
@@ -1131,19 +1134,53 @@ function FieldRenderer({
             <div className="space-y-2">
               {field.options.map((opt) => {
                 const taken = claimCounts[opt.value] || 0
-                const available = opt.capacity - taken
+                const currentCapacity = opt.current_capacity ?? opt.capacity
+                const available = currentCapacity - taken
                 const currentCount = (selected as Record<string, number>)[opt.value] || 0
                 const canIncrease = field.allowCapacityIncrease ?? false
-                const maxAllowed = canIncrease ? 99 : Math.min(available + currentCount, opt.capacity)
-                const isFull = !canIncrease && available <= 0 && currentCount === 0
+                const maxAllowed = Math.min(available + currentCount, currentCapacity)
+                const isFull = available <= 0 && currentCount === 0
 
                 return (
                   <div key={opt.value} className={`flex items-center gap-3 p-2 border rounded-lg ${disabled || isFull ? "opacity-50 bg-gray-50" : "bg-white"}`}>
                     <div className="flex-1">
                       <div className="font-medium text-sm">{opt.label}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {opt.capacity < 50 ? `${taken}/${opt.capacity} claimed` : `${taken} claimed`}
-                        {!canIncrease && available > 0 && ` • ${available} available`}
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <span>
+                          {currentCapacity < 50 ? `${taken}/${currentCapacity} claimed` : `${taken} claimed`}
+                          {available > 0 && ` • ${available} available`}
+                        </span>
+                        {canIncrease && !disabled && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const newCap = currentCapacity + 1
+                              try {
+                                const res = await fetch("/api/signup/update-capacity", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    formId: form.id,
+                                    fieldId: field.id,
+                                    itemValue: opt.value,
+                                    newCapacity: newCap,
+                                  }),
+                                })
+                                if (res.ok) {
+                                  // Mutate directly and force component update
+                                  opt.current_capacity = newCap
+                                  // Trigger re-render by cloning the value
+                                  onChange({ ...(value as object) })
+                                }
+                              } catch (e) {
+                                console.error("Failed to update capacity", e)
+                              }
+                            }}
+                            className="text-primary hover:underline text-[10px] font-medium"
+                          >
+                            + Add slot
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
