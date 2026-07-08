@@ -65,6 +65,7 @@ interface FormRow {
   target_year: number | null
   start_date: string | null
   end_date: string | null
+  auto_close_date: string | null
   theme: { primaryColor?: string; headerGradient?: string; fontFamily?: string; verseTextColor?: string; bodyTextColor?: string; emoji?: string; eventDateText?: string; hostInfo?: string; verse?: string; verseRef?: string; verseBgColor?: string }
   fields: SignupFieldConfig[]
   status: "draft" | "active" | "closed" | "archived"
@@ -72,6 +73,7 @@ interface FormRow {
   member_autocomplete: boolean
   max_submissions: number | null
   allow_duplicates: boolean
+  allow_count_selection: boolean
   show_responses: boolean
   notify_on_submit: boolean
   notify_smtp_config_id: string | null
@@ -157,7 +159,7 @@ export default function SignupsPage() {
     const supabase = createClient()
     const { data: formsData } = await supabase
       .from("signup_forms")
-      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, show_responses, rate_limit_per_hour, hidden_custom_items, muted, created_at")
+      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, auto_close_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, allow_count_selection, show_responses, rate_limit_per_hour, hidden_custom_items, muted, created_at")
       .order("created_at", { ascending: false })
 
     if (formsData) {
@@ -330,6 +332,7 @@ export default function SignupsPage() {
       target_year: form.target_year,
       start_date: form.start_date,
       end_date: form.end_date,
+      auto_close_date: form.auto_close_date,
       theme: form.theme,
       fields: form.fields,
       status: "draft" as const,
@@ -337,6 +340,7 @@ export default function SignupsPage() {
       member_autocomplete: form.member_autocomplete,
       max_submissions: form.max_submissions,
       allow_duplicates: form.allow_duplicates,
+      allow_count_selection: form.allow_count_selection,
       show_responses: form.show_responses,
       muted: false,
       notify_on_submit: false,
@@ -618,11 +622,13 @@ function FormEditor({
   const [targetYear, setTargetYear] = useState<number>(new Date().getFullYear())
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const [autoCloseDate, setAutoCloseDate] = useState("")
   const [status, setStatus] = useState<"draft" | "active" | "closed" | "archived">("draft")
   const [visibility, setVisibility] = useState<"public_link" | "admin_only">("admin_only")
   const [memberAutocomplete, setMemberAutocomplete] = useState(false)
   const [maxSubmissions, setMaxSubmissions] = useState<string>("")
   const [allowDuplicates, setAllowDuplicates] = useState(false)
+  const [allowCountSelection, setAllowCountSelection] = useState(false)
   const [showResponses, setShowResponses] = useState(true)
   const [muted, setMuted] = useState(false)
   const [notifyOnSubmit, setNotifyOnSubmit] = useState(false)
@@ -709,11 +715,13 @@ function FormEditor({
       setTargetYear(editForm.target_year || new Date().getFullYear())
       setStartDate(editForm.start_date || "")
       setEndDate(editForm.end_date || "")
+      setAutoCloseDate(editForm.auto_close_date || "")
       setStatus(editForm.status)
       setVisibility(editForm.visibility)
       setMemberAutocomplete(editForm.member_autocomplete)
       setMaxSubmissions(editForm.max_submissions ? String(editForm.max_submissions) : "")
       setAllowDuplicates(editForm.allow_duplicates)
+      setAllowCountSelection(editForm.allow_count_selection ?? false)
       setShowResponses(editForm.show_responses ?? true)
       setMuted(editForm.muted ?? false)
       setNotifyOnSubmit(editForm.notify_on_submit ?? false)
@@ -743,11 +751,13 @@ function FormEditor({
       setTargetYear(new Date().getFullYear())
       setStartDate("")
       setEndDate("")
+      setAutoCloseDate("")
       setStatus("draft")
       setVisibility("admin_only")
       setMemberAutocomplete(false)
       setMaxSubmissions("")
       setAllowDuplicates(false)
+      setAllowCountSelection(false)
       setShowResponses(true)
       setMuted(false)
       setPrimaryColor("#7C3AED")
@@ -841,6 +851,7 @@ function FormEditor({
         target_year: durationType === "month" ? targetYear : null,
         start_date: durationType === "date_range" ? startDate || null : null,
         end_date: durationType === "date_range" ? endDate || null : null,
+        auto_close_date: autoCloseDate || null,
         theme: { primaryColor, headerGradient: headerGradient || undefined, fontFamily: fontFamily || undefined, verseTextColor: verseTextColor || undefined, bodyTextColor: bodyTextColor || undefined, emoji: emoji || undefined, eventDateText: eventDateText || undefined, hostInfo: hostInfo || undefined, verse: verse || undefined, verseRef: verseRef || undefined, verseBgColor: verseBgColor || undefined },
         fields,
         status,
@@ -848,6 +859,7 @@ function FormEditor({
         member_autocomplete: memberAutocomplete,
         max_submissions: maxSubmissions ? parseInt(maxSubmissions, 10) : null,
         allow_duplicates: allowDuplicates,
+        allow_count_selection: allowCountSelection,
         show_responses: showResponses,
         muted,
         notify_on_submit: notifyOnSubmit,
@@ -1024,6 +1036,20 @@ function FormEditor({
             )}
           </div>
 
+          {/* Auto Close Date */}
+          <div className="space-y-2">
+            <Label>Auto Close Date (Optional)</Label>
+            <Input
+              type="date"
+              value={autoCloseDate}
+              onChange={(e) => setAutoCloseDate(e.target.value)}
+              className="h-8 text-xs w-fit"
+            />
+            <p className="text-xs text-muted-foreground">
+              Form will automatically close on this date. Leave empty to keep form open indefinitely.
+            </p>
+          </div>
+
           {/* Status & Visibility */}
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1.5">
@@ -1073,6 +1099,13 @@ function FormEditor({
             <div className="flex items-center gap-2">
               <Switch checked={allowDuplicates} onCheckedChange={setAllowDuplicates} id="allow-dup" />
               <Label htmlFor="allow-dup">Allow Duplicates</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={allowCountSelection} onCheckedChange={setAllowCountSelection} id="allow-count" />
+              <Label htmlFor="allow-count" className="flex items-center gap-1">
+                Allow Count Selection
+                <span className="text-xs text-muted-foreground">— Users can claim multiple of an item</span>
+              </Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={showResponses} onCheckedChange={setShowResponses} id="show-resp" />
@@ -1441,7 +1474,7 @@ function FieldEditor({
             onChange={(opts) => onUpdate({ options: opts } as Partial<SignupFieldConfig>)}
             onRemoveCustomItem={onRemoveCustomItem}
           />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Switch
                 checked={field.allowCustom}
@@ -1449,6 +1482,14 @@ function FieldEditor({
                 id={`allow-custom-${field.id}`}
               />
               <Label htmlFor={`allow-custom-${field.id}`} className="text-[10px]">Allow Custom Items</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={field.allowCountSelection ?? false}
+                onCheckedChange={(v) => onUpdate({ allowCountSelection: v } as Partial<SignupFieldConfig>)}
+                id={`allow-count-${field.id}`}
+              />
+              <Label htmlFor={`allow-count-${field.id}`} className="text-[10px]">Allow Count Selection</Label>
             </div>
             <div className="flex items-center gap-1">
               <Label className="text-[10px] text-muted-foreground">Max picks</Label>

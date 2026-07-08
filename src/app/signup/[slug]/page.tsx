@@ -26,6 +26,7 @@ interface FormData {
   fields: SignupFieldConfig[]
   visibility: string
   member_autocomplete: boolean
+  allow_count_selection?: boolean
   show_responses?: boolean
   hidden_custom_items?: Record<string, string[]>
   muted?: boolean
@@ -1065,7 +1066,12 @@ function FieldRenderer({
       )
 
     case "claim_select": {
-      const selected = (value as string[]) || []
+      const useCountSelection = field.allowCountSelection ?? false
+
+      // For count selection: value is { itemValue: count }
+      // For checkbox selection: value is string[]
+      const selected = useCountSelection ? (value as Record<string, number> || {}) : (value as string[] || [])
+
       // Build maps for case-insensitive matching
       const optionValues = new Set(field.options.map((o) => o.value))
       const optionByLowerValue = new Map(field.options.map((o) => [o.value.toLowerCase(), o.value]))
@@ -1078,69 +1084,163 @@ function FieldRenderer({
 
       for (const r of responses) {
         const items = r.data[field.id]
+
+        // Handle both formats: old array format and new count format
         if (Array.isArray(items)) {
+          // Old checkbox format: array of strings
           for (const item of items) {
             if (typeof item === "string") {
               const itemClean = item.trim()
               const itemLower = itemClean.toLowerCase()
-              // Try to map to official option (by value or label, case-insensitive, trimmed)
               const canonicalValue = optionValues.has(itemClean) ? itemClean :
                                     optionByLowerValue.get(itemLower) ||
                                     optionByLowerLabel.get(itemLower)
-
               if (canonicalValue) {
-                // This is an official option (or variation thereof)
                 claimCounts[canonicalValue] = (claimCounts[canonicalValue] || 0) + 1
               } else if (!hiddenForField.has(itemClean)) {
-                // This is a true custom item (not matching any official option)
                 customItems.set(itemClean, (customItems.get(itemClean) || 0) + 1)
+              }
+            }
+          }
+        } else if (items && typeof items === "object") {
+          // New count format: { itemValue: count }
+          for (const [item, count] of Object.entries(items)) {
+            if (typeof count === "number" && count > 0) {
+              const itemClean = item.trim()
+              const itemLower = itemClean.toLowerCase()
+              const canonicalValue = optionValues.has(itemClean) ? itemClean :
+                                    optionByLowerValue.get(itemLower) ||
+                                    optionByLowerLabel.get(itemLower)
+              if (canonicalValue) {
+                claimCounts[canonicalValue] = (claimCounts[canonicalValue] || 0) + count
+              } else if (!hiddenForField.has(itemClean)) {
+                customItems.set(itemClean, (customItems.get(itemClean) || 0) + count)
               }
             }
           }
         }
       }
-      const atMax = !!(field.maxSelections && selected.length >= field.maxSelections)
+
+      const selectedCount = useCountSelection ? Object.keys(selected).length : (selected as string[]).length
+      const atMax = !!(field.maxSelections && selectedCount >= field.maxSelections)
       return (
         <div className="space-y-1.5">
           {labelEl}
-          <div className="space-y-1">
-            {field.options.map((opt) => {
-              const taken = claimCounts[opt.value] || 0
-              const full = taken >= opt.capacity
-              const checked = selected.includes(opt.value)
-              return (
-                <label key={opt.value} className={`flex items-center gap-2 text-sm ${(full && !checked) || disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={disabled || (full && !checked) || (atMax && !checked)}
-                    onChange={() => {
-                      if (checked) {
-                        onChange(selected.filter((v) => v !== opt.value))
-                      } else {
-                        onChange([...selected, opt.value])
-                      }
-                    }}
-                    className="size-4 rounded border-2 text-white accent-current cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      accentColor: colors.primary,
-                      borderColor: checked ? colors.primary : "#9CA3AF",
-                    }}
-                  />
-                  <span>{opt.label}</span>
-                  {taken > 0 && (
-                    <span className={`text-xs ${full ? "text-red-500" : "text-gray-400"}`}>
-                      {opt.capacity < 50 ? `(${taken}/${opt.capacity})` : `(${taken} signed up)`}
-                    </span>
-                  )}
-                </label>
-              )
-            })}
-            {customItems.size > 0 && (
+          {useCountSelection ? (
+            // Count selection mode: show number inputs
+            <div className="space-y-2">
+              {field.options.map((opt) => {
+                const taken = claimCounts[opt.value] || 0
+                const available = opt.capacity - taken
+                const currentCount = (selected as Record<string, number>)[opt.value] || 0
+                const maxAllowed = Math.min(available + currentCount, opt.capacity)
+
+                return (
+                  <div key={opt.value} className={`flex items-center gap-3 p-2 border rounded-lg ${disabled || available <= 0 && currentCount === 0 ? "opacity-50 bg-gray-50" : "bg-white"}`}>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{opt.label}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {opt.capacity < 50 ? `${taken}/${opt.capacity} claimed` : `${taken} claimed`}
+                        {available > 0 && ` • ${available} available`}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={disabled || currentCount <= 0}
+                        onClick={() => {
+                          const newSelected = { ...(selected as Record<string, number>) }
+                          const newCount = currentCount - 1
+                          if (newCount <= 0) {
+                            delete newSelected[opt.value]
+                          } else {
+                            newSelected[opt.value] = newCount
+                          }
+                          onChange(newSelected)
+                        }}
+                        className="size-7 rounded border border-gray-300 flex items-center justify-center text-lg font-bold hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        value={currentCount || ""}
+                        min={0}
+                        max={maxAllowed}
+                        disabled={disabled || available <= 0 && currentCount === 0}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0
+                          const clamped = Math.min(Math.max(0, val), maxAllowed)
+                          const newSelected = { ...(selected as Record<string, number>) }
+                          if (clamped <= 0) {
+                            delete newSelected[opt.value]
+                          } else {
+                            newSelected[opt.value] = clamped
+                          }
+                          onChange(newSelected)
+                        }}
+                        className="w-14 text-center border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="0"
+                      />
+                      <button
+                        type="button"
+                        disabled={disabled || currentCount >= maxAllowed || available <= 0 && currentCount === 0}
+                        onClick={() => {
+                          const newSelected = { ...(selected as Record<string, number>) }
+                          newSelected[opt.value] = currentCount + 1
+                          onChange(newSelected)
+                        }}
+                        className="size-7 rounded border border-gray-300 flex items-center justify-center text-lg font-bold hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            // Checkbox mode: original behavior
+            <div className="space-y-1">
+              {field.options.map((opt) => {
+                const taken = claimCounts[opt.value] || 0
+                const full = taken >= opt.capacity
+                const checked = (selected as string[]).includes(opt.value)
+                return (
+                  <label key={opt.value} className={`flex items-center gap-2 text-sm ${(full && !checked) || disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={disabled || (full && !checked) || (atMax && !checked)}
+                      onChange={() => {
+                        if (checked) {
+                          onChange((selected as string[]).filter((v) => v !== opt.value))
+                        } else {
+                          onChange([...(selected as string[]), opt.value])
+                        }
+                      }}
+                      className="size-4 rounded border-2 text-white accent-current cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        accentColor: colors.primary,
+                        borderColor: checked ? colors.primary : "#9CA3AF",
+                      }}
+                    />
+                    <span>{opt.label}</span>
+                    {taken > 0 && (
+                      <span className={`text-xs ${full ? "text-red-500" : "text-gray-400"}`}>
+                        {opt.capacity < 50 ? `(${taken}/${opt.capacity})` : `(${taken} signed up)`}
+                      </span>
+                    )}
+                  </label>
+                )
+              })}
+            </div>
+          )}
+            {!useCountSelection && customItems.size > 0 && (
               <>
                 <div className="border-t my-2" />
                 {Array.from(customItems.entries()).map(([item, count]) => {
-                  const checked = selected.includes(item)
+                  const checked = (selected as string[]).includes(item)
                   return (
                     <label key={item} className={`flex items-center gap-2 text-sm ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                       <input
@@ -1148,8 +1248,8 @@ function FieldRenderer({
                         checked={checked}
                         disabled={disabled || (atMax && !checked)}
                         onChange={() => {
-                          if (checked) onChange(selected.filter((v) => v !== item))
-                          else onChange([...selected, item])
+                          if (checked) onChange((selected as string[]).filter((v) => v !== item))
+                          else onChange([...(selected as string[]), item])
                         }}
                         className="size-4 rounded border-2 text-white accent-current cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{
@@ -1165,7 +1265,7 @@ function FieldRenderer({
               </>
             )}
           </div>
-          {field.allowCustom && !disabled && (
+          {field.allowCustom && !disabled && !useCountSelection && (
             <div className="flex gap-2 mt-2">
               <input
                 type="text"
@@ -1176,8 +1276,8 @@ function FieldRenderer({
                   if (e.key === "Enter") {
                     e.preventDefault()
                     const val = (e.target as HTMLInputElement).value.trim()
-                    if (val && !selected.includes(val) && !atMax) {
-                      onChange([...selected, val])
+                    if (val && !(selected as string[]).includes(val) && !atMax) {
+                      onChange([...(selected as string[]), val])
                       ;(e.target as HTMLInputElement).value = ""
                     }
                   }
@@ -1189,8 +1289,8 @@ function FieldRenderer({
                 onClick={(e) => {
                   const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement
                   const val = input?.value.trim()
-                  if (val && !selected.includes(val) && !atMax) {
-                    onChange([...selected, val])
+                  if (val && !(selected as string[]).includes(val) && !atMax) {
+                    onChange([...(selected as string[]), val])
                     input.value = ""
                   }
                 }}
@@ -1199,17 +1299,38 @@ function FieldRenderer({
               </button>
             </div>
           )}
-          {selected.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {selected.map((item) => (
-                <span key={item} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                  {item}
-                  <button type="button" onClick={() => onChange(selected.filter((v) => v !== item))} className="text-gray-400 hover:text-red-500">
-                    &times;
-                  </button>
-                </span>
-              ))}
-            </div>
+          {useCountSelection ? (
+            // Show summary for count selection
+            Object.keys(selected as Record<string, number>).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {Object.entries(selected as Record<string, number>).map(([item, count]) => (
+                  <span key={item} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                    {item} × {count}
+                    <button type="button" onClick={() => {
+                      const newSelected = { ...(selected as Record<string, number>) }
+                      delete newSelected[item]
+                      onChange(newSelected)
+                    }} className="text-gray-400 hover:text-red-500">
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )
+          ) : (
+            // Show checkbox selections
+            (selected as string[]).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {(selected as string[]).map((item) => (
+                  <span key={item} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                    {item}
+                    <button type="button" onClick={() => onChange((selected as string[]).filter((v) => v !== item))} className="text-gray-400 hover:text-red-500">
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )
           )}
           {field.helpText && <p className="text-xs text-muted-foreground">{field.helpText}</p>}
         </div>

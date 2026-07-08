@@ -66,6 +66,7 @@ export interface ClaimSelectFieldConfig extends BaseFieldConfig {
   options: { value: string; label: string; capacity: number }[]
   allowCustom: boolean
   maxSelections?: number
+  allowCountSelection?: boolean  // Allow selecting multiple counts per item
 }
 
 export interface DateFieldConfig extends BaseFieldConfig {
@@ -240,8 +241,9 @@ export function getDefaultValue(field: SignupFieldConfig): unknown {
     case "member_lookup":
       return ""
     case "multi_select":
-    case "claim_select":
       return []
+    case "claim_select":
+      return field.allowCountSelection ? {} : []
     case "month_picker":
     case "number":
       return 0

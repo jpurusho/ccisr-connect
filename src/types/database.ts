@@ -1,402 +1,1716 @@
-// ── Enums ────────────────────────────────────────────────────────────────────
-
-export type FamilyRole = 'husband' | 'wife' | 'child'
-export type EventInstanceStatus = 'draft' | 'confirmed' | 'cancelled'
-export type DispatchStatus =
-  | 'pending'
-  | 'previewed'
-  | 'approved'
-  | 'sending'
-  | 'sent'
-  | 'failed'
-  | 'cancelled'
-export type RecipientType = 'to' | 'cc' | 'bcc'
-export type DeliveryStatus = 'pending' | 'sent' | 'bounced' | 'failed'
-export type UserRole = 'super_admin' | 'admin' | 'operator'
-
-export type JsonColorScheme = {
-  primary: string
-  secondary: string
-  accent: string
-}
-
-// ── Row types ────────────────────────────────────────────────────────────────
-
-export type Family = {
-  id: string
-  family_name: string
-  home_phone: string | null
-  notes: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export type Address = {
-  id: string
-  family_id: string
-  street: string | null
-  city: string | null
-  state: string | null
-  zip: string | null
-  full_address: string | null
-  is_current: boolean
-  created_at: string
-}
-
-export type Member = {
-  id: string
-  family_id: string
-  first_name: string
-  last_name: string
-  full_name: string
-  role_in_family: FamilyRole
-  cell_phone: string | null
-  email: string | null
-  birth_month: number | null
-  birth_day: number | null
-  birth_year: number | null
-  is_active: boolean
-  is_newcomer: boolean
-  newcomer_acknowledged: boolean
-  newcomer_date: string | null
-  notes: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type WeddingAnniversary = {
-  id: string
-  family_id: string
-  husband_member_id: string
-  wife_member_id: string
-  anniversary_month: number
-  anniversary_day: number
-  anniversary_year: number | null
-  created_at: string
-}
-
-export type EventType = {
-  id: string
-  name: string
-  comm_type: string | null
-  color_scheme: JsonColorScheme | null
-  icon: string | null
-  default_template_id: string | null
-  show_info_in_bulletin: boolean
-  is_active: boolean
-  created_at: string
-}
-
-export type Event = {
-  id: string
-  event_type_id: string
-  title: string
-  description: string | null
-  recurrence_rule: string | null
-  default_time: string | null
-  default_end_time: string | null
-  zoom_link: string | null
-  host_family_id: string | null
-  host_until: string | null
-  start_date: string | null
-  end_date: string | null
-  show_break_in_bulletin: boolean
-  promote_from: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export type EventInstance = {
-  id: string
-  event_id: string
-  instance_date: string
-  instance_time: string | null
-  instance_end_time: string | null
-  host_family_id: string | null
-  location_override: string | null
-  notes: string | null
-  info_sections: unknown | null
-  status: EventInstanceStatus
-  created_at: string
-  updated_at: string
-}
-
-export type EmailTemplate = {
-  id: string
-  name: string
-  event_type_id: string | null
-  subject_template: string
-  body_template: string
-  signature_template: string | null
-  header_image_url: string | null
-  is_default: boolean
-  created_by: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type SmtpConfig = {
-  id: string
-  name: string
-  host: string
-  port: number
-  username: string
-  encrypted_password: string
-  from_name: string
-  from_email: string
-  is_admin_only: boolean
-  created_by: string | null
-  is_active: boolean
-  created_at: string
-}
-
-export type MailingList = {
-  id: string
-  name: string
-  description: string | null
-  google_group_email: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type MailingListMember = {
-  id: string
-  mailing_list_id: string
-  member_id: string | null
-  external_email: string | null
-  recipient_type: RecipientType
-  created_at: string
-}
-
-export type DispatchQueue = {
-  id: string
-  event_instance_id: string | null
-  email_template_id: string | null
-  smtp_config_id: string
-  mailing_list_id: string
-  additional_recipients: string | null
-  template_type: string | null
-  week_start: string | null
-  subject: string
-  body_html: string
-  scheduled_at: string | null
-  status: DispatchStatus
-  created_by: string
-  approved_by: string | null
-  sent_at: string | null
-  error_message: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type DispatchRecipient = {
-  id: string
-  dispatch_id: string
-  email: string
-  name: string | null
-  recipient_type: RecipientType
-  delivery_status: DeliveryStatus
-}
-
-export type DispatchHistory = {
-  id: string
-  dispatch_id: string
-  full_snapshot: Record<string, unknown>
-  sent_at: string
-}
-
-export type AppUser = {
-  id: string
-  email: string
-  display_name: string | null
-  role: UserRole
-  is_active: boolean
-  permissions: Record<string, boolean>
-  allowed_smtp_configs: string[]
-  created_by: string | null
-  created_at: string
-  last_login: string | null
-}
-
-export type AuditLog = {
-  id: string
-  user_id: string | null
-  action: string
-  entity_type: string
-  entity_id: string | null
-  changes: Record<string, unknown> | null
-  ip_address: string | null
-  created_at: string
-}
-
-export type ComposedInstance = {
-  id: string
-  template_type: string
-  name: string
-  subject: string
-  form_data: Record<string, unknown>
-  mailing_list_id: string | null
-  smtp_config_id: string | null
-  additional_recipients: string | null
-  is_active: boolean
-  week_start: string | null
-  is_recurring: boolean
-  recur_until: string | null
-  created_by: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type Tag = {
-  id: string
-  name: string
-  color: string
-  created_at: string
-}
-
-export type MemberTag = {
-  id: string
-  member_id: string
-  tag_id: string
-  created_at: string
-}
-
-// ── Insert types (omit server-generated fields) ─────────────────────────────
-
-export type FamilyInsert = Omit<Family, 'id' | 'created_at' | 'updated_at'>
-export type AddressInsert = Omit<Address, 'id' | 'created_at'>
-export type MemberInsert = Omit<Member, 'id' | 'created_at' | 'updated_at'>
-export type WeddingAnniversaryInsert = Omit<WeddingAnniversary, 'id' | 'created_at'>
-export type EventTypeInsert = Omit<EventType, 'id' | 'created_at'>
-export type EventInsert = Omit<Event, 'id' | 'created_at' | 'updated_at'>
-export type EventInstanceInsert = Omit<EventInstance, 'id' | 'created_at' | 'updated_at'>
-export type EmailTemplateInsert = Omit<EmailTemplate, 'id' | 'created_at' | 'updated_at'>
-export type SmtpConfigInsert = Omit<SmtpConfig, 'id' | 'created_at'>
-export type MailingListInsert = Omit<MailingList, 'id' | 'created_at' | 'updated_at'>
-export type MailingListMemberInsert = Omit<MailingListMember, 'id' | 'created_at'>
-export type DispatchQueueInsert = Omit<DispatchQueue, 'id' | 'created_at' | 'updated_at'>
-export type DispatchRecipientInsert = Omit<DispatchRecipient, 'id'>
-export type DispatchHistoryInsert = Omit<DispatchHistory, 'id'>
-export type AppUserInsert = Omit<AppUser, 'id' | 'created_at'>
-export type AuditLogInsert = Omit<AuditLog, 'id' | 'created_at'>
-
-// ── Update types (all fields optional) ──────────────────────────────────────
-
-export type FamilyUpdate = Partial<FamilyInsert>
-export type AddressUpdate = Partial<AddressInsert>
-export type MemberUpdate = Partial<MemberInsert>
-export type WeddingAnniversaryUpdate = Partial<WeddingAnniversaryInsert>
-export type EventTypeUpdate = Partial<EventTypeInsert>
-export type EventUpdate = Partial<EventInsert>
-export type EventInstanceUpdate = Partial<EventInstanceInsert>
-export type EmailTemplateUpdate = Partial<EmailTemplateInsert>
-export type SmtpConfigUpdate = Partial<SmtpConfigInsert>
-export type MailingListUpdate = Partial<MailingListInsert>
-export type MailingListMemberUpdate = Partial<MailingListMemberInsert>
-export type DispatchQueueUpdate = Partial<DispatchQueueInsert>
-export type DispatchRecipientUpdate = Partial<DispatchRecipientInsert>
-export type DispatchHistoryUpdate = Partial<DispatchHistoryInsert>
-export type AppUserUpdate = Partial<AppUserInsert>
-export type AuditLogUpdate = Partial<AuditLogInsert>
-
-// ── Database type for Supabase client generic ───────────────────────────────
+Connecting to db 5432
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
-      families: {
-        Row: Family
-        Insert: FamilyInsert
-        Update: FamilyUpdate
-      }
       addresses: {
-        Row: Address
-        Insert: AddressInsert
-        Update: AddressUpdate
+        Row: {
+          city: string
+          created_at: string
+          family_id: string
+          full_address: string
+          id: string
+          is_current: boolean
+          state: string
+          street: string
+          zip: string
+        }
+        Insert: {
+          city: string
+          created_at?: string
+          family_id: string
+          full_address: string
+          id?: string
+          is_current?: boolean
+          state: string
+          street: string
+          zip: string
+        }
+        Update: {
+          city?: string
+          created_at?: string
+          family_id?: string
+          full_address?: string
+          id?: string
+          is_current?: boolean
+          state?: string
+          street?: string
+          zip?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addresses_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      members: {
-        Row: Member
-        Insert: MemberInsert
-        Update: MemberUpdate
-      }
-      wedding_anniversaries: {
-        Row: WeddingAnniversary
-        Insert: WeddingAnniversaryInsert
-        Update: WeddingAnniversaryUpdate
-      }
-      event_types: {
-        Row: EventType
-        Insert: EventTypeInsert
-        Update: EventTypeUpdate
-      }
-      events: {
-        Row: Event
-        Insert: EventInsert
-        Update: EventUpdate
-      }
-      event_instances: {
-        Row: EventInstance
-        Insert: EventInstanceInsert
-        Update: EventInstanceUpdate
-      }
-      email_templates: {
-        Row: EmailTemplate
-        Insert: EmailTemplateInsert
-        Update: EmailTemplateUpdate
-      }
-      smtp_configs: {
-        Row: SmtpConfig
-        Insert: SmtpConfigInsert
-        Update: SmtpConfigUpdate
-      }
-      mailing_lists: {
-        Row: MailingList
-        Insert: MailingListInsert
-        Update: MailingListUpdate
-      }
-      mailing_list_members: {
-        Row: MailingListMember
-        Insert: MailingListMemberInsert
-        Update: MailingListMemberUpdate
-      }
-      dispatch_queue: {
-        Row: DispatchQueue
-        Insert: DispatchQueueInsert
-        Update: DispatchQueueUpdate
-      }
-      dispatch_recipients: {
-        Row: DispatchRecipient
-        Insert: DispatchRecipientInsert
-        Update: DispatchRecipientUpdate
-      }
-      dispatch_history: {
-        Row: DispatchHistory
-        Insert: DispatchHistoryInsert
-        Update: DispatchHistoryUpdate
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: []
       }
       app_users: {
-        Row: AppUser
-        Insert: AppUserInsert
-        Update: AppUserUpdate
+        Row: {
+          allowed_smtp_configs: string[]
+          created_at: string
+          created_by: string | null
+          display_name: string | null
+          email: string
+          id: string
+          is_active: boolean
+          last_login: string | null
+          permissions: Json
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          allowed_smtp_configs?: string[]
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          email: string
+          id: string
+          is_active?: boolean
+          last_login?: string | null
+          permissions?: Json
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          allowed_smtp_configs?: string[]
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean
+          last_login?: string | null
+          permissions?: Json
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
       }
       audit_log: {
-        Row: AuditLog
-        Insert: AuditLogInsert
-        Update: AuditLogUpdate
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      bulletin_items: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          is_active: boolean
+          is_recurring: boolean
+          sort_order: number
+          title: string
+          week_start: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          is_active?: boolean
+          is_recurring?: boolean
+          sort_order?: number
+          title: string
+          week_start?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          is_active?: boolean
+          is_recurring?: boolean
+          sort_order?: number
+          title?: string
+          week_start?: string | null
+        }
+        Relationships: []
+      }
+      composed_instances: {
+        Row: {
+          additional_recipients: string | null
+          created_at: string
+          created_by: string | null
+          form_data: Json
+          id: string
+          is_active: boolean
+          is_recurring: boolean
+          mailing_list_id: string | null
+          name: string
+          recur_until: string | null
+          smtp_config_id: string | null
+          style_overrides: Json | null
+          subject: string
+          template_type: string
+          updated_at: string
+          week_start: string | null
+        }
+        Insert: {
+          additional_recipients?: string | null
+          created_at?: string
+          created_by?: string | null
+          form_data: Json
+          id?: string
+          is_active?: boolean
+          is_recurring?: boolean
+          mailing_list_id?: string | null
+          name: string
+          recur_until?: string | null
+          smtp_config_id?: string | null
+          style_overrides?: Json | null
+          subject: string
+          template_type: string
+          updated_at?: string
+          week_start?: string | null
+        }
+        Update: {
+          additional_recipients?: string | null
+          created_at?: string
+          created_by?: string | null
+          form_data?: Json
+          id?: string
+          is_active?: boolean
+          is_recurring?: boolean
+          mailing_list_id?: string | null
+          name?: string
+          recur_until?: string | null
+          smtp_config_id?: string | null
+          style_overrides?: Json | null
+          subject?: string
+          template_type?: string
+          updated_at?: string
+          week_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composed_instances_mailing_list_id_fkey"
+            columns: ["mailing_list_id"]
+            isOneToOne: false
+            referencedRelation: "mailing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composed_instances_smtp_config_id_fkey"
+            columns: ["smtp_config_id"]
+            isOneToOne: false
+            referencedRelation: "smtp_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_history: {
+        Row: {
+          dispatch_id: string
+          full_snapshot: Json
+          id: string
+          sent_at: string
+        }
+        Insert: {
+          dispatch_id: string
+          full_snapshot: Json
+          id?: string
+          sent_at?: string
+        }
+        Update: {
+          dispatch_id?: string
+          full_snapshot?: Json
+          id?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_history_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_queue: {
+        Row: {
+          additional_recipients: string | null
+          approved_by: string | null
+          body_html: string
+          created_at: string
+          created_by: string | null
+          email_template_id: string | null
+          error_message: string | null
+          event_instance_id: string | null
+          id: string
+          mailing_list_id: string | null
+          scheduled_at: string
+          sent_at: string | null
+          smtp_config_id: string | null
+          status: Database["public"]["Enums"]["dispatch_status"]
+          subject: string
+          template_type: string | null
+          updated_at: string
+          week_start: string | null
+        }
+        Insert: {
+          additional_recipients?: string | null
+          approved_by?: string | null
+          body_html: string
+          created_at?: string
+          created_by?: string | null
+          email_template_id?: string | null
+          error_message?: string | null
+          event_instance_id?: string | null
+          id?: string
+          mailing_list_id?: string | null
+          scheduled_at: string
+          sent_at?: string | null
+          smtp_config_id?: string | null
+          status?: Database["public"]["Enums"]["dispatch_status"]
+          subject: string
+          template_type?: string | null
+          updated_at?: string
+          week_start?: string | null
+        }
+        Update: {
+          additional_recipients?: string | null
+          approved_by?: string | null
+          body_html?: string
+          created_at?: string
+          created_by?: string | null
+          email_template_id?: string | null
+          error_message?: string | null
+          event_instance_id?: string | null
+          id?: string
+          mailing_list_id?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          smtp_config_id?: string | null
+          status?: Database["public"]["Enums"]["dispatch_status"]
+          subject?: string
+          template_type?: string | null
+          updated_at?: string
+          week_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_queue_email_template_id_fkey"
+            columns: ["email_template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_queue_event_instance_id_fkey"
+            columns: ["event_instance_id"]
+            isOneToOne: false
+            referencedRelation: "event_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_queue_mailing_list_id_fkey"
+            columns: ["mailing_list_id"]
+            isOneToOne: false
+            referencedRelation: "mailing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_queue_smtp_config_id_fkey"
+            columns: ["smtp_config_id"]
+            isOneToOne: false
+            referencedRelation: "smtp_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_recipients: {
+        Row: {
+          delivery_status: Database["public"]["Enums"]["delivery_status"]
+          dispatch_id: string
+          email: string
+          id: string
+          name: string | null
+          recipient_type: Database["public"]["Enums"]["recipient_type"]
+        }
+        Insert: {
+          delivery_status?: Database["public"]["Enums"]["delivery_status"]
+          dispatch_id: string
+          email: string
+          id?: string
+          name?: string | null
+          recipient_type?: Database["public"]["Enums"]["recipient_type"]
+        }
+        Update: {
+          delivery_status?: Database["public"]["Enums"]["delivery_status"]
+          dispatch_id?: string
+          email?: string
+          id?: string
+          name?: string | null
+          recipient_type?: Database["public"]["Enums"]["recipient_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_recipients_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "dispatch_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          body_template: string
+          created_at: string
+          created_by: string | null
+          event_type_id: string | null
+          header_image_url: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          signature_template: string | null
+          style_settings: Json | null
+          subject_template: string
+          updated_at: string
+          visual_config: Json | null
+        }
+        Insert: {
+          body_template: string
+          created_at?: string
+          created_by?: string | null
+          event_type_id?: string | null
+          header_image_url?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          signature_template?: string | null
+          style_settings?: Json | null
+          subject_template: string
+          updated_at?: string
+          visual_config?: Json | null
+        }
+        Update: {
+          body_template?: string
+          created_at?: string
+          created_by?: string | null
+          event_type_id?: string | null
+          header_image_url?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          signature_template?: string | null
+          style_settings?: Json | null
+          subject_template?: string
+          updated_at?: string
+          visual_config?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_event_type_id_fkey"
+            columns: ["event_type_id"]
+            isOneToOne: false
+            referencedRelation: "event_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_breaks: {
+        Row: {
+          created_at: string
+          end_date: string
+          event_id: string
+          id: string
+          location_id: string | null
+          message: string | null
+          start_date: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          event_id: string
+          id?: string
+          location_id?: string | null
+          message?: string | null
+          start_date: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          event_id?: string
+          id?: string
+          location_id?: string | null
+          message?: string | null
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_breaks_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_breaks_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "event_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_instance_locations: {
+        Row: {
+          address_override: string | null
+          created_at: string
+          host_family_id: string | null
+          id: string
+          instance_id: string
+          location_id: string
+          notes: string | null
+          phone_override: string | null
+          status: Database["public"]["Enums"]["event_instance_status"]
+        }
+        Insert: {
+          address_override?: string | null
+          created_at?: string
+          host_family_id?: string | null
+          id?: string
+          instance_id: string
+          location_id: string
+          notes?: string | null
+          phone_override?: string | null
+          status?: Database["public"]["Enums"]["event_instance_status"]
+        }
+        Update: {
+          address_override?: string | null
+          created_at?: string
+          host_family_id?: string | null
+          id?: string
+          instance_id?: string
+          location_id?: string
+          notes?: string | null
+          phone_override?: string | null
+          status?: Database["public"]["Enums"]["event_instance_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_instance_locations_host_family_id_fkey"
+            columns: ["host_family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_instance_locations_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "event_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_instance_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "event_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_instances: {
+        Row: {
+          created_at: string
+          event_id: string
+          host_family_id: string | null
+          id: string
+          info_sections: Json | null
+          instance_date: string
+          instance_end_time: string | null
+          instance_time: string | null
+          location_override: string | null
+          notes: string | null
+          signup_response_id: string | null
+          status: Database["public"]["Enums"]["event_instance_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          host_family_id?: string | null
+          id?: string
+          info_sections?: Json | null
+          instance_date: string
+          instance_end_time?: string | null
+          instance_time?: string | null
+          location_override?: string | null
+          notes?: string | null
+          signup_response_id?: string | null
+          status?: Database["public"]["Enums"]["event_instance_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          host_family_id?: string | null
+          id?: string
+          info_sections?: Json | null
+          instance_date?: string
+          instance_end_time?: string | null
+          instance_time?: string | null
+          location_override?: string | null
+          notes?: string | null
+          signup_response_id?: string | null
+          status?: Database["public"]["Enums"]["event_instance_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_instances_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_instances_host_family_id_fkey"
+            columns: ["host_family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_instances_signup_response_id_fkey"
+            columns: ["signup_response_id"]
+            isOneToOne: false
+            referencedRelation: "signup_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_locations: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string
+          event_id: string
+          host_family_id: string | null
+          host_until: string | null
+          id: string
+          is_active: boolean
+          label: string
+          phone: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          event_id: string
+          host_family_id?: string | null
+          host_until?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          phone?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          event_id?: string
+          host_family_id?: string | null
+          host_until?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          phone?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_locations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_locations_host_family_id_fkey"
+            columns: ["host_family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_types: {
+        Row: {
+          bulletin_detail_template: string | null
+          color_scheme: Json | null
+          comm_type: string | null
+          created_at: string
+          default_template_id: string | null
+          icon: string | null
+          id: string
+          info_sections: Json | null
+          is_active: boolean
+          linked_signup_form_id: string | null
+          name: string
+          show_info_in_bulletin: boolean | null
+          signup_field_map: Json | null
+        }
+        Insert: {
+          bulletin_detail_template?: string | null
+          color_scheme?: Json | null
+          comm_type?: string | null
+          created_at?: string
+          default_template_id?: string | null
+          icon?: string | null
+          id?: string
+          info_sections?: Json | null
+          is_active?: boolean
+          linked_signup_form_id?: string | null
+          name: string
+          show_info_in_bulletin?: boolean | null
+          signup_field_map?: Json | null
+        }
+        Update: {
+          bulletin_detail_template?: string | null
+          color_scheme?: Json | null
+          comm_type?: string | null
+          created_at?: string
+          default_template_id?: string | null
+          icon?: string | null
+          id?: string
+          info_sections?: Json | null
+          is_active?: boolean
+          linked_signup_form_id?: string | null
+          name?: string
+          show_info_in_bulletin?: boolean | null
+          signup_field_map?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_types_linked_signup_form_id_fkey"
+            columns: ["linked_signup_form_id"]
+            isOneToOne: false
+            referencedRelation: "signup_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_event_types_default_template"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_virtual_config: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          is_active: boolean
+          meeting_id: string | null
+          meeting_link: string
+          passcode: string | null
+          platform: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          is_active?: boolean
+          meeting_id?: string | null
+          meeting_link: string
+          passcode?: string | null
+          platform?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          is_active?: boolean
+          meeting_id?: string | null
+          meeting_link?: string
+          passcode?: string | null
+          platform?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_virtual_config_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          default_end_time: string | null
+          default_time: string | null
+          description: string | null
+          dinner_note: string | null
+          end_date: string | null
+          event_type_id: string
+          host_family_id: string | null
+          host_until: string | null
+          id: string
+          is_active: boolean
+          promote_from: string | null
+          recurrence_rule: string | null
+          show_break_in_bulletin: boolean
+          signup_link: string | null
+          start_date: string | null
+          title: string
+          topic: string | null
+          updated_at: string
+          zoom_link: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_end_time?: string | null
+          default_time?: string | null
+          description?: string | null
+          dinner_note?: string | null
+          end_date?: string | null
+          event_type_id: string
+          host_family_id?: string | null
+          host_until?: string | null
+          id?: string
+          is_active?: boolean
+          promote_from?: string | null
+          recurrence_rule?: string | null
+          show_break_in_bulletin?: boolean
+          signup_link?: string | null
+          start_date?: string | null
+          title: string
+          topic?: string | null
+          updated_at?: string
+          zoom_link?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_end_time?: string | null
+          default_time?: string | null
+          description?: string | null
+          dinner_note?: string | null
+          end_date?: string | null
+          event_type_id?: string
+          host_family_id?: string | null
+          host_until?: string | null
+          id?: string
+          is_active?: boolean
+          promote_from?: string | null
+          recurrence_rule?: string | null
+          show_break_in_bulletin?: boolean
+          signup_link?: string | null
+          start_date?: string | null
+          title?: string
+          topic?: string | null
+          updated_at?: string
+          zoom_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_event_type_id_fkey"
+            columns: ["event_type_id"]
+            isOneToOne: false
+            referencedRelation: "event_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_host_family_id_fkey"
+            columns: ["host_family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      families: {
+        Row: {
+          created_at: string
+          family_name: string
+          home_phone: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          family_name: string
+          home_phone?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          family_name?: string
+          home_phone?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mailing_list_members: {
+        Row: {
+          created_at: string
+          external_email: string | null
+          id: string
+          mailing_list_id: string
+          member_id: string | null
+          recipient_type: Database["public"]["Enums"]["recipient_type"]
+        }
+        Insert: {
+          created_at?: string
+          external_email?: string | null
+          id?: string
+          mailing_list_id: string
+          member_id?: string | null
+          recipient_type?: Database["public"]["Enums"]["recipient_type"]
+        }
+        Update: {
+          created_at?: string
+          external_email?: string | null
+          id?: string
+          mailing_list_id?: string
+          member_id?: string | null
+          recipient_type?: Database["public"]["Enums"]["recipient_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailing_list_members_mailing_list_id_fkey"
+            columns: ["mailing_list_id"]
+            isOneToOne: false
+            referencedRelation: "mailing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailing_list_members_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mailing_lists: {
+        Row: {
+          created_at: string
+          description: string | null
+          google_group_email: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          google_group_email?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          google_group_email?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      member_tags: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_tags_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      members: {
+        Row: {
+          birth_day: number | null
+          birth_month: number | null
+          birth_year: number | null
+          cell_phone: string | null
+          created_at: string
+          email: string | null
+          family_id: string
+          first_name: string
+          full_name: string
+          id: string
+          is_active: boolean
+          is_newcomer: boolean
+          last_name: string
+          newcomer_acknowledged: boolean
+          newcomer_date: string | null
+          notes: string | null
+          role_in_family: Database["public"]["Enums"]["family_role"]
+          updated_at: string
+        }
+        Insert: {
+          birth_day?: number | null
+          birth_month?: number | null
+          birth_year?: number | null
+          cell_phone?: string | null
+          created_at?: string
+          email?: string | null
+          family_id: string
+          first_name: string
+          full_name: string
+          id?: string
+          is_active?: boolean
+          is_newcomer?: boolean
+          last_name: string
+          newcomer_acknowledged?: boolean
+          newcomer_date?: string | null
+          notes?: string | null
+          role_in_family: Database["public"]["Enums"]["family_role"]
+          updated_at?: string
+        }
+        Update: {
+          birth_day?: number | null
+          birth_month?: number | null
+          birth_year?: number | null
+          cell_phone?: string | null
+          created_at?: string
+          email?: string | null
+          family_id?: string
+          first_name?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          is_newcomer?: boolean
+          last_name?: string
+          newcomer_acknowledged?: boolean
+          newcomer_date?: string | null
+          notes?: string | null
+          role_in_family?: Database["public"]["Enums"]["family_role"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "members_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signup_forms: {
+        Row: {
+          allow_count_selection: boolean
+          allow_duplicates: boolean
+          auto_close_date: string | null
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          duration_type: string
+          end_date: string | null
+          event_date: string | null
+          event_id: string | null
+          event_type_id: string | null
+          fields: Json
+          hidden_custom_items: Json | null
+          id: string
+          mailing_list_id: string | null
+          max_submissions: number | null
+          member_autocomplete: boolean
+          muted: boolean
+          notify_mailing_list_id: string | null
+          notify_on_submit: boolean
+          notify_smtp_config_id: string | null
+          rate_limit_per_hour: number | null
+          show_responses: boolean
+          slug: string
+          start_date: string | null
+          status: string
+          target_month: number | null
+          target_year: number | null
+          theme: Json
+          title: string
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          allow_count_selection?: boolean
+          allow_duplicates?: boolean
+          auto_close_date?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_type?: string
+          end_date?: string | null
+          event_date?: string | null
+          event_id?: string | null
+          event_type_id?: string | null
+          fields?: Json
+          hidden_custom_items?: Json | null
+          id?: string
+          mailing_list_id?: string | null
+          max_submissions?: number | null
+          member_autocomplete?: boolean
+          muted?: boolean
+          notify_mailing_list_id?: string | null
+          notify_on_submit?: boolean
+          notify_smtp_config_id?: string | null
+          rate_limit_per_hour?: number | null
+          show_responses?: boolean
+          slug: string
+          start_date?: string | null
+          status?: string
+          target_month?: number | null
+          target_year?: number | null
+          theme?: Json
+          title: string
+          updated_at?: string
+          visibility?: string
+        }
+        Update: {
+          allow_count_selection?: boolean
+          allow_duplicates?: boolean
+          auto_close_date?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_type?: string
+          end_date?: string | null
+          event_date?: string | null
+          event_id?: string | null
+          event_type_id?: string | null
+          fields?: Json
+          hidden_custom_items?: Json | null
+          id?: string
+          mailing_list_id?: string | null
+          max_submissions?: number | null
+          member_autocomplete?: boolean
+          muted?: boolean
+          notify_mailing_list_id?: string | null
+          notify_on_submit?: boolean
+          notify_smtp_config_id?: string | null
+          rate_limit_per_hour?: number | null
+          show_responses?: boolean
+          slug?: string
+          start_date?: string | null
+          status?: string
+          target_month?: number | null
+          target_year?: number | null
+          theme?: Json
+          title?: string
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signup_forms_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_forms_event_type_id_fkey"
+            columns: ["event_type_id"]
+            isOneToOne: false
+            referencedRelation: "event_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_forms_mailing_list_id_fkey"
+            columns: ["mailing_list_id"]
+            isOneToOne: false
+            referencedRelation: "mailing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_forms_notify_mailing_list_id_fkey"
+            columns: ["notify_mailing_list_id"]
+            isOneToOne: false
+            referencedRelation: "mailing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_forms_notify_smtp_config_id_fkey"
+            columns: ["notify_smtp_config_id"]
+            isOneToOne: false
+            referencedRelation: "smtp_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signup_rate_limits: {
+        Row: {
+          attempt_at: string
+          form_id: string
+          id: string
+          ip_hash: string
+        }
+        Insert: {
+          attempt_at?: string
+          form_id: string
+          id?: string
+          ip_hash: string
+        }
+        Update: {
+          attempt_at?: string
+          form_id?: string
+          id?: string
+          ip_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signup_rate_limits_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "signup_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signup_remove_attempts: {
+        Row: {
+          attempted_at: string
+          form_id: string
+          id: string
+          ip_hash: string
+          success: boolean
+        }
+        Insert: {
+          attempted_at?: string
+          form_id: string
+          id?: string
+          ip_hash: string
+          success?: boolean
+        }
+        Update: {
+          attempted_at?: string
+          form_id?: string
+          id?: string
+          ip_hash?: string
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signup_remove_attempts_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "signup_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signup_responses: {
+        Row: {
+          assigned_at: string | null
+          assigned_event_id: string | null
+          created_at: string
+          data: Json
+          form_id: string
+          id: string
+          ip_hash: string | null
+          member_id: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_event_id?: string | null
+          created_at?: string
+          data: Json
+          form_id: string
+          id?: string
+          ip_hash?: string | null
+          member_id?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_event_id?: string | null
+          created_at?: string
+          data?: Json
+          form_id?: string
+          id?: string
+          ip_hash?: string | null
+          member_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signup_responses_assigned_event_id_fkey"
+            columns: ["assigned_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_responses_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "signup_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_responses_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      smtp_configs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          encrypted_password: string
+          from_email: string
+          from_name: string
+          host: string
+          id: string
+          is_active: boolean
+          is_admin_only: boolean
+          name: string
+          port: number
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          encrypted_password: string
+          from_email: string
+          from_name: string
+          host: string
+          id?: string
+          is_active?: boolean
+          is_admin_only?: boolean
+          name: string
+          port: number
+          username: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          encrypted_password?: string
+          from_email?: string
+          from_name?: string
+          host?: string
+          id?: string
+          is_active?: boolean
+          is_admin_only?: boolean
+          name?: string
+          port?: number
+          username?: string
+        }
+        Relationships: []
+      }
+      tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      wedding_anniversaries: {
+        Row: {
+          anniversary_day: number
+          anniversary_month: number
+          anniversary_year: number | null
+          created_at: string
+          family_id: string
+          husband_member_id: string
+          id: string
+          wife_member_id: string
+        }
+        Insert: {
+          anniversary_day: number
+          anniversary_month: number
+          anniversary_year?: number | null
+          created_at?: string
+          family_id: string
+          husband_member_id: string
+          id?: string
+          wife_member_id: string
+        }
+        Update: {
+          anniversary_day?: number
+          anniversary_month?: number
+          anniversary_year?: number | null
+          created_at?: string
+          family_id?: string
+          husband_member_id?: string
+          id?: string
+          wife_member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wedding_anniversaries_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wedding_anniversaries_husband_member_id_fkey"
+            columns: ["husband_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wedding_anniversaries_wife_member_id_fkey"
+            columns: ["wife_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
-    Views: Record<string, never>
-    Functions: Record<string, never>
-    Enums: {
-      family_role: FamilyRole
-      event_instance_status: EventInstanceStatus
-      dispatch_status: DispatchStatus
-      recipient_type: RecipientType
-      delivery_status: DeliveryStatus
-      user_role: UserRole
+    Views: {
+      [_ in never]: never
     }
-    CompositeTypes: Record<string, never>
+    Functions: {
+      get_db_size: {
+        Args: never
+        Returns: {
+          size: string
+        }[]
+      }
+      get_table_schema: {
+        Args: { p_table_name: string }
+        Returns: {
+          character_maximum_length: number
+          column_default: string
+          column_name: string
+          data_type: string
+          is_nullable: string
+        }[]
+      }
+      get_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
+      get_week_status: {
+        Args: { p_end: string; p_start: string }
+        Returns: {
+          break_message: string
+          event_id: string
+          event_title: string
+          event_topic: string
+          event_type_name: string
+          host_address: string
+          host_city: string
+          host_family_id: string
+          host_family_name: string
+          host_phone: string
+          instance_date: string
+          instance_id: string
+          instance_status: string
+          instance_time: string
+          is_on_break: boolean
+          location_id: string
+          location_label: string
+          location_sort: number
+        }[]
+      }
+    }
+    Enums: {
+      delivery_status: "pending" | "sent" | "bounced" | "failed"
+      dispatch_status:
+        | "pending"
+        | "previewed"
+        | "approved"
+        | "sending"
+        | "sent"
+        | "failed"
+        | "cancelled"
+      event_instance_status: "draft" | "confirmed" | "cancelled"
+      family_role: "husband" | "wife" | "child"
+      recipient_type: "to" | "cc" | "bcc"
+      user_role: "super_admin" | "admin" | "operator"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {
+      delivery_status: ["pending", "sent", "bounced", "failed"],
+      dispatch_status: [
+        "pending",
+        "previewed",
+        "approved",
+        "sending",
+        "sent",
+        "failed",
+        "cancelled",
+      ],
+      event_instance_status: ["draft", "confirmed", "cancelled"],
+      family_role: ["husband", "wife", "child"],
+      recipient_type: ["to", "cc", "bcc"],
+      user_role: ["super_admin", "admin", "operator"],
+    },
+  },
+} as const
+
+<claude-code-hint v="1" type="plugin" value="supabase@claude-plugins-official" />
+A new version of Supabase CLI is available: v2.109.1 (currently installed v2.98.2)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
