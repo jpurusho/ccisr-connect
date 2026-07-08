@@ -18,7 +18,7 @@ export async function GET(
 
   const { data: form } = await supabase
     .from("signup_forms")
-    .select("id, title, description, theme, fields, status, visibility, member_autocomplete, show_responses, duration_type, event_date, target_month, target_year, start_date, end_date, max_submissions, hidden_custom_items, muted")
+    .select("id, title, description, theme, fields, status, visibility, member_autocomplete, show_responses, auto_close_date, max_submissions, hidden_custom_items, muted")
     .eq("slug", slug)
     .single()
 
@@ -27,21 +27,10 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  // Check expiration
-  const now = new Date()
-  if (form.duration_type === "event_date" && form.event_date) {
-    const eventDay = new Date(form.event_date + "T23:59:59")
-    if (now > eventDay) {
-      return NextResponse.json({ error: "This signup has ended" }, { status: 410 })
-    }
-  } else if (form.duration_type === "date_range" && form.end_date) {
-    const endDay = new Date(form.end_date + "T23:59:59")
-    if (now > endDay) {
-      return NextResponse.json({ error: "This signup has ended" }, { status: 410 })
-    }
-  } else if (form.duration_type === "month" && form.target_month && form.target_year) {
-    const endOfMonth = new Date(form.target_year, form.target_month, 0, 23, 59, 59)
-    if (now > endOfMonth) {
+  // Only close if admin set an explicit auto_close_date
+  if (form.auto_close_date) {
+    const closeDay = new Date(form.auto_close_date + "T23:59:59")
+    if (new Date() > closeDay) {
       return NextResponse.json({ error: "This signup has ended" }, { status: 410 })
     }
   }
