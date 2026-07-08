@@ -151,9 +151,9 @@ export default function MemberDetailPage() {
     }
     if (tagHistoryResult.data) {
       setTagHistory(
-        tagHistoryResult.data.map((row: { action: string; changes: Record<string, unknown> | null; created_at: string }) => ({
+        tagHistoryResult.data.map((row: { action: string; changes: unknown; created_at: string }) => ({
           action: row.action,
-          tag_name: (row.changes?.tag_name as string) ?? (row.changes?.tag as string) ?? "Unknown",
+          tag_name: ((row.changes as Record<string, unknown>)?.tag_name as string) ?? ((row.changes as Record<string, unknown>)?.tag as string) ?? "Unknown",
           created_at: row.created_at,
         }))
       )
