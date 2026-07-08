@@ -277,7 +277,8 @@ export default function CalendarPage() {
       }
 
       const eventType = typesMap.get(event.event_type_id)
-      const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
+      const colorScheme = eventType?.color_scheme as { primary?: string } | null
+      const color = colorScheme?.primary ?? DEFAULT_EVENT_COLOR
 
       // Show cancelled instances as dimmed "No {title}" entries
       if (instance.status === "cancelled") {
@@ -366,7 +367,8 @@ export default function CalendarPage() {
     for (const event of eventsData) {
       if (!event.recurrence_rule) continue
       const eventType = typesMap.get(event.event_type_id)
-      const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
+      const colorScheme = eventType?.color_scheme as { primary?: string } | null
+      const color = colorScheme?.primary ?? DEFAULT_EVENT_COLOR
       const occurrences = getOccurrences(event.recurrence_rule, visibleRange.start, visibleRange.end)
 
       const evtAny = event as Event & { host_family_id?: string | null; host_until?: string | null }
@@ -414,7 +416,8 @@ export default function CalendarPage() {
       const evtAny = event as Event & { start_date?: string | null; end_date?: string | null }
       if (!evtAny.start_date) continue
       const eventType = typesMap.get(event.event_type_id)
-      const color = eventType?.color_scheme?.primary ?? DEFAULT_EVENT_COLOR
+      const colorScheme = eventType?.color_scheme as { primary?: string } | null
+      const color = colorScheme?.primary ?? DEFAULT_EVENT_COLOR
       const rangeStart = new Date(evtAny.start_date + "T00:00:00")
       const rangeEnd = evtAny.end_date ? new Date(evtAny.end_date + "T00:00:00") : rangeStart
       let d = new Date(rangeStart)

@@ -1711,16 +1711,27 @@ export const Constants = {
   },
 } as const
 
-<claude-code-hint v="1" type="plugin" value="supabase@claude-plugins-official" />
-A new version of Supabase CLI is available: v2.109.1 (currently installed v2.98.2)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
-
 // Helper type exports for common database row types
-export type EventInstance = Database["public"]["Tables"]["event_instances"]["Row"]
+export type Address = Database["public"]["Tables"]["addresses"]["Row"]
+export type AppUser = Database["public"]["Tables"]["app_users"]["Row"]
+export type AuditLog = Database["public"]["Tables"]["audit_log"]["Row"]
+export type ComposedInstance = Database["public"]["Tables"]["composed_instances"]["Row"]
+export type DispatchQueue = Database["public"]["Tables"]["dispatch_queue"]["Row"]
+export type EmailTemplate = Database["public"]["Tables"]["email_templates"]["Row"]
 export type Event = Database["public"]["Tables"]["events"]["Row"]
+export type EventInstance = Database["public"]["Tables"]["event_instances"]["Row"]
 export type EventType = Database["public"]["Tables"]["event_types"]["Row"]
-export type Member = Database["public"]["Tables"]["members"]["Row"]
 export type Family = Database["public"]["Tables"]["families"]["Row"]
 export type MailingList = Database["public"]["Tables"]["mailing_lists"]["Row"]
+export type Member = Database["public"]["Tables"]["members"]["Row"]
 export type SignupForm = Database["public"]["Tables"]["signup_forms"]["Row"]
 export type SignupResponse = Database["public"]["Tables"]["signup_responses"]["Row"]
+export type SmtpConfig = Database["public"]["Tables"]["smtp_configs"]["Row"]
+export type Tag = Database["public"]["Tables"]["tags"]["Row"]
+export type WeddingAnniversary = Database["public"]["Tables"]["wedding_anniversaries"]["Row"]
+
+// Enum exports
+export type DispatchStatus = Database["public"]["Enums"]["dispatch_status"]
+export type EventInstanceStatus = Database["public"]["Enums"]["event_instance_status"]
+export type RecipientType = Database["public"]["Enums"]["recipient_type"]
+export type UserRole = Database["public"]["Enums"]["user_role"]

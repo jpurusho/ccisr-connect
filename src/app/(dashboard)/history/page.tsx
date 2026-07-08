@@ -57,6 +57,7 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { format } from "date-fns"
+import type { DispatchStatus } from "@/types/database"
 
 interface DispatchRecord {
   id: string
@@ -106,7 +107,7 @@ export default function HistoryPage() {
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
     if (search.trim()) query = query.ilike("subject", `%${search.trim()}%`)
-    if (statusFilter !== "all") query = query.eq("status", statusFilter)
+    if (statusFilter !== "all") query = query.eq("status", statusFilter as DispatchStatus)
     if (dateFrom) query = query.gte("created_at", dateFrom)
     if (dateTo) query = query.lte("created_at", dateTo + "T23:59:59")
 
@@ -125,7 +126,7 @@ export default function HistoryPage() {
     setPurging(true)
     const supabase = createClient()
     let query = supabase.from("dispatch_queue").delete()
-    if (statusFilter !== "all") query = query.eq("status", statusFilter)
+    if (statusFilter !== "all") query = query.eq("status", statusFilter as DispatchStatus)
     else query = query.gte("created_at", "1970-01-01")
     const { error } = await query
     const { toast } = await import("sonner")
