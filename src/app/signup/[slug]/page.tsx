@@ -417,8 +417,13 @@ export default function PublicSignupPage() {
               fields={form.fields}
               colors={colors}
               formId={form.id}
+              slug={slug}
               muted={form.muted || false}
               onRemoved={(id) => setResponses((prev) => prev.filter((r) => r.id !== id))}
+              onRefresh={(newResponses, newFields) => {
+                setResponses(newResponses)
+                setForm((prev) => prev ? { ...prev, fields: newFields } : prev)
+              }}
             />
           )}
 
@@ -708,13 +713,29 @@ function ByPersonView({ responses, fields, claimFields, colors }: { responses: R
 
 // ── Collapsible Signup List ──────────────────────────────────────────────────
 
-function SignupList({ responses, fields, colors, formId, muted, onRemoved }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; muted: boolean; onRemoved: (id: string) => void }) {
+function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved, onRefresh }: { responses: ResponseEntry[]; fields: SignupFieldConfig[]; colors: ReturnType<typeof getThemeColors>; formId: string; slug: string; muted: boolean; onRemoved: (id: string) => void; onRefresh: (responses: ResponseEntry[], fields: SignupFieldConfig[]) => void }) {
   const [open, setOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "items" | "unpicked" | "person">("all")
   const [removing, setRemoving] = useState<string | null>(null)
   const [verifyPhone, setVerifyPhone] = useState("")
   const [verifyTarget, setVerifyTarget] = useState<{ id: string; phone: string } | null>(null)
   const [removeError, setRemoveError] = useState("")
+
+  async function refetchData() {
+    setRefreshing(true)
+    try {
+      const res = await fetch(`/api/signup/${slug}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.responses && data.form?.fields) {
+          onRefresh(data.responses, data.form.fields)
+        }
+      }
+    } catch { /* silent */ } finally {
+      setRefreshing(false)
+    }
+  }
 
   const phoneField = fields.find((f) => f.type === "phone")
   const monthField = fields.find((f) => f.type === "month_picker")
@@ -770,10 +791,14 @@ function SignupList({ responses, fields, colors, formId, muted, onRemoved }: { r
     <div className="mt-6 rounded-xl border bg-white shadow-sm overflow-hidden">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          const willOpen = !open
+          setOpen(willOpen)
+          if (willOpen) refetchData()
+        }}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 transition-colors hover:bg-slate-50"
       >
-        <Users className="size-4" style={{ color: colors.primary }} />
+        {refreshing ? <Loader2 className="size-4 animate-spin" style={{ color: colors.primary }} /> : <Users className="size-4" style={{ color: colors.primary }} />}
         <span className="text-sm font-semibold text-gray-900">{responses.length} signed up</span>
         <svg
           className={`size-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
