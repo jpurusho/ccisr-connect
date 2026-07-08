@@ -1145,39 +1145,14 @@ function FieldRenderer({
                   <div key={opt.value} className={`flex items-center gap-3 p-2 border rounded-lg ${disabled || (isFull && !canIncrease) ? "opacity-50 bg-gray-50" : "bg-white"}`}>
                     <div className="flex-1">
                       <div className="font-medium text-sm">{opt.label}</div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        {canIncrease && !disabled ? (
-                          <>
-                            <span>{taken}/</span>
-                            <button
-                              type="button"
-                              disabled={currentCapacity <= taken}
-                              onClick={async () => {
-                                const newCap = currentCapacity - 1
-                                try {
-                                  const res = await fetch("/api/signup/update-capacity", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      formId: form.id,
-                                      fieldId: field.id,
-                                      itemValue: opt.value,
-                                      newCapacity: newCap,
-                                    }),
-                                  })
-                                  if (res.ok) {
-                                    opt.current_capacity = newCap
-                                    onChange({ ...(value as object) })
-                                  }
-                                } catch (e) {
-                                  console.error("Failed to update capacity", e)
-                                }
-                              }}
-                              className="size-4 rounded bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-[10px] font-bold disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                              −
-                            </button>
-                            <span className="font-medium">{currentCapacity}</span>
+                      <div className="text-xs text-muted-foreground">
+                        <span>
+                          {currentCapacity < 50 ? `${taken}/${currentCapacity} claimed` : `${taken} claimed`}
+                          {available > 0 && ` • ${available} available`}
+                          {isFull && canIncrease && " • full"}
+                        </span>
+                        {canIncrease && !disabled && (
+                          <span className="flex items-center gap-1.5 mt-1">
                             <button
                               type="button"
                               onClick={async () => {
@@ -1201,16 +1176,39 @@ function FieldRenderer({
                                   console.error("Failed to update capacity", e)
                                 }
                               }}
-                              className="size-4 rounded bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-[10px] font-bold"
+                              className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline"
                             >
-                              +
+                              + Add Slot
                             </button>
-                            <span className="ml-1">{available > 0 ? `${available} available` : "full"}</span>
-                          </>
-                        ) : (
-                          <span>
-                            {currentCapacity < 50 ? `${taken}/${currentCapacity} claimed` : `${taken} claimed`}
-                            {available > 0 && ` • ${available} available`}
+                            {currentCapacity > taken && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const newCap = currentCapacity - 1
+                                  try {
+                                    const res = await fetch("/api/signup/update-capacity", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        formId: form.id,
+                                        fieldId: field.id,
+                                        itemValue: opt.value,
+                                        newCapacity: newCap,
+                                      }),
+                                    })
+                                    if (res.ok) {
+                                      opt.current_capacity = newCap
+                                      onChange({ ...(value as object) })
+                                    }
+                                  } catch (e) {
+                                    console.error("Failed to update capacity", e)
+                                  }
+                                }}
+                                className="text-[11px] font-medium text-red-600 hover:text-red-800 hover:underline"
+                              >
+                                − Reduce Slot
+                              </button>
+                            )}
                           </span>
                         )}
                       </div>
