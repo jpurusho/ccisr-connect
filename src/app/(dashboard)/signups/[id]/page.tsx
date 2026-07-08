@@ -143,14 +143,15 @@ export default function SignupResponsesPage() {
         }
         if (Array.isArray(val)) return val.join("; ")
         if (typeof val === "object" && val) {
-          const entries = Object.entries(val as Record<string, unknown>).filter(([, v]) => typeof v === "number" && v > 0)
+          const entries = Object.entries(val as Record<string, unknown>).filter(([, v]) => v)
           if (entries.length > 0) {
-            return entries.map(([item, count]) => {
+            return entries.map(([item, v]) => {
               const opt = f.type === "claim_select" && "options" in f
                 ? (f as { options: { value: string; label: string }[] }).options.find((o) => o.value === item)
                 : null
               const label = opt?.label ?? item
-              return (count as number) > 1 ? `${label} (×${count})` : label
+              const count = typeof v === "number" ? v : 1
+              return count > 1 ? `${label} (×${count})` : label
             }).join("; ")
           }
         }
@@ -179,14 +180,15 @@ export default function SignupResponsesPage() {
     }
     if (Array.isArray(val)) return val.join(", ")
     if (typeof val === "object" && val) {
-      const entries = Object.entries(val as Record<string, unknown>).filter(([, v]) => typeof v === "number" && v > 0)
+      const entries = Object.entries(val as Record<string, unknown>).filter(([, v]) => v)
       if (entries.length > 0) {
-        return entries.map(([item, count]) => {
+        return entries.map(([item, v]) => {
           const opt = field.type === "claim_select" && "options" in field
             ? (field as { options: { value: string; label: string }[] }).options.find((o) => o.value === item)
             : null
           const label = opt?.label ?? item
-          return (count as number) > 1 ? `${label} (×${count})` : label
+          const count = typeof v === "number" ? v : 1
+          return count > 1 ? `${label} (×${count})` : label
         }).join(", ")
       }
     }
