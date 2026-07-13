@@ -19,14 +19,14 @@ export async function GET(
     return NextResponse.json({ error: "Form not found" }, { status: 404 })
   }
 
-  // Fetch audit logs for removals related to this form
+  // Fetch audit logs for removals AND updates related to this form
   const { data: auditLogs } = await supabase
     .from("audit_log")
     .select("id, action, entity_id, changes, created_at")
-    .eq("action", "signup_response_self_removed")
+    .in("action", ["signup_response_self_removed", "signup_response_updated"])
     .eq("entity_type", "signup_responses")
     .order("created_at", { ascending: false })
-    .limit(50)
+    .limit(100)
 
   // Filter by formId in the changes JSONB field
   const relevantLogs = (auditLogs || []).filter(

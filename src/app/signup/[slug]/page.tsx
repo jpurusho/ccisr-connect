@@ -101,6 +101,13 @@ export default function PublicSignupPage() {
   const [lookupLoading, setLookupLoading] = useState(false)
   const [selectedMember, setSelectedMember] = useState<MemberResult | null>(null)
 
+  // Edit mode state
+  const [editMode, setEditMode] = useState(false)
+  const [editResponseId, setEditResponseId] = useState<string | null>(null)
+  const [editPhoneLast4, setEditPhoneLast4] = useState("")
+  const [editLookupError, setEditLookupError] = useState<string | null>(null)
+  const [editLookupLoading, setEditLookupLoading] = useState(false)
+
   const fetchForm = useCallback(async () => {
     try {
       const previewParam = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1" ? "?preview=1" : ""
@@ -183,6 +190,59 @@ export default function PublicSignupPage() {
     setValues(updated)
   }
 
+  async function handleEditLookup() {
+    if (!form || !editPhoneLast4) return
+    setEditLookupError(null)
+    setEditLookupLoading(true)
+
+    try {
+      const res = await fetch("/api/signup/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formId: form.id,
+          phoneLast4: editPhoneLast4,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        setEditLookupError(data.error || "No matching response found")
+        return
+      }
+
+      const data = await res.json()
+      setEditResponseId(data.responseId)
+      setValues(data.data)
+      setEditMode(true)
+      setSubmitted(false)
+      // Scroll to form
+      setTimeout(() => {
+        document.querySelector("form")?.scrollIntoView({ behavior: "smooth" })
+      }, 100)
+    } catch {
+      setEditLookupError("Failed to look up response")
+    } finally {
+      setEditLookupLoading(false)
+    }
+  }
+
+  function cancelEdit() {
+    setEditMode(false)
+    setEditResponseId(null)
+    setEditPhoneLast4("")
+    setEditLookupError(null)
+    // Reset form values
+    if (form) {
+      const initial: Record<string, unknown> = {}
+      for (const field of form.fields) {
+        initial[field.id] = getDefaultValue(field)
+      }
+      setValues(initial)
+    }
+    setSubmitted(false)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form) return
@@ -209,21 +269,46 @@ export default function PublicSignupPage() {
     setSubmitting(true)
 
     try {
-      const res = await fetch("/api/signup/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          formId: form.id,
-          data: values,
-          honeypot: (document.getElementById("__hp_website") as HTMLInputElement)?.value || "",
-        }),
-      })
+      // Use update API if in edit mode
+      if (editMode && editResponseId) {
+        const res = await fetch("/api/signup/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            responseId: editResponseId,
+            formId: form.id,
+            data: values,
+            phoneLast4: editPhoneLast4,
+          }),
+        })
 
-      if (res.ok) {
-        setSubmitted(true)
+        if (res.ok) {
+          setSubmitted(true)
+          setEditMode(false)
+          setEditResponseId(null)
+          setEditPhoneLast4("")
+        } else {
+          const data = await res.json()
+          setSubmitError(data.error || "Update failed")
+        }
       } else {
-        const data = await res.json()
-        setSubmitError(data.error || "Submission failed")
+        // Normal submission
+        const res = await fetch("/api/signup/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            formId: form.id,
+            data: values,
+            honeypot: (document.getElementById("__hp_website") as HTMLInputElement)?.value || "",
+          }),
+        })
+
+        if (res.ok) {
+          setSubmitted(true)
+        } else {
+          const data = await res.json()
+          setSubmitError(data.error || "Submission failed")
+        }
       }
     } catch {
       setSubmitError("Network error. Please try again.")
@@ -340,6 +425,72 @@ export default function PublicSignupPage() {
             <p className="text-sm font-medium text-amber-900">
               📋 This form is currently in read-only mode. You can view signups but cannot make changes.
             </p>
+          </div>
+        )}
+
+        {/* Edit Response Section */}
+        {!form.muted && !editMode && !submitted && form.fields.some((f) => f.type === "phone") && (
+          <div className="border border-t-0 bg-blue-50 px-5 py-4" style={{ borderColor: colors.border }}>
+            <button
+              type="button"
+              onClick={() => {
+                const section = document.getElementById("edit-lookup-section")
+                if (section) {
+                  const isHidden = section.classList.contains("hidden")
+                  section.classList.toggle("hidden")
+                  if (isHidden) {
+                    section.scrollIntoView({ behavior: "smooth", block: "nearest" })
+                  }
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 text-sm font-medium text-blue-900 hover:text-blue-700"
+            >
+              <span>✏️ Already signed up? Edit your response</span>
+            </button>
+            <div id="edit-lookup-section" className="hidden mt-3 space-y-2">
+              <p className="text-xs text-blue-800">Enter the last 4 digits of your phone number to load your existing response:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={editPhoneLast4}
+                  onChange={(e) => setEditPhoneLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="Last 4 digits"
+                  maxLength={4}
+                  className="flex-1 rounded-md border border-blue-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <Button
+                  type="button"
+                  onClick={handleEditLookup}
+                  disabled={editPhoneLast4.length !== 4 || editLookupLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {editLookupLoading ? <Loader2 className="size-4 animate-spin" /> : "Load"}
+                </Button>
+              </div>
+              {editLookupError && (
+                <p className="text-xs text-red-600">{editLookupError}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Edit Mode Banner */}
+        {editMode && (
+          <div className="border border-t-0 bg-green-50 px-5 py-3" style={{ borderColor: colors.border }}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-green-900">
+                ✏️ Edit Mode: Update your response below
+              </p>
+              <Button
+                type="button"
+                onClick={cancelEdit}
+                variant="ghost"
+                size="sm"
+                className="text-green-700 hover:text-green-900"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
 
@@ -491,7 +642,7 @@ export default function PublicSignupPage() {
                 return !hasOpen
               })()}
             >
-              {submitting ? <Loader2 className="size-4 animate-spin" /> : form.muted ? "Form is Read-Only" : "Submit"}
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : form.muted ? "Form is Read-Only" : editMode ? "Update Response" : "Submit"}
             </Button>
             {responses.length > 0 && (
               <Button

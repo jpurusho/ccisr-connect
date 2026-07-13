@@ -23,15 +23,18 @@ interface ResponseEntry {
 
 interface AuditLogEntry {
   id: string
+  action: string
   entity_id: string | null
   changes: {
     formId: string
     formTitle: string
     ipHash: string
     verificationMethod: string
-    responseData: Record<string, unknown>
+    responseData?: Record<string, unknown>
     memberId?: string | null
-    removedAt: string
+    removedAt?: string
+    updatedAt?: string
+    changes?: Record<string, { from: unknown; to: unknown; label: string }>
   }
   created_at: string
 }
@@ -189,6 +192,36 @@ export default function SignupResponsesPage() {
     return "—"
   }
 
+  function formatFieldValue(val: unknown, field: SignupFieldConfig): string {
+    if (val === null || val === undefined || val === "") return "—"
+
+    if (field.type === "claim_select") {
+      return formatClaimedItems({ [field.id]: val }, field)
+    }
+
+    if (field.type === "month_picker" && typeof val === "number") {
+      return MONTHS[val - 1] || "—"
+    }
+
+    if (field.type === "number" && typeof val === "number") {
+      return String(val)
+    }
+
+    if (typeof val === "string") {
+      return val
+    }
+
+    if (Array.isArray(val)) {
+      return val.join(", ")
+    }
+
+    if (typeof val === "object") {
+      return JSON.stringify(val)
+    }
+
+    return String(val)
+  }
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: colors.bgLight }}>
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -225,7 +258,7 @@ export default function SignupResponsesPage() {
           </div>
         </div>
 
-        {/* Audit Log - Recent Removals */}
+        {/* Audit Log - Recent Changes */}
         {auditLogs.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border mb-6" style={{ borderColor: colors.border }}>
             <button
@@ -234,9 +267,9 @@ export default function SignupResponsesPage() {
             >
               <div>
                 <h2 className="text-lg font-semibold" style={{ color: colors.textDark }}>
-                  Recent Removals ({auditLogs.length})
+                  Recent Changes ({auditLogs.length})
                 </h2>
-                <p className="text-xs text-gray-500 mt-1">Track who removed their signup</p>
+                <p className="text-xs text-gray-500 mt-1">Track removals and edits</p>
               </div>
               <span className="text-gray-400 text-xl">{showAuditLogs ? "−" : "+"}</span>
             </button>
@@ -245,10 +278,24 @@ export default function SignupResponsesPage() {
               <div className="border-t px-4 md:px-6 pb-4" style={{ borderColor: colors.border }}>
                 <div className="space-y-3 mt-4">
                   {auditLogs.map((log) => {
+                    const isRemoval = log.action === "signup_response_self_removed"
+                    const isUpdate = log.action === "signup_response_updated"
                     const nameField = form?.fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
-                    const removedName = nameField ? String(log.changes.responseData[nameField.id] || "Anonymous") : "Anonymous"
+
+                    let personName = "Anonymous"
+                    if (isRemoval && log.changes.responseData && nameField) {
+                      personName = String(log.changes.responseData[nameField.id] || "Anonymous")
+                    } else if (isUpdate && log.changes.changes) {
+                      // Try to get name from changes
+                      const nameChange = nameField ? log.changes.changes[nameField.id] : null
+                      if (nameChange) {
+                        personName = String(nameChange.to || nameChange.from || "Anonymous")
+                      }
+                    }
+
                     const wasMemberLinked = !!log.changes.memberId
                     const verificationUsed = log.changes.verificationMethod || "none"
+                    const timestamp = log.changes.removedAt || log.changes.updatedAt || log.created_at
 
                     return (
                       <div
@@ -259,8 +306,18 @@ export default function SignupResponsesPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
+                              {isRemoval && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                  Removed
+                                </span>
+                              )}
+                              {isUpdate && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                                  Edited
+                                </span>
+                              )}
                               <span className="font-medium truncate" style={{ color: colors.textDark }}>
-                                {removedName}
+                                {personName}
                               </span>
                               {wasMemberLinked && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
@@ -274,18 +331,38 @@ export default function SignupResponsesPage() {
                               )}
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
-                              Removed {format(new Date(log.changes.removedAt), "MMM d, h:mm a")}
+                              {format(new Date(timestamp), "MMM d, h:mm a")}
                             </div>
 
                             {/* Show what was removed */}
-                            {claimFields.length > 0 && (
+                            {isRemoval && log.changes.responseData && claimFields.length > 0 && (
                               <div className="mt-2 text-xs text-gray-600">
                                 {claimFields.map((field) => {
-                                  const items = formatClaimedItems(log.changes.responseData, field)
+                                  const items = formatClaimedItems(log.changes.responseData!, field)
                                   if (items === "—") return null
                                   return (
                                     <div key={field.id} className="mt-1">
                                       <span className="font-medium">{field.label}:</span> {items}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            {/* Show what changed in an edit */}
+                            {isUpdate && log.changes.changes && Object.keys(log.changes.changes).length > 0 && (
+                              <div className="mt-2 text-xs text-gray-600 space-y-1">
+                                {Object.entries(log.changes.changes).map(([fieldId, change]) => {
+                                  const field = form?.fields.find((f) => f.id === fieldId)
+                                  if (!field) return null
+
+                                  const fromText = formatFieldValue(change.from, field)
+                                  const toText = formatFieldValue(change.to, field)
+
+                                  return (
+                                    <div key={fieldId}>
+                                      <span className="font-medium">{change.label}:</span>{" "}
+                                      <span className="line-through text-gray-400">{fromText}</span> → <span className="text-green-700">{toText}</span>
                                     </div>
                                   )
                                 })}
