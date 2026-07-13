@@ -466,6 +466,22 @@ export default function PublicSignupPage() {
               className="flex-1"
               style={{ backgroundColor: colors.primary }}
               disabled={form.muted || submitting || (() => {
+                // Check claim items or notes requirement
+                const claimFields = form.fields.filter((f) => f.type === "claim_select")
+                const notesField = form.fields.find((f) => f.type === "textarea")
+
+                if (claimFields.length > 0) {
+                  const hasClaimedItems = claimFields.some((field) => {
+                    const val = values[field.id]
+                    if (Array.isArray(val) && val.length > 0) return true
+                    if (val && typeof val === "object" && Object.keys(val).length > 0) return true
+                    return false
+                  })
+                  const hasNotes = notesField && values[notesField.id] && String(values[notesField.id]).trim().length > 0
+                  if (!hasClaimedItems && !hasNotes) return true
+                }
+
+                // Check month picker if required
                 const monthField = form.fields.find((f) => f.type === "month_picker")
                 if (!monthField || !monthField.required) return false
                 const excluded = new Set((monthField as { excludeMonths?: number[] }).excludeMonths ?? [])
