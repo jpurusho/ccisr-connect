@@ -812,13 +812,14 @@ function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved,
         className="w-full flex items-center justify-center gap-2 px-4 py-3 transition-colors hover:bg-slate-50"
       >
         {refreshing ? <Loader2 className="size-4 animate-spin" style={{ color: colors.primary }} /> : <Users className="size-4" style={{ color: colors.primary }} />}
-        <span className="text-sm font-semibold text-gray-900">{responses.length} signed up</span>
+        <span className="text-sm font-semibold" style={{ color: colors.primary }}>{responses.length} signed up</span>
         <svg
-          className={`size-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
           strokeWidth={2}
+          style={{ color: colors.primary }}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
