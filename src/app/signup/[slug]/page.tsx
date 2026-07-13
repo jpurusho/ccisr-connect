@@ -302,9 +302,14 @@ export default function PublicSignupPage() {
                 </span>
               )}
               {form.theme.hostInfo && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-medium">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.theme.hostInfo)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-medium hover:bg-white/30 transition-colors cursor-pointer"
+                >
                   🏠 {form.theme.hostInfo}
-                </span>
+                </a>
               )}
             </div>
           )}
