@@ -457,7 +457,7 @@ export default function PublicSignupPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="flex-shrink-0"
+                className="flex-shrink-0 bg-white hover:bg-gray-50"
                 style={{ borderColor: colors.primary, color: colors.primary }}
                 onClick={() => window.open(`/signup/${slug}/responses`, "_blank")}
               >

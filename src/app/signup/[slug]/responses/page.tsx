@@ -173,26 +173,26 @@ export default function SignupResponsesPage() {
         </div>
 
         {/* Summary Stats */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6" style={{ borderColor: colors.border }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: colors.textDark }}>Summary</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <div className="text-2xl font-bold" style={{ color: colors.primary }}>{responses.length}</div>
-              <div className="text-sm text-gray-600">Total Signups</div>
+        <div className="bg-white rounded-lg shadow-sm border p-4 md:p-6 mb-6" style={{ borderColor: colors.border }}>
+          <h2 className="text-lg font-semibold mb-3" style={{ color: colors.textDark }}>Summary</h2>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <div className="text-xl md:text-2xl font-bold" style={{ color: colors.primary }}>{responses.length}</div>
+              <div className="text-xs md:text-sm text-gray-600">Signups</div>
             </div>
             {stats.total > 0 && (
               <>
-                <div>
-                  <div className="text-2xl font-bold" style={{ color: colors.primary }}>{stats.adults}</div>
-                  <div className="text-sm text-gray-600">Adults</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xl md:text-2xl font-bold" style={{ color: colors.primary }}>{stats.adults}</div>
+                  <div className="text-xs md:text-sm text-gray-600">Adults</div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold" style={{ color: colors.primary }}>{stats.kids}</div>
-                  <div className="text-sm text-gray-600">Kids</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xl md:text-2xl font-bold" style={{ color: colors.primary }}>{stats.kids}</div>
+                  <div className="text-xs md:text-sm text-gray-600">Kids</div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold" style={{ color: colors.primary }}>{stats.total}</div>
-                  <div className="text-sm text-gray-600">Total Attending</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xl md:text-2xl font-bold" style={{ color: colors.primary }}>{stats.total}</div>
+                  <div className="text-xs md:text-sm text-gray-600">Total</div>
                 </div>
               </>
             )}
@@ -219,7 +219,7 @@ export default function SignupResponsesPage() {
                   </th>
                   {monthField && (
                     <th
-                      className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100"
+                      className="hidden sm:table-cell text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100"
                       onClick={() => toggleSort(monthField.id)}
                     >
                       <div className="flex items-center gap-1">
@@ -231,7 +231,7 @@ export default function SignupResponsesPage() {
                     </th>
                   )}
                   {numberFields.map((field) => (
-                    <th key={field.id} className="text-center py-3 px-4 font-semibold text-gray-700">
+                    <th key={field.id} className="hidden md:table-cell text-center py-3 px-4 font-semibold text-gray-700">
                       {field.label}
                     </th>
                   ))}
@@ -250,7 +250,7 @@ export default function SignupResponsesPage() {
                     </th>
                   ))}
                   <th
-                    className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100"
+                    className="hidden lg:table-cell text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100"
                     onClick={() => toggleSort("created_at")}
                   >
                     <div className="flex items-center gap-1">
@@ -279,7 +279,7 @@ export default function SignupResponsesPage() {
                         <td className="py-3 px-4 text-gray-500 font-medium">{idx + 1}</td>
                         <td className="py-3 px-4 font-medium" style={{ color: colors.textDark }}>{name}</td>
                         {monthField && (
-                          <td className="py-3 px-4">
+                          <td className="hidden sm:table-cell py-3 px-4">
                             {month && month > 0 ? (
                               <span className="inline-block px-2 py-0.5 rounded text-xs font-medium text-white" style={{ backgroundColor: colors.primary }}>
                                 {MONTHS[month - 1]}
@@ -292,7 +292,7 @@ export default function SignupResponsesPage() {
                         {numberFields.map((field) => {
                           const val = response.data[field.id] as number
                           return (
-                            <td key={field.id} className="py-3 px-4 text-center text-gray-600">
+                            <td key={field.id} className="hidden md:table-cell py-3 px-4 text-center text-gray-600">
                               {typeof val === "number" && val > 0 ? val : "—"}
                             </td>
                           )
@@ -302,7 +302,7 @@ export default function SignupResponsesPage() {
                             {formatClaimedItems(response.data, field)}
                           </td>
                         ))}
-                        <td className="py-3 px-4 text-gray-500 text-xs">
+                        <td className="hidden lg:table-cell py-3 px-4 text-gray-500 text-xs">
                           {format(new Date(response.created_at), "MMM d, h:mm a")}
                         </td>
                       </tr>
