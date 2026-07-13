@@ -1726,15 +1726,20 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
   const addrStr = addr ? [addr.street, addr.city, [addr.state, addr.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") : undefined
   const phoneField = fields.find((f) => f.type === "phone")
   const phone = phoneField ? (data[phoneField.id] as string) : undefined
-  const claimField = fields.find((f) => f.type === "claim_select")
-  const claimedRaw = claimField ? data[claimField.id] : undefined
-  const claimedItems: string[] | undefined = Array.isArray(claimedRaw)
-    ? claimedRaw
-    : claimedRaw && typeof claimedRaw === "object"
-      ? Object.entries(claimedRaw as Record<string, number>)
-          .filter(([, count]) => typeof count === "number" && count > 0)
-          .map(([item, count]) => count > 1 ? `${item}::${count}` : item)
-      : undefined
+  const claimFields = fields.filter((f) => f.type === "claim_select")
+  const allClaimedItems: string[] = []
+  for (const claimField of claimFields) {
+    const claimedRaw = data[claimField.id]
+    if (Array.isArray(claimedRaw)) {
+      allClaimedItems.push(...claimedRaw)
+    } else if (claimedRaw && typeof claimedRaw === "object") {
+      const items = Object.entries(claimedRaw as Record<string, number>)
+        .filter(([, count]) => typeof count === "number" && count > 0)
+        .map(([item, count]) => count > 1 ? `${item}::${count}` : item)
+      allClaimedItems.push(...items)
+    }
+  }
+  const claimedItems = allClaimedItems.length > 0 ? allClaimedItems : undefined
   const numberFields = fields.filter((f) => f.type === "number")
   const attendees = numberFields.map((f) => ({ label: f.label, value: data[f.id] as number })).filter((a) => a.value > 0)
 
@@ -1773,8 +1778,15 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
               Bringing: {claimedItems.map((item) => {
                 const [value, countStr] = item.split("::")
                 const count = countStr ? parseInt(countStr) : 1
-                const opt = claimField && "options" in claimField ? (claimField as { options: { value: string; label: string }[] }).options.find((o) => o.value === value) : null
-                const label = opt?.label ?? value
+                // Search across all claim fields for the label
+                let label = value
+                for (const cf of claimFields) {
+                  const opt = "options" in cf ? (cf as { options: { value: string; label: string }[] }).options.find((o) => o.value === value) : null
+                  if (opt) {
+                    label = opt.label
+                    break
+                  }
+                }
                 return count > 1 ? `${label} (×${count})` : label
               }).join(", ")}
             </p>
