@@ -551,6 +551,9 @@ export default function SignupsPage() {
                 <ContextMenuItem onClick={() => router.push(`/signups/${form.id}`)}>
                   <Eye className="size-3.5" /> View Responses
                 </ContextMenuItem>
+                <ContextMenuItem onClick={() => window.open(`/signup/${form.slug}/responses`, "_blank")}>
+                  <ExternalLink className="size-3.5" /> View Response Table
+                </ContextMenuItem>
                 <ContextMenuItem onClick={() => copyLink(form.slug)}>
                   <Copy className="size-3.5" /> Copy Link
                 </ContextMenuItem>
