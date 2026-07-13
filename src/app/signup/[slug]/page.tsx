@@ -1615,12 +1615,7 @@ function FieldRenderer({
           <Switch
             checked={(value as boolean) || false}
             onCheckedChange={(v) => onChange(v)}
-            style={
-              {
-                "--primary": colors.primary,
-              } as React.CSSProperties
-            }
-            className="data-checked:bg-[var(--primary)]"
+            style={(value as boolean) ? { backgroundColor: colors.primary } : {}}
           />
           <Label className="text-sm">{field.checkboxLabel || field.label}</Label>
         </div>
