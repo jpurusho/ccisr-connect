@@ -19,8 +19,8 @@ export async function GET(
     return NextResponse.json({ error: "Form not found" }, { status: 404 })
   }
 
-  // Type assertion for the new column
-  const form = formData as { id: string; title: string; show_audit_logs_public?: boolean }
+  // Type assertion for the new column (TypeScript doesn't know about it yet)
+  const form = formData as unknown as { id: string; title: string; show_audit_logs_public?: boolean }
 
   // Check if user is authenticated
   const { data: { user } } = await supabase.auth.getUser()
