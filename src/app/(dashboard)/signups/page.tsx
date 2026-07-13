@@ -75,6 +75,7 @@ interface FormRow {
   allow_duplicates: boolean
   allow_count_selection: boolean
   show_responses: boolean
+  show_audit_logs_public: boolean
   notify_on_submit: boolean
   notify_smtp_config_id: string | null
   notify_mailing_list_id: string | null
@@ -159,7 +160,7 @@ export default function SignupsPage() {
     const supabase = createClient()
     const { data: formsData } = await supabase
       .from("signup_forms")
-      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, auto_close_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, allow_count_selection, show_responses, rate_limit_per_hour, hidden_custom_items, muted, created_at")
+      .select("id, slug, title, description, duration_type, event_date, target_month, target_year, start_date, end_date, auto_close_date, theme, fields, status, visibility, member_autocomplete, max_submissions, allow_duplicates, allow_count_selection, show_responses, show_audit_logs_public, rate_limit_per_hour, hidden_custom_items, muted, created_at")
       .order("created_at", { ascending: false })
 
     if (formsData) {
@@ -342,6 +343,7 @@ export default function SignupsPage() {
       allow_duplicates: form.allow_duplicates,
       allow_count_selection: form.allow_count_selection,
       show_responses: form.show_responses,
+      show_audit_logs_public: form.show_audit_logs_public,
       muted: false,
       notify_on_submit: false,
       notify_smtp_config_id: null,
@@ -633,6 +635,7 @@ function FormEditor({
   const [allowDuplicates, setAllowDuplicates] = useState(false)
   const [allowCountSelection, setAllowCountSelection] = useState(false)
   const [showResponses, setShowResponses] = useState(true)
+  const [showAuditLogsPublic, setShowAuditLogsPublic] = useState(false)
   const [muted, setMuted] = useState(false)
   const [notifyOnSubmit, setNotifyOnSubmit] = useState(false)
   const [notifySmtpConfigId, setNotifySmtpConfigId] = useState("")
@@ -726,6 +729,7 @@ function FormEditor({
       setAllowDuplicates(editForm.allow_duplicates)
       setAllowCountSelection(editForm.allow_count_selection ?? false)
       setShowResponses(editForm.show_responses ?? true)
+      setShowAuditLogsPublic(editForm.show_audit_logs_public ?? false)
       setMuted(editForm.muted ?? false)
       setNotifyOnSubmit(editForm.notify_on_submit ?? false)
       setNotifySmtpConfigId(editForm.notify_smtp_config_id || "")
@@ -864,6 +868,7 @@ function FormEditor({
         allow_duplicates: allowDuplicates,
         allow_count_selection: allowCountSelection,
         show_responses: showResponses,
+        show_audit_logs_public: showAuditLogsPublic,
         muted,
         notify_on_submit: notifyOnSubmit,
         notify_smtp_config_id: notifySmtpConfigId || null,
@@ -1113,6 +1118,13 @@ function FormEditor({
             <div className="flex items-center gap-2">
               <Switch checked={showResponses} onCheckedChange={setShowResponses} id="show-resp" />
               <Label htmlFor="show-resp">Show Signups Publicly</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={showAuditLogsPublic} onCheckedChange={setShowAuditLogsPublic} id="show-audit-public" />
+              <Label htmlFor="show-audit-public" className="flex items-center gap-1">
+                Show Recent Changes Publicly
+                <span className="text-xs text-muted-foreground">— Public can see removals/edits audit log</span>
+              </Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={muted} onCheckedChange={setMuted} id="muted" />

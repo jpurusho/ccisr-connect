@@ -8,15 +8,24 @@ export async function GET(
   const { slug } = await params
   const supabase = await createClient()
 
-  // Fetch the form to get its ID
+  // Fetch the form to get its ID and audit visibility setting
   const { data: form } = await supabase
     .from("signup_forms")
-    .select("id, title")
+    .select("id, title, show_audit_logs_public")
     .eq("slug", slug)
     .single()
 
   if (!form) {
     return NextResponse.json({ error: "Form not found" }, { status: 404 })
+  }
+
+  // Check if user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  const isAuthenticated = !!user
+
+  // If audit logs are not public and user is not authenticated, return empty
+  if (!form.show_audit_logs_public && !isAuthenticated) {
+    return NextResponse.json({ logs: [] })
   }
 
   // Fetch audit logs for removals AND updates related to this form
