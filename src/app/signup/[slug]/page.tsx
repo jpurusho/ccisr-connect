@@ -1726,6 +1726,8 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
   const addrStr = addr ? [addr.street, addr.city, [addr.state, addr.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") : undefined
   const phoneField = fields.find((f) => f.type === "phone")
   const phone = phoneField ? (data[phoneField.id] as string) : undefined
+  const notesField = fields.find((f) => f.type === "textarea")
+  const notes = notesField ? (data[notesField.id] as string) : undefined
   const claimFields = fields.filter((f) => f.type === "claim_select")
   const allClaimedItems: string[] = []
   for (const claimField of claimFields) {
@@ -1771,7 +1773,7 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
           )}
         </div>
       </div>
-      {(claimedItems?.length || addrStr || phone) && (
+      {(claimedItems?.length || addrStr || phone || notes) && (
         <div className="mt-1.5 space-y-0.5">
           {claimedItems && claimedItems.length > 0 && (
             <p className="text-xs font-medium" style={{ color: colors.primary }}>
@@ -1791,6 +1793,7 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
               }).join(", ")}
             </p>
           )}
+          {notes && <p className="text-xs italic text-gray-600">Note: {notes}</p>}
           {addrStr && <p className="text-xs" style={{ color: colors.textLight }}>{addrStr}</p>}
           {phone && <p className="text-xs" style={{ color: colors.textLight }}>{phone}</p>}
         </div>

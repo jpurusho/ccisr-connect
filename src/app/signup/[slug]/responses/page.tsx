@@ -100,6 +100,7 @@ export default function SignupResponsesPage() {
   const claimFields = form.fields.filter((f) => f.type === "claim_select")
   const monthField = form.fields.find((f) => f.type === "month_picker")
   const numberFields = form.fields.filter((f) => f.type === "number")
+  const notesField = form.fields.find((f) => f.type === "textarea")
   const stats = calculateAttendanceStats(responses, form.fields)
 
   function toggleSort(field: string) {
@@ -249,6 +250,11 @@ export default function SignupResponsesPage() {
                       </div>
                     </th>
                   ))}
+                  {notesField && (
+                    <th className="hidden xl:table-cell text-left py-3 px-4 font-semibold text-gray-700">
+                      {notesField.label}
+                    </th>
+                  )}
                   <th
                     className="hidden lg:table-cell text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100"
                     onClick={() => toggleSort("created_at")}
@@ -302,6 +308,11 @@ export default function SignupResponsesPage() {
                             {formatClaimedItems(response.data, field)}
                           </td>
                         ))}
+                        {notesField && (
+                          <td className="hidden xl:table-cell py-3 px-4 text-gray-600 text-xs italic max-w-xs truncate">
+                            {response.data[notesField.id] ? String(response.data[notesField.id]) : "—"}
+                          </td>
+                        )}
                         <td className="hidden lg:table-cell py-3 px-4 text-gray-500 text-xs">
                           {format(new Date(response.created_at), "MMM d, h:mm a")}
                         </td>
