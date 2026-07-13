@@ -436,22 +436,34 @@ export default function PublicSignupPage() {
             </div>
           )}
 
-          <Button
-            type="submit"
-            className="mt-6 w-full"
-            style={{ backgroundColor: colors.primary }}
-            disabled={form.muted || submitting || (() => {
-              const monthField = form.fields.find((f) => f.type === "month_picker")
-              if (!monthField || !monthField.required) return false
-              const excluded = new Set((monthField as { excludeMonths?: number[] }).excludeMonths ?? [])
-              const currentMonth = new Date().getMonth() + 1
-              const takenMonths = new Set(responses.map((r) => r.data[monthField.id] as number).filter((m) => typeof m === "number" && m > 0))
-              const hasOpen = Array.from({ length: 12 }, (_, i) => i + 1).some((m) => m >= currentMonth && !excluded.has(m) && !takenMonths.has(m))
-              return !hasOpen
-            })()}
-          >
-            {submitting ? <Loader2 className="size-4 animate-spin" /> : form.muted ? "Form is Read-Only" : "Submit"}
-          </Button>
+          <div className="mt-6 flex gap-3">
+            <Button
+              type="submit"
+              className="flex-1"
+              style={{ backgroundColor: colors.primary }}
+              disabled={form.muted || submitting || (() => {
+                const monthField = form.fields.find((f) => f.type === "month_picker")
+                if (!monthField || !monthField.required) return false
+                const excluded = new Set((monthField as { excludeMonths?: number[] }).excludeMonths ?? [])
+                const currentMonth = new Date().getMonth() + 1
+                const takenMonths = new Set(responses.map((r) => r.data[monthField.id] as number).filter((m) => typeof m === "number" && m > 0))
+                const hasOpen = Array.from({ length: 12 }, (_, i) => i + 1).some((m) => m >= currentMonth && !excluded.has(m) && !takenMonths.has(m))
+                return !hasOpen
+              })()}
+            >
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : form.muted ? "Form is Read-Only" : "Submit"}
+            </Button>
+            {responses.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-shrink-0"
+                onClick={() => window.open(`/signup/${slug}/responses`, "_blank")}
+              >
+                View All Signups
+              </Button>
+            )}
+          </div>
         </form>
 
       </div>
