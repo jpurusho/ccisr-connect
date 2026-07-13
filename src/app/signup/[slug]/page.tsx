@@ -186,8 +186,27 @@ export default function PublicSignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form) return
-    setSubmitting(true)
     setSubmitError(null)
+
+    // Validate at least one claim_select has items OR notes is filled
+    const claimFields = form.fields.filter((f) => f.type === "claim_select")
+    const notesField = form.fields.find((f) => f.type === "textarea")
+
+    const hasClaimedItems = claimFields.some((field) => {
+      const val = values[field.id]
+      if (Array.isArray(val) && val.length > 0) return true
+      if (val && typeof val === "object" && Object.keys(val).length > 0) return true
+      return false
+    })
+
+    const hasNotes = notesField && values[notesField.id] && String(values[notesField.id]).trim().length > 0
+
+    if (claimFields.length > 0 && !hasClaimedItems && !hasNotes) {
+      setSubmitError("Please select at least one item to bring or fill in the notes field.")
+      return
+    }
+
+    setSubmitting(true)
 
     try {
       const res = await fetch("/api/signup/submit", {

@@ -98,8 +98,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", errors }, { status: 422 })
   }
 
-  // Capacity and maxSelections check for claim_select fields
+  // Additional validation: require at least one claim_select item OR notes
   const claimFields = fields.filter((f) => f.type === "claim_select") as Extract<SignupFieldConfig, { type: "claim_select" }>[]
+  const notesField = fields.find((f) => f.type === "textarea")
+
+  if (claimFields.length > 0) {
+    const hasClaimedItems = claimFields.some((cf) => {
+      const val = sanitized[cf.id]
+      if (Array.isArray(val) && val.length > 0) return true
+      if (val && typeof val === "object" && Object.keys(val).length > 0) return true
+      return false
+    })
+
+    const hasNotes = notesField && sanitized[notesField.id] && String(sanitized[notesField.id]).trim().length > 0
+
+    if (!hasClaimedItems && !hasNotes) {
+      return NextResponse.json(
+        { error: "Please select at least one item to bring or fill in the notes field" },
+        { status: 422 }
+      )
+    }
+  }
+
+  // Capacity and maxSelections check for claim_select fields
   for (const cf of claimFields) {
     const selectedItems = sanitized[cf.id]
 
