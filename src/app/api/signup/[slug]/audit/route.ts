@@ -24,7 +24,8 @@ export async function GET(
   const isAuthenticated = !!user
 
   // If audit logs are not public and user is not authenticated, return empty
-  if (!form.show_audit_logs_public && !isAuthenticated) {
+  const showAuditLogsPublic = (form as any).show_audit_logs_public ?? false
+  if (!showAuditLogsPublic && !isAuthenticated) {
     return NextResponse.json({ logs: [] })
   }
 
