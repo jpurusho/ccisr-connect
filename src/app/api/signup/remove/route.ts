@@ -84,10 +84,10 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Fetch the response with its data
+  // Fetch the response with its data and member_id
   const { data: response } = await supabase
     .from("signup_responses")
-    .select("id, form_id, data")
+    .select("id, form_id, data, member_id")
     .eq("id", responseId)
     .eq("form_id", formId)
     .single()
@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
     ipHash,
     verificationMethod,
     responseData: response.data, // Full snapshot for recovery
+    memberId: response.member_id, // Track if this was a member-linked response
     removedAt: new Date().toISOString(),
   })
 

@@ -18,6 +18,22 @@ interface ResponseEntry {
   id: string
   data: Record<string, unknown>
   created_at: string
+  member_id?: string | null
+}
+
+interface AuditLogEntry {
+  id: string
+  entity_id: string | null
+  changes: {
+    formId: string
+    formTitle: string
+    ipHash: string
+    verificationMethod: string
+    responseData: Record<string, unknown>
+    memberId?: string | null
+    removedAt: string
+  }
+  created_at: string
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
@@ -54,10 +70,12 @@ export default function SignupResponsesPage() {
 
   const [form, setForm] = useState<FormData | null>(null)
   const [responses, setResponses] = useState<ResponseEntry[]>([])
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sortField, setSortField] = useState<string>("created_at")
   const [sortAsc, setSortAsc] = useState(false)
+  const [showAuditLogs, setShowAuditLogs] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -70,6 +88,13 @@ export default function SignupResponsesPage() {
         const data = await res.json()
         setForm(data.form)
         setResponses(data.responses || [])
+
+        // Fetch audit logs
+        const auditRes = await fetch(`/api/signup/${slug}/audit`)
+        if (auditRes.ok) {
+          const auditData = await auditRes.json()
+          setAuditLogs(auditData.logs || [])
+        }
       } catch {
         setError("Failed to load data")
       } finally {
@@ -200,6 +225,83 @@ export default function SignupResponsesPage() {
           </div>
         </div>
 
+        {/* Audit Log - Recent Removals */}
+        {auditLogs.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border mb-6" style={{ borderColor: colors.border }}>
+            <button
+              onClick={() => setShowAuditLogs(!showAuditLogs)}
+              className="w-full p-4 md:p-6 text-left flex items-center justify-between hover:bg-gray-50"
+            >
+              <div>
+                <h2 className="text-lg font-semibold" style={{ color: colors.textDark }}>
+                  Recent Removals ({auditLogs.length})
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">Track who removed their signup</p>
+              </div>
+              <span className="text-gray-400 text-xl">{showAuditLogs ? "−" : "+"}</span>
+            </button>
+
+            {showAuditLogs && (
+              <div className="border-t px-4 md:px-6 pb-4" style={{ borderColor: colors.border }}>
+                <div className="space-y-3 mt-4">
+                  {auditLogs.map((log) => {
+                    const nameField = form?.fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
+                    const removedName = nameField ? String(log.changes.responseData[nameField.id] || "Anonymous") : "Anonymous"
+                    const wasMemberLinked = !!log.changes.memberId
+                    const verificationUsed = log.changes.verificationMethod || "none"
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="border rounded-lg p-3 bg-gray-50"
+                        style={{ borderColor: colors.border }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium truncate" style={{ color: colors.textDark }}>
+                                {removedName}
+                              </span>
+                              {wasMemberLinked && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  Member
+                                </span>
+                              )}
+                              {verificationUsed === "phone" && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                  Verified
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Removed {format(new Date(log.changes.removedAt), "MMM d, h:mm a")}
+                            </div>
+
+                            {/* Show what was removed */}
+                            {claimFields.length > 0 && (
+                              <div className="mt-2 text-xs text-gray-600">
+                                {claimFields.map((field) => {
+                                  const items = formatClaimedItems(log.changes.responseData, field)
+                                  if (items === "—") return null
+                                  return (
+                                    <div key={field.id} className="mt-1">
+                                      <span className="font-medium">{field.label}:</span> {items}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-white rounded-lg shadow-sm border overflow-hidden" style={{ borderColor: colors.border }}>
           <div className="overflow-x-auto">
@@ -279,11 +381,21 @@ export default function SignupResponsesPage() {
                   sortedResponses.map((response, idx) => {
                     const name = nameField ? String(response.data[nameField.id] || "Anonymous") : "Anonymous"
                     const month = monthField ? (response.data[monthField.id] as number) : null
+                    const isMemberLinked = !!response.member_id
 
                     return (
                       <tr key={response.id} className="border-b hover:bg-gray-50" style={{ borderColor: colors.border }}>
                         <td className="py-3 px-4 text-gray-500 font-medium">{idx + 1}</td>
-                        <td className="py-3 px-4 font-medium" style={{ color: colors.textDark }}>{name}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium" style={{ color: colors.textDark }}>{name}</span>
+                            {isMemberLinked && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                Member
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         {monthField && (
                           <td className="hidden sm:table-cell py-3 px-4">
                             {month && month > 0 ? (
