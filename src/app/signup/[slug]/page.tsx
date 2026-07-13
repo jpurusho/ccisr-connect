@@ -458,6 +458,7 @@ export default function PublicSignupPage() {
                 type="button"
                 variant="outline"
                 className="flex-shrink-0"
+                style={{ borderColor: colors.primary, color: colors.primary }}
                 onClick={() => window.open(`/signup/${slug}/responses`, "_blank")}
               >
                 View All Signups
