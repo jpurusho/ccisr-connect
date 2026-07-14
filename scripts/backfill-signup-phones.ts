@@ -89,14 +89,14 @@ async function backfillPhones() {
       continue
     }
 
-    // Fetch member's phone
+    // Fetch member's cell_phone
     const { data: member } = await supabase
       .from("members")
-      .select("phone")
+      .select("cell_phone")
       .eq("id", response.member_id)
       .single()
 
-    if (!member || !member.phone) {
+    if (!member || !member.cell_phone) {
       console.log(`  ⚠ No phone found for member ${response.member_id}`)
       skipped++
       continue
@@ -105,7 +105,7 @@ async function backfillPhones() {
     // Update response with phone
     const updatedData = {
       ...data,
-      [phoneField.id]: member.phone,
+      [phoneField.id]: member.cell_phone,
     }
 
     const { error: updateError } = await supabase
