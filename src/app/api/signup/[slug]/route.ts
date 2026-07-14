@@ -16,6 +16,10 @@ export async function GET(
   const isPreview = req.nextUrl.searchParams.get("preview") === "1"
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+  // Check if user is authenticated admin
+  const { data: { user } } = await supabase.auth.getUser()
+  const isAdmin = !!user
+
   const { data: form } = await supabase
     .from("signup_forms")
     .select("id, title, description, theme, fields, status, visibility, member_autocomplete, show_responses, auto_close_date, max_submissions, hidden_custom_items, muted")
@@ -64,5 +68,6 @@ export async function GET(
     },
     responses,
     responseCount: responses.length,
+    isAdmin,
   })
 }

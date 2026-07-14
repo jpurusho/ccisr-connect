@@ -79,6 +79,7 @@ export default function SignupResponsesPage() {
   const [sortField, setSortField] = useState<string>("created_at")
   const [sortAsc, setSortAsc] = useState(false)
   const [showAuditLogs, setShowAuditLogs] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -91,6 +92,10 @@ export default function SignupResponsesPage() {
         const data = await res.json()
         setForm(data.form)
         setResponses(data.responses || [])
+        // Check if response includes isAdmin flag
+        if (data.isAdmin) {
+          setIsAdmin(true)
+        }
 
         // Fetch audit logs
         const auditRes = await fetch(`/api/signup/${slug}/audit`)
@@ -127,9 +132,69 @@ export default function SignupResponsesPage() {
   const nameField = form.fields.find((f) => f.type === "member_lookup" || (f.type === "text" && f.order === 0))
   const claimFields = form.fields.filter((f) => f.type === "claim_select")
   const monthField = form.fields.find((f) => f.type === "month_picker")
+  const phoneField = form.fields.find((f) => f.type === "phone")
   const numberFields = form.fields.filter((f) => f.type === "number")
   const notesField = form.fields.find((f) => f.type === "textarea")
   const stats = calculateAttendanceStats(responses, form.fields)
+
+  function exportToCSV() {
+    if (!form || responses.length === 0) return
+
+    // Build CSV headers
+    const headers = ["#", "Name"]
+    if (monthField) headers.push("Month")
+    if (phoneField && isAdmin) headers.push("Phone")
+    numberFields.forEach(f => headers.push(f.label))
+    claimFields.forEach(f => headers.push(f.label))
+    if (notesField) headers.push("Notes")
+    headers.push("Signed Up")
+
+    // Build CSV rows
+    const rows = sortedResponses.map((response, idx) => {
+      const row: string[] = []
+      row.push(String(idx + 1))
+      row.push(nameField ? String(response.data[nameField.id] || "Anonymous") : "Anonymous")
+
+      if (monthField) {
+        const month = response.data[monthField.id] as number
+        row.push(month && month > 0 ? MONTHS[month - 1] : "")
+      }
+
+      if (phoneField && isAdmin) {
+        row.push(String(response.data[phoneField.id] || ""))
+      }
+
+      numberFields.forEach(f => {
+        const val = response.data[f.id] as number
+        row.push(typeof val === "number" && val > 0 ? String(val) : "")
+      })
+
+      claimFields.forEach(f => {
+        row.push(formatClaimedItems(response.data, f))
+      })
+
+      if (notesField) {
+        row.push(String(response.data[notesField.id] || ""))
+      }
+
+      row.push(format(new Date(response.created_at), "MMM d, h:mm a"))
+
+      return row
+    })
+
+    // Generate CSV content
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n")
+
+    // Download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    link.href = URL.createObjectURL(blob)
+    link.download = `${form.title.replace(/[^a-z0-9]/gi, "_")}_responses.csv`
+    link.click()
+  }
 
   function toggleSort(field: string) {
     if (sortField === field) {
@@ -226,9 +291,23 @@ export default function SignupResponsesPage() {
     <div className="min-h-screen" style={{ backgroundColor: colors.bgLight }}>
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2" style={{ color: colors.primary }}>{form.title}</h1>
-          {form.description && <p className="text-gray-600">{form.description}</p>}
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2" style={{ color: colors.primary }}>{form.title}</h1>
+            {form.description && <p className="text-gray-600">{form.description}</p>}
+          </div>
+          {isAdmin && responses.length > 0 && (
+            <button
+              onClick={exportToCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              style={{ borderColor: colors.primary, color: colors.primary }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export CSV
+            </button>
+          )}
         </div>
 
         {/* Summary Stats */}
@@ -410,6 +489,11 @@ export default function SignupResponsesPage() {
                       </div>
                     </th>
                   )}
+                  {isAdmin && phoneField && (
+                    <th className="hidden lg:table-cell text-left py-3 px-4 font-semibold text-gray-700">
+                      Phone
+                    </th>
+                  )}
                   {numberFields.map((field) => (
                     <th key={field.id} className="hidden md:table-cell text-center py-3 px-4 font-semibold text-gray-700">
                       {field.label}
@@ -482,6 +566,11 @@ export default function SignupResponsesPage() {
                             ) : (
                               <span className="text-gray-400">—</span>
                             )}
+                          </td>
+                        )}
+                        {isAdmin && phoneField && (
+                          <td className="hidden lg:table-cell py-3 px-4 text-gray-600 text-sm">
+                            {response.data[phoneField.id] ? String(response.data[phoneField.id]) : "—"}
                           </td>
                         )}
                         {numberFields.map((field) => {
