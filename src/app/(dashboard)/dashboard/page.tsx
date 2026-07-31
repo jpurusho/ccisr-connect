@@ -649,6 +649,7 @@ export default function DashboardPage() {
 
   // ---- Subject overrides (built-in CommType keys + custom template IDs) ----
   const [subjectOverrides, setSubjectOverrides] = useState<Record<string, string>>({})
+  const [subjectPrefixes, setSubjectPrefixes] = useState<Record<string, string>>({})
 
   // ---- Mailing list + SMTP state (per-card, keyed by CommType or custom template ID) ----
   const [mailingLists, setMailingLists] = useState<MailingListOption[]>([])
@@ -2261,6 +2262,11 @@ export default function DashboardPage() {
     }
   }
 
+  function combineSubject(baseSubject: string, keyOrType: string): string {
+    const prefix = subjectPrefixes[keyOrType]?.trim()
+    return prefix ? `${prefix}: ${baseSubject}` : baseSubject
+  }
+
   function getSubject(type: CommType): string {
     // If dispatched, show the exact subject that was sent
     const d = dispatches[type]
@@ -2281,6 +2287,10 @@ export default function DashboardPage() {
 
   function setSubjectOverride(type: CommType, value: string) {
     setSubjectOverrides((prev) => ({ ...prev, [type]: value }))
+  }
+
+  function setSubjectPrefix(keyOrType: string, value: string) {
+    setSubjectPrefixes((prev) => ({ ...prev, [keyOrType]: value }))
   }
 
   // ---- Get preview for type ----
@@ -2382,11 +2392,13 @@ export default function DashboardPage() {
 
       const weekStart = getWeekStartForSave(type)
       const templateName = BUILTIN_LABEL[type] || type
+      const baseSubject = getSubject(type)
+      const subject = combineSubject(baseSubject, type)
 
       const payload = {
         template_type: type,
         name: templateName,
-        subject: getSubject(type),
+        subject,
         form_data: getFormData(type),
         mailing_list_id: commOptions[type].mailingListId || null,
         smtp_config_id: commOptions[type].smtpConfigId || null,
@@ -2478,7 +2490,7 @@ export default function DashboardPage() {
   const handleSendNow = useCallback(
     async (type: CommType) => {
       const html = getLivePreview(type)
-      let subject = getSubject(type)
+      const baseSubject = getSubject(type)
       if (!html) {
         toast.error("No content to send. Please add data first.")
         return
@@ -2486,8 +2498,15 @@ export default function DashboardPage() {
 
       const currentStatus = getStatus(type)
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
-      if (isReminder && !subject.startsWith("Reminder: ")) {
-        subject = `Reminder: ${subject}`
+
+      // Apply prefix (if manually set, use it; otherwise auto-add "Reminder" for resends)
+      let finalSubject: string
+      if (subjectPrefixes[type]?.trim()) {
+        finalSubject = combineSubject(baseSubject, type)
+      } else if (isReminder) {
+        finalSubject = `Reminder: ${baseSubject}`
+      } else {
+        finalSubject = combineSubject(baseSubject, type)
       }
 
       const opts = commOptions[type]
@@ -2514,7 +2533,7 @@ export default function DashboardPage() {
         const draftPayload = {
           template_type: type,
           name: templateName,
-          subject,
+          subject: finalSubject,
           form_data: getFormData(type),
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
@@ -2545,7 +2564,7 @@ export default function DashboardPage() {
         const listName = mailingLists.find((ml) => ml.id === opts.mailingListId)?.name || "Direct recipients"
 
         // Show confirmation dialog instead of sending immediately
-        setSendConfirm({ open: true, type, subject, recipientCount: totalRecipients, listName, isReminder })
+        setSendConfirm({ open: true, type, subject: finalSubject, recipientCount: totalRecipients, listName, isReminder })
         setSendingType(null)
         return
       } catch {
@@ -2560,7 +2579,8 @@ export default function DashboardPage() {
 
   async function handleQueue(type: CommType) {
     const html = getLivePreview(type)
-    const subject = getSubject(type)
+    const baseSubject = getSubject(type)
+    const subject = combineSubject(baseSubject, type)
     if (!html) { toast.error("No content to queue. Please add data first."); return }
 
     const opts = commOptions[type]
@@ -2745,7 +2765,8 @@ export default function DashboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const adminEmail = user?.email
     if (!adminEmail) { toast.error("Could not determine your email."); return }
-    const subject = getSubject(type)
+    const baseSubject = getSubject(type)
+    const subject = combineSubject(baseSubject, type)
     try {
       const res = await fetch("/api/dispatch/test", {
         method: "POST",
@@ -2775,7 +2796,8 @@ export default function DashboardPage() {
     if (!opts?.mailingListId && !opts?.additionalRecipients?.trim()) { toast.error("Please select a mailing list or add recipients."); return }
 
     const ctKey = `custom:${ctId}`
-    const subj = subjectOverrides[ctId] || ct.subject_template || ct.name
+    const baseSubj = subjectOverrides[ctId] || ct.subject_template || ct.name
+    const subj = combineSubject(baseSubj, ctId)
     setSendingType("bulletin")
     try {
       const supabase = createClient()
@@ -2846,7 +2868,8 @@ export default function DashboardPage() {
     if (!opts?.mailingListId && !opts?.additionalRecipients?.trim()) { toast.error("Please select a mailing list or add recipients."); return }
 
     const ctKey = `custom:${ctId}`
-    const subj = subjectOverrides[ctId] || ct.subject_template || ct.name
+    const baseSubj = subjectOverrides[ctId] || ct.subject_template || ct.name
+    const subj = combineSubject(baseSubj, ctId)
     setSendingType("bulletin")
     try {
       const supabase = createClient()
@@ -2900,7 +2923,8 @@ export default function DashboardPage() {
     const form = customForms[ctId]
     if (!form) return
     const ctKey = `custom:${ctId}`
-    const subj = subjectOverrides[ctId] || ct.subject_template || ct.name
+    const baseSubj = subjectOverrides[ctId] || ct.subject_template || ct.name
+    const subj = combineSubject(baseSubj, ctId)
     setSavingInstance("bulletin")
     try {
       const supabase = createClient()
@@ -3763,6 +3787,8 @@ export default function DashboardPage() {
                 summaryLines={summaries}
                 subject={getSubject(type)}
                 onSubjectChange={(v) => setSubjectOverride(type, v)}
+                subjectPrefix={subjectPrefixes[type] || ""}
+                onSubjectPrefixChange={(v) => setSubjectPrefix(type, v)}
                 scheduledAt={getScheduledAt(type)}
                 previewHtml={getPreview(type)}
                 resourceLinks={links[type]}
@@ -3811,6 +3837,8 @@ export default function DashboardPage() {
               summaryLines={[form.title || "Custom announcement"]}
               subject={subj}
               onSubjectChange={(v) => setSubjectOverrides((prev) => ({ ...prev, [ct.id]: v }))}
+              subjectPrefix={subjectPrefixes[ct.id] || ""}
+              onSubjectPrefixChange={(v) => setSubjectPrefix(ct.id, v)}
               previewHtml={preview}
               resourceLinks={(form.resourceLinks ?? []).filter((l) => l.url)}
               mailingLists={mailingLists}

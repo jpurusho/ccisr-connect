@@ -72,6 +72,8 @@ export interface WeeklyCommunicationCardProps {
   summaryLines: string[]
   subject?: string
   onSubjectChange?: (value: string) => void
+  subjectPrefix?: string
+  onSubjectPrefixChange?: (value: string) => void
   scheduledAt?: Date | null
   previewHtml?: string | null
   resourceLinks?: ResourceLink[]
@@ -126,6 +128,8 @@ export function WeeklyCommunicationCard({
   summaryLines,
   subject,
   onSubjectChange,
+  subjectPrefix,
+  onSubjectPrefixChange,
   scheduledAt,
   previewHtml,
   onSendNow,
@@ -228,6 +232,22 @@ export function WeeklyCommunicationCard({
           </div>
         </div>
 
+        {/* Subject prefix (optional) */}
+        {subject !== undefined && editing && onSubjectPrefixChange && (
+          <div className="px-4 pl-5 pt-2">
+            <p className="text-xs font-medium text-muted-foreground mb-1">
+              Subject Prefix <span className="text-xs font-normal text-muted-foreground/60">(optional)</span>
+            </p>
+            <input
+              type="text"
+              className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              placeholder="e.g., Reminder, Final Notice"
+              value={subjectPrefix || ""}
+              onChange={(e) => onSubjectPrefixChange(e.target.value)}
+            />
+          </div>
+        )}
+
         {/* Subject line */}
         {subject !== undefined && (
           <div className="px-4 pl-5 pt-2">
@@ -240,7 +260,10 @@ export function WeeklyCommunicationCard({
                 onChange={(e) => onSubjectChange(e.target.value)}
               />
             ) : (
-              <p className="text-sm font-medium truncate">{subject}</p>
+              <p className="text-sm font-medium truncate">
+                {subjectPrefix && <span className="text-primary">{subjectPrefix}: </span>}
+                {subject}
+              </p>
             )}
           </div>
         )}
