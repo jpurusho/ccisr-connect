@@ -1682,6 +1682,7 @@ export default function TemplatesPage() {
                         boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[editingCustom.data.bodyBgColor as string]}50`,
                       } : undefined}
                     />
+                    <FormattingHelp />
                     <PastelColorPicker
                       value={editingCustom.data.bodyBgColor as string | undefined}
                       onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, bodyBgColor: color } })}
@@ -1699,6 +1700,7 @@ export default function TemplatesPage() {
                         boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[editingCustom.data.footerVerseBgColor as string]}50`,
                       } : undefined}
                     />
+                    <FormattingHelp />
                     <PastelColorPicker
                       value={editingCustom.data.footerVerseBgColor as string | undefined}
                       onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerVerseBgColor: color } })}
