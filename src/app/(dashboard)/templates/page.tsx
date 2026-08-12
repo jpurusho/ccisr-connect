@@ -68,6 +68,7 @@ import { TemplateStyleEditor } from "@/components/dashboard/template-style-edito
 import { VisualTemplateBuilder } from "@/components/template-builder/visual-template-builder"
 import type { VisualConfig } from "@/lib/email/visual-config-types"
 import { VerseLookup } from "@/components/shared/verse-lookup"
+import { FormattingHelp } from "@/components/shared/formatting-help"
 import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-builder"
 import { formatPhone } from "@/lib/utils"
 import { type CommType, inferCommType } from "@/lib/dashboard-types"
@@ -847,6 +848,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setBirthdayData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <FormattingHelp />
                         <PastelColorPicker
                           value={birthdayData.messageBgColor}
                           onChange={(color) => setBirthdayData((prev) => ({ ...prev, messageBgColor: color }))}
@@ -883,6 +885,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setAnniversaryData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <FormattingHelp />
                         <PastelColorPicker
                           value={anniversaryData.messageBgColor}
                           onChange={(color) => setAnniversaryData((prev) => ({ ...prev, messageBgColor: color }))}
@@ -944,6 +947,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setBibleStudyData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <FormattingHelp />
                         <PastelColorPicker
                           value={bibleStudyData.messageBgColor}
                           onChange={(color) => setBibleStudyData((prev) => ({ ...prev, messageBgColor: color }))}
@@ -1075,6 +1079,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setWomensStudyData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <FormattingHelp />
                         <PastelColorPicker
                           value={womensStudyData.messageBgColor}
                           onChange={(color) => setWomensStudyData((prev) => ({ ...prev, messageBgColor: color }))}
@@ -1177,6 +1182,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <FormattingHelp />
                         <PastelColorPicker
                           value={prayerMeetingData.messageBgColor}
                           onChange={(color) => setPrayerMeetingData((prev) => ({ ...prev, messageBgColor: color }))}
@@ -1261,6 +1267,7 @@ export default function TemplatesPage() {
                           onChange={(e) => setBulletinData((prev) => ({ ...prev, message: e.target.value }))}
                           className="min-h-16"
                         />
+                        <FormattingHelp />
                         <PastelColorPicker
                           value={bulletinData.messageBgColor}
                           onChange={(color) => setBulletinData((prev) => ({ ...prev, messageBgColor: color }))}
