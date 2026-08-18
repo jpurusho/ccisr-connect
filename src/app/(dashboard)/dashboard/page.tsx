@@ -924,14 +924,6 @@ export default function DashboardPage() {
       if (mailingListsRes.error) throw mailingListsRes.error
       if (smtpConfigsRes.error) throw smtpConfigsRes.error
 
-      // Debug: Log query results
-      console.log('[Dashboard] Query results:', {
-        eventTypes: eventTypesRes.data?.length ?? 0,
-        templates: templateDefaultsRes.data?.length ?? 0,
-        events: activeEventsRes.data?.length ?? 0,
-        instances: composedInstancesRes.data?.length ?? 0,
-      })
-
       // ---- Parse saved template defaults (no FK join, resolve in JS) ----
       const etIdToName: Record<string, string> = {}
       const etIdToTabName: Record<string, string> = {}
@@ -993,14 +985,6 @@ export default function DashboardPage() {
       setSavedTemplateData(
         Object.fromEntries(Object.entries(savedDefaults).map(([k, v]) => [k, v.data]))
       )
-
-      // Debug: Log template processing
-      console.log('[Dashboard] Template processing:', {
-        rawTemplates: templateDefaultsRes.data?.map(t => ({ id: t.id, event_type_id: t.event_type_id })),
-        etIdToTabName,
-        savedDefaultsKeys: Object.keys(savedDefaults),
-        commTypeToEtName,
-      })
 
       // Build composed instances map (template_type → data)
       type CIRow = (typeof composedInstancesRes.data extends (infer U)[] | null ? U : never)
@@ -2486,11 +2470,6 @@ export default function DashboardPage() {
   function handleRefreshFromTemplate(type: CommType) {
     // savedTemplateData is keyed by comm_type, not event type name
     const tmplData = savedTemplateData[type]
-    console.log('[Dashboard] Refresh from template:', {
-      type,
-      savedTemplateDataKeys: Object.keys(savedTemplateData),
-      tmplData: tmplData ? 'found' : 'not found',
-    })
     if (!tmplData) {
       toast.error(`No template defaults found for ${type}`)
       return
