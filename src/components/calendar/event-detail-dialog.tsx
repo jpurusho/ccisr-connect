@@ -250,9 +250,12 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
   const pastBreaks = breaks.filter((b) => b.end_date < refDate)
   const visibleBreaks = showPastBreaks ? breaks : activeBreaks
 
+  // Only show the breaks section if there are active breaks OR user wants to see past breaks
+  const showBreaksSection = activeBreaks.length > 0 || (pastBreaks.length > 0 && showPastBreaks)
+
   return (
     <div className="space-y-2">
-      {breaks.length > 0 && (
+      {showBreaksSection && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2 dark:border-amber-800 dark:bg-amber-950/20">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Scheduled Breaks</p>
