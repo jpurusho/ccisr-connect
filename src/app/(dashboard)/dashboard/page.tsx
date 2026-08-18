@@ -2272,8 +2272,8 @@ export default function DashboardPage() {
     const d = dispatches[type]
     if (d && (d.status === "sent" || d.status === "sending")) return d.subject
     if (subjectOverrides[type]) return subjectOverrides[type]!
-    const etKey = commTypeEtNames[type]
-    const savedTmpl = savedSubjectTemplates[etKey]
+    // savedSubjectTemplates is keyed by comm_type, not event type name
+    const savedTmpl = savedSubjectTemplates[type]
     if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
     switch (type) {
       case "birthday":       return `Happy Birthday! — Week of ${weekLabel}`
