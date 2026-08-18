@@ -2478,9 +2478,24 @@ export default function DashboardPage() {
     switch (type) {
       case "birthday": setBirthdayForm((prev) => ({ ...prev, ...common })); break
       case "anniversary": setAnniversaryForm((prev) => ({ ...prev, ...common })); break
-      case "bible_study": setBibleStudyForm((prev) => ({ ...prev, ...(tmplData as unknown as BibleStudyFormData) })); break
-      case "womens_study": setWomensStudyForm((prev) => ({ ...prev, ...(tmplData as unknown as WomensStudyFormData) })); break
-      case "prayer_meeting": setPrayerMeetingForm((prev) => ({ ...prev, ...(tmplData as unknown as PrayerMeetingFormData) })); break
+      case "bible_study": {
+        // Don't overwrite date (from calendar) or time (from calendar instance)
+        const { date: _date, time: _time, ...templateFields } = tmplData as unknown as BibleStudyFormData
+        setBibleStudyForm((prev) => ({ ...prev, ...templateFields }))
+        break
+      }
+      case "womens_study": {
+        // Don't overwrite date (from calendar) or time (from calendar instance)
+        const { date: _date, time: _time, ...templateFields } = tmplData as unknown as WomensStudyFormData
+        setWomensStudyForm((prev) => ({ ...prev, ...templateFields }))
+        break
+      }
+      case "prayer_meeting": {
+        // Don't overwrite date (from calendar) or time (from calendar instance)
+        const { date: _date, time: _time, ...templateFields } = tmplData as unknown as PrayerMeetingFormData
+        setPrayerMeetingForm((prev) => ({ ...prev, ...templateFields }))
+        break
+      }
       case "bulletin": setBulletinForm((prev) => ({ ...prev, ...common })); break
     }
     toast.success("Refreshed from template defaults")
