@@ -1238,6 +1238,16 @@ export default function DashboardPage() {
         if (breakRows && breakRows.length > 0) bsOnBreak = true
       }
 
+      console.log('[Dashboard] Bible Study date processing:', {
+        bsRawDate: bsRawDate ? format(bsRawDate, 'yyyy-MM-dd') : null,
+        hasInstance: !!bsInstance,
+        instanceStatus: bsInstance?.status,
+        bsCancelled,
+        bsOnBreak,
+        bsDate: bsDate ? format(bsDate, 'yyyy-MM-dd') : null,
+        finalDateStr: bsDateStr,
+      })
+
       if (hasBsDraft) {
         const fd = composedMap["bible_study"].form_data as Record<string, unknown>
         setBibleStudyForm({
