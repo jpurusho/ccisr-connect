@@ -2562,17 +2562,17 @@ export default function DashboardPage() {
         return
       }
 
-      // Get base subject (use override if user edited it, otherwise generate from form/template)
-      const baseSubject = getSubject(type, false)
+      // Track if this is a reminder (resending an already sent email)
+      const currentStatus = getStatus(type)
+      const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
+
+      // Get base subject - for reminders, always generate fresh (don't use old sent subject)
+      const baseSubject = getSubject(type, isReminder)
 
       // Apply user's custom prefix if they set one (NO automatic prefixes)
       const finalSubject = subjectPrefixes[type]?.trim()
         ? combineSubject(baseSubject, type)
         : baseSubject
-
-      // Track if this is a reminder (resending an already sent email)
-      const currentStatus = getStatus(type)
-      const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
       const opts = commOptions[type]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
