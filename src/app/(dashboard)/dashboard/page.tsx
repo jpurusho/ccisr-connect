@@ -2557,47 +2557,18 @@ export default function DashboardPage() {
   const handleSendNow = useCallback(
     async (type: CommType) => {
       const html = getLivePreview(type)
-      const currentStatus = getStatus(type)
-      const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
-
-      // For reminders: clear all state and generate completely fresh subject
-      let baseSubject: string
-      if (isReminder) {
-        // Temporarily clear overrides and prefixes to generate clean base subject
-        const oldOverride = subjectOverrides[type]
-        const oldPrefix = subjectPrefixes[type]
-        delete subjectOverrides[type]
-        delete subjectPrefixes[type]
-
-        // Generate fresh base subject from current form data
-        baseSubject = getSubject(type, true)
-
-        // Strip any "Reminder:" that might be in templates
-        baseSubject = baseSubject.replace(/Reminder:\s*/gi, "").trim()
-
-        // Restore state
-        if (oldOverride) subjectOverrides[type] = oldOverride
-        if (oldPrefix) subjectPrefixes[type] = oldPrefix
-
-        // Apply prefix: use custom if set, otherwise "Reminder:"
-        if (oldPrefix?.trim()) {
-          baseSubject = `${oldPrefix.trim()}: ${baseSubject}`
-        } else {
-          baseSubject = `Reminder: ${baseSubject}`
-        }
-      } else {
-        baseSubject = getSubject(type, false)
-        if (subjectPrefixes[type]?.trim()) {
-          baseSubject = combineSubject(baseSubject, type)
-        }
-      }
-
       if (!html) {
         toast.error("No content to send. Please add data first.")
         return
       }
 
-      const finalSubject = baseSubject
+      // Get base subject (use override if user edited it, otherwise generate from form/template)
+      const baseSubject = getSubject(type, false)
+
+      // Apply user's custom prefix if they set one (NO automatic prefixes)
+      const finalSubject = subjectPrefixes[type]?.trim()
+        ? combineSubject(baseSubject, type)
+        : baseSubject
 
       const opts = commOptions[type]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
