@@ -1195,6 +1195,13 @@ export default function DashboardPage() {
       const hasBsDraft = !!composedMap["bible_study"]
       const bsEvent = findEventByType("bible_study")
       const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, wkSun, wkSat) : []
+      console.log('[Dashboard] Bible Study event processing:', {
+        hasEvent: !!bsEvent,
+        recurrenceRule: bsEvent?.recurrence_rule,
+        weekRange: `${format(wkSun, 'yyyy-MM-dd')} to ${format(wkSat, 'yyyy-MM-dd')}`,
+        occurrencesFound: bsOccurrences.length,
+        occurrences: bsOccurrences.map(d => format(d, 'yyyy-MM-dd')),
+      })
       let bsRawDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
       if (!bsRawDate && bsEvent && !bsEvent.recurrence_rule) {
         const evtAny = bsEvent as typeof bsEvent & { start_date?: string | null }
