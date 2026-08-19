@@ -2306,10 +2306,13 @@ export default function DashboardPage() {
   }
 
   function getSubject(type: CommType): string {
-    // If dispatched, show the exact subject that was sent
+    // Subject override takes precedence (user is actively editing)
+    if (subjectOverrides[type]) return subjectOverrides[type]!
+
+    // If dispatched (sent/sending), show the exact subject that was sent
     const d = dispatches[type]
     if (d && (d.status === "sent" || d.status === "sending")) return d.subject
-    if (subjectOverrides[type]) return subjectOverrides[type]!
+
     // savedSubjectTemplates is keyed by comm_type, not event type name
     const savedTmpl = savedSubjectTemplates[type]
     if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
