@@ -2293,9 +2293,9 @@ export default function DashboardPage() {
     switch (type) {
       case "birthday":       return makeBirthdayVars(weekLabel, birthdayForm.birthdays.map(b => b.name))
       case "anniversary":    return makeAnniversaryVars(weekLabel, anniversaryForm.anniversaries.map(a => `${a.husbandName} & ${a.wifeName}`))
-      case "bible_study":    return makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
-      case "womens_study":   return makeEventVars(weekLabel, womensStudyForm.date, womensStudyForm.time, womensStudyForm.topic || "")
-      case "prayer_meeting": return makeEventVars(weekLabel, prayerMeetingForm.date, prayerMeetingForm.time, "")
+      case "bible_study":    return makeEventVars(weekLabel, cleanDateForSubject(bibleStudyForm.date), bibleStudyForm.time, bibleStudyForm.topic || "")
+      case "womens_study":   return makeEventVars(weekLabel, cleanDateForSubject(womensStudyForm.date), womensStudyForm.time, womensStudyForm.topic || "")
+      case "prayer_meeting": return makeEventVars(weekLabel, cleanDateForSubject(prayerMeetingForm.date || ""), prayerMeetingForm.time, "")
       case "bulletin":       return makeBulletinVars(weekLabel, weekLabel)
     }
   }
@@ -2561,11 +2561,16 @@ export default function DashboardPage() {
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
       // For reminders, generate fresh subject from current form state (not old sent subject)
-      const baseSubject = getSubject(type, isReminder)
+      let baseSubject = getSubject(type, isReminder)
 
       if (!html) {
         toast.error("No content to send. Please add data first.")
         return
+      }
+
+      // Strip any existing "Reminder:" prefix to avoid double-prefixing
+      if (isReminder) {
+        baseSubject = baseSubject.replace(/^Reminder:\s*/i, "")
       }
 
       // Apply prefix (if manually set, use it; otherwise auto-add "Reminder" for resends)
