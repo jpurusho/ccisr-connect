@@ -2445,12 +2445,11 @@ export default function DashboardPage() {
       const weekStart = getWeekStartForSave(type)
       const templateName = BUILTIN_LABEL[type] || type
       const baseSubject = getSubject(type)
-      const subject = combineSubject(baseSubject, type)
 
       const payload = {
         template_type: type,
         name: templateName,
-        subject,
+        subject: baseSubject,  // Store ONLY base subject (no prefix)
         form_data: getFormData(type),
         mailing_list_id: commOptions[type].mailingListId || null,
         smtp_config_id: commOptions[type].smtpConfigId || null,
@@ -2567,19 +2566,10 @@ export default function DashboardPage() {
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
       // Get base subject - for reminders, generate fresh (skip old sent subject)
-      let baseSubject = getSubject(type, isReminder)
-
-      // Strip common prefix keywords from base subject (from old templates/data)
-      // Only strip if user hasn't explicitly edited the subject (no override)
-      if (!subjectOverrides[type]) {
-        baseSubject = baseSubject
-          .replace(/^Reminder:\s*/i, "")
-          .replace(/^Final Notice:\s*/i, "")
-          .replace(/^Urgent:\s*/i, "")
-          .trim()
-      }
+      const baseSubject = getSubject(type, isReminder)
 
       // Apply ONLY user's explicit prefix (if they set one)
+      // Prefix is layered at runtime, never stored in DB
       const finalSubject = subjectPrefixes[type]?.trim()
         ? combineSubject(baseSubject, type)
         : baseSubject
@@ -2604,11 +2594,12 @@ export default function DashboardPage() {
         const dispatchWeekStart = getWeekStartForSave(type)
 
         // Auto-save draft before dispatching so form data persists
+        // IMPORTANT: Store ONLY base subject (no prefix) to avoid accumulation
         const templateName = BUILTIN_LABEL[type] || type
         const draftPayload = {
           template_type: type,
           name: templateName,
-          subject: finalSubject,
+          subject: baseSubject,  // Store base subject WITHOUT prefix
           form_data: getFormData(type),
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
