@@ -1,6 +1,6 @@
 {
   "name": "ccisr-churchconnect",
-  "version": "1.76.6",
+  "version": "1.77.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
