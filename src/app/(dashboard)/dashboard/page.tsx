@@ -2568,16 +2568,19 @@ export default function DashboardPage() {
         return
       }
 
-      // Strip any existing "Reminder:" prefix to avoid double-prefixing
+      // For reminders: strip ALL "Reminder:" occurrences from base subject
       if (isReminder) {
-        baseSubject = baseSubject.replace(/^Reminder:\s*/i, "")
+        // Remove "Reminder:" from anywhere in the subject (start, middle, etc.)
+        baseSubject = baseSubject.replace(/Reminder:\s*/gi, "").trim()
       }
 
-      // Apply prefix (if manually set, use it; otherwise auto-add "Reminder" for resends)
+      // Apply prefix logic
       let finalSubject: string
       if (subjectPrefixes[type]?.trim()) {
+        // User has custom prefix - use it as-is (it may already contain "Reminder:")
         finalSubject = combineSubject(baseSubject, type)
       } else if (isReminder) {
+        // No custom prefix - auto-add "Reminder:" for resends
         finalSubject = `Reminder: ${baseSubject}`
       } else {
         finalSubject = combineSubject(baseSubject, type)
