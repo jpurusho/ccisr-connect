@@ -2313,12 +2313,22 @@ export default function DashboardPage() {
     // savedSubjectTemplates is keyed by comm_type, not event type name
     const savedTmpl = savedSubjectTemplates[type]
     if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
+
+    // Helper: Clean date for subject (remove break messages and fallback text)
+    const cleanDateForSubject = (date: string): string => {
+      // If it's a break message (contains emoji or "On break"), return generic text
+      if (date.includes('🏖️') || date.includes('On break') || date.includes('No ')) {
+        return "This Week"
+      }
+      return date
+    }
+
     switch (type) {
       case "birthday":       return `Happy Birthday! — Week of ${weekLabel}`
       case "anniversary":    return `Happy Anniversary! — Week of ${weekLabel}`
-      case "bible_study":    return `Bible Study This Friday — ${bibleStudyForm.date}`
+      case "bible_study":    return `Bible Study This Friday — ${cleanDateForSubject(bibleStudyForm.date)}`
       case "womens_study":   return `Women's Bible Study This Wednesday`
-      case "prayer_meeting": return `Monthly Prayer Meeting — ${prayerMeetingForm.date || "Date TBD"}`
+      case "prayer_meeting": return `Monthly Prayer Meeting — ${cleanDateForSubject(prayerMeetingForm.date || "Date TBD")}`
       case "bulletin":       return `Weekly Bulletin for ${bulletinForm.weekLabel}`
     }
   }
