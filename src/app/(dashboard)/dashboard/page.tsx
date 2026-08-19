@@ -2570,6 +2570,10 @@ export default function DashboardPage() {
         ? combineSubject(baseSubject, type)
         : baseSubject
 
+      // Track if this is a reminder (resending an already sent email)
+      const currentStatus = getStatus(type)
+      const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
+
       const opts = commOptions[type]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
         toast.error("Please select a mailing list or add recipient emails before sending.")
