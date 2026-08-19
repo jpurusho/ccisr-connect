@@ -1195,13 +1195,6 @@ export default function DashboardPage() {
       const hasBsDraft = !!composedMap["bible_study"]
       const bsEvent = findEventByType("bible_study")
       const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, wkSun, wkSat) : []
-      console.log('[Dashboard] Bible Study event processing:', {
-        hasEvent: !!bsEvent,
-        recurrenceRule: bsEvent?.recurrence_rule,
-        weekRange: `${format(wkSun, 'yyyy-MM-dd')} to ${format(wkSat, 'yyyy-MM-dd')}`,
-        occurrencesFound: bsOccurrences.length,
-        occurrences: bsOccurrences.map(d => format(d, 'yyyy-MM-dd')),
-      })
       let bsRawDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
       if (!bsRawDate && bsEvent && !bsEvent.recurrence_rule) {
         const evtAny = bsEvent as typeof bsEvent & { start_date?: string | null }
@@ -1230,29 +1223,13 @@ export default function DashboardPage() {
       if (!bsOnBreak && bsEvent) {
         const { data: breakRows } = await supabase
           .from("event_breaks")
-          .select("id, start_date, end_date, message")
+          .select("id")
           .eq("event_id", bsEvent.id)
           .lte("start_date", bsBreakCheckDate)
           .gte("end_date", bsBreakCheckDate)
           .limit(1)
-        console.log('[Dashboard] Break check:', {
-          checkDate: bsBreakCheckDate,
-          eventId: bsEvent.id,
-          breaksFound: breakRows?.length || 0,
-          breaks: breakRows,
-        })
         if (breakRows && breakRows.length > 0) bsOnBreak = true
       }
-
-      console.log('[Dashboard] Bible Study date processing:', {
-        bsRawDate: bsRawDate ? format(bsRawDate, 'yyyy-MM-dd') : null,
-        hasInstance: !!bsInstance,
-        instanceStatus: bsInstance?.status,
-        bsCancelled,
-        bsOnBreak,
-        bsDate: bsDate ? format(bsDate, 'yyyy-MM-dd') : null,
-        finalDateStr: bsDateStr,
-      })
 
       if (hasBsDraft) {
         const fd = composedMap["bible_study"].form_data as Record<string, unknown>
