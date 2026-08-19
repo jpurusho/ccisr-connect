@@ -1230,11 +1230,17 @@ export default function DashboardPage() {
       if (!bsOnBreak && bsEvent) {
         const { data: breakRows } = await supabase
           .from("event_breaks")
-          .select("id")
+          .select("id, start_date, end_date, message")
           .eq("event_id", bsEvent.id)
           .lte("start_date", bsBreakCheckDate)
           .gte("end_date", bsBreakCheckDate)
           .limit(1)
+        console.log('[Dashboard] Break check:', {
+          checkDate: bsBreakCheckDate,
+          eventId: bsEvent.id,
+          breaksFound: breakRows?.length || 0,
+          breaks: breakRows,
+        })
         if (breakRows && breakRows.length > 0) bsOnBreak = true
       }
 
