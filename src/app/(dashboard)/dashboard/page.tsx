@@ -2566,16 +2566,20 @@ export default function DashboardPage() {
       const currentStatus = getStatus(type)
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
-      // Get base subject - for reminders, always generate fresh (don't use old sent subject)
+      // Get base subject - for reminders, generate fresh (skip old sent subject)
       let baseSubject = getSubject(type, isReminder)
 
-      // For reminders: strip ALL instances of "Reminder:" from base subject
-      // (it may be in saved templates or old subjects)
-      if (isReminder) {
-        baseSubject = baseSubject.replace(/Reminder:\s*/gi, "").trim()
+      // Strip common prefix keywords from base subject (from old templates/data)
+      // Only strip if user hasn't explicitly edited the subject (no override)
+      if (!subjectOverrides[type]) {
+        baseSubject = baseSubject
+          .replace(/^Reminder:\s*/i, "")
+          .replace(/^Final Notice:\s*/i, "")
+          .replace(/^Urgent:\s*/i, "")
+          .trim()
       }
 
-      // Apply user's custom prefix if they set one (NO automatic prefixes)
+      // Apply ONLY user's explicit prefix (if they set one)
       const finalSubject = subjectPrefixes[type]?.trim()
         ? combineSubject(baseSubject, type)
         : baseSubject
