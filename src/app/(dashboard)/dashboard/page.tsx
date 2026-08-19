@@ -88,6 +88,7 @@ import {
 } from "@/lib/dashboard-types"
 import { useCardVisibility } from "@/hooks/dashboard/use-card-visibility"
 import { resolveSignupAutoFill, type SignupFieldMap, type AutoFillResult } from "@/lib/signup/auto-fill"
+import { getBreakStatus } from "@/lib/dashboard/break-utils"
 
 import {
   WeeklyCommunicationCard,
@@ -1217,25 +1218,28 @@ export default function DashboardPage() {
       const bsDateStr = bsDate ? format(bsDate, "EEEE, MMMM do") : "No bible study this week"
       const bsTimeStr = bsInstance?.instance_time ? formatTime(bsInstance.instance_time) : null
 
-      // Break detection: query event_breaks for this event+date
-      const bsBreakCheckDate = bsRawDate ? format(bsRawDate, "yyyy-MM-dd") : format(wkSun, "yyyy-MM-dd")
+      // Break detection: get break status with detailed message
+      const bsBreakCheckDate = bsRawDate || wkSun
       let bsOnBreak = bsCancelled
+      let bsBreakMessage = "No bible study this week"
       if (!bsOnBreak && bsEvent) {
-        const { data: breakRows } = await supabase
-          .from("event_breaks")
-          .select("id")
-          .eq("event_id", bsEvent.id)
-          .lte("start_date", bsBreakCheckDate)
-          .gte("end_date", bsBreakCheckDate)
-          .limit(1)
-        if (breakRows && breakRows.length > 0) bsOnBreak = true
+        const breakStatus = await getBreakStatus(
+          bsEvent.id,
+          bsBreakCheckDate,
+          bsEvent.recurrence_rule,
+          supabase
+        )
+        bsOnBreak = breakStatus.isOnBreak
+        if (breakStatus.isOnBreak && breakStatus.displayMessage) {
+          bsBreakMessage = breakStatus.displayMessage
+        }
       }
 
       if (hasBsDraft) {
         const fd = composedMap["bible_study"].form_data as Record<string, unknown>
         setBibleStudyForm({
           title: (fd.title as string) ?? bsDef.title ?? "Bible Study This Friday",
-          date: bsOnBreak ? "No bible study this week" : bsDateStr,
+          date: bsOnBreak ? bsBreakMessage : bsDateStr,
           time: bsTimeStr ?? (fd.time as string) ?? bsDef.time ?? "7:30 PM",
           topic: (fd.topic as string) ?? bsDef.topic ?? "Studying the Book of Acts",
           hostNames: (fd.hostNames as string) ?? bsDef.hostNames ?? "TBD",
@@ -1283,7 +1287,7 @@ export default function DashboardPage() {
 
         setBibleStudyForm({
           title: bsDef.title ?? "Bible Study This Friday",
-          date: bsOnBreak ? "No bible study this week" : bsDateStr,
+          date: bsOnBreak ? bsBreakMessage : bsDateStr,
           time: bsTimeStr ?? bsDef.time ?? "7:30 PM",
           topic: bsDef.topic ?? "Studying the Book of Acts",
           hostNames: bsOnBreak ? "" : bsHostData.hostName,
@@ -1312,13 +1316,30 @@ export default function DashboardPage() {
 
       const wsDateStr = wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week"
 
+      // Break detection for Women's Study
+      const wsBreakCheckDate = wsRawDate || wkSun
+      let wsOnBreak = wsCancelled
+      let wsBreakMessage = "No study this week"
+      if (!wsOnBreak && wsEvent) {
+        const breakStatus = await getBreakStatus(
+          wsEvent.id,
+          wsBreakCheckDate,
+          wsEvent.recurrence_rule,
+          supabase
+        )
+        wsOnBreak = breakStatus.isOnBreak
+        if (breakStatus.isOnBreak && breakStatus.displayMessage) {
+          wsBreakMessage = breakStatus.displayMessage
+        }
+      }
+
       const wsCommon = extractCommonFields(wsDef)
       if (hasWsDraft) {
         const fd = composedMap["womens_study"].form_data as Record<string, unknown>
         setWomensStudyForm({
           title: (fd.title as string) ?? wsDef.title ?? "Women's Bible Study",
           topic: (fd.topic as string) ?? wsDef.topic ?? "Building a Relationship with God",
-          date: wsDateStr,
+          date: wsOnBreak ? wsBreakMessage : wsDateStr,
           time: (fd.time as string) ?? wsDef.time ?? "7:00 PM",
           zoomLink: (fd.zoomLink as string) ?? wsDef.zoomLink ?? "",
           zoomMeetingId: (fd.zoomMeetingId as string) ?? wsDef.zoomMeetingId ?? "",
@@ -1330,7 +1351,7 @@ export default function DashboardPage() {
         setWomensStudyForm({
           title: wsDef.title ?? "Women's Bible Study",
           topic: wsDef.topic ?? "Building a Relationship with God",
-          date: wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week",
+          date: wsOnBreak ? wsBreakMessage : (wsDate ? format(wsDate, "EEEE, MMMM do") : "No study this week"),
           time: wsDef.time ?? "7:00 PM",
           zoomLink: wsDef.zoomLink ?? "",
           zoomMeetingId: wsDef.zoomMeetingId ?? "",
@@ -1359,11 +1380,28 @@ export default function DashboardPage() {
       const pmDateStr = pmDate ? format(pmDate, "EEEE, MMMM do") : null
       const pmTimeStr = pmInstance?.instance_time ? formatTime(pmInstance.instance_time) : null
 
+      // Break detection for Prayer Meeting
+      const pmBreakCheckDate = pmRawDate || wkSun
+      let pmOnBreak = pmCancelled
+      let pmBreakMessage = "Not scheduled this week"
+      if (!pmOnBreak && pmEvent) {
+        const breakStatus = await getBreakStatus(
+          pmEvent.id,
+          pmBreakCheckDate,
+          pmEvent.recurrence_rule,
+          supabase
+        )
+        pmOnBreak = breakStatus.isOnBreak
+        if (breakStatus.isOnBreak && breakStatus.displayMessage) {
+          pmBreakMessage = breakStatus.displayMessage
+        }
+      }
+
       const pmCommon = extractCommonFields(pmDef)
       if (hasPmDraft) {
         const fd = composedMap["prayer_meeting"].form_data as Record<string, unknown>
         setPrayerMeetingForm({
-          date: pmDateStr ?? (pmEvent ? "Not scheduled this week" : (fd.date as string) ?? ""),
+          date: pmOnBreak ? pmBreakMessage : (pmDateStr ?? (pmEvent ? "Not scheduled this week" : (fd.date as string) ?? "")),
           time: pmTimeStr ?? ((fd.time as string) ?? pmDef.time ?? "6:00 PM"),
           hostNames: (fd.hostNames as string) ?? pmDef.hostNames ?? "TBD",
           address: (fd.address as string) ?? pmDef.address ?? "TBD",
@@ -1403,12 +1441,12 @@ export default function DashboardPage() {
         if (pmInstance?.location_override) pmHostData.address = pmInstance.location_override
 
         setPrayerMeetingForm({
-          date: pmDateStr ?? pmDef.date ?? "",
+          date: pmOnBreak ? pmBreakMessage : (pmDateStr ?? pmDef.date ?? ""),
           time: pmTimeStr ?? pmDef.time ?? "6:00 PM",
-          hostNames: pmHostData.hostName,
-          address: pmHostData.address,
-          city: pmHostData.city,
-          phone: pmHostData.phone,
+          hostNames: pmOnBreak ? "" : pmHostData.hostName,
+          address: pmOnBreak ? "" : pmHostData.address,
+          city: pmOnBreak ? "" : pmHostData.city,
+          phone: pmOnBreak ? "" : pmHostData.phone,
           dinnerNote: pmDef.dinnerNote ?? "",
           signupLink: pmDef.signupLink ?? "",
           ...pmCommon,

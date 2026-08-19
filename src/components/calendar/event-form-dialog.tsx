@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { format, addDays, isAfter } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
+import { checkBreakConflict } from "@/lib/dashboard/break-utils"
 import {
   type RecurrenceFields,
   DAY_MAP,
@@ -95,6 +96,12 @@ export function EventFormDialog({
   const [families, setFamilies] = useState<FamilyOption[]>([])
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [breakConflict, setBreakConflict] = useState<{
+    exists: boolean
+    message: string
+    startDate: string
+    endDate: string
+  } | null>(null)
 
   const [newExceptDate, setNewExceptDate] = useState("")
   const [rangeFrom, setRangeFrom] = useState("")
@@ -216,6 +223,48 @@ export function EventFormDialog({
 
     loadData()
   }, [open, mode, eventId, initialDate, resetForm])
+
+  // Check for break conflicts when date or event type changes
+  useEffect(() => {
+    async function checkForBreaks() {
+      if (!startDate || !eventTypeId || recurrenceFreq !== "NONE") {
+        setBreakConflict(null)
+        return
+      }
+
+      const supabase = createClient()
+
+      // Find all events with the same event_type_id
+      const { data: events } = await supabase
+        .from("events")
+        .select("id, title")
+        .eq("event_type_id", eventTypeId)
+        .eq("is_active", true)
+
+      if (!events || events.length === 0) {
+        setBreakConflict(null)
+        return
+      }
+
+      // Check each event for breaks covering the selected date
+      for (const event of events) {
+        const breakInfo = await checkBreakConflict(event.id, new Date(startDate + "T00:00:00"), supabase)
+        if (breakInfo) {
+          setBreakConflict({
+            exists: true,
+            message: breakInfo.message || "On scheduled break",
+            startDate: breakInfo.start_date,
+            endDate: breakInfo.end_date,
+          })
+          return
+        }
+      }
+
+      setBreakConflict(null)
+    }
+
+    checkForBreaks()
+  }, [startDate, eventTypeId, recurrenceFreq])
 
   async function handleSave() {
     if (!title.trim()) { toast.error("Title is required"); return }
@@ -529,27 +578,50 @@ export function EventFormDialog({
 
               {/* One-time: Event Date */}
               {recurrenceFreq === "NONE" && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Event Date *</Label>
-                    <Input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Event Date *</Label>
+                      <Input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">End Date (multi-day)</Label>
+                      <Input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Only for multi-day events (e.g., VBS).
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">End Date (multi-day)</Label>
-                    <Input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      Only for multi-day events (e.g., VBS).
-                    </p>
-                  </div>
-                </div>
+
+                  {/* Break conflict warning */}
+                  {breakConflict && (
+                    <div className="rounded-md border border-orange-300 bg-orange-50 p-3 dark:border-orange-700 dark:bg-orange-900/20">
+                      <div className="flex gap-2">
+                        <span className="text-lg">⚠️</span>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                            Break Conflict
+                          </p>
+                          <p className="text-xs text-orange-700 dark:text-orange-400">
+                            This date falls during <strong>&quot;{breakConflict.message}&quot;</strong><br />
+                            ({format(new Date(breakConflict.startDate + "T00:00:00"), "MMM d")} - {format(new Date(breakConflict.endDate + "T00:00:00"), "MMM d, yyyy")})
+                          </p>
+                          <p className="text-xs text-orange-600 dark:text-orange-500">
+                            Consider choosing a different date or removing the break period.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Recurring: Day + pattern */}

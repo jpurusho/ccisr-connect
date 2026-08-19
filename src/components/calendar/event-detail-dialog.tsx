@@ -246,12 +246,36 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
   if (loading) return null
 
   const refDate = format(eventDate, "yyyy-MM-dd")
-  const activeBreaks = breaks.filter((b) => b.end_date >= refDate)
-  const pastBreaks = breaks.filter((b) => b.end_date < refDate)
-  const visibleBreaks = showPastBreaks ? breaks : activeBreaks
+  const today = format(new Date(), "yyyy-MM-dd")
 
-  // Only show the breaks section if there are active breaks OR user wants to see past breaks
-  const showBreaksSection = activeBreaks.length > 0 || (pastBreaks.length > 0 && showPastBreaks)
+  // Categorize breaks by status relative to today
+  const activeBreaks = breaks.filter((b) => b.start_date <= today && b.end_date >= today)
+  const upcomingBreaks = breaks.filter((b) => b.start_date > today)
+  const pastBreaks = breaks.filter((b) => b.end_date < today)
+
+  const visibleBreaks = showPastBreaks ? breaks : [...activeBreaks, ...upcomingBreaks]
+
+  // Only show the breaks section if there are active/upcoming breaks OR user wants to see past breaks
+  const showBreaksSection = activeBreaks.length > 0 || upcomingBreaks.length > 0 || (pastBreaks.length > 0 && showPastBreaks)
+
+  // Helper to determine break status
+  const getBreakStatus = (brk: typeof breaks[0]) => {
+    if (brk.start_date <= today && brk.end_date >= today) return "active"
+    if (brk.start_date > today) return "upcoming"
+    return "past"
+  }
+
+  const statusColors = {
+    active: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+    upcoming: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+    past: "bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400",
+  }
+
+  const statusLabels = {
+    active: "Active",
+    upcoming: "Upcoming",
+    past: "Past",
+  }
 
   return (
     <div className="space-y-2">
@@ -269,19 +293,37 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
               </button>
             )}
           </div>
-          {visibleBreaks.map((brk) => (
-            <div key={brk.id} className="flex items-center justify-between gap-2 text-sm">
-              <div>
-                <span className="font-medium">
-                  {format(new Date(brk.start_date + "T00:00:00"), "MMM d")} – {format(new Date(brk.end_date + "T00:00:00"), "MMM d, yyyy")}
-                </span>
-                {brk.message && <span className="ml-2 text-muted-foreground text-xs">({brk.message})</span>}
+          {visibleBreaks.map((brk) => {
+            const status = getBreakStatus(brk)
+            return (
+              <div key={brk.id} className="flex items-start justify-between gap-2">
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[status]}`}>
+                      {statusLabels[status]}
+                    </Badge>
+                    {brk.message && (
+                      <span className="text-xs font-medium text-foreground">
+                        {brk.message}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium">
+                      {format(new Date(brk.start_date + "T00:00:00"), "MMM d")}
+                    </span>
+                    <span className="mx-1">→</span>
+                    <span className="font-semibold text-foreground">
+                      {format(new Date(brk.end_date + "T00:00:00"), "MMM d, yyyy")}
+                    </span>
+                  </div>
+                </div>
+                <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteBreak(brk.id)} title="Remove break">
+                  <X className="size-3.5 text-red-500" />
+                </Button>
               </div>
-              <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteBreak(brk.id)} title="Remove break">
-                <X className="size-3.5 text-red-500" />
-              </Button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

@@ -8,6 +8,7 @@
 import { format } from 'date-fns'
 import { getOccurrences } from '@/lib/recurrence'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getBreakStatus } from './break-utils'
 
 interface Event {
   id: string
@@ -39,6 +40,7 @@ interface ProcessedEvent {
   cancelled: boolean
   hasOccurrence: boolean
   instance: EventInstance | null
+  breakMessage: string | null  // User-friendly break message with end date and resume date
 }
 
 /**
@@ -62,6 +64,7 @@ export async function processRecurringEvent(
       cancelled: false,
       hasOccurrence: false,
       instance: null,
+      breakMessage: null,
     }
   }
 
@@ -88,6 +91,7 @@ export async function processRecurringEvent(
       cancelled: false,
       hasOccurrence: false,
       instance: null,
+      breakMessage: null,
     }
   }
 
@@ -98,28 +102,25 @@ export async function processRecurringEvent(
 
   const cancelled = instance?.status === 'cancelled'
 
-  // Check for break
-  const dateISO = format(rawDate, 'yyyy-MM-dd')
-  const { data: breakRows } = await supabase
-    .from('event_breaks')
-    .select('id')
-    .eq('event_id', event.id)
-    .lte('start_date', dateISO)
-    .gte('end_date', dateISO)
-    .limit(1)
-
-  const onBreak = (breakRows?.length ?? 0) > 0
+  // Check for break with detailed info
+  const breakStatus = await getBreakStatus(
+    event.id,
+    rawDate,
+    event.recurrence_rule,
+    supabase
+  )
 
   // Final date (null if cancelled or on break)
-  const finalDate = (cancelled || onBreak) ? null : rawDate
+  const finalDate = (cancelled || breakStatus.isOnBreak) ? null : rawDate
 
   return {
     date: finalDate ? format(finalDate, 'EEEE, MMMM do') : null,
     time: instance?.instance_time || event.default_time || null,
-    onBreak,
+    onBreak: breakStatus.isOnBreak,
     cancelled,
     hasOccurrence: true,
     instance,
+    breakMessage: breakStatus.displayMessage,
   }
 }
 
