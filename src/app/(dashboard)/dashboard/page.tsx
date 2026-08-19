@@ -2560,31 +2560,44 @@ export default function DashboardPage() {
       const currentStatus = getStatus(type)
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
-      // For reminders, generate fresh subject from current form state (not old sent subject)
-      let baseSubject = getSubject(type, isReminder)
+      // For reminders: clear all state and generate completely fresh subject
+      let baseSubject: string
+      if (isReminder) {
+        // Temporarily clear overrides and prefixes to generate clean base subject
+        const oldOverride = subjectOverrides[type]
+        const oldPrefix = subjectPrefixes[type]
+        delete subjectOverrides[type]
+        delete subjectPrefixes[type]
+
+        // Generate fresh base subject from current form data
+        baseSubject = getSubject(type, true)
+
+        // Strip any "Reminder:" that might be in templates
+        baseSubject = baseSubject.replace(/Reminder:\s*/gi, "").trim()
+
+        // Restore state
+        if (oldOverride) subjectOverrides[type] = oldOverride
+        if (oldPrefix) subjectPrefixes[type] = oldPrefix
+
+        // Apply prefix: use custom if set, otherwise "Reminder:"
+        if (oldPrefix?.trim()) {
+          baseSubject = `${oldPrefix.trim()}: ${baseSubject}`
+        } else {
+          baseSubject = `Reminder: ${baseSubject}`
+        }
+      } else {
+        baseSubject = getSubject(type, false)
+        if (subjectPrefixes[type]?.trim()) {
+          baseSubject = combineSubject(baseSubject, type)
+        }
+      }
 
       if (!html) {
         toast.error("No content to send. Please add data first.")
         return
       }
 
-      // For reminders: strip ALL "Reminder:" occurrences from base subject
-      if (isReminder) {
-        // Remove "Reminder:" from anywhere in the subject (start, middle, etc.)
-        baseSubject = baseSubject.replace(/Reminder:\s*/gi, "").trim()
-      }
-
-      // Apply prefix logic
-      let finalSubject: string
-      if (subjectPrefixes[type]?.trim()) {
-        // User has custom prefix - use it as-is (it may already contain "Reminder:")
-        finalSubject = combineSubject(baseSubject, type)
-      } else if (isReminder) {
-        // No custom prefix - auto-add "Reminder:" for resends
-        finalSubject = `Reminder: ${baseSubject}`
-      } else {
-        finalSubject = combineSubject(baseSubject, type)
-      }
+      const finalSubject = baseSubject
 
       const opts = commOptions[type]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
