@@ -2305,26 +2305,27 @@ export default function DashboardPage() {
     return prefix ? `${prefix}: ${baseSubject}` : baseSubject
   }
 
-  function getSubject(type: CommType): string {
+  // Helper: Clean date for subject (remove break messages and fallback text)
+  const cleanDateForSubject = (date: string): string => {
+    // If it's a break message (contains emoji or "On break"), return generic text
+    if (date.includes('🏖️') || date.includes('On break') || date.includes('No ')) {
+      return "This Week"
+    }
+    return date
+  }
+
+  function getSubject(type: CommType, forceFresh = false): string {
     // Subject override takes precedence (user is actively editing)
     if (subjectOverrides[type]) return subjectOverrides[type]!
 
     // If dispatched (sent/sending), show the exact subject that was sent
+    // UNLESS forceFresh is true (for reminders, we want a fresh subject)
     const d = dispatches[type]
-    if (d && (d.status === "sent" || d.status === "sending")) return d.subject
+    if (!forceFresh && d && (d.status === "sent" || d.status === "sending")) return d.subject
 
     // savedSubjectTemplates is keyed by comm_type, not event type name
     const savedTmpl = savedSubjectTemplates[type]
     if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
-
-    // Helper: Clean date for subject (remove break messages and fallback text)
-    const cleanDateForSubject = (date: string): string => {
-      // If it's a break message (contains emoji or "On break"), return generic text
-      if (date.includes('🏖️') || date.includes('On break') || date.includes('No ')) {
-        return "This Week"
-      }
-      return date
-    }
 
     switch (type) {
       case "birthday":       return `Happy Birthday! — Week of ${weekLabel}`
@@ -2556,14 +2557,16 @@ export default function DashboardPage() {
   const handleSendNow = useCallback(
     async (type: CommType) => {
       const html = getLivePreview(type)
-      const baseSubject = getSubject(type)
+      const currentStatus = getStatus(type)
+      const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
+
+      // For reminders, generate fresh subject from current form state (not old sent subject)
+      const baseSubject = getSubject(type, isReminder)
+
       if (!html) {
         toast.error("No content to send. Please add data first.")
         return
       }
-
-      const currentStatus = getStatus(type)
-      const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
       // Apply prefix (if manually set, use it; otherwise auto-add "Reminder" for resends)
       let finalSubject: string
