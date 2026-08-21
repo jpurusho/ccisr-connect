@@ -2070,6 +2070,7 @@ export default function DashboardPage() {
         if (ci?.subject) resolvedSubjects[ct] = ci.subject
         if (ci?.subject_prefix) resolvedPrefixes[ct] = ci.subject_prefix
       }
+      console.log('[DEBUG] Loaded subject prefixes from DB:', resolvedPrefixes)
 
       // ---- Match dispatches to communication types (count all, keep latest) ----
       const weekDispatches = weekDispatchesRes.data ?? []
@@ -2130,7 +2131,11 @@ export default function DashboardPage() {
       }
       setCommOptions({ ...prefilledOptions, ...customCommOpts })
       setSubjectOverrides({ ...resolvedSubjects, ...customSubjOvr })
-      setSubjectPrefixes((prev) => ({ ...prev, ...resolvedPrefixes }))
+      setSubjectPrefixes((prev) => {
+        const updated = { ...prev, ...resolvedPrefixes }
+        console.log('[DEBUG] Setting subject prefixes state:', updated)
+        return updated
+      })
 
       // Match dispatches for custom templates
       const customDispInfo: Record<string, { status: string; count: number; lastSentAt: string | null }> = {}
@@ -2356,6 +2361,7 @@ export default function DashboardPage() {
   }
 
   function setSubjectPrefix(keyOrType: string, value: string) {
+    console.log(`[DEBUG] setSubjectPrefix: ${keyOrType} = "${value}"`)
     setSubjectPrefixes((prev) => ({ ...prev, [keyOrType]: value }))
   }
 
@@ -2459,6 +2465,12 @@ export default function DashboardPage() {
       const weekStart = getWeekStartForSave(type)
       const templateName = BUILTIN_LABEL[type] || type
       const baseSubject = getSubject(type)
+
+      console.log(`[DEBUG] handleSaveInstance for ${type}:`, {
+        baseSubject,
+        subjectPrefix: subjectPrefixes[type],
+        allPrefixes: subjectPrefixes
+      })
 
       const payload = {
         template_type: type,
