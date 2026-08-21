@@ -2489,11 +2489,14 @@ export default function DashboardPage() {
       }
 
       const existingId = instanceIds[type]
+      console.log(`[DEBUG] Saving to database:`, { existingId, payload })
       if (existingId) {
-        const { error } = await supabase
+        const { error, data } = await supabase
           .from("composed_instances")
           .update(payload as never)
           .eq("id", existingId)
+          .select()
+        console.log(`[DEBUG] Update result:`, { error, data })
         if (error) {
           toast.error(`Save failed: ${error.message}`)
         } else {
@@ -2592,14 +2595,25 @@ export default function DashboardPage() {
       const currentStatus = getStatus(type)
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
+      console.log(`[DEBUG] handleSendNow for ${type}:`, {
+        isReminder,
+        subjectOverrides: subjectOverrides[type],
+        savedSubjectTemplates: savedSubjectTemplates[type],
+        subjectPrefixes: subjectPrefixes[type]
+      })
+
       // Get base subject - for reminders, generate fresh (skip old sent subject)
       const baseSubject = getSubject(type, isReminder)
+
+      console.log(`[DEBUG] getSubject returned:`, baseSubject)
 
       // Apply ONLY user's explicit prefix (if they set one)
       // Prefix is layered at runtime, never stored in DB
       const finalSubject = subjectPrefixes[type]?.trim()
         ? combineSubject(baseSubject, type)
         : baseSubject
+
+      console.log(`[DEBUG] finalSubject:`, finalSubject)
 
       const opts = commOptions[type]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
@@ -3887,7 +3901,14 @@ export default function DashboardPage() {
                   // For sent/scheduled emails, show the fresh subject (what will be used for reminder)
                   // This ensures the card displays what WILL be sent, not what WAS sent
                   const isReminderContext = status === "sent" || status === "scheduled"
-                  return getSubject(type, isReminderContext)
+                  const subject = getSubject(type, isReminderContext)
+                  console.log(`[DEBUG] Card subject for ${type}:`, {
+                    status,
+                    isReminderContext,
+                    subject,
+                    subjectOverride: subjectOverrides[type]
+                  })
+                  return subject
                 })()}
                 onSubjectChange={(v) => setSubjectOverride(type, v)}
                 subjectPrefix={subjectPrefixes[type] || ""}
