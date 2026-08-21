@@ -1692,3 +1692,13 @@ export const Constants = {
     },
   },
 } as const
+
+// Convenience type exports for table rows
+export type EventInstance = Database['public']['Tables']['event_instances']['Row']
+export type Event = Database['public']['Tables']['events']['Row']
+export type EventType = Database['public']['Tables']['event_types']['Row']
+export type Member = Database['public']['Tables']['members']['Row']
+export type WeddingAnniversary = Database['public']['Tables']['wedding_anniversaries']['Row']
+export type Family = Database['public']['Tables']['families']['Row']
+export type Address = Database['public']['Tables']['addresses']['Row']
+export type DispatchStatus = Database['public']['Enums']['dispatch_status']
