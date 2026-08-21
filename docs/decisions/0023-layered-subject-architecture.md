@@ -24,6 +24,7 @@ Implement a **layered architecture** that separates data storage from presentati
 
 ### Storage Layer (Database)
 - `composed_instances.subject` → Store ONLY base subject (no prefix)
+- `composed_instances.subject_prefix` → Store prefix separately (e.g., "Reminder", "Final Notice") *(added v1.77.3)*
 - `dispatch_queue.subject` → Store final subject AS SENT (preserves what was actually sent)
 - `email_templates.subject` → Store base template (no prefix)
 
@@ -172,7 +173,8 @@ async function handleSendNow(type: CommType) {
 - **2026-08-19**: Adopted layered architecture approach
 - **v1.77.0**: Removed all automatic prefix logic
 - **v1.77.1**: Implemented clean layered storage
-- **2026-08-21**: Fixed card display to show fresh subject for reminders (not old sent subject)
+- **2026-08-21 v1.77.2**: Fixed card display to show fresh subject for reminders (not old sent subject)
+- **2026-08-21 v1.77.3**: Added subject_prefix column to DB - prefix now persists across sessions
 
 ## User Guidance
 
