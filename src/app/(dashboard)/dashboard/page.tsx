@@ -2062,11 +2062,13 @@ export default function DashboardPage() {
         }
       }
 
-      // Pre-fill subject overrides from composed instances
+      // Pre-fill subject overrides and prefixes from composed instances
       const resolvedSubjects: Record<string, string> = {}
+      const resolvedPrefixes: Record<string, string> = {}
       for (const ct of commTypeKeys) {
         const ci = composedMap[ct]
         if (ci?.subject) resolvedSubjects[ct] = ci.subject
+        if (ci?.subject_prefix) resolvedPrefixes[ct] = ci.subject_prefix
       }
 
       // ---- Match dispatches to communication types (count all, keep latest) ----
@@ -2128,6 +2130,7 @@ export default function DashboardPage() {
       }
       setCommOptions({ ...prefilledOptions, ...customCommOpts })
       setSubjectOverrides({ ...resolvedSubjects, ...customSubjOvr })
+      setSubjectPrefixes((prev) => ({ ...prev, ...resolvedPrefixes }))
 
       // Match dispatches for custom templates
       const customDispInfo: Record<string, { status: string; count: number; lastSentAt: string | null }> = {}
@@ -2461,6 +2464,7 @@ export default function DashboardPage() {
         template_type: type,
         name: templateName,
         subject: baseSubject,  // Store ONLY base subject (no prefix)
+        subject_prefix: subjectPrefixes[type] || null,  // Store prefix separately
         form_data: getFormData(type),
         mailing_list_id: commOptions[type].mailingListId || null,
         smtp_config_id: commOptions[type].smtpConfigId || null,
@@ -2611,6 +2615,7 @@ export default function DashboardPage() {
           template_type: type,
           name: templateName,
           subject: baseSubject,  // Store base subject WITHOUT prefix
+          subject_prefix: subjectPrefixes[type] || null,  // Store prefix separately
           form_data: getFormData(type),
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
@@ -2681,7 +2686,8 @@ export default function DashboardPage() {
       const draftPayload = {
         template_type: type,
         name: templateName,
-        subject,
+        subject: baseSubject,  // Store base subject WITHOUT prefix
+        subject_prefix: subjectPrefixes[type] || null,  // Store prefix separately
         form_data: getFormData(type),
         mailing_list_id: opts.mailingListId || null,
         smtp_config_id: opts.smtpConfigId || null,
@@ -2884,7 +2890,8 @@ export default function DashboardPage() {
       const draftPayload = {
         template_type: ctKey,
         name: ct.name,
-        subject: subj,
+        subject: baseSubj,  // Store base subject WITHOUT prefix
+        subject_prefix: subjectPrefixes[ctId] || null,  // Store prefix separately
         form_data: form as unknown as Record<string, unknown>,
         mailing_list_id: opts.mailingListId || null,
         smtp_config_id: opts.smtpConfigId || null,
@@ -2956,7 +2963,8 @@ export default function DashboardPage() {
       const draftPayload = {
         template_type: ctKey,
         name: ct.name,
-        subject: subj,
+        subject: baseSubj,  // Store base subject WITHOUT prefix
+        subject_prefix: subjectPrefixes[ctId] || null,  // Store prefix separately
         form_data: form as unknown as Record<string, unknown>,
         mailing_list_id: opts.mailingListId || null,
         smtp_config_id: opts.smtpConfigId || null,
