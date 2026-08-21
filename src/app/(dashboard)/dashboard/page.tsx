@@ -988,12 +988,10 @@ export default function DashboardPage() {
       )
 
       // Build composed instances map (template_type → data)
-      console.log('[DEBUG] Raw DB query result (composedInstancesRes.data):', composedInstancesRes.data)
       type CIRow = (typeof composedInstancesRes.data extends (infer U)[] | null ? U : never)
       const composedMap: Record<string, CIRow> = {}
       if (composedInstancesRes.data) {
         for (const ci of composedInstancesRes.data) {
-          console.log('[DEBUG] Processing composed instance:', ci)
           if (ci.is_recurring && ci.recur_until && ci.recur_until < wkSunISO) continue
           const existing = composedMap[ci.template_type]
           if (!existing) {
@@ -2065,17 +2063,13 @@ export default function DashboardPage() {
       }
 
       // Pre-fill subject overrides and prefixes from composed instances
-      console.log('[DEBUG] composedMap:', composedMap)
-      console.log('[DEBUG] commTypeKeys:', commTypeKeys)
       const resolvedSubjects: Record<string, string> = {}
       const resolvedPrefixes: Record<string, string> = {}
       for (const ct of commTypeKeys) {
         const ci = composedMap[ct]
-        console.log(`[DEBUG] Processing ${ct}:`, ci)
         if (ci?.subject) resolvedSubjects[ct] = ci.subject
         if (ci?.subject_prefix) resolvedPrefixes[ct] = ci.subject_prefix
       }
-      console.log('[DEBUG] Loaded subject prefixes from DB:', resolvedPrefixes)
 
       // ---- Match dispatches to communication types (count all, keep latest) ----
       const weekDispatches = weekDispatchesRes.data ?? []
@@ -2136,11 +2130,7 @@ export default function DashboardPage() {
       }
       setCommOptions({ ...prefilledOptions, ...customCommOpts })
       setSubjectOverrides({ ...resolvedSubjects, ...customSubjOvr })
-      setSubjectPrefixes((prev) => {
-        const updated = { ...prev, ...resolvedPrefixes }
-        console.log('[DEBUG] Setting subject prefixes state:', updated)
-        return updated
-      })
+      setSubjectPrefixes((prev) => ({ ...prev, ...resolvedPrefixes }))
 
       // Match dispatches for custom templates
       const customDispInfo: Record<string, { status: string; count: number; lastSentAt: string | null }> = {}
@@ -2366,7 +2356,6 @@ export default function DashboardPage() {
   }
 
   function setSubjectPrefix(keyOrType: string, value: string) {
-    console.log(`[DEBUG] setSubjectPrefix: ${keyOrType} = "${value}"`)
     setSubjectPrefixes((prev) => ({ ...prev, [keyOrType]: value }))
   }
 
@@ -2471,12 +2460,6 @@ export default function DashboardPage() {
       const templateName = BUILTIN_LABEL[type] || type
       const baseSubject = getSubject(type)
 
-      console.log(`[DEBUG] handleSaveInstance for ${type}:`, {
-        baseSubject,
-        subjectPrefix: subjectPrefixes[type],
-        allPrefixes: subjectPrefixes
-      })
-
       const payload = {
         template_type: type,
         name: templateName,
@@ -2494,14 +2477,11 @@ export default function DashboardPage() {
       }
 
       const existingId = instanceIds[type]
-      console.log(`[DEBUG] Saving to database:`, { existingId, payload })
       if (existingId) {
-        const { error, data } = await supabase
+        const { error } = await supabase
           .from("composed_instances")
           .update(payload as never)
           .eq("id", existingId)
-          .select()
-        console.log(`[DEBUG] Update result:`, { error, data })
         if (error) {
           toast.error(`Save failed: ${error.message}`)
         } else {
@@ -2600,25 +2580,14 @@ export default function DashboardPage() {
       const currentStatus = getStatus(type)
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
-      console.log(`[DEBUG] handleSendNow for ${type}:`, {
-        isReminder,
-        subjectOverrides: subjectOverrides[type],
-        savedSubjectTemplates: savedSubjectTemplates[type],
-        subjectPrefixes: subjectPrefixes[type]
-      })
-
       // Get base subject - for reminders, generate fresh (skip old sent subject)
       const baseSubject = getSubject(type, isReminder)
-
-      console.log(`[DEBUG] getSubject returned:`, baseSubject)
 
       // Apply ONLY user's explicit prefix (if they set one)
       // Prefix is layered at runtime, never stored in DB
       const finalSubject = subjectPrefixes[type]?.trim()
         ? combineSubject(baseSubject, type)
         : baseSubject
-
-      console.log(`[DEBUG] finalSubject:`, finalSubject)
 
       const opts = commOptions[type]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
@@ -3906,14 +3875,7 @@ export default function DashboardPage() {
                   // For sent/scheduled emails, show the fresh subject (what will be used for reminder)
                   // This ensures the card displays what WILL be sent, not what WAS sent
                   const isReminderContext = status === "sent" || status === "scheduled"
-                  const subject = getSubject(type, isReminderContext)
-                  console.log(`[DEBUG] Card subject for ${type}:`, {
-                    status,
-                    isReminderContext,
-                    subject,
-                    subjectOverride: subjectOverrides[type]
-                  })
-                  return subject
+                  return getSubject(type, isReminderContext)
                 })()}
                 onSubjectChange={(v) => setSubjectOverride(type, v)}
                 subjectPrefix={subjectPrefixes[type] || ""}
