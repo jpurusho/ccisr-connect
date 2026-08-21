@@ -2314,6 +2314,17 @@ export default function DashboardPage() {
     return date
   }
 
+  /**
+   * Get the subject for a communication type
+   *
+   * @param forceFresh - When true, generates a fresh subject (for reminders/resends)
+   *                     When false, returns the old sent subject (for audit/history)
+   *
+   * Calling patterns:
+   * - Card display (sent emails): forceFresh=true to show what WILL be sent
+   * - Send reminder: forceFresh=true to generate fresh subject
+   * - Draft emails: forceFresh=false (default)
+   */
   function getSubject(type: CommType, forceFresh = false): string {
     // Subject override takes precedence (user is actively editing)
     if (subjectOverrides[type]) return subjectOverrides[type]!
@@ -3851,7 +3862,13 @@ export default function DashboardPage() {
                 icon={commTypeIcons[type] ? getIconComponent(commTypeIcons[type]) : tmpl.icon}
                 status={getStatus(type)}
                 summaryLines={summaries}
-                subject={getSubject(type)}
+                subject={(() => {
+                  const status = getStatus(type)
+                  // For sent/scheduled emails, show the fresh subject (what will be used for reminder)
+                  // This ensures the card displays what WILL be sent, not what WAS sent
+                  const isReminderContext = status === "sent" || status === "scheduled"
+                  return getSubject(type, isReminderContext)
+                })()}
                 onSubjectChange={(v) => setSubjectOverride(type, v)}
                 subjectPrefix={subjectPrefixes[type] || ""}
                 onSubjectPrefixChange={(v) => setSubjectPrefix(type, v)}

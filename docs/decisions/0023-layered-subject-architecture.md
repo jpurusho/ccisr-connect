@@ -172,6 +172,7 @@ async function handleSendNow(type: CommType) {
 - **2026-08-19**: Adopted layered architecture approach
 - **v1.77.0**: Removed all automatic prefix logic
 - **v1.77.1**: Implemented clean layered storage
+- **2026-08-21**: Fixed card display to show fresh subject for reminders (not old sent subject)
 
 ## User Guidance
 
@@ -184,3 +185,24 @@ async function handleSendNow(type: CommType) {
 - Never concatenate prefix + subject before saving to `composed_instances`
 - Always compute concatenation at display/send time
 - Only `dispatch_queue` should store final concatenated subjects
+- When displaying sent emails on cards, use `forceFresh=true` to show what WILL be sent for reminders, not what WAS sent
+
+## UI Implications
+
+**Card Display Behavior:**
+- **Draft emails**: Show current subject (either user override or template-generated)
+- **Sent/scheduled emails**: Show FRESH subject (what will be sent for next reminder)
+  - This prevents confusion where card shows "Old Subject" but Send Reminder uses "New Subject"
+  - User can still edit the subject — their edits (subjectOverride) take precedence
+
+**Code Pattern:**
+```typescript
+// Card display for sent emails
+subject={(() => {
+  const status = getStatus(type)
+  const isReminderContext = status === "sent" || status === "scheduled"
+  return getSubject(type, isReminderContext)  // forceFresh for reminders
+})()}
+```
+
+This ensures the card always displays what will ACTUALLY be sent when you click "Send Reminder".
