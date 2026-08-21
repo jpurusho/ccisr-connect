@@ -1705,3 +1705,4 @@ export type DispatchQueue = Database['public']['Tables']['dispatch_queue']['Row'
 export type MailingList = Database['public']['Tables']['mailing_lists']['Row']
 export type SmtpConfig = Database['public']['Tables']['smtp_configs']['Row']
 export type DispatchStatus = Database['public']['Enums']['dispatch_status']
+export type RecipientType = Database['public']['Enums']['recipient_type']
