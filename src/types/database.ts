@@ -1704,5 +1704,16 @@ export type Address = Database['public']['Tables']['addresses']['Row']
 export type DispatchQueue = Database['public']['Tables']['dispatch_queue']['Row']
 export type MailingList = Database['public']['Tables']['mailing_lists']['Row']
 export type SmtpConfig = Database['public']['Tables']['smtp_configs']['Row']
+export type Tag = Database['public']['Tables']['tags']['Row']
+export type AppUser = Database['public']['Tables']['app_users']['Row']
+
+// Insert types
+export type FamilyInsert = Database['public']['Tables']['families']['Insert']
+export type MemberInsert = Database['public']['Tables']['members']['Insert']
+
+// Enums
 export type DispatchStatus = Database['public']['Enums']['dispatch_status']
 export type RecipientType = Database['public']['Enums']['recipient_type']
+export type UserRole = Database['public']['Enums']['user_role']
+export type EventInstanceStatus = Database['public']['Enums']['event_instance_status']
+export type FamilyRole = Database['public']['Enums']['family_role']
