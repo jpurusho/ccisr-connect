@@ -905,10 +905,10 @@ export default function DashboardPage() {
         // Composed instances: match current week, bulletin week, or recurring
         supabase
           .from("composed_instances")
-          .select("id, template_type, form_data, subject, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until, updated_at")
+          .select("id, template_type, form_data, subject, subject_prefix, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until, updated_at")
           .eq("is_active", true)
           .or(`week_start.eq.${wkSunISO},and(is_recurring.eq.true,week_start.lte.${wkSunISO})`)
-          .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null; updated_at: string }[]>(),
+          .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; subject_prefix: string | null; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null; updated_at: string }[]>(),
 
       ])
 
