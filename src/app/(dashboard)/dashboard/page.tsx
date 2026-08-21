@@ -988,10 +988,12 @@ export default function DashboardPage() {
       )
 
       // Build composed instances map (template_type → data)
+      console.log('[DEBUG] Raw DB query result (composedInstancesRes.data):', composedInstancesRes.data)
       type CIRow = (typeof composedInstancesRes.data extends (infer U)[] | null ? U : never)
       const composedMap: Record<string, CIRow> = {}
       if (composedInstancesRes.data) {
         for (const ci of composedInstancesRes.data) {
+          console.log('[DEBUG] Processing composed instance:', ci)
           if (ci.is_recurring && ci.recur_until && ci.recur_until < wkSunISO) continue
           const existing = composedMap[ci.template_type]
           if (!existing) {
@@ -2063,10 +2065,13 @@ export default function DashboardPage() {
       }
 
       // Pre-fill subject overrides and prefixes from composed instances
+      console.log('[DEBUG] composedMap:', composedMap)
+      console.log('[DEBUG] commTypeKeys:', commTypeKeys)
       const resolvedSubjects: Record<string, string> = {}
       const resolvedPrefixes: Record<string, string> = {}
       for (const ct of commTypeKeys) {
         const ci = composedMap[ct]
+        console.log(`[DEBUG] Processing ${ct}:`, ci)
         if (ci?.subject) resolvedSubjects[ct] = ci.subject
         if (ci?.subject_prefix) resolvedPrefixes[ct] = ci.subject_prefix
       }
