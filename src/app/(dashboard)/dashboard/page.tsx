@@ -2476,15 +2476,25 @@ export default function DashboardPage() {
         created_by: user?.id ?? null,
       }
 
+      // Verification: Log what we're about to save
+      if (subjectPrefixes[type]) {
+        console.log(`[SAVE] ${type} with prefix: "${subjectPrefixes[type]}"`)
+      }
+
       const existingId = instanceIds[type]
       if (existingId) {
-        const { error } = await supabase
+        const { error, data } = await supabase
           .from("composed_instances")
           .update(payload as never)
           .eq("id", existingId)
+          .select('id, subject, subject_prefix')
+
         if (error) {
           toast.error(`Save failed: ${error.message}`)
+          console.error('[SAVE ERROR]', error)
         } else {
+          // Verify the save actually worked
+          console.log('[SAVE SUCCESS] Returned from DB:', data)
           toast.success(`${templateName} draft saved`)
           snapshotForm(type)
           logAudit("composed_instance_updated", "composed_instances", existingId, { name: templateName, type, weekStart })
