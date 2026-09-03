@@ -997,8 +997,19 @@ export default function DashboardPage() {
           if (!existing) {
             composedMap[ci.template_type] = ci
           } else {
+            // Ranking: same week (2) > recurring (1) > other (0)
+            // If ranks are equal, prefer most recently updated
             const rank = (c: CIRow) => c.week_start === wkSunISO ? 2 : c.is_recurring ? 1 : 0
-            if (rank(ci) > rank(existing)) composedMap[ci.template_type] = ci
+            const ciRank = rank(ci)
+            const existingRank = rank(existing)
+            if (ciRank > existingRank) {
+              composedMap[ci.template_type] = ci
+            } else if (ciRank === existingRank) {
+              // Same rank - use most recently updated
+              if (ci.updated_at > existing.updated_at) {
+                composedMap[ci.template_type] = ci
+              }
+            }
           }
         }
       }
@@ -2487,6 +2498,7 @@ export default function DashboardPage() {
       }
 
       const existingId = instanceIds[type]
+      console.log('[SAVE] instanceIds:', instanceIds, 'existingId for', type, '=', existingId)
       if (existingId) {
         const { error, data } = await supabase
           .from("composed_instances")
