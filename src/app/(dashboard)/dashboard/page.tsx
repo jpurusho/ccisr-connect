@@ -2460,6 +2460,16 @@ export default function DashboardPage() {
       const templateName = BUILTIN_LABEL[type] || type
       const baseSubject = getSubject(type)
 
+      // DEBUG: Trace subject resolution
+      console.log('[SAVE DEBUG]', {
+        type,
+        subjectOverride: subjectOverrides[type],
+        savedTemplate: savedSubjectTemplates[type],
+        dispatchSubject: dispatches[type]?.subject,
+        baseSubject,
+        prefix: subjectPrefixes[type]
+      })
+
       const payload = {
         template_type: type,
         name: templateName,
@@ -2474,11 +2484,6 @@ export default function DashboardPage() {
         is_recurring: false,
         recur_until: null,
         created_by: user?.id ?? null,
-      }
-
-      // Verification: Log what we're about to save
-      if (subjectPrefixes[type]) {
-        console.log(`[SAVE] ${type} with prefix: "${subjectPrefixes[type]}"`)
       }
 
       const existingId = instanceIds[type]
