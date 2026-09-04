@@ -2246,8 +2246,11 @@ export default function DashboardPage() {
 
   const bibleStudyPreview = useMemo(() => {
     const vars = makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
+    const cardTitle = bibleStudyForm.useSubjectAsTitle
+      ? getSubject("bible_study")  // Use subject line
+      : interp(bibleStudyForm.title, vars)  // Use manual title field
     return buildBibleStudyCard({
-      title: interp(bibleStudyForm.title, vars),
+      title: cardTitle,
       date: bibleStudyForm.date,
       time: bibleStudyForm.time,
       topic: interp(bibleStudyForm.topic, vars),
@@ -2261,8 +2264,11 @@ export default function DashboardPage() {
 
   const womensStudyPreview = useMemo(() => {
     const vars = makeEventVars(weekLabel, womensStudyForm.date, womensStudyForm.time, womensStudyForm.topic || "")
+    const cardTitle = womensStudyForm.useSubjectAsTitle
+      ? getSubject("womens_study")  // Use subject line
+      : interp(womensStudyForm.title, vars)  // Use manual title field
     return buildWomensStudyCard({
-      title: interp(womensStudyForm.title, vars),
+      title: cardTitle,
       topic: interp(womensStudyForm.topic, vars),
       date: womensStudyForm.date,
       time: womensStudyForm.time,

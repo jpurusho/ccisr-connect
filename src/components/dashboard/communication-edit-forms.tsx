@@ -1176,6 +1176,7 @@ export interface BibleStudyFormData extends BaseFormData {
   address: string
   city: string
   phone: string
+  useSubjectAsTitle?: boolean
 }
 
 export function BibleStudyEditForm({
@@ -1202,6 +1203,18 @@ export function BibleStudyEditForm({
           placeholder="Bible Study This Friday"
         />
       </Field>
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="bs-use-subject-as-title"
+          checked={data.useSubjectAsTitle ?? false}
+          onChange={(e) => set("useSubjectAsTitle" as any, e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300"
+        />
+        <Label htmlFor="bs-use-subject-as-title" className="text-sm text-muted-foreground cursor-pointer">
+          Use Subject line as Card Title (overrides the field above)
+        </Label>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <DateField
           label="Date"
@@ -1283,6 +1296,7 @@ export interface WomensStudyFormData extends BaseFormData {
   zoomMeetingId: string
   zoomPasscode: string
   location: string
+  useSubjectAsTitle?: boolean
 }
 
 export function WomensStudyEditForm({
@@ -1309,6 +1323,18 @@ export function WomensStudyEditForm({
           placeholder="Women's Bible Study"
         />
       </Field>
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="ws-use-subject-as-title"
+          checked={data.useSubjectAsTitle ?? false}
+          onChange={(e) => set("useSubjectAsTitle" as any, e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300"
+        />
+        <Label htmlFor="ws-use-subject-as-title" className="text-sm text-muted-foreground cursor-pointer">
+          Use Subject line as Card Title (overrides the field above)
+        </Label>
+      </div>
       <Field label="Topic (leave empty to exclude)" htmlFor="ws-i-topic">
         <Input
           id="ws-i-topic"
