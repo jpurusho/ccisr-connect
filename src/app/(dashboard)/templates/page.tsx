@@ -1440,8 +1440,8 @@ export default function TemplatesPage() {
                           backgroundColor: newCustom.bodyBgColor,
                           borderColor: PASTEL_BORDER_MAP[newCustom.bodyBgColor],
                           boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.bodyBgColor]}50`,
+                          color: '#1E293B', // Force dark text for visibility during editing
                         } : {}),
-                        ...(newCustom.bodyTextColor ? { color: newCustom.bodyTextColor } : {}),
                       }}
                     />
                     <div className="flex items-center gap-4">
@@ -1464,8 +1464,8 @@ export default function TemplatesPage() {
                           backgroundColor: newCustom.footerVerseBgColor,
                           borderColor: PASTEL_BORDER_MAP[newCustom.footerVerseBgColor],
                           boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.footerVerseBgColor]}50`,
+                          color: '#1E293B', // Force dark text for visibility during editing
                         } : {}),
-                        ...(newCustom.footerVerseTextColor ? { color: newCustom.footerVerseTextColor } : {}),
                       }}
                     />
                     <div className="flex items-center gap-4">
@@ -1680,6 +1680,7 @@ export default function TemplatesPage() {
                         backgroundColor: editingCustom.data.bodyBgColor as string,
                         borderColor: PASTEL_BORDER_MAP[editingCustom.data.bodyBgColor as string],
                         boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[editingCustom.data.bodyBgColor as string]}50`,
+                        color: '#1E293B', // Force dark text for visibility during editing
                       } : undefined}
                     />
                     <FormattingHelp />
@@ -1698,6 +1699,7 @@ export default function TemplatesPage() {
                         backgroundColor: editingCustom.data.footerVerseBgColor as string,
                         borderColor: PASTEL_BORDER_MAP[editingCustom.data.footerVerseBgColor as string],
                         boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[editingCustom.data.footerVerseBgColor as string]}50`,
+                        color: '#1E293B', // Force dark text for visibility during editing
                       } : undefined}
                     />
                     <FormattingHelp />
