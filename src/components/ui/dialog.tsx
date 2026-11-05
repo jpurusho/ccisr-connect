@@ -7,7 +7,36 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
+/**
+ * Hook to manage focus restoration
+ * Stores the trigger element and restores focus when dialog closes
+ */
+function useFocusRestoration(open: boolean) {
+  const triggerRef = React.useRef<HTMLElement | null>(null)
+
+  React.useEffect(() => {
+    if (open) {
+      // Store the currently focused element (the trigger)
+      triggerRef.current = document.activeElement as HTMLElement
+    } else {
+      // Restore focus to trigger when closing
+      const timer = setTimeout(() => {
+        if (triggerRef.current && typeof triggerRef.current.focus === 'function') {
+          triggerRef.current.focus()
+        }
+      }, 50)
+
+      return () => clearTimeout(timer)
+    }
+  }, [open])
+
+  return triggerRef
+}
+
 function Dialog({ disablePointerDismissal = true, ...props }: DialogPrimitive.Root.Props) {
+  // Enable focus restoration
+  useFocusRestoration(props.open ?? false)
+
   return <DialogPrimitive.Root data-slot="dialog" disablePointerDismissal={disablePointerDismissal} {...props} />
 }
 
@@ -47,10 +76,38 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  const contentRef = React.useRef<HTMLDivElement>(null)
+
+  // Set up focus management when dialog opens
+  React.useEffect(() => {
+    const content = contentRef.current
+    if (!content) return
+
+    // Find the first focusable element (input, button, etc.)
+    const focusableElements = content.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])'
+    )
+
+    if (focusableElements.length > 0) {
+      // Focus first input/select/textarea, or fallback to any focusable element
+      const firstInput = Array.from(focusableElements).find(
+        el => ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)
+      )
+      const elementToFocus = firstInput || focusableElements[0]
+
+      const timer = setTimeout(() => {
+        elementToFocus.focus()
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
+        ref={contentRef}
         data-slot="dialog-content"
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",

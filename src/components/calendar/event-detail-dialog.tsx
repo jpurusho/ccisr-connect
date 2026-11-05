@@ -288,6 +288,8 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
                 type="button"
                 onClick={() => setShowPastBreaks(!showPastBreaks)}
                 className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                aria-expanded={showPastBreaks}
+                aria-label={showPastBreaks ? "Hide past breaks" : `Show past breaks (${pastBreaks.length})`}
               >
                 {showPastBreaks ? "Hide past" : `Show past (${pastBreaks.length})`}
               </button>

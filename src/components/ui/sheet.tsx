@@ -7,7 +7,36 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
+/**
+ * Hook to manage focus restoration
+ * Stores the trigger element and restores focus when sheet closes
+ */
+function useFocusRestoration(open: boolean) {
+  const triggerRef = React.useRef<HTMLElement | null>(null)
+
+  React.useEffect(() => {
+    if (open) {
+      // Store the currently focused element (the trigger)
+      triggerRef.current = document.activeElement as HTMLElement
+    } else {
+      // Restore focus to trigger when closing
+      const timer = setTimeout(() => {
+        if (triggerRef.current && typeof triggerRef.current.focus === 'function') {
+          triggerRef.current.focus()
+        }
+      }, 50)
+
+      return () => clearTimeout(timer)
+    }
+  }, [open])
+
+  return triggerRef
+}
+
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
+  // Enable focus restoration
+  useFocusRestoration(props.open ?? false)
+
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
 
@@ -46,10 +75,38 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  const contentRef = React.useRef<HTMLDivElement>(null)
+
+  // Set up focus management when sheet opens
+  React.useEffect(() => {
+    const content = contentRef.current
+    if (!content) return
+
+    // Find the first focusable element (input, button, etc.)
+    const focusableElements = content.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])'
+    )
+
+    if (focusableElements.length > 0) {
+      // Focus first input/select/textarea, or fallback to any focusable element
+      const firstInput = Array.from(focusableElements).find(
+        el => ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)
+      )
+      const elementToFocus = firstInput || focusableElements[0]
+
+      const timer = setTimeout(() => {
+        elementToFocus.focus()
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Popup
+        ref={contentRef}
         data-slot="sheet-content"
         data-side={side}
         className={cn(

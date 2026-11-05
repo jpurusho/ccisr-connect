@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { ApiError } from "@/lib/api-response"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
   const translation = req.nextUrl.searchParams.get("translation") || "esv"
 
   if (!reference) {
-    return NextResponse.json({ error: "ref parameter required" }, { status: 400 })
+    return ApiError.badRequest("ref parameter required")
   }
 
   let result: VerseResult | null = null
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!result) {
-    return NextResponse.json({ error: "Verse not found" }, { status: 404 })
+    return ApiError.notFound("Verse not found")
   }
 
   return NextResponse.json(result)

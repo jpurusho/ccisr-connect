@@ -96,6 +96,9 @@ export function HostFamilyInput({
         onChange={(e) => handleSearch(e.target.value)}
         onBlur={() => setTimeout(() => setShowResults(false), 200)}
         onFocus={() => results.length > 0 && setShowResults(true)}
+        aria-label="Search for host family"
+        aria-autocomplete="list"
+        aria-expanded={showResults}
       />
       {showResults && (
         <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-48 overflow-y-auto">

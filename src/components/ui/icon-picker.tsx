@@ -93,8 +93,10 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
         size="sm"
         className="flex items-center gap-2"
         onClick={() => setOpen((p) => !p)}
+        aria-label="Select icon"
+        aria-expanded={open}
       >
-        <SelectedIcon className="size-4" />
+        <SelectedIcon className="size-4" aria-hidden="true" />
         <span className="text-xs">{selected?.label ?? "Pick icon"}</span>
       </Button>
 
@@ -109,12 +111,14 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
                   key={opt.value}
                   type="button"
                   title={opt.label}
+                  aria-label={opt.label}
+                  aria-pressed={isSelected}
                   className={`flex items-center justify-center rounded-md p-2 transition-colors hover:bg-accent ${
                     isSelected ? "bg-primary/10 ring-1 ring-primary" : ""
                   }`}
                   onClick={() => { onChange(opt.value); setOpen(false) }}
                 >
-                  <Icon className="size-4" />
+                  <Icon className="size-4" aria-hidden="true" />
                 </button>
               )
             })}

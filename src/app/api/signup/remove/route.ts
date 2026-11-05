@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { createHash } from "crypto"
+import { getIpHash } from "@/lib/rate-limit"
+import { getPhoneLast4 } from "@/lib/validation-schemas"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-// Hash IP address for privacy-preserving audit logs
-function hashIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for")
-  const ip = forwarded ? forwarded.split(",")[0] : req.headers.get("x-real-ip") || "unknown"
-  return createHash("sha256").update(ip + process.env.IP_SALT || "default-salt").digest("hex").slice(0, 16)
-}
 
 // Check rate limiting: max 5 attempts per hour per IP per form
 async function checkRateLimit(supabase: any, ipHash: string, formId: string): Promise<{ allowed: boolean; attempts: number }> {
@@ -72,7 +66,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
-  const ipHash = hashIp(req)
+  const ipHash = getIpHash(req)
 
   // Check rate limiting
   const rateLimit = await checkRateLimit(supabase, ipHash, formId)
@@ -116,8 +110,8 @@ export async function POST(req: NextRequest) {
     const phoneField = fields.find((f) => f.type === "phone")
     if (phoneField) {
       const storedPhone = ((response.data as Record<string, unknown>)?.[phoneField.id] as string) || ""
-      const storedLast4 = storedPhone.replace(/\D/g, "").slice(-4)
-      const inputLast4 = phoneLast4.replace(/\D/g, "").slice(-4)
+      const storedLast4 = getPhoneLast4(storedPhone)
+      const inputLast4 = getPhoneLast4(phoneLast4)
       if (storedLast4 && inputLast4 !== storedLast4) {
         await logAttempt(supabase, ipHash, formId, false)
         return NextResponse.json({ error: "Phone verification failed" }, { status: 403 })

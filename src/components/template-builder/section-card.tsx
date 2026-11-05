@@ -43,16 +43,16 @@ export function SectionCard({
         <span className="flex-1 text-sm font-medium">{meta.label}</span>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={onMoveUp} disabled={isFirst} title="Move up">
-            <ChevronUp className="size-3.5" />
+          <Button variant="ghost" size="icon-sm" onClick={onMoveUp} disabled={isFirst} title="Move up" aria-label={`Move ${meta.label} section up`}>
+            <ChevronUp className="size-3.5" aria-hidden="true" />
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={onMoveDown} disabled={isLast} title="Move down">
-            <ChevronDown className="size-3.5" />
+          <Button variant="ghost" size="icon-sm" onClick={onMoveDown} disabled={isLast} title="Move down" aria-label={`Move ${meta.label} section down`}>
+            <ChevronDown className="size-3.5" aria-hidden="true" />
           </Button>
-          <Switch size="sm" checked={section.enabled} onCheckedChange={onToggle} />
+          <Switch size="sm" checked={section.enabled} onCheckedChange={onToggle} aria-label={`Toggle ${meta.label} section`} />
           {section.type !== "header" && section.type !== "footer" && (
-            <Button variant="ghost" size="icon-sm" onClick={onRemove} title="Remove section">
-              <Trash2 className="size-3.5 text-muted-foreground" />
+            <Button variant="ghost" size="icon-sm" onClick={onRemove} title="Remove section" aria-label={`Remove ${meta.label} section`}>
+              <Trash2 className="size-3.5 text-muted-foreground" aria-hidden="true" />
             </Button>
           )}
         </div>
@@ -63,6 +63,8 @@ export function SectionCard({
           <button
             className="w-full border-t px-3 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
             onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
+            aria-label={expanded ? `Hide ${meta.label} settings` : `Edit ${meta.label} settings`}
           >
             {expanded ? "Hide settings ▲" : "Edit settings ▼"}
           </button>

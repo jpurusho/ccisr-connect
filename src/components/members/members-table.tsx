@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, memo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
@@ -54,6 +54,151 @@ function getMemberTags(member: MemberWithFamily): { id: string; name: string; co
     .map((mt) => mt.tags)
     .filter((t): t is Pick<Tag, "id" | "name" | "color"> => t !== null)
 }
+
+const MemberTableRow = memo(function MemberTableRow({
+  member,
+  selected,
+  onToggleSelect,
+  onNavigate,
+  onToggleActive,
+  availableTags,
+  tagPopoverOpen,
+  onToggleTagPopover,
+  togglingTagId,
+  onToggleTag,
+}: {
+  member: MemberWithFamily
+  selected: boolean
+  onToggleSelect: () => void
+  onNavigate: () => void
+  onToggleActive: (checked: boolean) => void
+  availableTags: { id: string; name: string; color: string }[]
+  tagPopoverOpen: boolean
+  onToggleTagPopover: () => void
+  togglingTagId: string | null
+  onToggleTag: (tagId: string, hasTag: boolean, tagName: string) => void
+}) {
+  const memberTags = getMemberTags(member)
+  const memberCity = getMemberCity(member)
+
+  return (
+    <TableRow
+      className="cursor-pointer"
+      onClick={onNavigate}
+    >
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          className="size-4 rounded border-gray-300"
+          aria-label={`Select ${member.full_name}`}
+        />
+      </TableCell>
+      <TableCell className="font-medium">{member.full_name}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {member.families?.family_name ?? "-"}
+      </TableCell>
+      <TableCell className="text-muted-foreground">
+        {formatPhone(member.cell_phone) || "-"}
+      </TableCell>
+      <TableCell className="hidden text-muted-foreground md:table-cell">
+        {member.email ?? "-"}
+      </TableCell>
+      <TableCell className="hidden text-muted-foreground lg:table-cell">
+        {memberCity !== "Unknown" ? memberCity : "-"}
+      </TableCell>
+      <TableCell className="hidden lg:table-cell">
+        {member.birth_month && member.birth_day ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400">
+            <Cake className="size-3" />
+            {MONTH_NAMES[member.birth_month]} {member.birth_day}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )}
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <Badge variant="secondary" className="capitalize">
+          {member.role_in_family}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <div
+          className="flex items-center gap-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Switch
+            size="sm"
+            checked={member.is_active}
+            onCheckedChange={onToggleActive}
+            aria-label={`Toggle active status for ${member.full_name}`}
+          />
+        </div>
+      </TableCell>
+      <TableCell
+        className="hidden xl:table-cell relative"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleTagPopover()
+        }}
+      >
+        <div
+          className="flex flex-wrap gap-1 cursor-pointer min-h-[24px] rounded-md p-0.5 hover:bg-muted/50"
+          role="button"
+          tabIndex={0}
+          aria-label={`Manage tags for ${member.full_name}`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onToggleTagPopover()
+            }
+          }}
+        >
+          {memberTags.map((tag) => (
+            <span
+              key={tag.id}
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
+              style={{ backgroundColor: tag.color }}
+            >
+              {tag.name}
+            </span>
+          ))}
+          {memberTags.length === 0 && (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+              <Plus className="size-3" /> Tags
+            </span>
+          )}
+        </div>
+        {tagPopoverOpen && (
+          <div className="absolute right-0 z-50 mt-1 rounded-lg border bg-popover p-2 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-wrap gap-1.5 max-w-xs">
+              {availableTags.map((tag) => {
+                const hasTag = memberTags.some((t) => t.id === tag.id)
+                const isToggling = togglingTagId === tag.id
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    disabled={isToggling}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${hasTag ? "text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                    style={hasTag ? { backgroundColor: tag.color } : undefined}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleTag(tag.id, hasTag, tag.name)
+                    }}
+                  >
+                    {tag.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
+  )
+})
 
 export function MembersTable({
   searchQuery,
@@ -316,6 +461,7 @@ export function MembersTable({
                 checked={paginated.length > 0 && selected.size === paginated.length}
                 onChange={toggleSelectAll}
                 className="size-4 rounded border-gray-300"
+                aria-label="Select all members on this page"
               />
             </TableHead>
             <TableHead
@@ -346,153 +492,62 @@ export function MembersTable({
         </TableHeader>
         <TableBody>
           {paginated.map((member) => (
-            <TableRow
+            <MemberTableRow
               key={member.id}
-              className="cursor-pointer"
-              onClick={() => router.push(`/members/${member.id}`)}
-            >
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(member.id)}
-                  onChange={() => toggleSelect(member.id)}
-                  className="size-4 rounded border-gray-300"
-                />
-              </TableCell>
-              <TableCell className="font-medium">{member.full_name}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {member.families?.family_name ?? "-"}
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {formatPhone(member.cell_phone) || "-"}
-              </TableCell>
-              <TableCell className="hidden text-muted-foreground md:table-cell">
-                {member.email ?? "-"}
-              </TableCell>
-              <TableCell className="hidden text-muted-foreground lg:table-cell">
-                {getMemberCity(member) !== "Unknown"
-                  ? getMemberCity(member)
-                  : "-"}
-              </TableCell>
-              <TableCell className="hidden lg:table-cell">
-                {member.birth_month && member.birth_day ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400">
-                    <Cake className="size-3" />
-                    {MONTH_NAMES[member.birth_month]} {member.birth_day}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                )}
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Badge variant="secondary" className="capitalize">
-                  {member.role_in_family}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div
-                  className="flex items-center gap-1.5"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Switch
-                    size="sm"
-                    checked={member.is_active}
-                    onCheckedChange={async (checked) => {
-                      const supabase = createClient()
-                      const { error } = await supabase
-                        .from("members")
-                        .update({ is_active: checked } as never)
-                        .eq("id", member.id)
-                      if (error) {
-                        toast.error(`Failed: ${error.message}`)
-                      } else {
-                        setMembers((prev) =>
-                          prev.map((m) =>
-                            m.id === member.id
-                              ? { ...m, is_active: checked }
-                              : m
-                          )
-                        )
-                        onRefresh?.()
-                        logAudit("member_toggled_active", "members", member.id, { is_active: checked, name: member.full_name })
-                        toast.success(
-                          `${member.full_name} ${checked ? "activated" : "deactivated"}`
-                        )
-                      }
-                    }}
-                  />
-                  {/* Newcomer shown as tag badge in Tags column */}
-                </div>
-              </TableCell>
-              <TableCell
-                className="hidden xl:table-cell relative"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setTagPopoverMemberId(tagPopoverMemberId === member.id ? null : member.id)
-                }}
-              >
-                <div className="flex flex-wrap gap-1 cursor-pointer min-h-[24px] rounded-md p-0.5 hover:bg-muted/50">
-                  {getMemberTags(member).map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
-                      style={{ backgroundColor: tag.color }}
-                    >
-                      {tag.name}
-                    </span>
-                  ))}
-                  {getMemberTags(member).length === 0 && (
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                      <Plus className="size-3" /> Tags
-                    </span>
-                  )}
-                </div>
-                {tagPopoverMemberId === member.id && (
-                  <div className="absolute right-0 z-50 mt-1 rounded-lg border bg-popover p-2 shadow-lg" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex flex-wrap gap-1.5 max-w-xs">
-                      {availableTags.map((tag) => {
-                        const hasTag = getMemberTags(member).some((t) => t.id === tag.id)
-                        const isToggling = togglingTagId === tag.id
-                        return (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            disabled={isToggling}
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${hasTag ? "text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                            style={hasTag ? { backgroundColor: tag.color } : undefined}
-                            onClick={async (e) => {
-                              e.stopPropagation()
-                              setTogglingTagId(tag.id)
-                              const supabase = createClient()
-                              const { error } = hasTag
-                                ? await supabase.from("member_tags").delete().eq("member_id", member.id).eq("tag_id", tag.id)
-                                : await supabase.from("member_tags").insert({ member_id: member.id, tag_id: tag.id } as never)
-                              if (error) {
-                                toast.error(`Failed to ${hasTag ? "remove" : "add"} tag: ${error.message}`)
-                                setTogglingTagId(null)
-                                return
-                              }
-                              logAudit(hasTag ? "tag_removed" : "tag_added", "member_tags", member.id, { tag: tag.name })
-                              const { data: updated } = await supabase
-                                .from("members")
-                                .select("*, families(family_name, addresses(city, zip, is_current)), member_tags(tags(id, name, color))")
-                                .eq("id", member.id)
-                                .single()
-                              if (updated) {
-                                setMembers((prev) => prev.map((m) => m.id === member.id ? updated as MemberWithFamily : m))
-                              }
-                              setTogglingTagId(null)
-                            }}
-                          >
-                            {tag.name}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              </TableCell>
-            </TableRow>
+              member={member}
+              selected={selected.has(member.id)}
+              onToggleSelect={() => toggleSelect(member.id)}
+              onNavigate={() => router.push(`/members/${member.id}`)}
+              onToggleActive={async (checked) => {
+                const supabase = createClient()
+                const { error } = await supabase
+                  .from("members")
+                  .update({ is_active: checked } as never)
+                  .eq("id", member.id)
+                if (error) {
+                  toast.error(`Failed: ${error.message}`)
+                } else {
+                  setMembers((prev) =>
+                    prev.map((m) =>
+                      m.id === member.id
+                        ? { ...m, is_active: checked }
+                        : m
+                    )
+                  )
+                  onRefresh?.()
+                  logAudit("member_toggled_active", "members", member.id, { is_active: checked, name: member.full_name })
+                  toast.success(
+                    `${member.full_name} ${checked ? "activated" : "deactivated"}`
+                  )
+                }
+              }}
+              availableTags={availableTags}
+              tagPopoverOpen={tagPopoverMemberId === member.id}
+              onToggleTagPopover={() => setTagPopoverMemberId(tagPopoverMemberId === member.id ? null : member.id)}
+              togglingTagId={togglingTagId}
+              onToggleTag={async (tagId, hasTag, tagName) => {
+                setTogglingTagId(tagId)
+                const supabase = createClient()
+                const { error } = hasTag
+                  ? await supabase.from("member_tags").delete().eq("member_id", member.id).eq("tag_id", tagId)
+                  : await supabase.from("member_tags").insert({ member_id: member.id, tag_id: tagId } as never)
+                if (error) {
+                  toast.error(`Failed to ${hasTag ? "remove" : "add"} tag: ${error.message}`)
+                  setTogglingTagId(null)
+                  return
+                }
+                logAudit(hasTag ? "tag_removed" : "tag_added", "member_tags", member.id, { tag: tagName })
+                const { data: updated } = await supabase
+                  .from("members")
+                  .select("*, families(family_name, addresses(city, zip, is_current)), member_tags(tags(id, name, color))")
+                  .eq("id", member.id)
+                  .single()
+                if (updated) {
+                  setMembers((prev) => prev.map((m) => m.id === member.id ? updated as MemberWithFamily : m))
+                }
+                setTogglingTagId(null)
+              }}
+            />
           ))}
         </TableBody>
       </Table>

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { rateLimitByIp } from "@/lib/rate-limit"
+import { ApiError } from "@/lib/api-response"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -8,9 +10,20 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  // Rate limiting: 20 requests per hour per IP
+  const rateLimit = rateLimitByIp(req, {
+    maxRequests: 20,
+    windowMs: 60 * 60 * 1000,
+    namespace: "signup-slug",
+  })
+
+  if (!rateLimit.allowed) {
+    return ApiError.tooManyRequests()
+  }
+
   const { slug } = await params
   if (!slug || slug.length < 4) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
+    return ApiError.notFound()
   }
 
   const isPreview = req.nextUrl.searchParams.get("preview") === "1"
@@ -28,14 +41,14 @@ export async function GET(
 
   // Allow preview of draft/closed forms with ?preview=1
   if (!form || (!isPreview && form.status !== "active")) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
+    return ApiError.notFound()
   }
 
   // Only close if admin set an explicit auto_close_date
   if (form.auto_close_date) {
     const closeDay = new Date(form.auto_close_date + "T23:59:59")
     if (new Date() > closeDay) {
-      return NextResponse.json({ error: "This signup has ended" }, { status: 410 })
+      return ApiError.gone("This signup has ended")
     }
   }
 

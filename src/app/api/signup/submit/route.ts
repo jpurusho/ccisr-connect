@@ -1,44 +1,39 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { createHash } from "crypto"
 import nodemailer from "nodemailer"
 import { buildFormSchema, type SignupFieldConfig } from "@/lib/signup/field-registry"
 import { sanitizeFormData } from "@/lib/signup/sanitize"
+import { ApiError, successResponse, StatusCode } from "@/lib/api-response"
+import { getIpHash } from "@/lib/rate-limit"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const IP_SALT = process.env.SIGNUP_IP_SALT || "ccisr-signup-default-salt"
-
-function hashIp(ip: string): string {
-  return createHash("sha256").update(ip + IP_SALT).digest("hex").slice(0, 16)
-}
 
 export async function POST(req: NextRequest) {
   const contentLength = parseInt(req.headers.get("content-length") || "0", 10)
   if (contentLength > 50_000) {
-    return NextResponse.json({ error: "Request too large" }, { status: 413 })
+    return ApiError.payloadTooLarge()
   }
 
   let body: { formId?: string; data?: Record<string, unknown>; honeypot?: string }
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+    return ApiError.badRequest("Invalid JSON")
   }
 
   const { formId, data, honeypot } = body
   if (!formId || !data) {
-    return NextResponse.json({ error: "formId and data are required" }, { status: 400 })
+    return ApiError.badRequest("formId and data are required")
   }
 
   // Honeypot check — bots fill hidden fields
   if (honeypot) {
-    return NextResponse.json({ success: true }, { status: 201 })
+    return successResponse({ success: true }, StatusCode.CREATED)
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
-  const ipHash = hashIp(ip)
+  const ipHash = getIpHash(req)
 
   // Fetch form
   const { data: form, error: formErr } = await supabase
@@ -48,15 +43,15 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (formErr || !form) {
-    return NextResponse.json({ error: "Form not found" }, { status: 404 })
+    return ApiError.notFound("Form not found")
   }
 
   if (form.status !== "active") {
-    return NextResponse.json({ error: "This form is no longer accepting responses" }, { status: 410 })
+    return ApiError.gone("This form is no longer accepting responses")
   }
 
   if (form.muted) {
-    return NextResponse.json({ error: "This form is currently in read-only mode" }, { status: 403 })
+    return ApiError.forbidden("This form is currently in read-only mode")
   }
 
   // Rate limiting: per-form configurable limit
@@ -71,7 +66,7 @@ export async function POST(req: NextRequest) {
       .gte("created_at", oneHourAgo)
 
     if ((recentSubmissions ?? 0) >= rateLimit) {
-      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
+      return ApiError.tooManyRequests("Too many attempts. Please try again later.")
     }
   } catch { /* proceed if check fails */ }
 
@@ -83,7 +78,7 @@ export async function POST(req: NextRequest) {
       .eq("form_id", formId)
 
     if ((count ?? 0) >= form.max_submissions) {
-      return NextResponse.json({ error: "This form has reached its maximum number of responses" }, { status: 410 })
+      return ApiError.gone("This form has reached its maximum number of responses")
     }
   }
 
@@ -95,7 +90,7 @@ export async function POST(req: NextRequest) {
 
   if (!result.success) {
     const errors = result.error.issues.map((i) => ({ field: i.path.join("."), message: i.message }))
-    return NextResponse.json({ error: "Validation failed", errors }, { status: 422 })
+    return ApiError.validationFailed("Validation failed", errors)
   }
 
   // Additional validation: require at least one claim_select item OR notes
@@ -113,10 +108,7 @@ export async function POST(req: NextRequest) {
     const hasNotes = notesField && sanitized[notesField.id] && String(sanitized[notesField.id]).trim().length > 0
 
     if (!hasClaimedItems && !hasNotes) {
-      return NextResponse.json(
-        { error: "Please select at least one item to bring or fill in the notes field" },
-        { status: 422 }
-      )
+      return ApiError.validationFailed("Please select at least one item to bring or fill in the notes field")
     }
   }
 
@@ -138,10 +130,7 @@ export async function POST(req: NextRequest) {
         ? Object.keys(selectedItems as object).length
         : (selectedItems as unknown[]).length
       if (pickCount > cf.maxSelections) {
-        return NextResponse.json(
-          { error: `Maximum ${cf.maxSelections} items allowed for "${cf.label}"` },
-          { status: 422 }
-        )
+        return ApiError.validationFailed(`Maximum ${cf.maxSelections} items allowed for "${cf.label}"`)
       }
     }
 
@@ -182,10 +171,7 @@ export async function POST(req: NextRequest) {
           const currentCapacity = (opt as { current_capacity?: number }).current_capacity ?? opt.capacity
           const existingCount = claimCounts[item] || 0
           if (existingCount + count > currentCapacity) {
-            return NextResponse.json(
-              { error: `"${opt.label}" only has ${currentCapacity - existingCount} remaining (you requested ${count})` },
-              { status: 409 }
-            )
+            return ApiError.conflict(`"${opt.label}" only has ${currentCapacity - existingCount} remaining (you requested ${count})`)
           }
         }
       }
@@ -196,10 +182,7 @@ export async function POST(req: NextRequest) {
         if (opt) {
           const currentCapacity = (opt as { current_capacity?: number }).current_capacity ?? opt.capacity
           if ((claimCounts[item as string] || 0) >= currentCapacity) {
-            return NextResponse.json(
-              { error: `"${opt.label}" is full (${currentCapacity}/${currentCapacity} claimed)` },
-              { status: 409 }
-            )
+            return ApiError.conflict(`"${opt.label}" is full (${currentCapacity}/${currentCapacity} claimed)`)
           }
         }
       }
@@ -219,7 +202,7 @@ export async function POST(req: NextRequest) {
           .contains("data", { [nameField.id]: nameVal })
 
         if ((dupCount ?? 0) > 0) {
-          return NextResponse.json({ error: "You have already signed up for this event" }, { status: 409 })
+          return ApiError.conflict("You have already signed up for this event")
         }
       }
     }
@@ -238,7 +221,7 @@ export async function POST(req: NextRequest) {
     })
 
   if (insertErr) {
-    return NextResponse.json({ error: "Failed to save response" }, { status: 500 })
+    return ApiError.internalError("Failed to save response")
   }
 
   // Notify (best-effort, don't fail the response)
@@ -246,7 +229,7 @@ export async function POST(req: NextRequest) {
     notifyAdmin(supabase, form.title || form.slug, sanitized, fields, form.notify_smtp_config_id, form.notify_mailing_list_id).catch(() => {})
   }
 
-  return NextResponse.json({ success: true }, { status: 201 })
+  return successResponse({ success: true }, StatusCode.CREATED)
 }
 
 interface SmtpRow { host: string; port: number; username: string; encrypted_password: string; from_name: string | null; from_email: string }

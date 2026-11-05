@@ -140,6 +140,8 @@ export function TagManagementPanel() {
                     className={`size-6 rounded-full border-2 transition-transform hover:scale-110 ${newColor === c ? "border-foreground scale-110" : "border-transparent"}`}
                     style={{ backgroundColor: c }}
                     onClick={() => setNewColor(c)}
+                    aria-label={`Select color ${c}`}
+                    aria-pressed={newColor === c}
                   />
                 ))}
                 <Input

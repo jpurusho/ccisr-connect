@@ -67,6 +67,8 @@ export function BottomNav() {
               key={item.title}
               href={item.href}
               onClick={(e) => handleClick(e, item)}
+              aria-label={item.title}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 min-w-[64px] h-full rounded-lg transition-colors",
                 "active:scale-95 active:bg-accent/50",
@@ -75,7 +77,7 @@ export function BottomNav() {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-5 w-5" aria-hidden="true" />
               <span className="text-[10px] font-medium">{item.title}</span>
             </Link>
           )

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import nodemailer from "nodemailer"
+import { ApiError, successResponse } from "@/lib/api-response"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -8,7 +9,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 export async function POST(req: NextRequest) {
   const { smtpConfigId } = await req.json()
   if (!smtpConfigId) {
-    return NextResponse.json({ error: "smtpConfigId required" }, { status: 400 })
+    return ApiError.badRequest("smtpConfigId required")
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error || !smtp) {
-    return NextResponse.json({ error: "SMTP config not found" }, { status: 404 })
+    return ApiError.notFound("SMTP config not found")
   }
 
   try {
@@ -43,9 +44,9 @@ export async function POST(req: NextRequest) {
       html: "<p>This is a test email from CCISR Connect. Your SMTP configuration is working correctly.</p>",
     })
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown SMTP error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return ApiError.internalError(message)
   }
 }

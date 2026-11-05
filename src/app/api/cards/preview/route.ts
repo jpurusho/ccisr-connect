@@ -7,8 +7,21 @@ import {
   buildPrayerMeetingCard,
   buildBulletinCard,
 } from "@/lib/email/card-builder";
+import { rateLimitByIp } from "@/lib/rate-limit";
+import { ApiError } from "@/lib/api-response";
 
 export async function GET(request: NextRequest) {
+  // Rate limiting: 30 requests per hour per IP
+  const rateLimit = rateLimitByIp(request, {
+    maxRequests: 30,
+    windowMs: 60 * 60 * 1000,
+    namespace: "cards-preview",
+  })
+
+  if (!rateLimit.allowed) {
+    return ApiError.tooManyRequests()
+  }
+
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type") || "birthday";
 
@@ -107,7 +120,7 @@ export async function GET(request: NextRequest) {
       break;
 
     default:
-      return NextResponse.json({ error: "Unknown card type" }, { status: 400 });
+      return ApiError.badRequest("Unknown card type");
   }
 
   const fullHtml = `<!DOCTYPE html>

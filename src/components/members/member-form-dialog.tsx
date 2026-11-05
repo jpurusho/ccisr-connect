@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import type { Member, Family, FamilyRole, FamilyInsert, MemberInsert, Tag } from "@/types/database"
 import { formatPhone } from "@/lib/utils"
+import { isValidEmail } from "@/lib/validation-schemas"
 import {
   Sheet,
   SheetContent,
@@ -97,7 +98,7 @@ export function MemberFormDialog({
   function validateField(field: string, value: string): string | null {
     if (field === "firstName" && !value.trim()) return "First name is required"
     if (field === "lastName" && !value.trim()) return "Last name is required"
-    if (field === "email" && value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return "Invalid email format"
+    if (field === "email" && value.trim() && !isValidEmail(value)) return "Invalid email format"
     return null
   }
 
@@ -216,7 +217,7 @@ export function MemberFormDialog({
     const errors: Record<string, string> = {}
     if (!firstName.trim()) errors.firstName = "First name is required"
     if (!lastName.trim()) errors.lastName = "Last name is required"
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = "Invalid email format"
+    if (email.trim() && !isValidEmail(email)) errors.email = "Invalid email format"
     if (!familyId && !newFamilyName.trim()) errors.family = "Select a family or enter a new one"
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)

@@ -1,14 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import nodemailer from "nodemailer"
+import { rateLimitByIp } from "@/lib/rate-limit"
+import { ApiError, successResponse } from "@/lib/api-response"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(req: NextRequest) {
+  // Rate limiting: 5 requests per 5 minutes per IP
+  const rateLimit = rateLimitByIp(req, {
+    maxRequests: 5,
+    windowMs: 5 * 60 * 1000,
+    namespace: "dispatch-send",
+  })
+
+  if (!rateLimit.allowed) {
+    return ApiError.tooManyRequests()
+  }
+
   const { dispatchId } = await req.json()
   if (!dispatchId) {
-    return NextResponse.json({ error: "dispatchId required" }, { status: 400 })
+    return ApiError.badRequest("dispatchId required")
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -21,18 +34,15 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (fetchErr || !dispatch) {
-    return NextResponse.json(
-      { error: fetchErr?.message || "Dispatch not found" },
-      { status: 404 }
-    )
+    return ApiError.notFound(fetchErr?.message || "Dispatch not found")
   }
 
   if (dispatch.status === "sent") {
-    return NextResponse.json({ error: "Already sent" }, { status: 400 })
+    return ApiError.badRequest("Already sent")
   }
 
   if (dispatch.status === "cancelled") {
-    return NextResponse.json({ error: "Dispatch is cancelled" }, { status: 400 })
+    return ApiError.badRequest("Dispatch is cancelled")
   }
 
   // Fetch SMTP config
@@ -41,7 +51,7 @@ export async function POST(req: NextRequest) {
       .from("dispatch_queue")
       .update({ status: "failed", error_message: "No SMTP account configured" } as never)
       .eq("id", dispatchId)
-    return NextResponse.json({ error: "No SMTP account configured" }, { status: 400 })
+    return ApiError.badRequest("No SMTP account configured")
   }
 
   const { data: smtp, error: smtpErr } = await supabase
@@ -55,7 +65,7 @@ export async function POST(req: NextRequest) {
       .from("dispatch_queue")
       .update({ status: "failed", error_message: "SMTP config not found" } as never)
       .eq("id", dispatchId)
-    return NextResponse.json({ error: "SMTP config not found" }, { status: 404 })
+    return ApiError.notFound("SMTP config not found")
   }
 
   // Fetch recipients from mailing list
@@ -112,7 +122,7 @@ export async function POST(req: NextRequest) {
       .from("dispatch_queue")
       .update({ status: "failed", error_message: "No recipients found" } as never)
       .eq("id", dispatchId)
-    return NextResponse.json({ error: "No recipients found" }, { status: 400 })
+    return ApiError.badRequest("No recipients found")
   }
 
   // Mark as sending
@@ -186,7 +196,7 @@ export async function POST(req: NextRequest) {
       },
     } as never)
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
       recipientCount: allRecipients.length,
     })
@@ -202,6 +212,6 @@ export async function POST(req: NextRequest) {
       } as never)
       .eq("id", dispatchId)
 
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    return ApiError.internalError(errorMessage)
   }
 }

@@ -99,8 +99,10 @@ export function TemplateStyleEditor({ value, onChange }: TemplateStyleEditorProp
         type="button"
         className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-left hover:bg-muted/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        aria-label={expanded ? "Collapse style and appearance settings" : "Expand style and appearance settings"}
       >
-        {expanded ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
+        {expanded ? <ChevronDown className="size-4 shrink-0" aria-hidden="true" /> : <ChevronRight className="size-4 shrink-0" aria-hidden="true" />}
         Style & Appearance
         {(value.fontFamily || value.headerFontFamily || value.headerTextColor || value.bodyTextColor || value.footerTextColor || value.headerStyle || value.sectionLayout || value.footerText || (value.headerGradient && value.headerGradient !== "none")) && (
           <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">customized</span>

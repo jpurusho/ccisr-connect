@@ -11,14 +11,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import {
   Cake,
@@ -29,14 +25,10 @@ import {
   HandHelping,
   Save,
   Eye,
-  Plus,
-  Trash2,
   Loader2,
-  Pencil,
-  Send,
   Copy,
-  Ban,
-  RotateCcw,
+  Send,
+  Plus,
 } from "lucide-react"
 import {
   buildBirthdayCard,
@@ -46,7 +38,7 @@ import {
   buildPrayerMeetingCard,
   buildBulletinCard,
   extractCommonCardData,
-  PASTEL_BORDER_MAP,
+  buildStyleContext,
 } from "@/lib/email/card-builder"
 import {
   type BibleStudyDefaults,
@@ -55,22 +47,13 @@ import {
   type BirthdayDefaults,
   type AnniversaryDefaults,
   type BulletinDefaults,
-  type CommonCardFields,
-  type PlaceholderDef,
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
   SUBJECT_FALLBACKS,
-  TEMPLATE_PLACEHOLDERS,
 } from "@/lib/template-defaults"
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
-import { HostFamilyInput, CustomSectionsEditor, FlyerSectionsEditor, ResourceLinksEditor, PastelColorPicker, TextColorPicker, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
 import { TemplateStyleEditor } from "@/components/dashboard/template-style-editor"
-import { VisualTemplateBuilder } from "@/components/template-builder/visual-template-builder"
-import type { VisualConfig } from "@/lib/email/visual-config-types"
-import { VerseLookup } from "@/components/shared/verse-lookup"
-import { FormattingHelp } from "@/components/shared/formatting-help"
-import { type TemplateStyleSettings, buildStyleContext } from "@/lib/email/card-builder"
-import { formatPhone } from "@/lib/utils"
+import { type TemplateStyleSettings } from "@/lib/email/card-builder"
 import { type CommType, inferCommType } from "@/lib/dashboard-types"
 import {
   Sheet,
@@ -80,6 +63,17 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet"
+import { Field, ColorPickerField } from "@/components/templates/template-form-field"
+import { PlaceholderReference } from "@/components/templates/common-template-fields"
+import { BirthdayTemplateForm } from "@/components/templates/birthday-template-form"
+import { AnniversaryTemplateForm } from "@/components/templates/anniversary-template-form"
+import { BibleStudyTemplateForm } from "@/components/templates/bible-study-template-form"
+import { WomensStudyTemplateForm } from "@/components/templates/womens-study-template-form"
+import { PrayerMeetingTemplateForm } from "@/components/templates/prayer-meeting-template-form"
+import { BulletinTemplateForm } from "@/components/templates/bulletin-template-form"
+import { CustomTemplateEditor } from "@/components/templates/custom-template-editor"
+import { TemplateGrid } from "@/components/templates/template-grid"
+import { CustomTemplateList } from "@/components/templates/custom-template-list"
 
 interface SavedTemplate {
   id: string
@@ -99,109 +93,6 @@ const EVENT_TYPE_TABS = [
   { name: "bulletin", label: "Bulletin", icon: Newspaper, color: "#4F46E5" },
 ]
 
-function Field({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  )
-}
-
-const COLOR_PRESETS = [
-  { label: "Purple", value: "#7C3AED" },
-  { label: "Gold", value: "#D97706" },
-  { label: "Teal", value: "#0D9488" },
-  { label: "Rose", value: "#DB2777" },
-  { label: "Green", value: "#059669" },
-  { label: "Indigo", value: "#4F46E5" },
-  { label: "Blue", value: "#2563EB" },
-  { label: "Red", value: "#DC2626" },
-  { label: "Orange", value: "#EA580C" },
-  { label: "Cyan", value: "#0891B2" },
-  { label: "Slate", value: "#475569" },
-]
-
-function ColorPickerField({ value, onChange, defaultColor }: { value: string | undefined; onChange: (color: string) => void; defaultColor: string }) {
-  const current = value || defaultColor
-  return (
-    <div className="space-y-1.5">
-      <Label>Theme Color</Label>
-      <div className="flex items-center gap-3">
-        <div className="flex flex-wrap gap-1.5">
-          {COLOR_PRESETS.map((preset) => (
-            <button
-              key={preset.value}
-              type="button"
-              title={preset.label}
-              className={`size-6 rounded-full border-2 transition-transform hover:scale-110 ${current === preset.value ? "border-foreground scale-110" : "border-transparent"}`}
-              style={{ backgroundColor: preset.value }}
-              onClick={() => onChange(preset.value)}
-            />
-          ))}
-        </div>
-        <Input
-          type="color"
-          value={current}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-8 w-12 cursor-pointer rounded border p-0.5"
-        />
-      </div>
-    </div>
-  )
-}
-
-
-function CommonTemplateFields<T extends CommonCardFields>({
-  data,
-  onChange,
-}: {
-  data: T
-  onChange: (updater: (prev: T) => T) => void
-}) {
-  return (
-    <>
-      <CustomSectionsEditor
-        sections={data.customSections ?? []}
-        onChange={(sections) => onChange((prev) => ({ ...prev, customSections: sections }))}
-      />
-      <ResourceLinksEditor
-        links={data.resourceLinks ?? []}
-        onChange={(links) => onChange((prev) => ({ ...prev, resourceLinks: links }))}
-      />
-    </>
-  )
-}
-
-function PlaceholderReference({ typeName }: { typeName: string }) {
-  const placeholders: PlaceholderDef[] = TEMPLATE_PLACEHOLDERS[typeName] ?? []
-  if (placeholders.length === 0) return null
-  return (
-    <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Available Placeholders</p>
-      <div className="flex flex-wrap gap-1.5">
-        {placeholders.map((p) => (
-          <button
-            key={p.token}
-            type="button"
-            title={`${p.description} — e.g. "${p.example}"`}
-            className="inline-flex items-center rounded border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground hover:bg-accent transition-colors"
-            onClick={() => {
-              navigator.clipboard.writeText(p.token)
-                .then(() => {/* copied */})
-                .catch(() => {/* ignore */})
-            }}
-          >
-            {p.token}
-          </button>
-        ))}
-      </div>
-      <p className="text-[11px] text-muted-foreground">Click to copy. Use in subject, message, or footer fields.</p>
-    </div>
-  )
-}
-
 export default function TemplatesPage() {
   const [activeTab, setActiveTab] = useState("")
   const [templates, setTemplates] = useState<SavedTemplate[]>([])
@@ -210,19 +101,13 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
 
-  // Custom templates
   const [customTemplates, setCustomTemplates] = useState<{ id: string; name: string; subject_template: string; body_template: string; style_settings?: Record<string, unknown>; is_active: boolean }[]>([])
 
-  const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown>; styleSettings: TemplateStyleSettings } | null>(null)
+  const [editingCustom, setEditingCustom] = useState<{ id: string; name: string; subject: string; data: Record<string, unknown>; styleSettings: TemplateStyleSettings; isActive: boolean } | null>(null)
   const [creatingCustom, setCreatingCustom] = useState(false)
-  const [newCustomStyleSettings, setNewCustomStyleSettings] = useState<TemplateStyleSettings>({})
-  const [newCustom, setNewCustom] = useState({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined as string | undefined, bodyTextColor: undefined as string | undefined, headerTitleColor: undefined as string | undefined, headerSubtitleColor: undefined as string | undefined, footerVerse: "", footerVerseBgColor: undefined as string | undefined, footerVerseTextColor: undefined as string | undefined, resourceLinks: [] as { label: string; url: string }[], customSections: [] as { title: string; emoji: string; entries: { label: string; name: string }[] }[], flyerSections: [] as FlyerSectionItem[], onBreak: false, breakMessage: "", breaks: [] as { from: string; to: string; message: string }[] })
 
-
-  // Style settings per template type
   const [styleSettings, setStyleSettings] = useState<Record<string, TemplateStyleSettings>>({})
 
-  // Per-type form state
   const [subjects, setSubjects] = useState<Record<string, string>>({})
   const [birthdayData, setBirthdayData] = useState<BirthdayDefaults>({})
   const [anniversaryData, setAnniversaryData] = useState<AnniversaryDefaults>({})
@@ -241,7 +126,6 @@ export default function TemplatesPage() {
     setLoading(true)
     const supabase = createClient()
 
-    // Fetch event types and templates separately to avoid FK ambiguity
     const [etRes, tmplRes, customRes] = await Promise.all([
       supabase.from("event_types").select("id, name, comm_type").order("name").returns<{ id: string; name: string; comm_type: string | null }[]>(),
       supabase
@@ -259,7 +143,6 @@ export default function TemplatesPage() {
 
     if (customRes.data) setCustomTemplates(customRes.data.map((ct) => ({ ...ct, style_settings: ct.style_settings ?? undefined, is_active: ct.is_active !== false })))
 
-    // Build event type maps — keyed by comm_type directly
     const idToTabName: Record<string, string> = {}
     const tabNameToId: Record<string, string> = {}
     if (etRes.data) {
@@ -271,7 +154,6 @@ export default function TemplatesPage() {
       setEventTypeIds(tabNameToId)
     }
 
-    // Reset to defaults first, then overlay saved data
     setBirthdayData({})
     setAnniversaryData({})
     setBibleStudyData(FALLBACK_DEFAULTS.bible_study.data as BibleStudyDefaults)
@@ -329,7 +211,6 @@ export default function TemplatesPage() {
     setTemplates(saved)
     setSubjects(subjs)
 
-
     setLoading(false)
   }, [])
 
@@ -349,7 +230,6 @@ export default function TemplatesPage() {
     }
   }
 
-  // CommType is now the single routing key — identity mapping
   const ET_NAME_TO_COMM_TYPE: Record<string, string> = {
     birthday: "birthday",
     anniversary: "anniversary",
@@ -406,7 +286,6 @@ export default function TemplatesPage() {
 
     const supabase = createClient()
 
-    // Find the event for this event type
     const { data: events } = await supabase
       .from("events")
       .select("id")
@@ -420,11 +299,9 @@ export default function TemplatesPage() {
 
     const formData = getDataForType(typeName) as Record<string, unknown>
 
-    // ---- Sync breaks to event_breaks table ----
     const formLocations = formData.locations as { label: string; breaks?: { from: string; to: string; message: string }[] }[] | undefined
     const breaksToWrite: { location_id: string | null; start_date: string; end_date: string; message: string | null }[] = []
 
-    // Template-level breaks (CommonCardFields.breaks)
     const templateBreaks = formData.breaks as { from: string; to: string; message: string }[] | undefined
     if (templateBreaks) {
       for (const brk of templateBreaks) {
@@ -434,7 +311,6 @@ export default function TemplatesPage() {
       }
     }
 
-    // Location-level breaks from form (stored without location_id since single-location)
     if (formLocations) {
       for (const formLoc of formLocations) {
         if (!formLoc.breaks) continue
@@ -446,7 +322,6 @@ export default function TemplatesPage() {
       }
     }
 
-    // Replace all breaks for this event
     await supabase.from("event_breaks").delete().eq("event_id", eventId)
     if (breaksToWrite.length > 0) {
       await supabase.from("event_breaks").insert(
@@ -454,7 +329,6 @@ export default function TemplatesPage() {
       )
     }
 
-    // ---- Sync zoom/virtual config ----
     const zoomLink = formData.zoomLink as string | undefined
     if (zoomLink) {
       await supabase.from("event_virtual_config").upsert({
@@ -467,7 +341,6 @@ export default function TemplatesPage() {
       } as never, { onConflict: "event_id" })
     }
 
-    // ---- Sync operational fields to events table ----
     const eventUpdates: Record<string, unknown> = {}
     if (formData.topic) eventUpdates.topic = formData.topic
     if (formData.dinnerNote !== undefined) eventUpdates.dinner_note = formData.dinnerNote || null
@@ -575,7 +448,6 @@ export default function TemplatesPage() {
     }
   }
 
-  // Live preview
   const previewHtml = useMemo(() => {
     const sampleWeek = "Apr 26 – May 2"
     const sc = buildStyleContext(styleSettings[activeTab])
@@ -707,7 +579,6 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header + back button when editing */}
       <div className="flex items-center gap-3">
         {activeTab && (
           <Button variant="ghost" size="icon-sm" onClick={() => { setActiveTab(""); setEditingCustom(null); setCreatingCustom(false) }} className="shrink-0">
@@ -724,58 +595,27 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      {/* Grid view — shown when no template is selected */}
       {!activeTab && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {allTemplateCards.map((card) => {
-            const Icon = card.icon
-            return (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => {
-                  if (card.isCustom) {
-                    const ctId = card.id.replace("custom-", "")
-                    const ct = customTemplates.find((t) => t.id === ctId)
-                    if (ct) {
-                      let parsed: Record<string, unknown> = {}
-                      try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
-                      setEditingCustom({ id: ct.id, name: ct.name, subject: ct.subject_template, data: parsed, styleSettings: (ct.style_settings as TemplateStyleSettings) ?? {} })
-                    }
-                    setActiveTab("custom")
-                  } else {
-                    setActiveTab(card.id)
-                  }
-                }}
-                className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all hover:shadow-md hover:border-primary/30 active:scale-95 ${"isActive" in card && !card.isActive ? "opacity-50" : ""}`}
-              >
-                <div
-                  className="flex size-10 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: card.color + "18", color: card.color }}
-                >
-                  <Icon className="size-5" />
-                </div>
-                <span className="text-sm font-medium">{card.label}</span>
-                {"isActive" in card && !card.isActive ? (
-                  <Badge variant="secondary" className="text-[10px]">Inactive</Badge>
-                ) : card.hasSaved ? (
-                  <span className="size-1.5 rounded-full" style={{ backgroundColor: card.color }} />
-                ) : null}
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            onClick={() => { setActiveTab("custom"); setCreatingCustom(true) }}
-            className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-center text-muted-foreground transition-all hover:border-primary/40 hover:text-primary"
-          >
-            <Plus className="size-5" />
-            <span className="text-sm font-medium">New Template</span>
-          </button>
-        </div>
+        <TemplateGrid
+          cards={allTemplateCards}
+          onSelectCard={(cardId) => {
+            if (cardId.startsWith("custom-")) {
+              const ctId = cardId.replace("custom-", "")
+              const ct = customTemplates.find((t) => t.id === ctId)
+              if (ct) {
+                let parsed: Record<string, unknown> = {}
+                try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+                setEditingCustom({ id: ct.id, name: ct.name, subject: ct.subject_template, data: parsed, styleSettings: (ct.style_settings as TemplateStyleSettings) ?? {}, isActive: ct.is_active })
+              }
+              setActiveTab("custom")
+            } else {
+              setActiveTab(cardId)
+            }
+          }}
+          onCreateNew={() => { setActiveTab("custom"); setCreatingCustom(true) }}
+        />
       )}
 
-      {/* Editor view — shown when a template is selected */}
       {activeTab && (
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="hidden">
@@ -788,7 +628,6 @@ export default function TemplatesPage() {
         {EVENT_TYPE_TABS.map((tab) => (
           <TabsContent key={tab.name} value={tab.name}>
             <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-              {/* Editor */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">
@@ -838,463 +677,30 @@ export default function TemplatesPage() {
                     onChange={(s) => setStyleSettings((prev) => ({ ...prev, [tab.name]: s }))}
                   />
 
-                  {/* Birthday fields */}
                   {tab.name === "birthday" && (
-                    <>
-                      <Field label="Wish Message" htmlFor="bd-msg" hint="Leave empty for no wish text">
-                        <Textarea
-                          id="bd-msg"
-                          value={birthdayData.message || ""}
-                          onChange={(e) => setBirthdayData((prev) => ({ ...prev, message: e.target.value }))}
-                          className="min-h-16"
-                        />
-                        <FormattingHelp />
-                        <PastelColorPicker
-                          value={birthdayData.messageBgColor}
-                          onChange={(color) => setBirthdayData((prev) => ({ ...prev, messageBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
-                      </Field>
-                      <Field label="Footer Bible Verse" htmlFor="bd-verse" hint="Leave empty for no footer">
-                        <Input
-                          id="bd-verse"
-                          value={birthdayData.footerVerse || ""}
-                          onChange={(e) => setBirthdayData((prev) => ({ ...prev, footerVerse: e.target.value }))}
-                        />
-                        <div className="flex items-center gap-4">
-                          <PastelColorPicker
-                            value={birthdayData.footerVerseBgColor}
-                            onChange={(color) => setBirthdayData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                            extraPastels={styleSettings[tab.name]?.customPastels}
-                          />
-                          <TextColorPicker value={birthdayData.footerVerseTextColor} onChange={(c) => setBirthdayData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
-                        </div>
-                        <VerseLookup onSelect={(text, ref) => setBirthdayData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
-                      </Field>
-                      <CommonTemplateFields data={birthdayData} onChange={setBirthdayData} />
-                    </>
+                    <BirthdayTemplateForm data={birthdayData} onChange={setBirthdayData} styleSettings={styleSettings[tab.name]} />
                   )}
 
-                  {/* Anniversary fields */}
                   {tab.name === "anniversary" && (
-                    <>
-                      <Field label="Wish Message" htmlFor="an-msg" hint="Leave empty for no wish text">
-                        <Textarea
-                          id="an-msg"
-                          value={anniversaryData.message || ""}
-                          onChange={(e) => setAnniversaryData((prev) => ({ ...prev, message: e.target.value }))}
-                          className="min-h-16"
-                        />
-                        <FormattingHelp />
-                        <PastelColorPicker
-                          value={anniversaryData.messageBgColor}
-                          onChange={(color) => setAnniversaryData((prev) => ({ ...prev, messageBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
-                      </Field>
-                      <Field label="Footer Bible Verse" htmlFor="an-verse" hint="Leave empty for no footer">
-                        <Input
-                          id="an-verse"
-                          value={anniversaryData.footerVerse || ""}
-                          onChange={(e) => setAnniversaryData((prev) => ({ ...prev, footerVerse: e.target.value }))}
-                        />
-                        <div className="flex items-center gap-4">
-                          <PastelColorPicker
-                            value={anniversaryData.footerVerseBgColor}
-                            onChange={(color) => setAnniversaryData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                            extraPastels={styleSettings[tab.name]?.customPastels}
-                          />
-                          <TextColorPicker value={anniversaryData.footerVerseTextColor} onChange={(c) => setAnniversaryData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
-                        </div>
-                        <VerseLookup onSelect={(text, ref) => setAnniversaryData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
-                      </Field>
-                      <CommonTemplateFields data={anniversaryData} onChange={setAnniversaryData} />
-                    </>
+                    <AnniversaryTemplateForm data={anniversaryData} onChange={setAnniversaryData} styleSettings={styleSettings[tab.name]} />
                   )}
 
-                  {/* Bible Study fields */}
                   {tab.name === "bible_study" && (
-                    <>
-                      <Field label="Card Title" htmlFor="bs-title">
-                        <Input
-                          id="bs-title"
-                          value={bibleStudyData.title || ""}
-                          onChange={(e) => setBibleStudyData((prev) => ({ ...prev, title: e.target.value }))}
-                          placeholder="Bible Study This Friday"
-                        />
-                      </Field>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Topic" htmlFor="bs-topic">
-                          <Input
-                            id="bs-topic"
-                            value={bibleStudyData.topic || ""}
-                            onChange={(e) => setBibleStudyData((prev) => ({ ...prev, topic: e.target.value }))}
-                          />
-                        </Field>
-                        <Field label="Default Time" htmlFor="bs-time">
-                          <Input
-                            id="bs-time"
-                            value={bibleStudyData.time || ""}
-                            onChange={(e) => setBibleStudyData((prev) => ({ ...prev, time: e.target.value }))}
-                            placeholder="7:30 PM"
-                          />
-                        </Field>
-                      </div>
-                      <Field label="Invite Message" htmlFor="bs-msg" hint="Leave empty to exclude">
-                        <Textarea
-                          id="bs-msg"
-                          value={bibleStudyData.message || ""}
-                          onChange={(e) => setBibleStudyData((prev) => ({ ...prev, message: e.target.value }))}
-                          className="min-h-16"
-                        />
-                        <FormattingHelp />
-                        <PastelColorPicker
-                          value={bibleStudyData.messageBgColor}
-                          onChange={(color) => setBibleStudyData((prev) => ({ ...prev, messageBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
-                      </Field>
-                      <Field label="Footer Bible Verse" htmlFor="bs-verse" hint="Leave empty for no footer">
-                        <Input
-                          id="bs-verse"
-                          value={bibleStudyData.footerVerse || ""}
-                          onChange={(e) => setBibleStudyData((prev) => ({ ...prev, footerVerse: e.target.value }))}
-                        />
-                        <div className="flex items-center gap-4">
-                          <PastelColorPicker
-                            value={bibleStudyData.footerVerseBgColor}
-                            onChange={(color) => setBibleStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                            extraPastels={styleSettings[tab.name]?.customPastels}
-                          />
-                          <TextColorPicker value={bibleStudyData.footerVerseTextColor} onChange={(c) => setBibleStudyData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
-                        </div>
-                        <VerseLookup onSelect={(text, ref) => setBibleStudyData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
-                      </Field>
-
-                      <CommonTemplateFields data={bibleStudyData} onChange={setBibleStudyData} />
-
-                      <div className="space-y-3">
-                        <Label>Default Host / Location</Label>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <HostFamilyInput
-                            value={bibleStudyData.hostNames || ""}
-                            onChange={(v) => setBibleStudyData((prev) => ({ ...prev, hostNames: v }))}
-                            onSelect={(f) => {
-                              setBibleStudyData((prev) => ({
-                                ...prev,
-                                hostNames: `${f.family_name}'s Residence`,
-                                address: f.street ?? f.full_address ?? prev.address,
-                                city: [f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || prev.city,
-                                phone: formatPhone(f.home_phone) || prev.phone,
-                              }))
-                            }}
-                          />
-                          <Input
-                            placeholder="Phone"
-                            value={bibleStudyData.phone || ""}
-                            onChange={(e) => setBibleStudyData((prev) => ({ ...prev, phone: e.target.value }))}
-                          />
-                        </div>
-                        <Input
-                          placeholder="Address"
-                          value={bibleStudyData.address || ""}
-                          onChange={(e) => setBibleStudyData((prev) => ({ ...prev, address: e.target.value }))}
-                        />
-                        <Input
-                          placeholder="City, State ZIP"
-                          value={bibleStudyData.city || ""}
-                          onChange={(e) => setBibleStudyData((prev) => ({ ...prev, city: e.target.value }))}
-                        />
-                      </div>
-                    </>
+                    <BibleStudyTemplateForm data={bibleStudyData} onChange={setBibleStudyData} styleSettings={styleSettings[tab.name]} />
                   )}
 
-                  {/* Women's Study fields */}
                   {tab.name === "womens_study" && (
-                    <>
-                      <Field label="Card Title" htmlFor="ws-title">
-                        <Input
-                          id="ws-title"
-                          value={womensStudyData.title || ""}
-                          onChange={(e) => setWomensStudyData((prev) => ({ ...prev, title: e.target.value }))}
-                          placeholder="Women's Bible Study"
-                        />
-                      </Field>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Topic" htmlFor="ws-topic">
-                          <Input
-                            id="ws-topic"
-                            value={womensStudyData.topic || ""}
-                            onChange={(e) => setWomensStudyData((prev) => ({ ...prev, topic: e.target.value }))}
-                          />
-                        </Field>
-                        <Field label="Default Time" htmlFor="ws-time">
-                          <Input
-                            id="ws-time"
-                            value={womensStudyData.time || ""}
-                            onChange={(e) => setWomensStudyData((prev) => ({ ...prev, time: e.target.value }))}
-                            placeholder="7:00 PM"
-                          />
-                        </Field>
-                      </div>
-                      <Field label="Zoom Link" htmlFor="ws-zoom" hint="Leave empty to exclude Zoom details">
-                        <Input
-                          id="ws-zoom"
-                          value={womensStudyData.zoomLink || ""}
-                          onChange={(e) => setWomensStudyData((prev) => ({ ...prev, zoomLink: e.target.value }))}
-                          placeholder="https://zoom.us/j/..."
-                        />
-                      </Field>
-                      {womensStudyData.zoomLink && (
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <Field label="Meeting ID" htmlFor="ws-zmid">
-                            <Input
-                              id="ws-zmid"
-                              value={womensStudyData.zoomMeetingId || ""}
-                              onChange={(e) => setWomensStudyData((prev) => ({ ...prev, zoomMeetingId: e.target.value }))}
-                              placeholder="779 2123 2378"
-                            />
-                          </Field>
-                          <Field label="Passcode" htmlFor="ws-zmpw">
-                            <Input
-                              id="ws-zmpw"
-                              value={womensStudyData.zoomPasscode || ""}
-                              onChange={(e) => setWomensStudyData((prev) => ({ ...prev, zoomPasscode: e.target.value }))}
-                              placeholder="6gLy8u"
-                            />
-                          </Field>
-                        </div>
-                      )}
-                      <Field label="Location (when no Zoom)" htmlFor="ws-loc">
-                        <Input
-                          id="ws-loc"
-                          value={womensStudyData.location || ""}
-                          onChange={(e) => setWomensStudyData((prev) => ({ ...prev, location: e.target.value }))}
-                        />
-                      </Field>
-                      <Field label="Invite Message" htmlFor="ws-msg" hint="Leave empty to exclude">
-                        <Textarea
-                          id="ws-msg"
-                          value={womensStudyData.message || ""}
-                          onChange={(e) => setWomensStudyData((prev) => ({ ...prev, message: e.target.value }))}
-                          className="min-h-16"
-                        />
-                        <FormattingHelp />
-                        <PastelColorPicker
-                          value={womensStudyData.messageBgColor}
-                          onChange={(color) => setWomensStudyData((prev) => ({ ...prev, messageBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
-                      </Field>
-                      <Field label="Footer Bible Verse" htmlFor="ws-verse" hint="Leave empty for no footer">
-                        <Input
-                          id="ws-verse"
-                          value={womensStudyData.footerVerse || ""}
-                          onChange={(e) => setWomensStudyData((prev) => ({ ...prev, footerVerse: e.target.value }))}
-                        />
-                        <div className="flex items-center gap-4">
-                          <PastelColorPicker
-                            value={womensStudyData.footerVerseBgColor}
-                            onChange={(color) => setWomensStudyData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                            extraPastels={styleSettings[tab.name]?.customPastels}
-                          />
-                          <TextColorPicker value={womensStudyData.footerVerseTextColor} onChange={(c) => setWomensStudyData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
-                        </div>
-                        <VerseLookup onSelect={(text, ref) => setWomensStudyData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
-                      </Field>
-
-                      <CommonTemplateFields data={womensStudyData} onChange={setWomensStudyData} />
-                    </>
+                    <WomensStudyTemplateForm data={womensStudyData} onChange={setWomensStudyData} styleSettings={styleSettings[tab.name]} />
                   )}
 
-                  {/* Prayer Meeting fields */}
                   {tab.name === "prayer_meeting" && (
-                    <>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Default Date" htmlFor="pm-date" hint="e.g., First Saturday of each month">
-                          <Input
-                            id="pm-date"
-                            value={prayerMeetingData.date || ""}
-                            onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, date: e.target.value }))}
-                            placeholder="Saturday, May 3rd"
-                          />
-                        </Field>
-                        <Field label="Default Time" htmlFor="pm-time">
-                          <Input
-                            id="pm-time"
-                            value={prayerMeetingData.time || ""}
-                            onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, time: e.target.value }))}
-                            placeholder="6:00 PM"
-                          />
-                        </Field>
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Default Host" htmlFor="pm-host">
-                          <Input
-                            id="pm-host"
-                            value={prayerMeetingData.hostNames || ""}
-                            onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, hostNames: e.target.value }))}
-                            placeholder="Host family name"
-                          />
-                        </Field>
-                        <Field label="Phone" htmlFor="pm-phone">
-                          <Input
-                            id="pm-phone"
-                            value={prayerMeetingData.phone || ""}
-                            onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, phone: e.target.value }))}
-                          />
-                        </Field>
-                      </div>
-                      <Field label="Address" htmlFor="pm-addr">
-                        <Input
-                          id="pm-addr"
-                          value={prayerMeetingData.address || ""}
-                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, address: e.target.value }))}
-                        />
-                      </Field>
-                      <Field label="City, State ZIP" htmlFor="pm-city">
-                        <Input
-                          id="pm-city"
-                          value={prayerMeetingData.city || ""}
-                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, city: e.target.value }))}
-                        />
-                      </Field>
-                      <Field label="Dinner Note" htmlFor="pm-dinner" hint="Leave empty to exclude">
-                        <Input
-                          id="pm-dinner"
-                          value={prayerMeetingData.dinnerNote || ""}
-                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, dinnerNote: e.target.value }))}
-                          placeholder="Potluck dinner — please bring a dish to share"
-                        />
-                      </Field>
-                      <Field label="Signup Link" htmlFor="pm-signup" hint="Leave empty to exclude">
-                        <Input
-                          id="pm-signup"
-                          value={prayerMeetingData.signupLink || ""}
-                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, signupLink: e.target.value }))}
-                          placeholder="https://..."
-                        />
-                      </Field>
-                      <Field label="Invite Message" htmlFor="pm-msg" hint="Leave empty for default">
-                        <Textarea
-                          id="pm-msg"
-                          value={prayerMeetingData.message || ""}
-                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, message: e.target.value }))}
-                          className="min-h-16"
-                        />
-                        <FormattingHelp />
-                        <PastelColorPicker
-                          value={prayerMeetingData.messageBgColor}
-                          onChange={(color) => setPrayerMeetingData((prev) => ({ ...prev, messageBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
-                      </Field>
-                      <Field label="Footer Bible Verse" htmlFor="pm-verse" hint="Leave empty for default">
-                        <Input
-                          id="pm-verse"
-                          value={prayerMeetingData.footerVerse || ""}
-                          onChange={(e) => setPrayerMeetingData((prev) => ({ ...prev, footerVerse: e.target.value }))}
-                        />
-                        <div className="flex items-center gap-4">
-                          <PastelColorPicker
-                            value={prayerMeetingData.footerVerseBgColor}
-                            onChange={(color) => setPrayerMeetingData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                            extraPastels={styleSettings[tab.name]?.customPastels}
-                          />
-                          <TextColorPicker value={prayerMeetingData.footerVerseTextColor} onChange={(c) => setPrayerMeetingData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
-                        </div>
-                        <VerseLookup onSelect={(text, ref) => setPrayerMeetingData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
-                      </Field>
-                      <CommonTemplateFields data={prayerMeetingData} onChange={setPrayerMeetingData} />
-                    </>
+                    <PrayerMeetingTemplateForm data={prayerMeetingData} onChange={setPrayerMeetingData} styleSettings={styleSettings[tab.name]} />
                   )}
 
-                  {/* Bulletin fields */}
                   {tab.name === "bulletin" && (
-                    <div className="space-y-3">
-                      <Label>Default Events</Label>
-                      {(bulletinData.events || []).map((evt, i) => (
-                        <div key={i} className="space-y-1.5 rounded-md border p-2.5">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              placeholder="Event title"
-                              value={evt.title}
-                              onChange={(e) => {
-                                const evts = [...(bulletinData.events || [])]
-                                evts[i] = { ...evts[i], title: e.target.value }
-                                setBulletinData((prev) => ({ ...prev, events: evts }))
-                              }}
-                              className="flex-1"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => {
-                                const evts = (bulletinData.events || []).filter((_, j) => j !== i)
-                                setBulletinData((prev) => ({ ...prev, events: evts }))
-                              }}
-                            >
-                              <Trash2 className="size-3.5 text-muted-foreground" />
-                            </Button>
-                          </div>
-                          <Textarea
-                            placeholder="Details"
-                            value={evt.details}
-                            onChange={(e) => {
-                              const evts = [...(bulletinData.events || [])]
-                              evts[i] = { ...evts[i], details: e.target.value }
-                              setBulletinData((prev) => ({ ...prev, events: evts }))
-                            }}
-                            className="min-h-10"
-                          />
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const evts = [...(bulletinData.events || []), { title: "", details: "" }]
-                          setBulletinData((prev) => ({ ...prev, events: evts }))
-                        }}
-                      >
-                        <Plus className="size-3.5" />
-                        Add Event
-                      </Button>
-                      <Field label="Bulletin Message" htmlFor="bul-msg" hint="Leave empty to exclude">
-                        <Textarea
-                          id="bul-msg"
-                          value={bulletinData.message || ""}
-                          onChange={(e) => setBulletinData((prev) => ({ ...prev, message: e.target.value }))}
-                          className="min-h-16"
-                        />
-                        <FormattingHelp />
-                        <PastelColorPicker
-                          value={bulletinData.messageBgColor}
-                          onChange={(color) => setBulletinData((prev) => ({ ...prev, messageBgColor: color }))}
-                          extraPastels={styleSettings[tab.name]?.customPastels}
-                        />
-                      </Field>
-                      <Field label="Footer Bible Verse" htmlFor="bul-verse" hint="Leave empty for default footer">
-                        <Input
-                          id="bul-verse"
-                          value={bulletinData.footerVerse || ""}
-                          onChange={(e) => setBulletinData((prev) => ({ ...prev, footerVerse: e.target.value }))}
-                        />
-                        <div className="flex items-center gap-4">
-                          <PastelColorPicker
-                            value={bulletinData.footerVerseBgColor}
-                            onChange={(color) => setBulletinData((prev) => ({ ...prev, footerVerseBgColor: color }))}
-                            extraPastels={styleSettings[tab.name]?.customPastels}
-                          />
-                          <TextColorPicker value={bulletinData.footerVerseTextColor} onChange={(c) => setBulletinData((prev) => ({ ...prev, footerVerseTextColor: c }))} label="Text" />
-                        </div>
-                        <VerseLookup onSelect={(text, ref) => setBulletinData((prev) => ({ ...prev, footerVerse: `${text} — ${ref}` }))} />
-                      </Field>
-                      <CommonTemplateFields data={bulletinData} onChange={setBulletinData} />
-                    </div>
+                    <BulletinTemplateForm data={bulletinData} onChange={setBulletinData} styleSettings={styleSettings[tab.name]} />
                   )}
 
-                  {/* Save + Preview buttons */}
                   <div className="flex gap-2 pt-2">
                     <Button
                       onClick={() => handleSave(tab.name)}
@@ -1327,7 +733,6 @@ export default function TemplatesPage() {
                 </CardContent>
               </Card>
 
-              {/* Live Preview Sidebar */}
               <Card className="hidden lg:block">
                 <CardHeader>
                   <CardTitle className="text-sm">Live Preview</CardTitle>
@@ -1346,7 +751,6 @@ export default function TemplatesPage() {
           </TabsContent>
         ))}
 
-        {/* Custom Templates Tab */}
         <TabsContent value="custom">
           <Card>
             <CardHeader>
@@ -1358,13 +762,7 @@ export default function TemplatesPage() {
                   </CardDescription>
                 </div>
                 {!creatingCustom && !editingCustom && (
-                  <Button
-                    onClick={() => {
-                      setNewCustom({ name: "", subject: "", title: "", subtitle: "", emoji: "📋", primaryColor: "", body: "", bodyBgColor: undefined, bodyTextColor: undefined, headerTitleColor: undefined, headerSubtitleColor: undefined, footerVerse: "", footerVerseBgColor: undefined, footerVerseTextColor: undefined, resourceLinks: [], customSections: [], flyerSections: [], onBreak: false, breakMessage: "", breaks: [] })
-                      setNewCustomStyleSettings({})
-                      setCreatingCustom(true)
-                    }}
-                  >
+                  <Button onClick={() => setCreatingCustom(true)}>
                     <Plus className="size-4" />
                     New Template
                   </Button>
@@ -1372,491 +770,133 @@ export default function TemplatesPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Create form */}
-              {creatingCustom && (
-                <div className="space-y-4">
-                  <Field label="Template Name *" htmlFor="nc-name" hint="A short name to identify this template">
-                    <Input
-                      id="nc-name"
-                      value={newCustom.name}
-                      onChange={(e) => setNewCustom({ ...newCustom, name: e.target.value })}
-                      placeholder="e.g., Easter Announcement"
-                    />
-                  </Field>
-                  <Field label="Email Subject *" htmlFor="nc-subj">
-                    <Input
-                      id="nc-subj"
-                      value={newCustom.subject}
-                      onChange={(e) => setNewCustom({ ...newCustom, subject: e.target.value })}
-                      placeholder="e.g., Easter Service — Join Us This Sunday"
-                    />
-                  </Field>
-                  <Field label="Card Title" htmlFor="nc-title" hint="Displayed as the heading in the email card">
-                    <Input
-                      id="nc-title"
-                      value={newCustom.title}
-                      onChange={(e) => setNewCustom({ ...newCustom, title: e.target.value })}
-                      placeholder="e.g., Easter Sunday Service"
-                      style={newCustom.headerTitleColor ? { color: newCustom.headerTitleColor } : undefined}
-                    />
-                    <TextColorPicker value={newCustom.headerTitleColor} onChange={(c) => setNewCustom({ ...newCustom, headerTitleColor: c })} label="Text" />
-                  </Field>
-                  <Field label="Subtitle" htmlFor="nc-sub">
-                    <Input
-                      id="nc-sub"
-                      value={newCustom.subtitle}
-                      onChange={(e) => setNewCustom({ ...newCustom, subtitle: e.target.value })}
-                      style={newCustom.headerSubtitleColor ? { color: newCustom.headerSubtitleColor } : undefined}
-                    />
-                    <TextColorPicker value={newCustom.headerSubtitleColor} onChange={(c) => setNewCustom({ ...newCustom, headerSubtitleColor: c })} label="Text" />
-                    <VerseLookup onSelect={(text, ref) => setNewCustom({ ...newCustom, subtitle: `"${text}" — ${ref}` })} />
-                  </Field>
-                  <Field label="Header Emoji" htmlFor="nc-emoji" hint="Paste an emoji (e.g. 🤝 🙌 ⛪)">
-                    <Input
-                      id="nc-emoji"
-                      value={newCustom.emoji}
-                      onChange={(e) => setNewCustom({ ...newCustom, emoji: e.target.value })}
-                      className="w-24 text-2xl text-center"
-                    />
-                  </Field>
-                  <ColorPickerField
-                    value={newCustom.primaryColor}
-                    defaultColor="#6B7280"
-                    onChange={(color) => setNewCustom({ ...newCustom, primaryColor: color })}
-                  />
-                  <TemplateStyleEditor
-                    value={newCustomStyleSettings}
-                    onChange={setNewCustomStyleSettings}
-                  />
-                  <Field label="Message Body" htmlFor="nc-body">
-                    <Textarea
-                      id="nc-body"
-                      value={newCustom.body}
-                      onChange={(e) => setNewCustom({ ...newCustom, body: e.target.value })}
-                      className="min-h-24 transition-colors"
-                      placeholder="Write the main content of the announcement..."
-                      style={{
-                        ...(newCustom.bodyBgColor ? {
-                          backgroundColor: newCustom.bodyBgColor,
-                          borderColor: PASTEL_BORDER_MAP[newCustom.bodyBgColor],
-                          boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.bodyBgColor]}50`,
-                          color: '#1E293B', // Force dark text for visibility during editing
-                        } : {}),
-                      }}
-                    />
-                    <div className="flex items-center gap-4">
-                      <PastelColorPicker
-                        value={newCustom.bodyBgColor}
-                        onChange={(color) => setNewCustom({ ...newCustom, bodyBgColor: color })}
-                        extraPastels={newCustomStyleSettings.customPastels}
-                      />
-                      <TextColorPicker value={newCustom.bodyTextColor} onChange={(c) => setNewCustom({ ...newCustom, bodyTextColor: c })} label="Text" />
-                    </div>
-                  </Field>
-                  <Field label="Footer Verse" htmlFor="nc-foot">
-                    <Input
-                      id="nc-foot"
-                      value={newCustom.footerVerse}
-                      onChange={(e) => setNewCustom({ ...newCustom, footerVerse: e.target.value })}
-                      placeholder="e.g., For God so loved the world... — John 3:16"
-                      style={{
-                        ...(newCustom.footerVerseBgColor ? {
-                          backgroundColor: newCustom.footerVerseBgColor,
-                          borderColor: PASTEL_BORDER_MAP[newCustom.footerVerseBgColor],
-                          boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[newCustom.footerVerseBgColor]}50`,
-                          color: '#1E293B', // Force dark text for visibility during editing
-                        } : {}),
-                      }}
-                    />
-                    <div className="flex items-center gap-4">
-                      <PastelColorPicker
-                        value={newCustom.footerVerseBgColor}
-                        onChange={(color) => setNewCustom({ ...newCustom, footerVerseBgColor: color })}
-                        extraPastels={newCustomStyleSettings.customPastels}
-                      />
-                      <TextColorPicker value={newCustom.footerVerseTextColor} onChange={(c) => setNewCustom({ ...newCustom, footerVerseTextColor: c })} label="Text" />
-                    </div>
-                    <VerseLookup onSelect={(text, ref) => setNewCustom({ ...newCustom, footerVerse: `"${text}" — ${ref}` })} />
-                  </Field>
-                  <FlyerSectionsEditor
-                    sections={newCustom.flyerSections}
-                    onChange={(flyerSections) => setNewCustom({ ...newCustom, flyerSections })}
-                  />
-                  <CustomSectionsEditor
-                    sections={newCustom.customSections}
-                    onChange={(sections) => setNewCustom({ ...newCustom, customSections: sections })}
-                  />
-                  <ResourceLinksEditor
-                    links={newCustom.resourceLinks}
-                    onChange={(links) => setNewCustom({ ...newCustom, resourceLinks: links })}
-                  />
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      onClick={async () => {
-                        if (!newCustom.name.trim() || !newCustom.subject.trim()) {
-                          toast.error("Template name and subject are required")
-                          return
-                        }
-                        setSaving(true)
-                        const supabase = createClient()
-                        const bodyData = {
-                          title: newCustom.title,
-                          subtitle: newCustom.subtitle,
-                          emoji: newCustom.emoji || "📋",
-                          primaryColor: newCustom.primaryColor || undefined,
-                          headerTitleColor: newCustom.headerTitleColor || undefined,
-                          headerSubtitleColor: newCustom.headerSubtitleColor || undefined,
-                          body: newCustom.body,
-                          bodyBgColor: newCustom.bodyBgColor || undefined,
-                          bodyTextColor: newCustom.bodyTextColor || undefined,
-                          footerVerse: newCustom.footerVerse,
-                          footerVerseBgColor: newCustom.footerVerseBgColor || undefined,
-                          footerVerseTextColor: newCustom.footerVerseTextColor || undefined,
-                          flyerSections: newCustom.flyerSections.filter((s) => s.imageUrl),
-                          resourceLinks: newCustom.resourceLinks.filter((l) => l.url),
-                          customSections: newCustom.customSections.filter((s) => s.title && s.entries.some((e) => e.name)),
-                          onBreak: newCustom.onBreak || undefined,
-                          breakMessage: newCustom.breakMessage || undefined,
-                          breaks: newCustom.breaks.length > 0 ? newCustom.breaks : undefined,
-                        }
-                        const { data: inserted, error } = await supabase
-                          .from("email_templates")
-                          .insert({
-                            name: newCustom.name.trim(),
-                            subject_template: newCustom.subject.trim(),
-                            body_template: JSON.stringify(bodyData),
-                            style_settings: newCustomStyleSettings,
-                            is_default: false,
-                          } as never)
-                          .select("id")
-                          .single() as { data: { id: string } | null; error: { message: string } | null }
-                        if (error) {
-                          toast.error(`Failed: ${error.message}`)
-                        } else {
-                          toast.success(`"${newCustom.name}" created`)
-                          logAudit("custom_template_created", "email_templates", inserted?.id, { name: newCustom.name })
-                          setCreatingCustom(false)
-                          fetchTemplates()
-                        }
-                        setSaving(false)
-                      }}
-                      disabled={saving || !newCustom.name.trim() || !newCustom.subject.trim()}
-                      style={{ backgroundColor: "#6B7280" }}
-                      className="text-white hover:opacity-90"
-                    >
-                      {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                      Create Template
-                    </Button>
-                    <Button variant="outline" onClick={() => setCreatingCustom(false)} disabled={saving}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
+              {(creatingCustom || editingCustom) ? (
+                <CustomTemplateEditor
+                  mode={creatingCustom ? "create" : "edit"}
+                  initialData={editingCustom ? {
+                    id: editingCustom.id,
+                    name: editingCustom.name,
+                    subject: editingCustom.subject,
+                    data: editingCustom.data,
+                    styleSettings: editingCustom.styleSettings,
+                    isActive: editingCustom.isActive
+                  } : undefined}
+                  saving={saving}
+                  onSave={async (data) => {
+                    setSaving(true)
+                    const supabase = createClient()
 
-              {/* Edit form */}
-              {editingCustom && !creatingCustom && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 border-b pb-3">
-                    <Button
-                      variant={!(editingCustom.data._useVisualBuilder) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, _useVisualBuilder: false } })}
-                    >
-                      Form Editor
-                    </Button>
-                    <Button
-                      variant={(editingCustom.data._useVisualBuilder) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, _useVisualBuilder: true } })}
-                    >
-                      Visual Builder
-                    </Button>
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {customTemplates.find((t) => t.id === editingCustom.id)?.is_active !== false ? "Active" : "Inactive"}
-                      </span>
-                      <Switch
-                        size="sm"
-                        checked={customTemplates.find((t) => t.id === editingCustom.id)?.is_active !== false}
-                        onCheckedChange={async (checked) => {
-                          const supabase = createClient()
-                          const { error } = await supabase.from("email_templates").update({ is_active: checked } as never).eq("id", editingCustom.id)
-                          if (error) {
-                            toast.error(`Failed: ${error.message}`)
-                          } else {
-                            toast.success(checked ? `"${editingCustom.name}" activated` : `"${editingCustom.name}" deactivated — hidden from dashboard`)
-                            logAudit("custom_template_toggled_active", "email_templates", editingCustom.id, { name: editingCustom.name, is_active: checked })
-                            fetchTemplates()
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
+                    const bodyData = {
+                      ...data.data,
+                      flyerSections: ((data.data.flyerSections as { imageUrl: string }[]) ?? []).filter((s) => s.imageUrl),
+                      resourceLinks: ((data.data.resourceLinks as { url: string }[]) ?? []).filter((l) => l.url),
+                      customSections: ((data.data.customSections as { title: string; entries: { name: string }[] }[]) ?? []).filter((s) => s.title && s.entries.some((e) => e.name)),
+                    }
 
-                  {editingCustom.data._useVisualBuilder ? (
-                    <VisualTemplateBuilder
-                      initialConfig={(editingCustom.data.visualConfig as VisualConfig) ?? null}
-                      globalStyle={editingCustom.styleSettings}
-                      saving={saving}
-                      onSave={async (config) => {
-                        setSaving(true)
-                        const supabase = createClient()
-                        const { error } = await supabase
-                          .from("email_templates")
-                          .update({
-                            name: editingCustom.name,
-                            subject_template: editingCustom.subject,
-                            body_template: JSON.stringify({ ...editingCustom.data, visualConfig: config, _useVisualBuilder: undefined }),
-                            style_settings: editingCustom.styleSettings,
-                            visual_config: config,
-                          } as never)
-                          .eq("id", editingCustom.id)
-                        if (error) {
-                          toast.error(`Failed: ${error.message}`)
-                        } else {
-                          toast.success(`"${editingCustom.name}" updated (visual builder)`)
-                          setEditingCustom(null)
-                          fetchTemplates()
-                        }
-                        setSaving(false)
-                      }}
-                    />
-                  ) : (
-                  <>
-                  <Field label="Template Name" htmlFor="ct-name">
-                    <Input
-                      id="ct-name"
-                      value={editingCustom.name}
-                      onChange={(e) => setEditingCustom({ ...editingCustom, name: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Subject Line" htmlFor="ct-subj">
-                    <Input
-                      id="ct-subj"
-                      value={editingCustom.subject}
-                      onChange={(e) => setEditingCustom({ ...editingCustom, subject: e.target.value })}
-                    />
-                  </Field>
-                  <PlaceholderReference typeName="custom" />
-                  <Field label="Title" htmlFor="ct-title">
-                    <Input
-                      id="ct-title"
-                      value={(editingCustom.data.title as string) || ""}
-                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, title: e.target.value } })}
-                    />
-                  </Field>
-                  <Field label="Subtitle" htmlFor="ct-sub">
-                    <Input
-                      id="ct-sub"
-                      value={(editingCustom.data.subtitle as string) || ""}
-                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, subtitle: e.target.value } })}
-                    />
-                  </Field>
-                  <Field label="Header Emoji" htmlFor="ct-emoji" hint="Paste an emoji (e.g. 🤝 🙌 ⛪)">
-                    <Input
-                      id="ct-emoji"
-                      value={(editingCustom.data.emoji as string) || "📋"}
-                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, emoji: e.target.value } })}
-                      className="w-24 text-2xl text-center"
-                    />
-                  </Field>
-                  <ColorPickerField
-                    value={(editingCustom.data.primaryColor as string) || ""}
-                    defaultColor="#6B7280"
-                    onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, primaryColor: color } })}
-                  />
-                  <TemplateStyleEditor
-                    value={editingCustom.styleSettings}
-                    onChange={(s) => setEditingCustom({ ...editingCustom, styleSettings: s })}
-                  />
-                  <Field label="Message Body" htmlFor="ct-body">
-                    <Textarea
-                      id="ct-body"
-                      value={(editingCustom.data.body as string) || ""}
-                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, body: e.target.value } })}
-                      className="min-h-24 transition-colors"
-                      style={(editingCustom.data.bodyBgColor as string) ? {
-                        backgroundColor: editingCustom.data.bodyBgColor as string,
-                        borderColor: PASTEL_BORDER_MAP[editingCustom.data.bodyBgColor as string],
-                        boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[editingCustom.data.bodyBgColor as string]}50`,
-                        color: '#1E293B', // Force dark text for visibility during editing
-                      } : undefined}
-                    />
-                    <FormattingHelp />
-                    <PastelColorPicker
-                      value={editingCustom.data.bodyBgColor as string | undefined}
-                      onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, bodyBgColor: color } })}
-                      extraPastels={editingCustom.styleSettings.customPastels}
-                    />
-                  </Field>
-                  <Field label="Footer Verse" htmlFor="ct-foot">
-                    <Input
-                      id="ct-foot"
-                      value={(editingCustom.data.footerVerse as string) || ""}
-                      onChange={(e) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerVerse: e.target.value } })}
-                      style={(editingCustom.data.footerVerseBgColor as string) ? {
-                        backgroundColor: editingCustom.data.footerVerseBgColor as string,
-                        borderColor: PASTEL_BORDER_MAP[editingCustom.data.footerVerseBgColor as string],
-                        boxShadow: `0 0 6px ${PASTEL_BORDER_MAP[editingCustom.data.footerVerseBgColor as string]}50`,
-                        color: '#1E293B', // Force dark text for visibility during editing
-                      } : undefined}
-                    />
-                    <FormattingHelp />
-                    <PastelColorPicker
-                      value={editingCustom.data.footerVerseBgColor as string | undefined}
-                      onChange={(color) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, footerVerseBgColor: color } })}
-                      extraPastels={editingCustom.styleSettings.customPastels}
-                    />
-                  </Field>
-                  <FlyerSectionsEditor
-                    sections={(editingCustom.data.flyerSections as FlyerSectionItem[]) ?? []}
-                    onChange={(flyerSections) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, flyerSections } })}
-                  />
-                  <CustomSectionsEditor
-                    sections={(editingCustom.data.customSections as { title: string; emoji: string; entries: { label: string; name: string }[] }[]) ?? []}
-                    onChange={(sections) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, customSections: sections } })}
-                  />
-                  <ResourceLinksEditor
-                    links={(editingCustom.data.resourceLinks as { label: string; url: string }[]) ?? []}
-                    onChange={(links) => setEditingCustom({ ...editingCustom, data: { ...editingCustom.data, resourceLinks: links } })}
-                  />
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      onClick={async () => {
-                        setSaving(true)
-                        const supabase = createClient()
-                        const { error } = await supabase
-                          .from("email_templates")
-                          .update({
-                            name: editingCustom.name,
-                            subject_template: editingCustom.subject,
-                            body_template: JSON.stringify(editingCustom.data),
-                            style_settings: editingCustom.styleSettings,
-                          } as never)
-                          .eq("id", editingCustom.id)
-                        if (error) {
-                          toast.error(`Failed: ${error.message}`)
-                        } else {
-                          toast.success(`"${editingCustom.name}" updated`)
-                          logAudit("custom_template_updated", "email_templates", editingCustom.id, { name: editingCustom.name })
-                          setEditingCustom(null)
-                          fetchTemplates()
-                        }
-                        setSaving(false)
-                      }}
-                      disabled={saving}
-                    >
-                      {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                      Save Changes
-                    </Button>
-                    <Button variant="outline" onClick={() => setEditingCustom(null)}>
-                      Cancel
-                    </Button>
-                  </div>
-                  </>
-                  )}
-                </div>
-              )}
+                    if (editingCustom && data.id) {
+                      const { error } = await supabase
+                        .from("email_templates")
+                        .update({
+                          name: data.name,
+                          subject_template: data.subject,
+                          body_template: JSON.stringify(bodyData),
+                          style_settings: data.styleSettings,
+                        } as never)
+                        .eq("id", data.id)
 
-              {/* Template list */}
-              {!creatingCustom && !editingCustom && (
-                <>
-                  {customTemplates.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <Send className="size-10 text-muted-foreground/30 mb-3" />
-                      <p className="text-sm text-muted-foreground">No custom templates yet.</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Click <strong>New Template</strong> to create your first custom announcement template.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {customTemplates.map((ct) => {
-                        let parsed: Record<string, unknown> = {}
-                        try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
-                        return (
-                          <div key={ct.id} className={`flex items-center justify-between rounded-lg border px-4 py-3 ${!ct.is_active ? "opacity-50" : ""}`}>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-sm truncate">{ct.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">{ct.subject_template}</p>
-                              {typeof parsed.title === "string" && parsed.title && (
-                                <p className="text-xs text-muted-foreground/70 truncate mt-0.5">Card: {parsed.title}</p>
-                              )}
-                              {!ct.is_active && (
-                                <Badge variant="secondary" className="mt-1 text-[10px]">Inactive</Badge>
-                              )}
-                            </div>
-                            <div className="flex gap-1 shrink-0 ml-2">
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                title="Edit"
-                                onClick={() => {
-                                  setEditingCustom({
-                                    id: ct.id,
-                                    name: ct.name,
-                                    subject: ct.subject_template,
-                                    data: parsed,
-                                    styleSettings: (ct.style_settings as TemplateStyleSettings) ?? {},
-                                  })
-                                }}
-                              >
-                                <Pencil className="size-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                title={ct.is_active ? "Deactivate" : "Activate"}
-                                onClick={async () => {
-                                  const supabase = createClient()
-                                  const newActive = !ct.is_active
-                                  const { error } = await supabase.from("email_templates").update({ is_active: newActive } as never).eq("id", ct.id)
-                                  if (error) {
-                                    toast.error(`Failed: ${error.message}`)
-                                  } else {
-                                    toast.success(newActive ? `"${ct.name}" activated` : `"${ct.name}" deactivated`)
-                                    logAudit("custom_template_toggled_active", "email_templates", ct.id, { name: ct.name, is_active: newActive })
-                                    fetchTemplates()
-                                  }
-                                }}
-                              >
-                                {ct.is_active ? <Ban className="size-3.5 text-muted-foreground" /> : <RotateCcw className="size-3.5 text-green-600" />}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                title="Clone"
-                                onClick={() => cloneTemplate(ct.id, ct.name)}
-                              >
-                                <Copy className="size-3.5 text-muted-foreground" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                title="Delete"
-                                onClick={async () => {
-                                  if (!confirm(`Delete template "${ct.name}"?`)) return
-                                  const supabase = createClient()
-                                  const { error } = await supabase.from("email_templates").delete().eq("id", ct.id)
-                                  if (error) {
-                                    toast.error(`Failed: ${error.message}`)
-                                  } else {
-                                    toast.success(`"${ct.name}" deleted`)
-                                    logAudit("custom_template_deleted", "email_templates", ct.id, { name: ct.name })
-                                    fetchTemplates()
-                                  }
-                                }}
-                              >
-                                <Trash2 className="size-3.5 text-destructive" />
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </>
+                      if (error) {
+                        toast.error(`Failed: ${error.message}`)
+                      } else {
+                        toast.success(`"${data.name}" updated`)
+                        logAudit("custom_template_updated", "email_templates", data.id, { name: data.name })
+                        setEditingCustom(null)
+                        await fetchTemplates()
+                      }
+                    } else {
+                      const { data: inserted, error } = await supabase
+                        .from("email_templates")
+                        .insert({
+                          name: data.name,
+                          subject_template: data.subject,
+                          body_template: JSON.stringify(bodyData),
+                          style_settings: data.styleSettings,
+                          is_default: false,
+                        } as never)
+                        .select("id")
+                        .single() as { data: { id: string } | null; error: { message: string } | null }
+
+                      if (error) {
+                        toast.error(`Failed: ${error.message}`)
+                      } else {
+                        toast.success(`"${data.name}" created`)
+                        logAudit("custom_template_created", "email_templates", inserted?.id, { name: data.name })
+                        setCreatingCustom(false)
+                        await fetchTemplates()
+                      }
+                    }
+                    setSaving(false)
+                  }}
+                  onCancel={() => {
+                    setCreatingCustom(false)
+                    setEditingCustom(null)
+                  }}
+                  onToggleActive={async (id, isActive) => {
+                    const supabase = createClient()
+                    const { error } = await supabase.from("email_templates").update({ is_active: isActive } as never).eq("id", id)
+                    if (error) {
+                      toast.error(`Failed: ${error.message}`)
+                    } else {
+                      const tmpl = customTemplates.find((t) => t.id === id)
+                      toast.success(isActive ? `"${tmpl?.name}" activated` : `"${tmpl?.name}" deactivated`)
+                      logAudit("custom_template_toggled_active", "email_templates", id, { is_active: isActive })
+                      await fetchTemplates()
+                      if (editingCustom && editingCustom.id === id) {
+                        setEditingCustom({ ...editingCustom, isActive })
+                      }
+                    }
+                  }}
+                />
+              ) : (
+                <CustomTemplateList
+                  templates={customTemplates}
+                  onEdit={(ct) => {
+                    let parsed: Record<string, unknown> = {}
+                    try { parsed = JSON.parse(ct.body_template) } catch { /* ignore */ }
+                    setEditingCustom({
+                      id: ct.id,
+                      name: ct.name,
+                      subject: ct.subject_template,
+                      data: parsed,
+                      styleSettings: (ct.style_settings as TemplateStyleSettings) ?? {},
+                      isActive: ct.is_active
+                    })
+                  }}
+                  onToggleActive={async (id, name, currentActive) => {
+                    const supabase = createClient()
+                    const newActive = !currentActive
+                    const { error } = await supabase.from("email_templates").update({ is_active: newActive } as never).eq("id", id)
+                    if (error) {
+                      toast.error(`Failed: ${error.message}`)
+                    } else {
+                      toast.success(newActive ? `"${name}" activated` : `"${name}" deactivated`)
+                      logAudit("custom_template_toggled_active", "email_templates", id, { name, is_active: newActive })
+                      await fetchTemplates()
+                    }
+                  }}
+                  onClone={cloneTemplate}
+                  onDelete={async (id, name) => {
+                    if (!confirm(`Delete template "${name}"?`)) return
+                    const supabase = createClient()
+                    const { error } = await supabase.from("email_templates").delete().eq("id", id)
+                    if (error) {
+                      toast.error(`Failed: ${error.message}`)
+                    } else {
+                      toast.success(`"${name}" deleted`)
+                      logAudit("custom_template_deleted", "email_templates", id, { name })
+                      await fetchTemplates()
+                    }
+                  }}
+                />
               )}
             </CardContent>
           </Card>
@@ -1864,7 +904,6 @@ export default function TemplatesPage() {
       </Tabs>
       )}
 
-      {/* Mobile preview sheet */}
       <Sheet open={previewing} onOpenChange={setPreviewing}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
           <SheetHeader>

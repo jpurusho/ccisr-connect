@@ -749,11 +749,11 @@ export default function CalendarPage() {
             Today
           </Button>
           <div className="flex items-center">
-            <Button variant="ghost" size="icon-sm" onClick={goPrev} title="Previous">
-              <ChevronLeft className="size-4" />
+            <Button variant="ghost" size="icon-sm" onClick={goPrev} title="Previous" aria-label={view === "week" ? "Previous week" : "Previous month"}>
+              <ChevronLeft className="size-4" aria-hidden="true" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={goNext} title="Next">
-              <ChevronRight className="size-4" />
+            <Button variant="ghost" size="icon-sm" onClick={goNext} title="Next" aria-label={view === "week" ? "Next week" : "Next month"}>
+              <ChevronRight className="size-4" aria-hidden="true" />
             </Button>
           </div>
           <h2 className="text-lg font-semibold">{headerTitle}</h2>

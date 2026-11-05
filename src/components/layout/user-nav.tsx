@@ -88,9 +88,10 @@ export function UserNav() {
             size="icon-sm"
             className="shrink-0"
             onClick={handleSignOut}
+            aria-label="Sign out"
             title="Sign out"
           >
-            <LogOut className="size-3.5" />
+            <LogOut className="size-3.5" aria-hidden="true" />
           </Button>
         </div>
       </SidebarMenuItem>

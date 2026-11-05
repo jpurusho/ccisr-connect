@@ -1,4 +1,11 @@
 import { z } from "zod"
+import {
+  PHONE_REGEX,
+  ISO_DATE_REGEX,
+  TEXT_MAX_LENGTH,
+  TEXTAREA_MAX_LENGTH,
+  PHONE_MIN_LENGTH,
+} from "@/lib/validation-schemas"
 
 // ── Field Types ─────────────────────────────────────────────────────────────
 
@@ -144,13 +151,10 @@ export const FIELD_TYPE_META: FieldTypeMeta[] = [
 
 // ── Zod Schema Builders ─────────────────────────────────────────────────────
 
-const PHONE_REGEX = /^[\d\s\-().+]+$/
-const MAX_TEXT = 1000
-
 function fieldSchema(field: SignupFieldConfig): z.ZodTypeAny {
   switch (field.type) {
     case "text": {
-      let s = z.string().max(field.maxLength ?? MAX_TEXT)
+      let s = z.string().max(field.maxLength ?? TEXT_MAX_LENGTH)
       if (field.minLength) s = s.min(field.minLength)
       return field.required ? s.min(1, `${field.label} is required`) : s
     }
@@ -160,10 +164,10 @@ function fieldSchema(field: SignupFieldConfig): z.ZodTypeAny {
         : z.string().email("Invalid email address").or(z.literal(""))
     case "phone":
       return field.required
-        ? z.string().regex(PHONE_REGEX, "Invalid phone number").min(7)
+        ? z.string().regex(PHONE_REGEX, "Invalid phone number").min(PHONE_MIN_LENGTH)
         : z.string().regex(PHONE_REGEX, "Invalid phone number").or(z.literal(""))
     case "textarea": {
-      const s = z.string().max(field.maxLength ?? 2000)
+      const s = z.string().max(field.maxLength ?? TEXTAREA_MAX_LENGTH)
       return field.required ? s.min(1, `${field.label} is required`) : s
     }
     case "select": {
@@ -192,8 +196,8 @@ function fieldSchema(field: SignupFieldConfig): z.ZodTypeAny {
     }
     case "date":
       return field.required
-        ? z.string().min(1, `${field.label} is required`).regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date")
-        : z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date").or(z.literal(""))
+        ? z.string().min(1, `${field.label} is required`).regex(ISO_DATE_REGEX, "Invalid date")
+        : z.string().regex(ISO_DATE_REGEX, "Invalid date").or(z.literal(""))
     case "month_picker": {
       const excluded = new Set(field.excludeMonths ?? [])
       return field.required

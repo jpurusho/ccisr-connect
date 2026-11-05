@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useState, memo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -115,6 +115,59 @@ function statusConfig(status: CommunicationStatus) {
       return { label: "Failed", variant: "destructive" as const, icon: AlertCircle }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Memoized subcomponents
+// ---------------------------------------------------------------------------
+
+const EmailPreviewContent = memo(function EmailPreviewContent({
+  previewHtml,
+  accentColor,
+  canDispatch,
+  onQueue,
+  onSendNow,
+  onClose,
+  status,
+}: {
+  previewHtml: string
+  accentColor: string
+  canDispatch: boolean
+  onQueue?: () => void
+  onSendNow: () => void
+  onClose: () => void
+  status: CommunicationStatus
+}) {
+  return (
+    <div className="border-t">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/30">
+        <span className="text-xs font-medium text-muted-foreground">Email Preview</span>
+        <div className="flex items-center gap-2">
+          {status === "draft" && onQueue && (
+            <Button variant="outline" size="sm" onClick={() => { onClose(); onQueue() }} disabled={!canDispatch}>
+              <Clock className="size-3.5" data-icon="inline-start" />
+              Queue
+            </Button>
+          )}
+          {status === "draft" && (
+            <Button size="sm" onClick={() => { onClose(); onSendNow() }} style={canDispatch ? { backgroundColor: accentColor } : undefined} className="text-white hover:opacity-90" disabled={!canDispatch}>
+              <Send className="size-3.5" data-icon="inline-start" />
+              Send Now
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+      <div className="p-4">
+        <div
+          className="mx-auto max-w-2xl rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
+        />
+      </div>
+    </div>
+  )
+})
 
 // ---------------------------------------------------------------------------
 // Component
@@ -235,15 +288,17 @@ export function WeeklyCommunicationCard({
         {/* Subject prefix (optional) */}
         {subject !== undefined && editing && onSubjectPrefixChange && (
           <div className="px-4 pl-5 pt-2">
-            <p className="text-xs font-medium text-muted-foreground mb-1">
+            <label htmlFor="subject-prefix" className="text-xs font-medium text-muted-foreground mb-1 block">
               Subject Prefix <span className="text-xs font-normal text-muted-foreground/60">(optional)</span>
-            </p>
+            </label>
             <input
+              id="subject-prefix"
               type="text"
               className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               placeholder="e.g., Reminder, Final Notice"
               value={subjectPrefix || ""}
               onChange={(e) => onSubjectPrefixChange(e.target.value)}
+              aria-label="Subject prefix (optional)"
             />
           </div>
         )}
@@ -251,13 +306,15 @@ export function WeeklyCommunicationCard({
         {/* Subject line */}
         {subject !== undefined && (
           <div className="px-4 pl-5 pt-2">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
+            <label htmlFor="email-subject" className="text-xs font-medium text-muted-foreground mb-1 block">Subject</label>
             {editing && onSubjectChange ? (
               <input
+                id="email-subject"
                 type="text"
                 className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                 value={subject}
                 onChange={(e) => onSubjectChange(e.target.value)}
+                aria-label="Email subject"
               />
             ) : (
               <p className="text-sm font-medium truncate">
@@ -334,6 +391,7 @@ export function WeeklyCommunicationCard({
               placeholder="Extra emails: a@b.com, c@d.com"
               className="h-8 min-w-40 flex-1 rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               onClick={(e) => e.stopPropagation()}
+              aria-label="Additional recipient email addresses"
             />
           )}
         </div>
@@ -456,8 +514,10 @@ export function WeeklyCommunicationCard({
             type="button"
             onClick={() => setShareOpen(!shareOpen)}
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            aria-expanded={shareOpen}
+            aria-label={shareOpen ? "Hide share and export options" : "Show share and export options"}
           >
-            {shareOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+            {shareOpen ? <ChevronUp className="size-3" aria-hidden="true" /> : <ChevronDown className="size-3" aria-hidden="true" />}
             Share & Export
           </button>
           {shareOpen && (
@@ -566,34 +626,15 @@ export function WeeklyCommunicationCard({
 
       {/* Inline Preview */}
       {previewing && previewHtml && (
-        <div className="border-t">
-          <div className="flex items-center justify-between px-4 py-2 bg-muted/30">
-            <span className="text-xs font-medium text-muted-foreground">Email Preview</span>
-            <div className="flex items-center gap-2">
-              {status === "draft" && onQueue && (
-                <Button variant="outline" size="sm" onClick={() => { setPreviewing(false); onQueue() }} disabled={!canDispatch}>
-                  <Clock className="size-3.5" data-icon="inline-start" />
-                  Queue
-                </Button>
-              )}
-              {status === "draft" && (
-                <Button size="sm" onClick={() => { setPreviewing(false); onSendNow() }} style={canDispatch ? { backgroundColor: accentColor } : undefined} className="text-white hover:opacity-90" disabled={!canDispatch}>
-                  <Send className="size-3.5" data-icon="inline-start" />
-                  Send Now
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" onClick={() => setPreviewing(false)}>
-                Close
-              </Button>
-            </div>
-          </div>
-          <div className="p-4">
-            <div
-              className="mx-auto max-w-2xl rounded-lg border bg-slate-50 p-4 dark:bg-slate-900"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
-            />
-          </div>
-        </div>
+        <EmailPreviewContent
+          previewHtml={previewHtml}
+          accentColor={accentColor}
+          canDispatch={canDispatch}
+          onQueue={onQueue}
+          onSendNow={onSendNow}
+          onClose={() => setPreviewing(false)}
+          status={status}
+        />
       )}
     </>
   )

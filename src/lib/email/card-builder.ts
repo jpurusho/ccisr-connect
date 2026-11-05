@@ -13,6 +13,8 @@
  *   Bulletin:        Indigo (#4F46E5)
  */
 
+import { buildDetailRow, buildDetailTable } from "./card-utils"
+
 export interface CardColors {
   primary: string;
   primaryLight: string;
@@ -583,37 +585,29 @@ export interface BibleStudyCardData extends BaseCardData {
 
 export function buildBibleStudyCard(data: BibleStudyCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.bible_study;
-  const sz = style?.sizes ?? SIZE_SCALES.default;
-
-  const detailRow = (label: string, value: string) =>
-    `<tr>
-<td style="padding:6px 0;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
-<td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
-</tr>`;
 
   const isBreakDate = data.date.toLowerCase().includes("no ") || data.date.toLowerCase().includes("on break");
 
-  let details = "";
-  details += isBreakDate
-    ? detailRow("When", data.date)
-    : detailRow("When", `${data.date} at ${data.time}`);
-  if (data.topic) details += detailRow("Topic", data.topic);
+  const details: { label: string; value: string }[] = [];
+  details.push({
+    label: "When",
+    value: isBreakDate ? data.date : `${data.date} at ${data.time}`
+  });
+  if (data.topic) details.push({ label: "Topic", value: data.topic });
 
-  const detailsHtml = `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">\n${details}\n</table>`;
+  const detailsHtml = buildDetailTable(details, colors, style, { marginBottom: "16px" });
 
   // Host/address/phone block (like prayer meeting pattern)
   let hostBlock = "";
   if (!isBreakDate) {
-    let hostDetails = "";
-    if (data.hostNames) hostDetails += detailRow("Host", data.hostNames);
+    const hostDetails: { label: string; value: string }[] = [];
+    if (data.hostNames) hostDetails.push({ label: "Host", value: data.hostNames });
     const addrParts = [data.address, data.city].filter(Boolean).join("<br/>");
-    if (addrParts) hostDetails += detailRow("Where", addrParts);
-    if (data.phone) hostDetails += detailRow("Contact", data.phone);
+    if (addrParts) hostDetails.push({ label: "Where", value: addrParts });
+    if (data.phone) hostDetails.push({ label: "Contact", value: data.phone });
 
-    if (hostDetails) {
-      hostBlock = `<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
-${hostDetails}
-</table>`;
+    if (hostDetails.length > 0) {
+      hostBlock = buildDetailTable(hostDetails, colors, style, { withBackground: true });
     }
   }
 
@@ -654,26 +648,20 @@ export interface WomensStudyCardData extends BaseCardData {
 
 export function buildWomensStudyCard(data: WomensStudyCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.womens_study;
-  const sz = style?.sizes ?? SIZE_SCALES.default;
 
-  const detailRow = (label: string, value: string) =>
-    `<tr>
-<td style="padding:6px 0;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
-<td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
-</tr>`;
-
-  let details = detailRow("When", `${data.date} at ${data.time}`);
-  if (data.topic) details += detailRow("Topic", data.topic);
+  const details: { label: string; value: string }[] = [];
+  details.push({ label: "When", value: `${data.date} at ${data.time}` });
+  if (data.topic) details.push({ label: "Topic", value: data.topic });
   if (data.zoomLink) {
-    details += detailRow("Where", "Via Zoom");
-    details += detailRow(
-      "Link",
-      `<a href="${data.zoomLink}" style="color:${colors.primary};text-decoration:underline">Join Zoom Meeting</a>`
-    );
-    if (data.zoomMeetingId) details += detailRow("Meeting ID", data.zoomMeetingId);
-    if (data.zoomPasscode) details += detailRow("Passcode", data.zoomPasscode);
+    details.push({ label: "Where", value: "Via Zoom" });
+    details.push({
+      label: "Link",
+      value: `<a href="${data.zoomLink}" style="color:${colors.primary};text-decoration:underline">Join Zoom Meeting</a>`
+    });
+    if (data.zoomMeetingId) details.push({ label: "Meeting ID", value: data.zoomMeetingId });
+    if (data.zoomPasscode) details.push({ label: "Passcode", value: data.zoomPasscode });
   } else if (data.location) {
-    details += detailRow("Where", data.location);
+    details.push({ label: "Where", value: data.location });
   }
 
   const content =
@@ -688,9 +676,7 @@ export function buildWomensStudyCard(data: WomensStudyCardData, style?: StyleCon
     ) +
     contentRow(
       `${data.message ? msgBlock(data.message, data.messageBgColor, colors, "0 0 16px", style, data.messageTextColor) : ""}
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
-${details}
-</table>
+${buildDetailTable(details, colors, style, { withBackground: true })}
 ${commonTrailingHtml(data, colors, undefined, style)}`,
       colors
     ) +
@@ -720,18 +706,13 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData, style?: Styl
     data.message ||
     "Please join us for a time of prayer and worship, followed by a fellowship dinner.";
 
-  const detailRow = (label: string, value: string) =>
-    `<tr>
-<td style="padding:6px 0;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
-<td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
-</tr>`;
-
-  let details = detailRow("When", `${data.date} at ${data.time}`);
-  details += detailRow("Host", data.hostNames);
-  const showCity = data.city && !data.address.toLowerCase().includes(data.city.toLowerCase())
-  details += detailRow("Where", data.address + (showCity ? `<br/>${data.city}` : ""));
-  if (data.phone) details += detailRow("Contact", data.phone);
-  if (data.dinnerNote) details += detailRow("Dinner", data.dinnerNote);
+  const details: { label: string; value: string }[] = [];
+  details.push({ label: "When", value: `${data.date} at ${data.time}` });
+  details.push({ label: "Host", value: data.hostNames });
+  const showCity = data.city && !data.address.toLowerCase().includes(data.city.toLowerCase());
+  details.push({ label: "Where", value: data.address + (showCity ? `<br/>${data.city}` : "") });
+  if (data.phone) details.push({ label: "Contact", value: data.phone });
+  if (data.dinnerNote) details.push({ label: "Dinner", value: data.dinnerNote });
 
   let signupHtml = "";
   if (data.signupLink) {
@@ -752,9 +733,7 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData, style?: Styl
     ) +
     contentRow(
       `${msgBlock(message, data.messageBgColor, colors, "0 0 16px", style, data.messageTextColor)}
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
-${details}
-</table>
+${buildDetailTable(details, colors, style, { withBackground: true })}
 ${signupHtml}
 ${commonTrailingHtml(data, colors, data.resourceLink ? [data.resourceLink] : undefined, style)}`,
       colors
@@ -947,24 +926,18 @@ export function buildGenericEventCard(
   const sz = style?.sizes ?? SIZE_SCALES.default;
   const activeSections = sections ?? ["header", "details", "locations", "virtual", "message", "custom", "footer"];
 
-  const detailRow = (label: string, value: string) =>
-    `<tr>
-<td style="padding:6px 0;font-size:${sz.label}px;color:${colors.textLight};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;vertical-align:top;width:80px">${label}</td>
-<td style="padding:6px 0 6px 12px;font-size:${sz.body}px;color:${colors.textDark};font-weight:500">${value}</td>
-</tr>`;
-
   // Details section (when, topic)
   let detailsHtml = "";
   if (activeSections.includes("details")) {
     const allOnBreak = data.locations && data.locations.length > 0 && data.locations.every((l) => l.isOnBreak);
     if (!allOnBreak) {
-      let rows = "";
-      if (data.date && data.time) rows += detailRow("When", `${data.date} at ${data.time}`);
-      else if (data.date) rows += detailRow("When", data.date);
-      if (data.topic) rows += detailRow("Topic", data.topic);
-      if (data.dinnerNote) rows += detailRow("Note", data.dinnerNote);
-      if (rows) {
-        detailsHtml = `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px">\n${rows}\n</table>`;
+      const details: { label: string; value: string }[] = [];
+      if (data.date && data.time) details.push({ label: "When", value: `${data.date} at ${data.time}` });
+      else if (data.date) details.push({ label: "When", value: data.date });
+      if (data.topic) details.push({ label: "Topic", value: data.topic });
+      if (data.dinnerNote) details.push({ label: "Note", value: data.dinnerNote });
+      if (details.length > 0) {
+        detailsHtml = buildDetailTable(details, colors, style, { marginBottom: "16px" });
       }
     }
   }
@@ -975,28 +948,26 @@ export function buildGenericEventCard(
     const showLabels = data.locations.length > 1;
     locationsHtml = data.locations
       .map((loc) => {
-        const locationHeader = showLabels
+        const locationHeader = showLabels && loc.label
           ? `<p style="margin:0 0 8px;font-size:${sz.body}px;font-weight:700;color:${colors.primary}">${loc.label}</p>`
           : "";
 
         if (loc.isOnBreak) {
-          const msg = loc.breakMessage || `${loc.label} is on break`;
+          const msg = loc.breakMessage || `${loc.label || "Location"} is on break`;
           return `${locationHeader}<div style="background:${colors.bgLight};border-radius:8px;padding:12px 16px;text-align:center">
 <p style="margin:0;font-size:${sz.label + 1}px;color:${colors.textLight};font-style:italic">${msg}</p>
 </div>`;
         }
 
-        let details = "";
-        if (loc.hostName) details += detailRow("Host", loc.hostName);
+        const details: { label: string; value: string }[] = [];
+        if (loc.hostName) details.push({ label: "Host", value: loc.hostName });
         const addrParts = [loc.address, loc.city].filter(Boolean).join("<br/>");
-        if (addrParts) details += detailRow("Where", addrParts);
-        if (loc.phone) details += detailRow("Contact", loc.phone);
+        if (addrParts) details.push({ label: "Where", value: addrParts });
+        if (loc.phone) details.push({ label: "Contact", value: loc.phone });
 
-        if (!details) return "";
+        if (details.length === 0) return "";
 
-        return `${locationHeader}<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px">
-${details}
-</table>`;
+        return `${locationHeader}${buildDetailTable(details, colors, style, { withBackground: true })}`;
       })
       .filter(Boolean)
       .join(`<div style="height:16px"></div>`);
@@ -1005,11 +976,15 @@ ${details}
   // Virtual meeting section
   let virtualHtml = "";
   if (activeSections.includes("virtual") && data.virtual) {
-    let rows = detailRow("Where", "Via " + (data.virtual.platform ?? "Zoom"));
-    rows += detailRow("Link", `<a href="${data.virtual.meetingLink}" style="color:${colors.primary};text-decoration:underline">Join Meeting</a>`);
-    if (data.virtual.meetingId) rows += detailRow("Meeting ID", data.virtual.meetingId);
-    if (data.virtual.passcode) rows += detailRow("Passcode", data.virtual.passcode);
-    virtualHtml = `<table width="100%" cellpadding="0" cellspacing="0" style="background:${colors.bgLight};border-radius:8px;padding:4px 16px;margin-bottom:16px">\n${rows}\n</table>`;
+    const details: { label: string; value: string }[] = [];
+    details.push({ label: "Where", value: "Via " + (data.virtual.platform ?? "Zoom") });
+    details.push({
+      label: "Link",
+      value: `<a href="${data.virtual.meetingLink}" style="color:${colors.primary};text-decoration:underline">Join Meeting</a>`
+    });
+    if (data.virtual.meetingId) details.push({ label: "Meeting ID", value: data.virtual.meetingId });
+    if (data.virtual.passcode) details.push({ label: "Passcode", value: data.virtual.passcode });
+    virtualHtml = buildDetailTable(details, colors, style, { withBackground: true, marginBottom: "16px" });
   }
 
   // Signup link
