@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { SmtpConfig } from "@/types/database"
+import { fetchWithCsrf } from "@/lib/client-csrf"
 import {
   Card,
   CardContent,
@@ -174,9 +175,8 @@ export default function SmtpConfigPage() {
   async function handleTest(configId: string, toEmail: string) {
     setTestingId(configId)
     try {
-      const res = await fetch("/api/smtp/test", {
+      const res = await fetchWithCsrf("/api/smtp/test", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ smtpConfigId: configId }),
       })
       const data = await res.json()

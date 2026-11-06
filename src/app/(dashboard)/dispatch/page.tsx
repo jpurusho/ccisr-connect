@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { logAudit } from "@/lib/audit"
 import { sanitizeHtml } from "@/lib/sanitize-html"
+import { fetchWithCsrf } from "@/lib/client-csrf"
 import type {
   DispatchQueue,
   DispatchStatus,
@@ -293,9 +294,8 @@ export default function DispatchQueuePage() {
   async function handleSendNow(item: DispatchQueue) {
     toast.info(`Sending "${item.subject}"...`)
     try {
-      const res = await fetch("/api/dispatch/send", {
+      const res = await fetchWithCsrf("/api/dispatch/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dispatchId: item.id }),
       })
       const data = await res.json()

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { AppUser, UserRole } from "@/types/database"
+import { fetchWithCsrf } from "@/lib/client-csrf"
 import {
   Card,
   CardContent,
@@ -82,11 +83,8 @@ export default function UserManagementPage() {
 
     setSaving(true)
     try {
-      const res = await fetch("/api/users/invite", {
+      const res = await fetchWithCsrf("/api/users/invite", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           email: inviteEmail.trim(),
           display_name: inviteDisplayName.trim() || inviteEmail.trim(),
