@@ -1545,7 +1545,7 @@ export type Database = {
         | "failed"
         | "cancelled"
       event_instance_status: "draft" | "confirmed" | "cancelled"
-      family_role: "husband" | "wife" | "child"
+      family_role: "individual" | "husband" | "wife" | "child"
       recipient_type: "to" | "cc" | "bcc"
       user_role: "super_admin" | "admin" | "operator"
     }

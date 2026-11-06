@@ -48,6 +48,7 @@ const DAYS = Array.from({ length: 31 }, (_, i) => ({
 }))
 
 const ROLES: { value: FamilyRole; label: string }[] = [
+  { value: "individual", label: "Individual (Single/Unmarried)" },
   { value: "husband", label: "Husband" },
   { value: "wife", label: "Wife" },
   { value: "child", label: "Child" },
@@ -67,7 +68,7 @@ export function MemberFormDialog({
   const [familyId, setFamilyId] = useState<string | null>(null)
   const [newFamilyName, setNewFamilyName] = useState("")
   const [isNewFamily, setIsNewFamily] = useState(false)
-  const [roleInFamily, setRoleInFamily] = useState<FamilyRole>("husband")
+  const [roleInFamily, setRoleInFamily] = useState<FamilyRole>("individual")
   const [cellPhone, setCellPhone] = useState("")
   const [email, setEmail] = useState("")
   const [birthMonth, setBirthMonth] = useState<string>("")
@@ -157,6 +158,13 @@ export function MemberFormDialog({
     setHomePhone(fam?.home_phone ?? "")
   }
 
+  // Auto-suggest family name for individuals (use last name)
+  useEffect(() => {
+    if (roleInFamily === "individual" && isNewFamily && lastName.trim() && !newFamilyName.trim()) {
+      setNewFamilyName(lastName.trim())
+    }
+  }, [roleInFamily, lastName, isNewFamily, newFamilyName])
+
   // Pre-fill form when editing — only after families are loaded
   useEffect(() => {
     if (open && member && !loadingFamilies) {
@@ -191,7 +199,7 @@ export function MemberFormDialog({
       setFamilyId(null)
       setNewFamilyName("")
       setIsNewFamily(false)
-      setRoleInFamily("husband")
+      setRoleInFamily("individual")
       setCellPhone("")
       setEmail("")
       setBirthMonth("")
@@ -532,7 +540,7 @@ export function MemberFormDialog({
               <Input
                 value={newFamilyName}
                 onChange={(e) => setNewFamilyName(e.target.value)}
-                placeholder="New family name"
+                placeholder={roleInFamily === "individual" ? `Family name (e.g., ${lastName || "LastName"})` : "New family name"}
               />
             ) : loadingFamilies ? (
               <Input value="Loading families..." disabled />
