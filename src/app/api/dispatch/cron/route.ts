@@ -38,7 +38,10 @@ export async function GET(req: NextRequest) {
     try {
       const res = await fetch(`${baseUrl}/api/dispatch/send`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-server-secret": cronSecret, // Bypass CSRF for server-to-server calls
+        },
         body: JSON.stringify({ dispatchId: d.id }),
       })
       if (res.ok) sentCount++

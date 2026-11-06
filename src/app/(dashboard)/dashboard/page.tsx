@@ -49,6 +49,7 @@ import {
 } from "lucide-react"
 import { getIconComponent } from "@/components/ui/icon-picker"
 import { createClient } from "@/lib/supabase/client"
+import { fetchWithCsrf } from "@/lib/client-csrf"
 import {
   buildBirthdayCard,
   buildAnniversaryCard,
@@ -2816,9 +2817,8 @@ export default function DashboardPage() {
           toast.error(`Failed: ${error.message}`)
         } else {
           // Immediately send via API
-          const sendRes = await fetch("/api/dispatch/send", {
+          const sendRes = await fetchWithCsrf("/api/dispatch/send", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ dispatchId: inserted?.id }),
           })
 
@@ -2968,9 +2968,8 @@ export default function DashboardPage() {
       } as never).select("id").single() as { data: { id: string } | null; error: { message: string } | null }
       if (error) { toast.error(`Failed: ${error.message}`); return }
 
-      const sendRes = await fetch("/api/dispatch/send", {
+      const sendRes = await fetchWithCsrf("/api/dispatch/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dispatchId: inserted?.id }),
       })
       if (sendRes.ok) {

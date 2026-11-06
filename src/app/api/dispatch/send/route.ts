@@ -12,16 +12,25 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(req: NextRequest) {
-  // CSRF protection
-  const csrfError = await requireCsrfToken(req)
-  if (csrfError) {
-    return csrfError
+  // Server-to-server calls (cron/scheduled) can bypass CSRF with server secret
+  const serverSecret = req.headers.get("x-server-secret")
+  const isServerCall = serverSecret && serverSecret === process.env.CRON_SECRET
+
+  // CSRF protection (only for browser-based requests)
+  if (!isServerCall) {
+    const csrfError = await requireCsrfToken(req)
+    if (csrfError) {
+      return csrfError
+    }
   }
 
-  // Verify admin authorization
-  const auth = await verifyAdmin(req)
-  if (!auth.authorized) {
-    return auth.error
+  // Verify admin authorization (only for browser-based requests)
+  // Server calls are already authenticated via CRON_SECRET
+  if (!isServerCall) {
+    const auth = await verifyAdmin(req)
+    if (!auth.authorized) {
+      return auth.error
+    }
   }
 
   // Rate limiting: 5 requests per 5 minutes per IP
