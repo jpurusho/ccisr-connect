@@ -58,15 +58,15 @@ WHERE is_active = true;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_instances_event_id
 ON event_instances(event_id);
 
--- Index: event_instances by date
+-- Index: event_instances by instance_date
 -- Pattern: Date range queries for calendar views
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_instances_date
-ON event_instances(date);
+ON event_instances(instance_date);
 
--- Composite index: event_instances by event_id and date
+-- Composite index: event_instances by event_id and instance_date
 -- Pattern: Loading instances for a specific event in date order
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_instances_event_date
-ON event_instances(event_id, date);
+ON event_instances(event_id, instance_date);
 
 -- Index: composed_instances by week_start
 -- Pattern: Loading drafts for a specific week in dashboard calendar
