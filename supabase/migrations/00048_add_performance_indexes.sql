@@ -146,12 +146,12 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_signup_forms_status
 ON signup_forms(status)
 WHERE status = 'active';
 
--- Index: audit_logs by table_name and created_at
+-- Index: audit_log by entity_type and created_at
 -- Pattern: Loading audit history for specific entities
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_table_created
-ON audit_logs(table_name, created_at DESC);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_log_entity_created
+ON audit_log(entity_type, created_at DESC);
 
--- Index: audit_logs by user_id
+-- Index: audit_log by user_id
 -- Pattern: Loading actions by a specific user
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_user_id
-ON audit_logs(user_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_log_user_id
+ON audit_log(user_id);
