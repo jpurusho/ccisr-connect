@@ -131,11 +131,8 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_dispatch_queue_status_scheduled
 ON dispatch_queue(status, scheduled_at)
 WHERE status = 'pending';
 
--- Index: email_templates by is_active
--- Pattern: Loading available templates for composition
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_email_templates_is_active
-ON email_templates(is_active)
-WHERE is_active = true;
+-- Note: email_templates has no is_active column (all templates are always available)
+-- No index needed - table is small and fully scanned
 
 -- Index: event_types by is_active
 -- Pattern: Loading active event types for scheduling
@@ -143,11 +140,11 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_event_types_is_active
 ON event_types(is_active)
 WHERE is_active = true;
 
--- Index: signup_forms by is_active
--- Pattern: Loading available signup forms
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_signup_forms_is_active
-ON signup_forms(is_active)
-WHERE is_active = true;
+-- Index: signup_forms by status
+-- Pattern: Loading active signup forms (status = 'active')
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_signup_forms_status
+ON signup_forms(status)
+WHERE status = 'active';
 
 -- Index: audit_logs by table_name and created_at
 -- Pattern: Loading audit history for specific entities
