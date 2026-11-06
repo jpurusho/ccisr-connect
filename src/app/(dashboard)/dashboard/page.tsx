@@ -429,6 +429,7 @@ export default function DashboardPage() {
 
   // ---- Signup auto-fill tracking ----
   const [signupAutoFills, setSignupAutoFills] = useState<Partial<Record<CommType, AutoFillResult>>>({})
+  const [signupLinks, setSignupLinks] = useState<Partial<Record<CommType, { formId: string; fieldMap: SignupFieldMap }>>>({})
 
   // ---- Smart section context (resolved per week for visual builder templates) ----
   const [smartContext, setSmartContext] = useState<SmartSectionContext | null>(null)
@@ -2188,6 +2189,7 @@ export default function DashboardPage() {
         return result
       })
       setSignupAutoFills(autoFills)
+      setSignupLinks(etSignupLinks as Partial<Record<CommType, { formId: string; fieldMap: SignupFieldMap }>>)
 
       // Build smart section context from resolved week data
       setSmartContext({
@@ -2586,8 +2588,75 @@ export default function DashboardPage() {
     }
   }
 
-  function handleRefreshFromTemplate(type: CommType) {
-    // savedTemplateData is keyed by comm_type, not event type name
+  async function handleRefreshFromTemplate(type: CommType) {
+    // Check if we have signup auto-fill data FIRST
+    const autoFill = signupAutoFills[type]
+    const signupLink = signupLinks[type]
+
+    // If there's signup data, use it
+    if (autoFill && autoFill.source === "signup") {
+      switch (type) {
+        case "bible_study":
+          setBibleStudyForm((prev) => ({
+            ...prev,
+            hostNames: autoFill.hostName || prev.hostNames,
+            address: autoFill.address || prev.address,
+            city: autoFill.city || prev.city,
+            phone: autoFill.phone || prev.phone,
+          }))
+          toast.success("Refreshed from signup sheet")
+          return
+        case "prayer_meeting":
+          setPrayerMeetingForm((prev) => ({
+            ...prev,
+            hostNames: autoFill.hostName || prev.hostNames,
+            address: autoFill.address || prev.address,
+            city: autoFill.city || prev.city,
+            phone: autoFill.phone || prev.phone,
+          }))
+          toast.success("Refreshed from signup sheet")
+          return
+      }
+    }
+
+    // If no signup data but have signup link, try to fetch it now
+    if (signupLink && (type === "bible_study" || type === "prayer_meeting")) {
+      const currentDate = type === "bible_study" ? bibleStudyForm.date : prayerMeetingForm.date
+      if (currentDate && !currentDate.toLowerCase().includes("no ")) {
+        try {
+          const freshAutoFill = await resolveSignupAutoFill(signupLink.formId, signupLink.fieldMap, new Date(currentDate))
+          if (freshAutoFill.source === "signup") {
+            switch (type) {
+              case "bible_study":
+                setBibleStudyForm((prev) => ({
+                  ...prev,
+                  hostNames: freshAutoFill.hostName || prev.hostNames,
+                  address: freshAutoFill.address || prev.address,
+                  city: freshAutoFill.city || prev.city,
+                  phone: freshAutoFill.phone || prev.phone,
+                }))
+                break
+              case "prayer_meeting":
+                setPrayerMeetingForm((prev) => ({
+                  ...prev,
+                  hostNames: freshAutoFill.hostName || prev.hostNames,
+                  address: freshAutoFill.address || prev.address,
+                  city: freshAutoFill.city || prev.city,
+                  phone: freshAutoFill.phone || prev.phone,
+                }))
+                break
+            }
+            toast.success("Refreshed from signup sheet")
+            return
+          }
+        } catch (err) {
+          console.error("Failed to fetch signup data:", err)
+          // Fall through to template defaults
+        }
+      }
+    }
+
+    // Fall back to template defaults
     const tmplData = savedTemplateData[type]
     if (!tmplData) {
       toast.error(`No template defaults found for ${type}`)

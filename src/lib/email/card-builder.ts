@@ -602,8 +602,10 @@ export function buildBibleStudyCard(data: BibleStudyCardData, style?: StyleConte
   if (!isBreakDate) {
     const hostDetails: { label: string; value: string }[] = [];
     if (data.hostNames) hostDetails.push({ label: "Host", value: data.hostNames });
-    const addrParts = [data.address, data.city].filter(Boolean).join("<br/>");
-    if (addrParts) hostDetails.push({ label: "Where", value: addrParts });
+    // Only add city if it's not already in the address
+    const showCity = data.city && data.address && !data.address.toLowerCase().includes(data.city.toLowerCase());
+    const addrValue = data.address + (showCity ? `<br/>${data.city}` : "");
+    if (addrValue) hostDetails.push({ label: "Where", value: addrValue });
     if (data.phone) hostDetails.push({ label: "Contact", value: data.phone });
 
     if (hostDetails.length > 0) {
