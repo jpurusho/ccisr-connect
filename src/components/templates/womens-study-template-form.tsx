@@ -5,7 +5,8 @@ import { CommonTemplateFields } from "./common-template-fields"
 import { FormattingHelp } from "@/components/shared/formatting-help"
 import { VerseLookup } from "@/components/shared/verse-lookup"
 import { PastelColorPicker, TextColorPicker } from "@/components/dashboard/communication-edit-forms"
-import type { WomensStudyDefaults, TemplateStyleSettings } from "@/lib/template-defaults"
+import type { WomensStudyDefaults } from "@/lib/template-defaults"
+import type { TemplateStyleSettings } from "@/lib/email/card-builder"
 
 interface WomensStudyTemplateFormProps {
   data: WomensStudyDefaults

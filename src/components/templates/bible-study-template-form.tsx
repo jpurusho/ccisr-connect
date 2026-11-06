@@ -7,7 +7,8 @@ import { FormattingHelp } from "@/components/shared/formatting-help"
 import { VerseLookup } from "@/components/shared/verse-lookup"
 import { PastelColorPicker, TextColorPicker, HostFamilyInput } from "@/components/dashboard/communication-edit-forms"
 import { formatPhone } from "@/lib/utils"
-import type { BibleStudyDefaults, TemplateStyleSettings } from "@/lib/template-defaults"
+import type { BibleStudyDefaults } from "@/lib/template-defaults"
+import type { TemplateStyleSettings } from "@/lib/email/card-builder"
 
 interface BibleStudyTemplateFormProps {
   data: BibleStudyDefaults
@@ -91,7 +92,7 @@ export function BibleStudyTemplateForm({ data, onChange, styleSettings }: BibleS
               onChange((prev) => ({
                 ...prev,
                 hostNames: `${f.family_name}'s Residence`,
-                address: useStreet ? f.street : (f.full_address ?? prev.address),
+                address: useStreet ? (f.street || undefined) : (f.full_address || prev.address),
                 city: useStreet ? ([f.city, [f.state, f.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || prev.city) : "",
                 phone: formatPhone(f.home_phone) || prev.phone,
               }))

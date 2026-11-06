@@ -1,4 +1,4 @@
-import { memo } from "react"
+import React, { memo } from "react"
 import { Label } from "@/components/ui/label"
 import { CustomSectionsEditor, ResourceLinksEditor } from "@/components/dashboard/communication-edit-forms"
 import { type CommonCardFields, type PlaceholderDef, TEMPLATE_PLACEHOLDERS } from "@/lib/template-defaults"
@@ -25,7 +25,7 @@ export const CommonTemplateFields = memo(function CommonTemplateFields<T extends
 }) as <T extends CommonCardFields>(props: {
   data: T
   onChange: (updater: (prev: T) => T) => void
-}) => JSX.Element
+}) => React.ReactElement
 
 export const PlaceholderReference = memo(function PlaceholderReference({ typeName }: { typeName: string }) {
   const placeholders: PlaceholderDef[] = TEMPLATE_PLACEHOLDERS[typeName] ?? []

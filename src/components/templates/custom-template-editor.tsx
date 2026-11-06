@@ -10,8 +10,8 @@ import { VerseLookup } from "@/components/shared/verse-lookup"
 import { PastelColorPicker, TextColorPicker, CustomSectionsEditor, ResourceLinksEditor, FlyerSectionsEditor, type FlyerSectionItem } from "@/components/dashboard/communication-edit-forms"
 import { TemplateStyleEditor } from "@/components/dashboard/template-style-editor"
 import { VisualTemplateBuilder } from "@/components/template-builder/visual-template-builder"
-import { PASTEL_BORDER_MAP } from "@/lib/email/card-builder"
-import type { TemplateStyleSettings, VisualConfig } from "@/lib/email/visual-config-types"
+import { PASTEL_BORDER_MAP, type TemplateStyleSettings } from "@/lib/email/card-builder"
+import type { VisualConfig } from "@/lib/email/visual-config-types"
 
 interface CustomTemplateEditorProps {
   mode: "create" | "edit"

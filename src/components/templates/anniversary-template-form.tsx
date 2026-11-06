@@ -5,7 +5,8 @@ import { CommonTemplateFields } from "./common-template-fields"
 import { FormattingHelp } from "@/components/shared/formatting-help"
 import { VerseLookup } from "@/components/shared/verse-lookup"
 import { PastelColorPicker, TextColorPicker } from "@/components/dashboard/communication-edit-forms"
-import type { AnniversaryDefaults, TemplateStyleSettings } from "@/lib/template-defaults"
+import type { AnniversaryDefaults } from "@/lib/template-defaults"
+import type { TemplateStyleSettings } from "@/lib/email/card-builder"
 
 interface AnniversaryTemplateFormProps {
   data: AnniversaryDefaults

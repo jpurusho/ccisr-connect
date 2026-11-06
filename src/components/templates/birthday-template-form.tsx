@@ -5,7 +5,8 @@ import { CommonTemplateFields } from "./common-template-fields"
 import { FormattingHelp } from "@/components/shared/formatting-help"
 import { VerseLookup } from "@/components/shared/verse-lookup"
 import { PastelColorPicker, TextColorPicker } from "@/components/dashboard/communication-edit-forms"
-import type { BirthdayDefaults, TemplateStyleSettings } from "@/lib/template-defaults"
+import type { BirthdayDefaults } from "@/lib/template-defaults"
+import type { TemplateStyleSettings } from "@/lib/email/card-builder"
 
 interface BirthdayTemplateFormProps {
   data: BirthdayDefaults
