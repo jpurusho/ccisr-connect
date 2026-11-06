@@ -28,14 +28,15 @@ async function hashToken(token: string): Promise<string> {
 }
 
 /**
- * Set CSRF token as an HTTP-only cookie on the response.
- * Uses secure, httpOnly, sameSite=lax for security.
+ * Set CSRF token as a cookie on the response.
+ * Uses secure, sameSite=lax for security.
+ * httpOnly=false is required for double-submit pattern (client must read cookie).
  */
 export async function setCsrfCookie(response: NextResponse, token: string): Promise<NextResponse> {
-  const hashed = await hashToken(token)
   const expires = new Date(Date.now() + TOKEN_EXPIRY_MS)
 
-  response.cookies.set(CSRF_COOKIE_NAME, hashed, {
+  // Store unhashed token - double-submit pattern compares cookie === header
+  response.cookies.set(CSRF_COOKIE_NAME, token, {
     httpOnly: false, // Must be readable by JavaScript for double-submit pattern
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -62,7 +63,7 @@ function getCsrfHeader(req: NextRequest): string | null {
 
 /**
  * Validate CSRF token using double-submit cookie pattern.
- * Compares hashed cookie value with hashed header value using timing-safe comparison.
+ * Compares cookie value with header value using timing-safe comparison.
  *
  * @returns true if valid, false otherwise
  */
@@ -75,18 +76,15 @@ export async function validateCsrfToken(req: NextRequest): Promise<boolean> {
     return false
   }
 
-  // Hash the header token and compare with cookie (double-submit pattern)
-  const hashedHeader = await hashToken(headerToken)
-
-  // Simple constant-time string comparison (good enough for hex strings)
-  if (cookieToken.length !== hashedHeader.length) {
+  // Simple constant-time string comparison to prevent timing attacks
+  if (cookieToken.length !== headerToken.length) {
     return false
   }
 
   // Compare each character to prevent timing attacks
   let mismatch = 0
   for (let i = 0; i < cookieToken.length; i++) {
-    mismatch |= cookieToken.charCodeAt(i) ^ hashedHeader.charCodeAt(i)
+    mismatch |= cookieToken.charCodeAt(i) ^ headerToken.charCodeAt(i)
   }
 
   return mismatch === 0
@@ -94,23 +92,19 @@ export async function validateCsrfToken(req: NextRequest): Promise<boolean> {
 
 /**
  * Middleware helper: Generate and set CSRF token if not present.
- * Returns the token value (unhashed) for use in forms.
+ * Returns the token value for use in forms (though client reads from cookie).
  */
 export async function ensureCsrfToken(req: NextRequest, response: NextResponse): Promise<{ response: NextResponse; token: string }> {
   const existingCookie = getCsrfCookie(req)
 
   if (existingCookie) {
     // Cookie exists, no need to regenerate
-    // Return a placeholder since we can't unhash the cookie
-    return { response, token: "" }
+    return { response, token: existingCookie }
   }
 
-  // Generate new token
+  // Generate new token and store in cookie
   const token = generateCsrfToken()
   const updatedResponse = await setCsrfCookie(response, token)
-
-  // Also set token in response header for client-side access
-  updatedResponse.headers.set(CSRF_HEADER_NAME, token)
 
   return { response: updatedResponse, token }
 }
