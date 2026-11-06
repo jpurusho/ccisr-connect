@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import nodemailer from "nodemailer"
+import nodemailer, { type SendMailOptions } from "nodemailer"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { ApiError, successResponse } from "@/lib/api-response"
 import { dispatchSendSchema, validateRequest } from "@/lib/validation-schemas"
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    const mailOptions: nodemailer.SendMailOptions = {
+    const mailOptions: SendMailOptions = {
       from: smtp.from_name
         ? `"${smtp.from_name}" <${smtp.from_email}>`
         : smtp.from_email,
