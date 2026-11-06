@@ -47,6 +47,7 @@ import type {
 import { inferCommType } from "@/lib/dashboard-types"
 import { logAudit } from "@/lib/audit"
 import { sanitizeHtml } from "@/lib/sanitize-html"
+import { batchResolveHostFamilies } from "@/lib/queries/batch-host-families"
 import { toast } from "sonner"
 import {
   ChevronLeft,
@@ -214,28 +215,45 @@ export default function CalendarPage() {
     const eventsMap = new Map(eventsData.map((e) => [e.id, e]))
     const typesMap = new Map(eventTypes.map((t) => [t.id, t]))
 
-    // For instances with host families, fetch family + address info
-    const hostFamilyIds = [
-      ...new Set(
-        instances
-          .map((i) => i.host_family_id)
-          .filter((id): id is string => id !== null)
-      ),
-    ]
+    // ---- BATCH QUERY OPTIMIZATION: Collect all host family IDs (instance + event level) ----
+    const instanceHostIds = new Set(
+      instances
+        .map((i) => i.host_family_id)
+        .filter((id): id is string => id !== null)
+    )
 
+    // Also collect event-level host families (for recurrence-generated events)
+    const today = new Date()
+    const eventHostIds = new Set(
+      eventsData
+        .map((e) => {
+          const evtAny = e as Event & { host_family_id?: string | null; host_until?: string | null }
+          if (!evtAny.host_family_id) return null
+          const expired = evtAny.host_until ? new Date(evtAny.host_until + "T23:59:59") < today : false
+          return expired ? null : evtAny.host_family_id
+        })
+        .filter((id): id is string => id !== null)
+    )
+
+    const allHostFamilyIds = [...new Set([...instanceHostIds, ...eventHostIds])]
+
+    // Batch-resolve all host families in a single round-trip (eliminates N+1 pattern)
+    const hostFamiliesMap = await batchResolveHostFamilies(allHostFamilyIds, supabase)
+
+    // Build legacy maps for backward compatibility with existing code
     let familiesMap = new Map<string, Family>()
     let addressMap = new Map<string, Address>()
 
-    if (hostFamilyIds.length > 0) {
+    if (allHostFamilyIds.length > 0) {
       const [familiesResult, addressesResult] = await Promise.all([
         supabase
           .from("families")
           .select("*")
-          .in("id", hostFamilyIds),
+          .in("id", allHostFamilyIds),
         supabase
           .from("addresses")
           .select("*")
-          .in("family_id", hostFamilyIds)
+          .in("family_id", allHostFamilyIds)
           .eq("is_current", true),
       ])
       familiesMap = new Map(
@@ -341,29 +359,13 @@ export default function CalendarPage() {
       })
     }
 
-    // Collect event-level host family IDs for recurrence-generated events
-    const eventHostFamilyIds = [
-      ...new Set(
-        eventsData
-          .map((e) => (e as Event & { host_family_id?: string | null }).host_family_id)
-          .filter((id): id is string => !!id)
-      ),
-    ].filter((id) => !familiesMap.has(id))
-
-    if (eventHostFamilyIds.length > 0) {
-      const [efRes, eaRes] = await Promise.all([
-        supabase.from("families").select("*").in("id", eventHostFamilyIds),
-        supabase.from("addresses").select("*").in("family_id", eventHostFamilyIds).eq("is_current", true),
-      ])
-      for (const f of (efRes.data ?? []) as Family[]) familiesMap.set(f.id, f)
-      for (const a of (eaRes.data ?? []) as Address[]) addressMap.set(a.family_id, a)
-    }
+    // Event-level host families already loaded above (batch optimization)
 
     // Build CalendarEvents from recurrence rules (for dates without explicit instances)
     const instanceDates = new Set(
       instances.map((i) => `${i.event_id}:${i.instance_date}`)
     )
-    const today = new Date()
+    // Reuse today from above for host expiry check
     for (const event of eventsData) {
       if (!event.recurrence_rule) continue
       const eventType = typesMap.get(event.event_type_id)
@@ -744,23 +746,23 @@ export default function CalendarPage() {
       {/* Toolbar: nav + view toggle */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Navigation */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={goToday}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={goToday} className="min-h-[44px]" aria-label="Go to today">
             Today
           </Button>
           <div className="flex items-center">
-            <Button variant="ghost" size="icon-sm" onClick={goPrev} title="Previous" aria-label={view === "week" ? "Previous week" : "Previous month"}>
-              <ChevronLeft className="size-4" aria-hidden="true" />
+            <Button variant="ghost" size="icon" onClick={goPrev} title="Previous" aria-label={view === "week" ? "Previous week" : "Previous month"} className="min-h-[44px] min-w-[44px]">
+              <ChevronLeft className="size-5" aria-hidden="true" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={goNext} title="Next" aria-label={view === "week" ? "Next week" : "Next month"}>
-              <ChevronRight className="size-4" aria-hidden="true" />
+            <Button variant="ghost" size="icon" onClick={goNext} title="Next" aria-label={view === "week" ? "Next week" : "Next month"} className="min-h-[44px] min-w-[44px]">
+              <ChevronRight className="size-5" aria-hidden="true" />
             </Button>
           </div>
-          <h2 className="text-lg font-semibold">{headerTitle}</h2>
+          <h2 className="text-base sm:text-lg font-semibold">{headerTitle}</h2>
         </div>
 
         {/* View toggle + Create button */}
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex items-center gap-2 flex-wrap">
           <Tabs
             value={view}
             onValueChange={(val) => {
@@ -768,15 +770,16 @@ export default function CalendarPage() {
               setSelectedDay(null)
             }}
           >
-            <TabsList>
-              <TabsTrigger value="week">Week</TabsTrigger>
-              <TabsTrigger value="month">Month</TabsTrigger>
-              <TabsTrigger value="agenda">Agenda</TabsTrigger>
+            <TabsList className="h-auto">
+              <TabsTrigger value="week" className="min-h-[44px] px-4">Week</TabsTrigger>
+              <TabsTrigger value="month" className="min-h-[44px] px-4">Month</TabsTrigger>
+              <TabsTrigger value="agenda" className="min-h-[44px] px-4">Agenda</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button size="sm" onClick={() => openCreateForm()}>
-            <Plus className="size-3.5" />
-            Create Event
+          <Button size="sm" onClick={() => openCreateForm()} className="min-h-[44px]" aria-label="Create new event">
+            <Plus className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Create Event</span>
+            <span className="sm:hidden">Create</span>
           </Button>
         </div>
       </div>
@@ -840,17 +843,18 @@ export default function CalendarPage() {
 
           {/* Agenda view */}
           {view === "agenda" && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               {events
                 .sort((a, b) => a.date.getTime() - b.date.getTime())
                 .map((evt) => (
                   <button
                     key={evt.id}
                     type="button"
-                    className="flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left hover:bg-muted/50 transition-colors"
+                    className="flex w-full items-center gap-3 rounded-lg border px-4 py-3 min-h-[56px] text-left hover:bg-muted/50 transition-colors active:scale-[0.99]"
                     onClick={() => handleEventClick(evt)}
+                    aria-label={`View ${evt.title} on ${format(evt.date, "EEE, MMM d")}${evt.time ? ` at ${evt.time}` : ''}`}
                   >
-                    <div className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: evt.color }} />
+                    <div className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: evt.color }} aria-hidden="true" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{evt.title}</p>
                       {evt.time && <p className="text-xs text-muted-foreground">{evt.time}</p>}

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { SignupFieldConfig } from "@/lib/signup/field-registry"
 import { rateLimitByIp, getIpHash } from "@/lib/rate-limit"
 import { ApiError } from "@/lib/api-response"
-import { getPhoneLast4 } from "@/lib/validation-schemas"
+import { getPhoneLast4, signupLookupSchema, validateRequest } from "@/lib/validation-schemas"
+import type { SignupLookupRequest } from "@/types/api"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 // Log lookup attempt (reuse same table as remove attempts)
-async function logAttempt(supabase: any, ipHash: string, formId: string) {
+async function logAttempt(supabase: SupabaseClient, ipHash: string, formId: string) {
   await supabase.from("signup_remove_attempts").insert({
     ip_hash: ipHash,
     form_id: formId,
@@ -30,17 +31,20 @@ export async function POST(req: NextRequest) {
     return ApiError.tooManyRequests("Too many lookup attempts. Please try again later.")
   }
 
-  let body: { formId?: string; phoneLast4?: string }
+  let body: unknown
   try {
     body = await req.json()
   } catch {
     return ApiError.badRequest("Invalid JSON")
   }
 
-  const { formId, phoneLast4 } = body
-  if (!formId || !phoneLast4) {
-    return ApiError.badRequest("formId and phoneLast4 required")
+  // Validate request body
+  const validation = validateRequest(signupLookupSchema, body)
+  if (!validation.success) {
+    return ApiError.badRequest(validation.error)
   }
+
+  const { formId, phoneLast4 } = validation.data
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
   const ipHash = getIpHash(req)

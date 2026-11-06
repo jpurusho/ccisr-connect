@@ -89,9 +89,9 @@ const STATUS_BADGE_VARIANT: Record<
 
 const STATUS_BADGE_CLASS: Record<DispatchStatus, string> = {
   pending:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    "bg-yellow-100 text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-400",
   previewed:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    "bg-yellow-100 text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-400",
   approved:
     "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   sending:
@@ -739,7 +739,7 @@ export default function DispatchQueuePage() {
                                     aria-label="Reschedule"
                                     title="Reschedule"
                                   >
-                                    <Clock className="size-3.5 text-amber-600" />
+                                    <Clock className="size-3.5 text-amber-700" />
                                   </Button>
                                 )}
 
@@ -849,7 +849,7 @@ export default function DispatchQueuePage() {
                   <Label className="text-xs text-muted-foreground">Mailing List</Label>
                   <p className="text-sm">
                     {mailingLists.find((ml) => ml.id === previewItem.mailing_list_id)?.name || (
-                      <span className="text-amber-600 text-xs">Not configured</span>
+                      <span className="text-amber-700 text-xs">Not configured</span>
                     )}
                   </p>
                 </div>
@@ -857,7 +857,7 @@ export default function DispatchQueuePage() {
                   <Label className="text-xs text-muted-foreground">Send From</Label>
                   <p className="text-sm">
                     {smtpConfigs.find((sc) => sc.id === previewItem.smtp_config_id)?.name || (
-                      <span className="text-amber-600 text-xs">Not configured</span>
+                      <span className="text-amber-700 text-xs">Not configured</span>
                     )}
                   </p>
                 </div>

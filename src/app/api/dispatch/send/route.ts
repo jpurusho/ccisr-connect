@@ -3,11 +3,27 @@ import { createClient } from "@supabase/supabase-js"
 import nodemailer from "nodemailer"
 import { rateLimitByIp } from "@/lib/rate-limit"
 import { ApiError, successResponse } from "@/lib/api-response"
+import { dispatchSendSchema, validateRequest } from "@/lib/validation-schemas"
+import { requireCsrfToken } from "@/lib/csrf"
+import { verifyAdmin } from "@/lib/auth-checks"
+import type { EmailRecipients, SmtpConfig, RecipientType } from "@/types/api"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(req: NextRequest) {
+  // CSRF protection
+  const csrfError = await requireCsrfToken(req)
+  if (csrfError) {
+    return csrfError
+  }
+
+  // Verify admin authorization
+  const auth = await verifyAdmin(req)
+  if (!auth.authorized) {
+    return auth.error
+  }
+
   // Rate limiting: 5 requests per 5 minutes per IP
   const rateLimit = rateLimitByIp(req, {
     maxRequests: 5,
@@ -19,10 +35,20 @@ export async function POST(req: NextRequest) {
     return ApiError.tooManyRequests()
   }
 
-  const { dispatchId } = await req.json()
-  if (!dispatchId) {
-    return ApiError.badRequest("dispatchId required")
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return ApiError.badRequest("Invalid JSON")
   }
+
+  // Validate request body
+  const validation = validateRequest(dispatchSendSchema, body)
+  if (!validation.success) {
+    return ApiError.badRequest(validation.error)
+  }
+
+  const { dispatchId } = validation.data
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
@@ -69,7 +95,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Fetch recipients from mailing list
-  const recipients: { to: string[]; cc: string[]; bcc: string[] } = {
+  const recipients: EmailRecipients = {
     to: [],
     cc: [],
     bcc: [],

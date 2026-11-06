@@ -44,7 +44,7 @@ import { Plus, UserCog, Shield, ShieldCheck, User, Loader2 } from "lucide-react"
 
 const ROLE_CONFIG: Record<UserRole, { label: string; icon: typeof Shield; color: string }> = {
   super_admin: { label: "Super Admin", icon: ShieldCheck, color: "text-red-600" },
-  admin: { label: "Admin", icon: Shield, color: "text-amber-600" },
+  admin: { label: "Admin", icon: Shield, color: "text-amber-700" },
   operator: { label: "Operator", icon: User, color: "text-blue-600" },
 }
 
@@ -82,54 +82,34 @@ export default function UserManagementPage() {
 
     setSaving(true)
     try {
-      const supabase = createClient()
+      const res = await fetch("/api/users/invite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          display_name: inviteDisplayName.trim() || inviteEmail.trim(),
+          role: inviteRole,
+        }),
+      })
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users`,
-        {
-          method: "POST",
-          headers: {
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: inviteEmail.trim(),
-            email_confirm: true,
-            user_metadata: { full_name: inviteDisplayName.trim() || inviteEmail.trim() },
-          }),
-        }
-      )
+      const data = await res.json()
 
       if (!res.ok) {
-        const err = await res.json()
-        toast.error(`Failed to create auth user: ${err.message || err.msg || "Unknown error"}`)
-        setSaving(false)
+        toast.error(data.error || "Failed to invite user")
         return
       }
 
-      const authUser = await res.json()
-
-      const { error } = await supabase.from("app_users").insert({
-        id: authUser.id,
-        email: inviteEmail.trim(),
-        display_name: inviteDisplayName.trim() || null,
-        role: inviteRole,
-        is_active: true,
-      } as never)
-
-      if (error) {
-        toast.error(`Failed to create app user: ${error.message}`)
-      } else {
-        toast.success(`User ${inviteEmail.trim()} invited as ${inviteRole}`)
-        setDialogOpen(false)
-        setInviteEmail("")
-        setInviteDisplayName("")
-        setInviteRole("operator")
-        fetchUsers()
-      }
-    } catch {
+      toast.success(`User ${inviteEmail.trim()} invited as ${inviteRole}`)
+      setDialogOpen(false)
+      setInviteEmail("")
+      setInviteDisplayName("")
+      setInviteRole("operator")
+      fetchUsers()
+    } catch (err) {
       toast.error("An unexpected error occurred")
+      console.error("Invite error:", err)
     } finally {
       setSaving(false)
     }
@@ -174,9 +154,10 @@ export default function UserManagementPage() {
             Manage who can access CCISR Connect and their permissions.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="size-4" />
-          Invite User
+        <Button onClick={() => setDialogOpen(true)} className="min-h-[44px]" aria-label="Invite new user">
+          <Plus className="size-4" aria-hidden="true" />
+          <span className="hidden sm:inline">Invite User</span>
+          <span className="sm:hidden">Invite</span>
         </Button>
       </div>
 
@@ -198,13 +179,14 @@ export default function UserManagementPage() {
               ))}
             </div>
           ) : (
+            <div className="overflow-x-auto -mx-6 px-6">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="hidden md:table-cell">Last Login</TableHead>
-                  <TableHead>Active</TableHead>
+                  <TableHead className="min-w-[180px]">User</TableHead>
+                  <TableHead className="min-w-[140px]">Role</TableHead>
+                  <TableHead className="hidden md:table-cell min-w-[120px]">Last Login</TableHead>
+                  <TableHead className="min-w-[80px]">Active</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -213,18 +195,18 @@ export default function UserManagementPage() {
                   const RoleIcon = roleConfig.icon
                   return (
                     <TableRow key={user.id}>
-                      <TableCell>
+                      <TableCell className="py-4">
                         <div>
-                          <p className="font-medium">{user.display_name || user.email}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <p className="font-medium text-sm sm:text-base">{user.display_name || user.email}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground break-all">{user.email}</p>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-4">
                         <Select
                           value={user.role}
                           onValueChange={(val) => updateRole(user, val as UserRole)}
                         >
-                          <SelectTrigger className="w-36">
+                          <SelectTrigger className="w-32 sm:w-36 min-h-[44px]">
                             <div className="flex items-center gap-1.5">
                               <RoleIcon className={`size-3.5 ${roleConfig.color}`} />
                               <SelectValue />
@@ -237,22 +219,25 @@ export default function UserManagementPage() {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell py-4">
                         {user.last_login
                           ? new Date(user.last_login).toLocaleDateString()
                           : "Never"}
                       </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={user.is_active}
-                          onCheckedChange={() => toggleActive(user)}
-                        />
+                      <TableCell className="py-4">
+                        <div className="flex items-center min-h-[44px]">
+                          <Switch
+                            checked={user.is_active}
+                            onCheckedChange={() => toggleActive(user)}
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -308,11 +293,13 @@ export default function UserManagementPage() {
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
                 disabled={saving}
+                className="min-h-[44px]"
+                aria-label="Cancel invitation"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="animate-spin" />}
+              <Button type="submit" disabled={saving} className="min-h-[44px]" aria-label="Send invitation">
+                {saving && <Loader2 className="animate-spin" aria-label="Sending" />}
                 Invite
               </Button>
             </DialogFooter>

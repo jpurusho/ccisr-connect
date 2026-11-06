@@ -1454,7 +1454,7 @@ function FieldEditor({
             type="button"
             disabled={index === 0}
             onClick={() => onMove(-1)}
-            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             <ChevronUp className="size-3.5" />
           </button>
@@ -1462,7 +1462,7 @@ function FieldEditor({
             type="button"
             disabled={index === total - 1}
             onClick={() => onMove(1)}
-            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             <ChevronDown className="size-3.5" />
           </button>

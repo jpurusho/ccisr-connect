@@ -20,7 +20,9 @@
     ],
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "types": ["node", "next"],
+    "rootDir": "."
   },
   "include": [
     "next-env.d.ts",

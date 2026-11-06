@@ -139,22 +139,22 @@ const EmailPreviewContent = memo(function EmailPreviewContent({
 }) {
   return (
     <div className="border-t">
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/30">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 flex-wrap gap-2">
         <span className="text-xs font-medium text-muted-foreground">Email Preview</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {status === "draft" && onQueue && (
-            <Button variant="outline" size="sm" onClick={() => { onClose(); onQueue() }} disabled={!canDispatch}>
+            <Button variant="outline" size="sm" onClick={() => { onClose(); onQueue() }} disabled={!canDispatch} className="min-h-[44px]">
               <Clock className="size-3.5" data-icon="inline-start" />
               Queue
             </Button>
           )}
           {status === "draft" && (
-            <Button size="sm" onClick={() => { onClose(); onSendNow() }} style={canDispatch ? { backgroundColor: accentColor } : undefined} className="text-white hover:opacity-90" disabled={!canDispatch}>
+            <Button size="sm" onClick={() => { onClose(); onSendNow() }} style={canDispatch ? { backgroundColor: accentColor } : undefined} className="text-white hover:opacity-90 min-h-[44px]" disabled={!canDispatch}>
               <Send className="size-3.5" data-icon="inline-start" />
               Send Now
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose} className="min-h-[44px]">
             Close
           </Button>
         </div>
@@ -294,7 +294,7 @@ export function WeeklyCommunicationCard({
             <input
               id="subject-prefix"
               type="text"
-              className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 min-h-[44px] text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               placeholder="e.g., Reminder, Final Notice"
               value={subjectPrefix || ""}
               onChange={(e) => onSubjectPrefixChange(e.target.value)}
@@ -311,7 +311,7 @@ export function WeeklyCommunicationCard({
               <input
                 id="email-subject"
                 type="text"
-                className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 min-h-[44px] text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                 value={subject}
                 onChange={(e) => onSubjectChange(e.target.value)}
                 aria-label="Email subject"
@@ -350,7 +350,7 @@ export function WeeklyCommunicationCard({
               value={selectedMailingList || ""}
               onValueChange={(val) => onMailingListChange(val ?? "")}
             >
-              <SelectTrigger className="h-8 w-auto min-w-32 max-w-48 gap-1 text-xs px-2.5">
+              <SelectTrigger className="h-10 min-h-[44px] w-auto min-w-32 max-w-48 gap-1 text-xs px-2.5">
                 <SelectValue placeholder="Mailing list...">
                   {selectedMlName || "Mailing list..."}
                 </SelectValue>
@@ -369,7 +369,7 @@ export function WeeklyCommunicationCard({
               value={selectedSmtpConfig || ""}
               onValueChange={(val) => onSmtpConfigChange(val ?? "")}
             >
-              <SelectTrigger className="h-8 w-auto min-w-32 max-w-48 gap-1 text-xs px-2.5">
+              <SelectTrigger className="h-10 min-h-[44px] w-auto min-w-32 max-w-48 gap-1 text-xs px-2.5">
                 <SelectValue placeholder="Send from...">
                   {selectedSmtpLabel || "Send from..."}
                 </SelectValue>
@@ -389,7 +389,7 @@ export function WeeklyCommunicationCard({
               value={additionalRecipients || ""}
               onChange={(e) => onAdditionalRecipientsChange(e.target.value)}
               placeholder="Extra emails: a@b.com, c@d.com"
-              className="h-8 min-w-40 flex-1 rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              className="h-10 min-h-[44px] min-w-40 flex-1 rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               onClick={(e) => e.stopPropagation()}
               aria-label="Additional recipient email addresses"
             />
@@ -406,7 +406,7 @@ export function WeeklyCommunicationCard({
               setEditing((prev) => !prev)
             }}
             style={editing ? { backgroundColor: accentColor } : undefined}
-            className={editing ? "text-white hover:opacity-90" : ""}
+            className={editing ? "text-white hover:opacity-90 min-h-[44px]" : "min-h-[44px]"}
           >
             {editing ? (
               <ChevronUp className="size-3.5" data-icon="inline-start" />
@@ -421,6 +421,7 @@ export function WeeklyCommunicationCard({
               size="sm"
               onClick={() => setPreviewing(true)}
               disabled={!previewHtml}
+              className="min-h-[44px]"
             >
               <Eye className="size-3.5" data-icon="inline-start" />
               Preview
@@ -438,6 +439,7 @@ export function WeeklyCommunicationCard({
                   onClick={onQueue}
                   disabled={!canDispatch}
                   title={dispatchTitle || "Queue for review before sending"}
+                  className="min-h-[44px]"
                 >
                   <Clock className="size-3.5" data-icon="inline-start" />
                   Queue
@@ -447,7 +449,7 @@ export function WeeklyCommunicationCard({
                 size="sm"
                 onClick={onSendNow}
                 style={canDispatch ? { backgroundColor: accentColor } : undefined}
-                className="text-white hover:opacity-90"
+                className="text-white hover:opacity-90 min-h-[44px]"
                 disabled={!canDispatch}
                 title={dispatchTitle}
               >
@@ -461,7 +463,7 @@ export function WeeklyCommunicationCard({
                   onClick={onTestSend}
                   disabled={!selectedSmtpConfig}
                   title={!selectedSmtpConfig ? "Select a Send From account first" : "Send test email to yourself"}
-                  className="text-xs text-muted-foreground"
+                  className="text-xs text-muted-foreground min-h-[44px]"
                 >
                   <Mail className="size-3.5" data-icon="inline-start" />
                   Test
@@ -478,6 +480,7 @@ export function WeeklyCommunicationCard({
                   onClick={onQueue}
                   disabled={!canDispatch}
                   title={dispatchTitle || "Queue reminder for review"}
+                  className="min-h-[44px]"
                 >
                   <Clock className="size-3.5" data-icon="inline-start" />
                   Queue Reminder
@@ -488,6 +491,7 @@ export function WeeklyCommunicationCard({
                 onClick={onSendNow}
                 disabled={!canDispatch}
                 title={dispatchTitle}
+                className="min-h-[44px]"
               >
                 <RefreshCw className="size-3.5" data-icon="inline-start" />
                 Send Reminder
@@ -501,6 +505,7 @@ export function WeeklyCommunicationCard({
               variant="destructive"
               disabled={!canDispatch}
               title={dispatchTitle}
+              className="min-h-[44px]"
             >
               <Send className="size-3.5" data-icon="inline-start" />
               Retry
@@ -513,11 +518,11 @@ export function WeeklyCommunicationCard({
           <button
             type="button"
             onClick={() => setShareOpen(!shareOpen)}
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 py-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors min-h-[44px] active:scale-95"
             aria-expanded={shareOpen}
             aria-label={shareOpen ? "Hide share and export options" : "Show share and export options"}
           >
-            {shareOpen ? <ChevronUp className="size-3" aria-hidden="true" /> : <ChevronDown className="size-3" aria-hidden="true" />}
+            {shareOpen ? <ChevronUp className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
             Share & Export
           </button>
           {shareOpen && (
@@ -527,6 +532,7 @@ export function WeeklyCommunicationCard({
                 size="sm"
                 onClick={() => previewHtml && downloadAsPdf(previewHtml, title)}
                 disabled={!previewHtml}
+                className="min-h-[44px]"
               >
                 <Download className="size-3.5" data-icon="inline-start" />
                 PDF
@@ -536,6 +542,7 @@ export function WeeklyCommunicationCard({
                 size="sm"
                 onClick={handleDownloadImage}
                 disabled={!previewHtml}
+                className="min-h-[44px]"
               >
                 <Image className="size-3.5" data-icon="inline-start" />
                 Image
@@ -545,6 +552,7 @@ export function WeeklyCommunicationCard({
                 size="sm"
                 onClick={handleShare}
                 disabled={!previewHtml}
+                className="min-h-[44px]"
               >
                 <Share2 className="size-3.5" data-icon="inline-start" />
                 Share
@@ -564,7 +572,7 @@ export function WeeklyCommunicationCard({
                   onClick={() => { onSave(); setEditing(false) }}
                   disabled={saving}
                   style={{ backgroundColor: accentColor }}
-                  className="text-white hover:opacity-90"
+                  className="text-white hover:opacity-90 min-h-[44px]"
                 >
                   {saving ? (
                     <Loader2 className="size-3.5 animate-spin" data-icon="inline-start" />
@@ -579,6 +587,7 @@ export function WeeklyCommunicationCard({
                 size="sm"
                 onClick={() => setPreviewing(true)}
                 disabled={!previewHtml}
+                className="min-h-[44px]"
               >
                 <Eye className="size-3.5" data-icon="inline-start" />
                 Preview
@@ -588,6 +597,7 @@ export function WeeklyCommunicationCard({
                   variant="outline"
                   size="sm"
                   onClick={() => { onCancel(); setEditing(false) }}
+                  className="min-h-[44px]"
                 >
                   <Undo2 className="size-3.5" data-icon="inline-start" />
                   Cancel
@@ -599,6 +609,7 @@ export function WeeklyCommunicationCard({
                   size="sm"
                   onClick={onRefresh}
                   title="Refresh fields from template defaults"
+                  className="min-h-[44px]"
                 >
                   <RefreshCw className="size-3.5" data-icon="inline-start" />
                   From Template
@@ -610,7 +621,7 @@ export function WeeklyCommunicationCard({
                   variant="ghost"
                   size="sm"
                   onClick={onDelete}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground hover:text-destructive min-h-[44px]"
                 >
                   <Trash2 className="size-3.5" data-icon="inline-start" />
                   Delete Draft

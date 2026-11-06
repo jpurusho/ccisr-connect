@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { ApiError } from "@/lib/api-response"
+import { bibleVerseSchema, validateRequest } from "@/lib/validation-schemas"
+import type { BibleVerseResponse } from "@/types/api"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -8,7 +10,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 interface VerseResult {
   text: string
   reference: string
-  translation: string
+  version: string
 }
 
 async function getEsvApiKey(): Promise<string> {
@@ -37,7 +39,7 @@ async function fetchESV(reference: string): Promise<VerseResult | null> {
     const data = await res.json()
     const text = (data.passages?.[0] || "").trim()
     if (!text) return null
-    return { text, reference: data.canonical || reference, translation: "ESV" }
+    return { text, reference: data.canonical || reference, version: "ESV" }
   } catch {
     return null
   }
@@ -53,7 +55,7 @@ async function fetchBibleApi(reference: string, translation: string): Promise<Ve
     return {
       text: data.text.trim(),
       reference: data.reference || reference,
-      translation: data.translation_name || translation.toUpperCase(),
+      version: data.translation_name || translation.toUpperCase(),
     }
   } catch {
     return null
@@ -61,12 +63,18 @@ async function fetchBibleApi(reference: string, translation: string): Promise<Ve
 }
 
 export async function GET(req: NextRequest) {
-  const reference = req.nextUrl.searchParams.get("ref")
-  const translation = req.nextUrl.searchParams.get("translation") || "esv"
-
-  if (!reference) {
-    return ApiError.badRequest("ref parameter required")
+  // Validate input parameters
+  const params = {
+    ref: req.nextUrl.searchParams.get("ref") ?? undefined,
+    translation: req.nextUrl.searchParams.get("translation") ?? "esv",
   }
+
+  const validation = validateRequest(bibleVerseSchema, params)
+  if (!validation.success) {
+    return ApiError.badRequest(validation.error)
+  }
+
+  const { ref: reference, translation = "esv" } = validation.data
 
   let result: VerseResult | null = null
 
@@ -74,7 +82,7 @@ export async function GET(req: NextRequest) {
     result = await fetchESV(reference)
     if (!result) {
       result = await fetchBibleApi(reference, "web")
-      if (result) result.translation = "WEB (ESV unavailable)"
+      if (result) result.version = "WEB (ESV unavailable)"
     }
   } else if (translation === "kjv") {
     result = await fetchBibleApi(reference, "kjv")

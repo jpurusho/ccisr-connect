@@ -89,6 +89,8 @@ import {
 import { useCardVisibility } from "@/hooks/dashboard/use-card-visibility"
 import { resolveSignupAutoFill, type SignupFieldMap, type AutoFillResult } from "@/lib/signup/auto-fill"
 import { getBreakStatus } from "@/lib/dashboard/break-utils"
+import { batchResolveHostFamilies } from "@/lib/queries/batch-host-families"
+import { batchLoadEventBreaks, isEventOnBreak } from "@/lib/queries/batch-event-breaks"
 
 import {
   WeeklyCommunicationCard,
@@ -1159,31 +1161,30 @@ export default function DashboardPage() {
       const findInstance = (eventId: string, dateStr: string) =>
         weekInstances.find((i) => i.event_id === eventId && i.instance_date === dateStr)
 
-      // Helper: resolve host family info from an instance
-      async function resolveHostFamily(hostFamilyId: string | null) {
-        if (!hostFamilyId) return { hostName: "TBD", address: "TBD", city: "", phone: "" }
-        const [familyRes, addrRes, membersRes] = await Promise.all([
-          supabase.from("families").select("family_name, home_phone").eq("id", hostFamilyId)
-            .returns<{ family_name: string; home_phone: string | null }[]>().single(),
-          supabase.from("addresses").select("full_address, city, state, zip").eq("family_id", hostFamilyId).eq("is_current", true)
-            .returns<{ full_address: string; city: string | null; state: string | null; zip: string | null }[]>().limit(1).single(),
-          supabase.from("members").select("first_name, role_in_family, cell_phone").eq("family_id", hostFamilyId).eq("is_active", true)
-            .in("role_in_family", ["husband", "wife"]).order("role_in_family")
-            .returns<{ first_name: string; role_in_family: string; cell_phone: string | null }[]>(),
-        ])
-        const husband = membersRes.data?.find((m) => m.role_in_family === "husband")
-        const wife = membersRes.data?.find((m) => m.role_in_family === "wife")
-        let hostName = familyRes.data?.family_name ?? "TBD"
-        if (husband && wife) hostName = `${husband.first_name} & ${wife.first_name}`
-        else if (husband) hostName = husband.first_name
-        else if (wife) hostName = wife.first_name
-        const phone = husband?.cell_phone ?? wife?.cell_phone ?? familyRes.data?.home_phone ?? ""
-        return {
-          hostName,
-          address: addrRes.data?.full_address ?? "TBD",
-          city: [addrRes.data?.city, addrRes.data?.state, addrRes.data?.zip].filter(Boolean).join(", "),
-          phone,
+      // ---- BATCH QUERY OPTIMIZATION: Collect all host family IDs upfront ----
+      const hostFamilyIds = new Set<string>()
+      for (const inst of weekInstances) {
+        if (inst.host_family_id) hostFamilyIds.add(inst.host_family_id)
+      }
+      for (const evt of activeEvents) {
+        const evtAny = evt as typeof evt & { host_family_id?: string | null; host_until?: string | null }
+        if (evtAny.host_family_id) {
+          const expired = evtAny.host_until ? new Date(evtAny.host_until + "T23:59:59") < new Date() : false
+          if (!expired) hostFamilyIds.add(evtAny.host_family_id)
         }
+      }
+
+      // Batch-resolve all host families in a single round-trip (eliminates N+1 pattern)
+      const hostFamiliesMap = await batchResolveHostFamilies([...hostFamilyIds], supabase)
+
+      // ---- BATCH QUERY OPTIMIZATION: Load all event breaks upfront ----
+      const eventIds = activeEvents.map(e => e.id)
+      const breaksMap = await batchLoadEventBreaks(eventIds, wkSunISO, wkSatISO, supabase)
+
+      // Helper: get host family info from batched data
+      function getHostFamilyInfo(hostFamilyId: string | null) {
+        if (!hostFamilyId) return { hostName: "TBD", address: "TBD", city: "", phone: "" }
+        return hostFamiliesMap.get(hostFamilyId) ?? { hostName: "TBD", address: "TBD", city: "", phone: "" }
       }
 
       // Find events by internal tab name
@@ -1279,11 +1280,11 @@ export default function DashboardPage() {
 
         // Instance/event host_family_id is authoritative (overrides signup raw name)
         if (bsInstance?.host_family_id) {
-          bsHostData = await resolveHostFamily(bsInstance.host_family_id)
+          bsHostData = getHostFamilyInfo(bsInstance.host_family_id)
         } else if (bsHostData.hostName === "TBD") {
           if (bsEvent?.host_family_id) {
             const expired = bsEvent.host_until ? new Date(bsEvent.host_until + "T23:59:59") < new Date() : false
-            if (!expired) bsHostData = await resolveHostFamily(bsEvent.host_family_id)
+            if (!expired) bsHostData = getHostFamilyInfo(bsEvent.host_family_id)
           }
         }
         if (bsInstance?.location_override) bsHostData.address = bsInstance.location_override
@@ -1442,11 +1443,11 @@ export default function DashboardPage() {
 
         // Instance/event host_family_id is authoritative
         if (pmInstance?.host_family_id) {
-          pmHostData = await resolveHostFamily(pmInstance.host_family_id)
+          pmHostData = getHostFamilyInfo(pmInstance.host_family_id)
         } else if (pmHostData.hostName === "TBD") {
           if (pmEvent?.host_family_id) {
             const expired = pmEvent.host_until ? new Date(pmEvent.host_until + "T23:59:59") < new Date() : false
-            if (!expired) pmHostData = await resolveHostFamily(pmEvent.host_family_id)
+            if (!expired) pmHostData = getHostFamilyInfo(pmEvent.host_family_id)
           }
         }
         if (pmInstance?.location_override) pmHostData.address = pmInstance.location_override
@@ -1522,18 +1523,11 @@ export default function DashboardPage() {
             const inst = weekInstances.find((wi) => wi.event_id === evt.id && wi.instance_date === format(occ, "yyyy-MM-dd"))
             if (inst?.status === "cancelled") continue
             const occDateStr = format(occ, "yyyy-MM-dd")
-            // Check if event has a break for this date
-            const { data: occBreaks } = await supabase
-              .from("event_breaks")
-              .select("id, message")
-              .eq("event_id", evt.id)
-              .lte("start_date", occDateStr)
-              .gte("end_date", occDateStr)
-              .limit(1)
-              .returns<{ id: string; message: string | null }[]>()
-            if (occBreaks && occBreaks.length > 0) {
+            // Check if event has a break for this date (use batched data)
+            const breakStatus = isEventOnBreak(evt.id, occDateStr, breaksMap)
+            if (breakStatus.isOnBreak) {
               if (evt.show_break_in_bulletin !== false) {
-                const breakMsg = occBreaks[0].message || "On scheduled break"
+                const breakMsg = breakStatus.message || "On scheduled break"
                 bulletinAutoEvents.push({
                   title: evt.title,
                   details: breakMsg,
@@ -1558,20 +1552,13 @@ export default function DashboardPage() {
             || (evtStart && !evtEnd && evtStart >= wkSun && evtStart <= wkSat)
 
           if (overlapsWeek) {
-            // Check break for the event date
+            // Check break for the event date (use batched data)
             const checkDate = inst?.instance_date ?? (evtStart ? format(evtStart, "yyyy-MM-dd") : "")
             if (checkDate) {
-              const { data: oneTimeBreaks } = await supabase
-                .from("event_breaks")
-                .select("id, message")
-                .eq("event_id", evt.id)
-                .lte("start_date", checkDate)
-                .gte("end_date", checkDate)
-                .limit(1)
-                .returns<{ id: string; message: string | null }[]>()
-              if (oneTimeBreaks && oneTimeBreaks.length > 0) {
+              const breakStatus = isEventOnBreak(evt.id, checkDate, breaksMap)
+              if (breakStatus.isOnBreak) {
                 if (evt.show_break_in_bulletin !== false) {
-                  const breakMsg = oneTimeBreaks[0].message || "On scheduled break"
+                  const breakMsg = breakStatus.message || "On scheduled break"
                   bulletinAutoEvents.push({ title: evt.title, details: breakMsg })
                 }
                 continue
@@ -1871,13 +1858,13 @@ export default function DashboardPage() {
         let hostName = ""
         let address = ""
         if (instForOcc?.host_family_id) {
-          const hf = await resolveHostFamily(instForOcc.host_family_id)
+          const hf = getHostFamilyInfo(instForOcc.host_family_id)
           hostName = hf.hostName !== "TBD" ? hf.hostName : ""
           address = hf.address !== "TBD" ? hf.address : ""
         } else if (evt.host_family_id) {
           const expired = evt.host_until ? new Date(evt.host_until + "T23:59:59") < new Date() : false
           if (!expired) {
-            const hf = await resolveHostFamily(evt.host_family_id)
+            const hf = getHostFamilyInfo(evt.host_family_id)
             hostName = hf.hostName !== "TBD" ? hf.hostName : ""
             address = hf.address !== "TBD" ? hf.address : ""
           }
@@ -2011,12 +1998,12 @@ export default function DashboardPage() {
             const inst = weekInstances.find((i) => i.event_id === evt.id && i.instance_date === dateStr)
             let hostName: string | null = null
             if (inst?.host_family_id) {
-              const hf = await resolveHostFamily(inst.host_family_id)
+              const hf = getHostFamilyInfo(inst.host_family_id)
               hostName = hf.hostName !== "TBD" ? hf.hostName : null
             } else if (evt.host_family_id) {
               const expired = evt.host_until ? new Date(evt.host_until + "T23:59:59") < new Date() : false
               if (!expired) {
-                const hf = await resolveHostFamily(evt.host_family_id)
+                const hf = getHostFamilyInfo(evt.host_family_id)
                 hostName = hf.hostName !== "TBD" ? hf.hostName : null
               }
             }
@@ -3306,7 +3293,7 @@ export default function DashboardPage() {
           title: "Pending",
           value: stats.pendingDispatches,
           icon: Clock,
-          color: "text-amber-600 dark:text-amber-400",
+          color: "text-amber-700 dark:text-amber-400",
           bg: "bg-amber-100 dark:bg-amber-950/40",
           href: "/dispatch",
         },
@@ -3729,7 +3716,7 @@ export default function DashboardPage() {
                       const modTs = formatRelativeTime(instanceUpdatedAt[type])
                       if (sentTs) return <p className="mt-0.5 text-[10px] text-green-600 dark:text-green-400">Sent {sentTs}</p>
                       if (modTs && hasDraft) return <p className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-400">Modified {modTs}</p>
-                      if (weekOffset < 0 && !hasDraft && status === "draft" && hasData) return <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">Not dispatched</p>
+                      if (weekOffset < 0 && !hasDraft && status === "draft" && hasData) return <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">Not dispatched</p>
                       if (!hasData && (type === "bible_study" || type === "womens_study" || type === "prayer_meeting")) {
                         return <Link href="/calendar" className="mt-0.5 text-[10px] text-primary hover:underline" onClick={(e) => e.stopPropagation()}>Set up schedule</Link>
                       }

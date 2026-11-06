@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { getIpHash } from "@/lib/rate-limit"
 import { getPhoneLast4 } from "@/lib/validation-schemas"
+import { requireValidOrigin } from "@/lib/csrf"
+import type { SignupRemoveRequest } from "@/types/api"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 // Check rate limiting: max 5 attempts per hour per IP per form
-async function checkRateLimit(supabase: any, ipHash: string, formId: string): Promise<{ allowed: boolean; attempts: number }> {
+async function checkRateLimit(supabase: SupabaseClient, ipHash: string, formId: string): Promise<{ allowed: boolean; attempts: number }> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
   const { data } = await supabase
@@ -22,7 +24,7 @@ async function checkRateLimit(supabase: any, ipHash: string, formId: string): Pr
 }
 
 // Log attempt for rate limiting
-async function logAttempt(supabase: any, ipHash: string, formId: string, success: boolean) {
+async function logAttempt(supabase: SupabaseClient, ipHash: string, formId: string, success: boolean) {
   await supabase.from("signup_remove_attempts").insert({
     ip_hash: ipHash,
     form_id: formId,
@@ -33,7 +35,7 @@ async function logAttempt(supabase: any, ipHash: string, formId: string, success
 
 // Audit log helper (client-compatible version)
 async function logAudit(
-  supabase: any,
+  supabase: SupabaseClient,
   action: string,
   entityType: string,
   entityId: string | null,
@@ -53,6 +55,12 @@ async function logAudit(
 }
 
 export async function POST(req: NextRequest) {
+  // CSRF protection via Origin/Referer validation
+  const originError = requireValidOrigin(req)
+  if (originError) {
+    return originError
+  }
+
   let body: { responseId?: string; formId?: string; phoneLast4?: string }
   try {
     body = await req.json()
@@ -134,7 +142,7 @@ export async function POST(req: NextRequest) {
   // Log to audit trail BEFORE deletion (includes full response data for recovery)
   await logAudit(supabase, "signup_response_self_removed", "signup_responses", responseId, {
     formId,
-    formTitle: (form as any)?.title || "Unknown",
+    formTitle: (form as { title?: string })?.title || "Unknown",
     ipHash,
     verificationMethod,
     responseData: response.data, // Full snapshot for recovery

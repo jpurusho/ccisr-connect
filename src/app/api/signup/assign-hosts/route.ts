@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requireCsrfToken } from "@/lib/csrf"
+import type { SignupHostAssignmentRequest } from "@/types/api"
 
 interface AssignmentRow {
   date: string
@@ -8,6 +10,12 @@ interface AssignmentRow {
 }
 
 export async function POST(req: NextRequest) {
+  // CSRF protection
+  const csrfError = await requireCsrfToken(req)
+  if (csrfError) {
+    return csrfError
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

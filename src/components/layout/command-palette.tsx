@@ -143,25 +143,61 @@ export function CommandPalette() {
     </CommandDialog>
 
     <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Keyboard Shortcuts</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-sm">
-          {[
-            ["⌘ K", "Open command palette"],
-            ["?", "Show this help"],
-            ["g then d", "Go to Dashboard"],
-            ["g then c", "Go to Calendar"],
-            ["g then m", "Go to Members"],
-            ["g then s", "Go to Signups"],
-            ["g then e", "Go to Email"],
-          ].map(([key, desc]) => (
-            <div key={key} className="flex items-center justify-between">
-              <span className="text-muted-foreground">{desc}</span>
-              <kbd className="rounded border bg-muted px-2 py-0.5 text-xs font-mono">{key}</kbd>
+        <div className="space-y-4 text-sm">
+          <div>
+            <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Navigation</h4>
+            <div className="space-y-2">
+              {[
+                ["⌘ K", "Open command palette"],
+                ["?", "Show this help"],
+                ["g then d", "Go to Dashboard"],
+                ["g then c", "Go to Calendar"],
+                ["g then m", "Go to Members"],
+                ["g then s", "Go to Signups"],
+                ["g then e", "Go to Email"],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{desc}</span>
+                  <kbd className="rounded border bg-muted px-2 py-0.5 text-xs font-mono">{key}</kbd>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          <div>
+            <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Calendar</h4>
+            <div className="space-y-2">
+              {[
+                ["Arrow keys", "Navigate between dates"],
+                ["Home / End", "Jump to start/end of week"],
+                ["Enter", "Select date"],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{desc}</span>
+                  <kbd className="rounded border bg-muted px-2 py-0.5 text-xs font-mono">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">General</h4>
+            <div className="space-y-2">
+              {[
+                ["Tab", "Navigate forward"],
+                ["Shift + Tab", "Navigate backward"],
+                ["Esc", "Close dialogs"],
+                ["Enter / Space", "Activate button/link"],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{desc}</span>
+                  <kbd className="rounded border bg-muted px-2 py-0.5 text-xs font-mono">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

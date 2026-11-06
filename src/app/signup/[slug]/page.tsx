@@ -363,6 +363,7 @@ export default function PublicSignupPage() {
               }}
               className="rounded-lg px-4 py-2 text-sm font-medium text-white"
               style={{ backgroundColor: colors.primary }}
+              aria-label="Submit another response"
             >
               Submit Another Response
             </button>
@@ -373,6 +374,7 @@ export default function PublicSignupPage() {
                 else window.close()
               }}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              aria-label="Close form"
             >
               Close
             </button>
@@ -443,12 +445,14 @@ export default function PublicSignupPage() {
                   }
                 }
               }}
-              className="w-full flex items-center justify-center gap-2 text-sm font-medium text-blue-900 hover:text-blue-700"
+              className="w-full flex items-center justify-center gap-2 text-sm font-medium text-blue-900 hover:text-blue-800"
+              aria-label="Toggle edit response section"
+              aria-expanded={!document.getElementById("edit-lookup-section")?.classList.contains("hidden")}
             >
               <span>✏️ Already signed up? Edit your response</span>
             </button>
             <div id="edit-lookup-section" className="hidden mt-3 space-y-2">
-              <p className="text-xs text-blue-800">Enter the last 4 digits of your phone number to load your existing response:</p>
+              <p className="text-xs text-blue-900">Enter the last 4 digits of your phone number to load your existing response:</p>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -463,12 +467,13 @@ export default function PublicSignupPage() {
                   onClick={handleEditLookup}
                   disabled={editPhoneLast4.length !== 4 || editLookupLoading}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
+                  aria-label="Load existing response"
                 >
-                  {editLookupLoading ? <Loader2 className="size-4 animate-spin" /> : "Load"}
+                  {editLookupLoading ? <Loader2 className="size-4 animate-spin" aria-label="Loading" /> : "Load"}
                 </Button>
               </div>
               {editLookupError && (
-                <p className="text-xs text-red-600">{editLookupError}</p>
+                <p className="text-xs text-red-700">{editLookupError}</p>
               )}
             </div>
           </div>
@@ -486,7 +491,8 @@ export default function PublicSignupPage() {
                 onClick={cancelEdit}
                 variant="ghost"
                 size="sm"
-                className="text-green-700 hover:text-green-900"
+                className="text-green-800 hover:text-green-900"
+                aria-label="Cancel edit mode"
               >
                 Cancel
               </Button>
@@ -604,9 +610,9 @@ export default function PublicSignupPage() {
 
           {submitError && (
             <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 flex items-center justify-between gap-2">
-              <span className="text-sm text-red-700">{submitError}</span>
-              <button type="button" onClick={() => setSubmitError(null)} className="text-red-400 hover:text-red-600 shrink-0">
-                <span className="text-lg leading-none">×</span>
+              <span className="text-sm text-red-800">{submitError}</span>
+              <button type="button" onClick={() => setSubmitError(null)} className="text-red-600 hover:text-red-800 shrink-0" aria-label="Dismiss error message">
+                <span className="text-lg leading-none" aria-hidden="true">×</span>
               </button>
             </div>
           )}
@@ -641,8 +647,9 @@ export default function PublicSignupPage() {
                 const hasOpen = Array.from({ length: 12 }, (_, i) => i + 1).some((m) => m >= currentMonth && !excluded.has(m) && !takenMonths.has(m))
                 return !hasOpen
               })()}
+              aria-label={editMode ? "Update your response" : "Submit signup form"}
             >
-              {submitting ? <Loader2 className="size-4 animate-spin" /> : form.muted ? "Form is Read-Only" : editMode ? "Update Response" : "Submit"}
+              {submitting ? <Loader2 className="size-4 animate-spin" aria-label="Submitting" /> : form.muted ? "Form is Read-Only" : editMode ? "Update Response" : "Submit"}
             </Button>
             {responses.length > 0 && (
               <Button
@@ -651,6 +658,7 @@ export default function PublicSignupPage() {
                 className="flex-shrink-0 bg-white hover:bg-gray-50"
                 style={{ borderColor: colors.primary, color: colors.primary }}
                 onClick={() => window.open(`/signup/${slug}/responses`, "_blank")}
+                aria-label="View all signups in new tab"
               >
                 View All Signups
               </Button>
@@ -746,7 +754,7 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
 
     if (unpickedOptions.length === 0) {
       return (
-        <div className="p-6 text-center text-sm text-gray-500">
+        <div className="p-6 text-center text-sm text-gray-600">
           All items have been claimed!
         </div>
       )
@@ -765,7 +773,7 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
             {unpickedOptions.sort((a, b) => a.label.localeCompare(b.label)).map((opt) => (
               <tr key={opt.value} className="border-b" style={{ borderColor: colors.border }}>
                 <td className="py-2 px-2 text-gray-600">{opt.label}</td>
-                <td className="py-2 px-2 text-center text-gray-500 text-xs">
+                <td className="py-2 px-2 text-center text-gray-600 text-xs">
                   {((opt as { current_capacity?: number }).current_capacity ?? opt.capacity) < 50 ? `0/${(opt as { current_capacity?: number }).current_capacity ?? opt.capacity}` : "Available"}
                 </td>
               </tr>
@@ -785,7 +793,7 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
 
   if (sortedItems.length === 0) {
     return (
-      <div className="p-6 text-center text-sm text-gray-500">
+      <div className="p-6 text-center text-sm text-gray-600">
         No items have been signed up yet.
       </div>
     )
@@ -811,7 +819,7 @@ function ItemsTable({ responses, fields, claimField, colors, showUnpicked }: { r
               <tr key={canonicalValue} className="border-b" style={{ borderColor: colors.border }}>
                 <td className="py-2 px-2 font-medium" style={{ color: colors.textDark }}>{label}</td>
                 <td className="py-2 px-2 text-center">
-                  <span className={`text-xs font-medium ${isFull ? "text-red-600" : "text-gray-600"}`}>
+                  <span className={`text-xs font-medium ${isFull ? "text-red-700" : "text-gray-600"}`}>
                     {currentCapacity && currentCapacity < 50 ? `${totalCount}/${currentCapacity}` : totalCount}
                   </span>
                 </td>
@@ -875,7 +883,7 @@ function ByPersonView({ responses, fields, claimFields, colors }: { responses: R
 
   if (sortedPeople.length === 0) {
     return (
-      <div className="p-6 text-center text-sm text-gray-500">
+      <div className="p-6 text-center text-sm text-gray-600">
         No items have been signed up yet.
       </div>
     )
@@ -1025,7 +1033,7 @@ function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved,
               className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === "all"
                   ? "border-b-2 text-gray-900"
-                  : "text-gray-500 hover:text-gray-700"
+                  : "text-gray-600 hover:text-gray-700"
               }`}
               style={activeTab === "all" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
             >
@@ -1039,7 +1047,7 @@ function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved,
                   className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
                     activeTab === "items"
                       ? "border-b-2 text-gray-900"
-                      : "text-gray-500 hover:text-gray-700"
+                      : "text-gray-600 hover:text-gray-700"
                   }`}
                   style={activeTab === "items" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
                 >
@@ -1051,7 +1059,7 @@ function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved,
                   className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
                     activeTab === "unpicked"
                       ? "border-b-2 text-gray-900"
-                      : "text-gray-500 hover:text-gray-700"
+                      : "text-gray-600 hover:text-gray-700"
                   }`}
                   style={activeTab === "unpicked" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
                 >
@@ -1063,7 +1071,7 @@ function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved,
                   className={`flex-1 px-3 py-2.5 text-sm font-medium transition-colors ${
                     activeTab === "person"
                       ? "border-b-2 text-gray-900"
-                      : "text-gray-500 hover:text-gray-700"
+                      : "text-gray-600 hover:text-gray-700"
                   }`}
                   style={activeTab === "person" ? { borderBottomColor: colors.primary, color: colors.primary } : {}}
                 >
@@ -1145,7 +1153,7 @@ function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved,
       {/* Phone verification dialog */}
       {verifyTarget && (
         <div className="border-t bg-amber-50 p-3 space-y-2">
-          <p className="text-xs text-amber-800 font-medium">Enter the last 4 digits of your phone to confirm removal:</p>
+          <p className="text-xs text-amber-900 font-medium">Enter the last 4 digits of your phone to confirm removal:</p>
           <div className="flex gap-2">
             <input
               type="tel"
@@ -1159,6 +1167,7 @@ function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved,
               type="button"
               onClick={confirmVerify}
               className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+              aria-label="Confirm phone verification"
             >
               Confirm
             </button>
@@ -1166,11 +1175,12 @@ function SignupList({ responses, fields, colors, formId, slug, muted, onRemoved,
               type="button"
               onClick={() => setVerifyTarget(null)}
               className="rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+              aria-label="Cancel verification"
             >
               Cancel
             </button>
           </div>
-          {removeError && <p className="text-xs text-red-600 mt-1">{removeError}</p>}
+          {removeError && <p className="text-xs text-red-700 mt-1">{removeError}</p>}
         </div>
       )}
     </div>
@@ -1219,7 +1229,7 @@ function FieldRenderer({
   const labelEl = (
     <Label className="text-sm font-medium text-gray-700">
       {field.label}
-      {field.required && <span className="text-red-500 ml-0.5">*</span>}
+      {field.required && <span className="text-red-700 ml-0.5">*</span>}
     </Label>
   )
 
@@ -1450,7 +1460,8 @@ function FieldRenderer({
                                   console.error("Failed to update capacity", e)
                                 }
                               }}
-                              className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                              className="text-[11px] font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                              aria-label={`Add slot for ${opt.label}`}
                             >
                               + Add Slot
                             </button>
@@ -1478,7 +1489,8 @@ function FieldRenderer({
                                     console.error("Failed to update capacity", e)
                                   }
                                 }}
-                                className="text-[11px] font-medium text-red-600 hover:text-red-800 hover:underline"
+                                className="text-[11px] font-medium text-red-700 hover:text-red-900 hover:underline"
+                                aria-label={`Reduce slot for ${opt.label}`}
                               >
                                 − Reduce Slot
                               </button>
@@ -1501,7 +1513,8 @@ function FieldRenderer({
                           }
                           onChange(newSelected)
                         }}
-                        className="size-7 rounded border border-gray-300 flex items-center justify-center text-lg font-bold hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="size-7 rounded border border-gray-300 flex items-center justify-center text-lg font-bold hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label={`Decrease quantity for ${opt.label}`}
                       >
                         −
                       </button>
@@ -1554,7 +1567,8 @@ function FieldRenderer({
                           newSelected[opt.value] = currentCount + 1
                           onChange(newSelected)
                         }}
-                        className="size-7 rounded border border-gray-300 flex items-center justify-center text-lg font-bold hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="size-7 rounded border border-gray-300 flex items-center justify-center text-lg font-bold hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label={`Increase quantity for ${opt.label}`}
                       >
                         +
                       </button>
@@ -1591,7 +1605,7 @@ function FieldRenderer({
                     />
                     <span>{opt.label}</span>
                     {taken > 0 && (
-                      <span className={`text-xs ${full ? "text-red-500" : "text-gray-400"}`}>
+                      <span className={`text-xs ${full ? "text-red-700" : "text-gray-600"}`}>
                         {opt.capacity < 50 ? `(${taken}/${opt.capacity})` : `(${taken} signed up)`}
                       </span>
                     )}
@@ -1622,7 +1636,7 @@ function FieldRenderer({
                         }}
                       />
                       <span>{item}</span>
-                      <span className="text-xs text-gray-400">({count} signed up)</span>
+                      <span className="text-xs text-gray-600">({count} signed up)</span>
                     </label>
                 )
               })}
@@ -1657,6 +1671,7 @@ function FieldRenderer({
                     input.value = ""
                   }
                 }}
+                aria-label="Add custom item"
               >
                 Add
               </button>
@@ -1673,7 +1688,7 @@ function FieldRenderer({
                       const newSelected = { ...(selected as Record<string, number>) }
                       delete newSelected[item]
                       onChange(newSelected)
-                    }} className="text-gray-400 hover:text-red-500">
+                    }} className="text-gray-600 hover:text-red-700" aria-label={`Remove ${item}`}>
                       &times;
                     </button>
                   </span>
@@ -1687,7 +1702,7 @@ function FieldRenderer({
                 {(selected as string[]).map((item) => (
                   <span key={item} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
                     {item}
-                    <button type="button" onClick={() => onChange((selected as string[]).filter((v) => v !== item))} className="text-gray-400 hover:text-red-500">
+                    <button type="button" onClick={() => onChange((selected as string[]).filter((v) => v !== item))} className="text-gray-600 hover:text-red-700" aria-label={`Remove ${item}`}>
                       &times;
                     </button>
                   </span>
@@ -1747,16 +1762,16 @@ function FieldRenderer({
               if (isSelected) {
                 className += "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold ring-2 ring-emerald-200"
               } else if (isExcluded) {
-                className += "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                className += "border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed"
                 statusText = "Break"
               } else if (isPast && isTaken) {
-                className += "border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed"
+                className += "border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed"
                 statusText = takenBy || "Done"
               } else if (isPast) {
-                className += "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                className += "border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed"
                 statusText = "Past"
               } else if (isTaken) {
-                className += "border-blue-200 bg-blue-50 text-blue-600 cursor-not-allowed"
+                className += "border-blue-200 bg-blue-50 text-blue-900 cursor-not-allowed"
                 statusText = takenBy || "Taken"
               } else {
                 className += "border-gray-200 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
@@ -1770,6 +1785,8 @@ function FieldRenderer({
                   disabled={isDisabled}
                   className={className}
                   onClick={() => !isDisabled && onChange(isSelected ? 0 : month)}
+                  aria-label={`Select ${m} - ${statusText}`}
+                  aria-pressed={isSelected}
                 >
                   <span className="block font-medium">{m.slice(0, 3)}</span>
                   <span className={`block text-[10px] mt-0.5 ${isSelected ? "text-emerald-600" : ""}`}>
@@ -1881,9 +1898,10 @@ function FieldRenderer({
                     type="button"
                     className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-slate-100 text-left border-b border-gray-100 last:border-b-0"
                     onClick={() => onMemberSelect(m)}
+                    aria-label={`Select ${m.name}${m.city ? ` from ${m.city}` : ''}`}
                   >
                     <span className="font-medium text-gray-900">{m.name}</span>
-                    {m.city && <span className="text-xs text-gray-500">{m.city}</span>}
+                    {m.city && <span className="text-xs text-gray-600">{m.city}</span>}
                   </button>
                 ))}
               </div>
@@ -1937,7 +1955,7 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
         <span className="font-semibold text-sm" style={{ color: colors.textDark }}>{name}</span>
         <div className="flex items-center gap-2">
           {attendees.length > 0 && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-600">
               {attendees.map((a) => `${a.value}`).join("+")}
             </span>
           )}
@@ -1951,10 +1969,10 @@ function ResponseRow({ data, fields, colors, removing, canRemove, onRemove }: { 
               type="button"
               onClick={onRemove}
               disabled={removing}
-              className="text-gray-400 hover:text-red-500 transition-colors p-0.5"
-              title="Remove signup"
+              className="text-gray-600 hover:text-red-700 transition-colors p-0.5"
+              aria-label="Remove signup"
             >
-              {removing ? <Loader2 className="size-3.5 animate-spin" /> : <span className="text-xs">✕</span>}
+              {removing ? <Loader2 className="size-3.5 animate-spin" aria-label="Removing" /> : <span className="text-xs" aria-hidden="true">✕</span>}
             </button>
           )}
         </div>

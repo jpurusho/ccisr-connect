@@ -34,8 +34,9 @@ function EventPill({
     <button
       type="button"
       onClick={onClick}
+      aria-label={`${event.title}, ${event.kind}${event.time ? ', ' + event.time : ''}${isCancelled ? ', cancelled' : ''}${isOnBreak ? ', on break' : ''}`}
       className={cn(
-        "group/pill flex w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-xs transition-all hover:opacity-80",
+        "group/pill flex w-full items-center gap-1.5 rounded-full px-3 py-2 min-h-[44px] text-left text-xs transition-all hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-[0.98]",
         isBirthday && "bg-purple-500 text-white",
         isAnniversary && "bg-amber-500 text-white",
         isDispatch && "border border-dashed",
@@ -83,7 +84,7 @@ function EventPill({
 
 export function WeekView({ days, events, onEventClick, onDayClick, onEditEvent, onCancelInstance }: WeekViewProps) {
   return (
-    <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-border ring-1 ring-border sm:grid-cols-7">
+    <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-border ring-1 ring-border sm:grid-cols-7" role="grid" aria-label="Calendar week view">
       {days.map((day) => {
         const dayEvents = events.filter((e) => isSameDay(e.date, day))
         const today = isToday(day)
@@ -92,7 +93,7 @@ export function WeekView({ days, events, onEventClick, onDayClick, onEditEvent, 
           <div
             key={day.toISOString()}
             className={cn(
-              "group/day flex min-h-[140px] flex-col bg-card p-2 sm:min-h-[180px]",
+              "group/day flex min-h-[180px] flex-col bg-card p-2 sm:min-h-[200px]",
               today && "bg-primary/[0.03]"
             )}
           >
@@ -115,16 +116,17 @@ export function WeekView({ days, events, onEventClick, onDayClick, onEditEvent, 
                 <button
                   type="button"
                   onClick={() => onDayClick(day)}
-                  className="ml-auto flex size-5 items-center justify-center rounded-full text-muted-foreground/40 opacity-0 transition-opacity hover:bg-primary/10 hover:text-primary group-hover/day:opacity-100"
+                  className="ml-auto flex size-8 min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-muted-foreground/40 opacity-0 transition-opacity hover:bg-primary/10 hover:text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover/day:opacity-100 sm:opacity-100 active:scale-95"
                   title="Create event"
+                  aria-label={`Create event on ${format(day, "EEEE, MMMM d")}`}
                 >
-                  <Plus className="size-3" />
+                  <Plus className="size-4" />
                 </button>
               )}
             </div>
 
             {/* Events */}
-            <div className="flex flex-1 flex-col gap-1">
+            <div className="flex flex-1 flex-col gap-2">
               {dayEvents.length === 0 && (
                 <p className="mt-2 text-center text-xs text-muted-foreground/50">
                   No events

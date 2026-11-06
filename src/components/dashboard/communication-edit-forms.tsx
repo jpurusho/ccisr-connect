@@ -1211,7 +1211,7 @@ export function BibleStudyEditForm({
           type="checkbox"
           id="bs-use-subject-as-title"
           checked={data.useSubjectAsTitle ?? false}
-          onChange={(e) => set("useSubjectAsTitle" as any, e.target.checked)}
+          onChange={(e) => set("useSubjectAsTitle", e.target.checked)}
           className="h-4 w-4 rounded border-gray-300"
         />
         <Label htmlFor="bs-use-subject-as-title" className="text-sm text-muted-foreground cursor-pointer">
@@ -1331,7 +1331,7 @@ export function WomensStudyEditForm({
           type="checkbox"
           id="ws-use-subject-as-title"
           checked={data.useSubjectAsTitle ?? false}
-          onChange={(e) => set("useSubjectAsTitle" as any, e.target.checked)}
+          onChange={(e) => set("useSubjectAsTitle", e.target.checked)}
           className="h-4 w-4 rounded border-gray-300"
         />
         <Label htmlFor="ws-use-subject-as-title" className="text-sm text-muted-foreground cursor-pointer">

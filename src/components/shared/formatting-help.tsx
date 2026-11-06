@@ -55,7 +55,7 @@ export function FormattingHelp() {
                 {ex.code}
               </code>
               {ex.alt && (
-                <code className="block text-xs bg-gray-50 dark:bg-gray-900 p-2.5 rounded border border-gray-200 dark:border-gray-800 font-mono break-all text-gray-600 dark:text-gray-400">
+                <code className="block text-xs bg-gray-50 dark:bg-gray-900 p-2.5 rounded border border-gray-200 dark:border-gray-800 font-mono break-all text-gray-700 dark:text-gray-400">
                   {ex.alt}
                 </code>
               )}

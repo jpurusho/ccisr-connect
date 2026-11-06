@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { ensureCsrfToken } from '@/lib/csrf'
 
 const PUBLIC_ROUTES = ['/login', '/unauthorized', '/api/auth/callback', '/api/cards/preview', '/api/dispatch/cron', '/api/dispatch/send', '/signup', '/api/signup']
 
@@ -28,7 +29,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  return supabaseResponse
+  // Generate CSRF token for authenticated sessions
+  const { response } = await ensureCsrfToken(request, supabaseResponse)
+  return response
 }
 
 export const config = {

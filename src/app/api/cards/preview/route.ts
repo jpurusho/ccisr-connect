@@ -9,6 +9,8 @@ import {
 } from "@/lib/email/card-builder";
 import { rateLimitByIp } from "@/lib/rate-limit";
 import { ApiError } from "@/lib/api-response";
+import { cardPreviewSchema, validateRequest } from "@/lib/validation-schemas";
+import type { CardType } from "@/types/api";
 
 export async function GET(request: NextRequest) {
   // Rate limiting: 30 requests per hour per IP
@@ -23,7 +25,28 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const type = searchParams.get("type") || "birthday";
+
+  // Validate input parameters
+  const params = {
+    type: searchParams.get("type") || "birthday",
+    week: searchParams.get("week") || undefined,
+    date: searchParams.get("date") || undefined,
+    time: searchParams.get("time") || undefined,
+    topic: searchParams.get("topic") || undefined,
+    host: searchParams.get("host") || undefined,
+    address: searchParams.get("address") || undefined,
+    phone: searchParams.get("phone") || undefined,
+    zoom: searchParams.get("zoom") || undefined,
+    signup: searchParams.get("signup") || undefined,
+    dinner: searchParams.get("dinner") || undefined,
+  }
+
+  const validation = validateRequest(cardPreviewSchema, params)
+  if (!validation.success) {
+    return ApiError.badRequest(validation.error)
+  }
+
+  const { type } = validation.data;
 
   let html = "";
 

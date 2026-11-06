@@ -1,15 +1,34 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import nodemailer from "nodemailer"
 import { buildFormSchema, type SignupFieldConfig } from "@/lib/signup/field-registry"
 import { sanitizeFormData } from "@/lib/signup/sanitize"
 import { ApiError, successResponse, StatusCode } from "@/lib/api-response"
-import { getIpHash } from "@/lib/rate-limit"
+import { getIpHash, rateLimitByIp } from "@/lib/rate-limit"
+import { requireValidOrigin } from "@/lib/csrf"
+import type { SmtpConfig } from "@/types/api"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(req: NextRequest) {
+  // CSRF protection via Origin/Referer validation
+  const originError = requireValidOrigin(req)
+  if (originError) {
+    return originError
+  }
+
+  // Global rate limiting: 30 submissions per hour per IP (across all forms)
+  const globalRateLimit = rateLimitByIp(req, {
+    maxRequests: 30,
+    windowMs: 60 * 60 * 1000,
+    namespace: "signup-submit-global",
+  })
+
+  if (!globalRateLimit.allowed) {
+    return ApiError.tooManyRequests("Too many signup submissions from your IP address. Please try again later.")
+  }
+
   const contentLength = parseInt(req.headers.get("content-length") || "0", 10)
   if (contentLength > 50_000) {
     return ApiError.payloadTooLarge()
@@ -232,11 +251,8 @@ export async function POST(req: NextRequest) {
   return successResponse({ success: true }, StatusCode.CREATED)
 }
 
-interface SmtpRow { host: string; port: number; username: string; encrypted_password: string; from_name: string | null; from_email: string }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function notifyAdmin(
-  supabase: any,
+  supabase: SupabaseClient,
   formTitle: string,
   data: Record<string, unknown>,
   fields: SignupFieldConfig[],
@@ -248,7 +264,7 @@ async function notifyAdmin(
     .select("*")
     .eq("id", smtpConfigId)
     .single()
-  const smtp = smtpRaw as unknown as SmtpRow | null
+  const smtp = smtpRaw as unknown as SmtpConfig | null
   if (!smtp) return
 
   // Get recipients: from mailing list or fallback to admins

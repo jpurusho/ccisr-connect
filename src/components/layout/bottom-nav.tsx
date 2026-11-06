@@ -54,7 +54,7 @@ export function BottomNav() {
 
   return (
     <nav className="lg:hidden border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="flex items-center justify-around h-16 px-1">
+      <div className="flex items-center justify-around px-1 py-1">
         {navItems.map((item) => {
           const isActive = item.href === "/dashboard"
             ? pathname === "/dashboard"
@@ -70,14 +70,14 @@ export function BottomNav() {
               aria-label={item.title}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 min-w-[64px] h-full rounded-lg transition-colors",
+                "flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[56px] rounded-lg transition-colors",
                 "active:scale-95 active:bg-accent/50",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className="h-5 w-5" aria-hidden="true" />
+              <Icon className="h-6 w-6" aria-hidden="true" />
               <span className="text-[10px] font-medium">{item.title}</span>
             </Link>
           )

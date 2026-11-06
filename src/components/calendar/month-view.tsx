@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef, useEffect } from "react"
 import {
   format,
   isSameDay,
@@ -10,6 +11,8 @@ import {
   startOfWeek,
   endOfWeek,
   eachDayOfInterval,
+  addDays,
+  subDays,
 } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Plus } from "lucide-react"
@@ -47,6 +50,49 @@ export function MonthView({
   const calStart = startOfWeek(monthStart, { weekStartsOn: 0 })
   const calEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
   const days = eachDayOfInterval({ start: calStart, end: calEnd })
+  const gridRef = useRef<HTMLDivElement>(null)
+
+  // Handle keyboard navigation for calendar grid
+  const handleKeyDown = (e: React.KeyboardEvent, day: Date, index: number) => {
+    let targetIndex = index
+    let handled = false
+
+    switch (e.key) {
+      case "ArrowLeft":
+        targetIndex = index - 1
+        handled = true
+        break
+      case "ArrowRight":
+        targetIndex = index + 1
+        handled = true
+        break
+      case "ArrowUp":
+        targetIndex = index - 7
+        handled = true
+        break
+      case "ArrowDown":
+        targetIndex = index + 7
+        handled = true
+        break
+      case "Home":
+        targetIndex = Math.floor(index / 7) * 7
+        handled = true
+        break
+      case "End":
+        targetIndex = Math.floor(index / 7) * 7 + 6
+        handled = true
+        break
+    }
+
+    if (handled) {
+      e.preventDefault()
+      // Find the target button and focus it
+      const buttons = gridRef.current?.querySelectorAll('button[data-day-button]')
+      if (buttons && targetIndex >= 0 && targetIndex < buttons.length) {
+        (buttons[targetIndex] as HTMLButtonElement).focus()
+      }
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-xl ring-1 ring-border">
@@ -63,8 +109,8 @@ export function MonthView({
       </div>
 
       {/* Day grid */}
-      <div className="grid grid-cols-7 gap-px bg-border">
-        {days.map((day) => {
+      <div ref={gridRef} className="grid grid-cols-7 gap-px bg-border" role="grid" aria-label="Calendar month view">
+        {days.map((day, index) => {
           const inMonth = isSameMonth(day, currentDate)
           const today = isToday(day)
           const dayEvents = events.filter((e) => isSameDay(e.date, day))
@@ -73,13 +119,21 @@ export function MonthView({
           const visibleEvents = dayEvents.slice(0, maxDots)
           const overflow = dayEvents.length - maxDots
 
+          const dateLabel = format(day, "EEEE, MMMM d, yyyy")
+          const eventsLabel = dayEvents.length > 0 ? `, ${dayEvents.length} event${dayEvents.length > 1 ? 's' : ''}` : ''
+
           return (
             <button
               key={day.toISOString()}
               type="button"
+              data-day-button
               onClick={() => onDayClick(day)}
+              onKeyDown={(e) => handleKeyDown(e, day, index)}
+              aria-label={`${dateLabel}${eventsLabel}`}
+              aria-current={today ? "date" : undefined}
+              aria-selected={isSelected}
               className={cn(
-                "group relative flex min-h-[72px] flex-col items-start bg-card p-1.5 text-left transition-colors hover:bg-muted/40 sm:min-h-[88px] sm:p-2",
+                "group relative flex min-h-[88px] flex-col items-start bg-card p-2 text-left transition-colors hover:bg-muted/40 active:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:z-10 sm:min-h-[100px] sm:p-3",
                 !inMonth && "bg-muted/20",
                 isSelected && "ring-2 ring-inset ring-primary/40"
               )}
@@ -87,7 +141,7 @@ export function MonthView({
               {/* Day number */}
               <span
                 className={cn(
-                  "flex size-6 items-center justify-center rounded-full text-xs font-medium sm:size-7 sm:text-sm",
+                  "flex size-7 items-center justify-center rounded-full text-sm font-medium sm:size-8 sm:text-base",
                   !inMonth && "text-muted-foreground/40",
                   inMonth && "text-foreground",
                   today &&
@@ -104,12 +158,14 @@ export function MonthView({
                     key={event.id}
                     role="button"
                     tabIndex={0}
+                    aria-label={`${event.title}, ${event.kind}${event.time ? ', ' + event.time : ''}`}
                     onClick={(e) => {
                       e.stopPropagation()
                       onEventClick(event)
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
                         e.stopPropagation()
                         onEventClick(event)
                       }
@@ -144,12 +200,12 @@ export function MonthView({
                 ))}
 
                 {/* Mobile: just show dots */}
-                <div className="flex items-center gap-0.5 sm:hidden">
+                <div className="flex items-center gap-1 sm:hidden">
                   {visibleEvents.map((event) => (
                     <span
                       key={event.id}
                       className={cn(
-                        "size-1.5 rounded-full",
+                        "size-2 rounded-full",
                         dotColor(event),
                         event.kind === "dispatch" && "ring-1 ring-current"
                       )}
@@ -201,7 +257,8 @@ export function DayDetailPanel({
         <button
           type="button"
           onClick={onClose}
-          className="text-xs text-muted-foreground hover:text-foreground"
+          aria-label="Close day detail panel"
+          className="text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-2 py-1"
         >
           Close
         </button>
@@ -218,8 +275,9 @@ export function DayDetailPanel({
                 key={event.id}
                 type="button"
                 onClick={() => onEventClick(event)}
+                aria-label={`${event.title}, ${event.kind}${event.time ? ', ' + event.time : ''}`}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60",
+                  "flex w-full items-center gap-2 rounded-lg px-3 py-3 min-h-[48px] text-left text-sm transition-colors hover:bg-muted/60 active:scale-[0.98]",
                   event.kind === "birthday" &&
                     "bg-purple-50 dark:bg-purple-950/20",
                   event.kind === "anniversary" &&
@@ -280,9 +338,10 @@ export function DayDetailPanel({
           <button
             type="button"
             onClick={() => onCreateEvent(day)}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            aria-label={`Create new event on ${format(day, "MMMM d, yyyy")}`}
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-3 min-h-[48px] text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
-            <Plus className="size-3" />
+            <Plus className="size-4" />
             New Event
           </button>
         )}

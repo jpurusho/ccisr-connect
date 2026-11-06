@@ -58,26 +58,29 @@ export function ThemeToggle() {
     <div className="relative" ref={ref}>
       <Button
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         onClick={() => setOpen((prev) => !prev)}
         title="Toggle theme"
+        className="min-h-[44px] min-w-[44px]"
       >
         {icon}
         <span className="sr-only">Toggle theme</span>
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-40 rounded-lg border bg-popover p-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-lg border bg-popover p-1 shadow-lg">
           <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Light</p>
           {THEMES.filter((t) => t.group === "light").map((t) => {
             const Icon = t.icon
             return (
               <button
                 key={t.value}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent ${theme === t.value ? "bg-accent font-medium" : ""}`}
+                className={`flex w-full items-center gap-2 rounded-md px-3 py-2.5 min-h-[44px] text-sm transition-colors hover:bg-accent active:scale-[0.98] ${theme === t.value ? "bg-accent font-medium" : ""}`}
                 onClick={() => { setTheme(t.value); setOpen(false) }}
+                aria-label={`Switch to ${t.label} theme`}
+                aria-current={theme === t.value ? "true" : undefined}
               >
-                <Icon className="size-3.5" />
+                <Icon className="size-4" aria-hidden="true" />
                 {t.label}
               </button>
             )
@@ -89,10 +92,12 @@ export function ThemeToggle() {
             return (
               <button
                 key={t.value}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent ${theme === t.value ? "bg-accent font-medium" : ""}`}
+                className={`flex w-full items-center gap-2 rounded-md px-3 py-2.5 min-h-[44px] text-sm transition-colors hover:bg-accent active:scale-[0.98] ${theme === t.value ? "bg-accent font-medium" : ""}`}
                 onClick={() => { setTheme(t.value); setOpen(false) }}
+                aria-label={`Switch to ${t.label} theme`}
+                aria-current={theme === t.value ? "true" : undefined}
               >
-                <Icon className="size-3.5" />
+                <Icon className="size-4" aria-hidden="true" />
                 {t.label}
               </button>
             )

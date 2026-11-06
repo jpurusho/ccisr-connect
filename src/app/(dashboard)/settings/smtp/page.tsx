@@ -292,7 +292,7 @@ export default function SmtpConfigPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                          className="h-7 gap-1 text-green-700 hover:text-green-800 hover:bg-green-50 dark:hover:bg-green-950"
                           disabled={testingId === config.id || !config.is_active}
                           onClick={() => handleTest(config.id, config.from_email)}
                           title={!config.is_active ? "Enable account to test" : "Send test email"}
@@ -478,7 +478,7 @@ export default function SmtpConfigPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="gap-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                    className="gap-1.5 text-green-700 hover:text-green-800 hover:bg-green-50 dark:hover:bg-green-950"
                     disabled={testingId === editingConfig.id}
                     onClick={() => handleTest(editingConfig.id, editingConfig.from_email)}
                   >

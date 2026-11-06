@@ -123,7 +123,7 @@ export default function SignupResponsesPage() {
   if (error || !form) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-red-600">{error || "Form not found"}</div>
+        <div className="text-red-700">{error || "Form not found"}</div>
       </div>
     )
   }
@@ -350,7 +350,7 @@ export default function SignupResponsesPage() {
                 </h2>
                 <p className="text-xs text-gray-500 mt-1">Track removals and edits</p>
               </div>
-              <span className="text-gray-400 text-xl">{showAuditLogs ? "−" : "+"}</span>
+              <span className="text-gray-600 text-xl">{showAuditLogs ? "−" : "+"}</span>
             </button>
 
             {showAuditLogs && (
@@ -399,7 +399,7 @@ export default function SignupResponsesPage() {
                                 {personName}
                               </span>
                               {wasMemberLinked && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-900">
                                   Member
                                 </span>
                               )}
@@ -441,7 +441,7 @@ export default function SignupResponsesPage() {
                                   return (
                                     <div key={fieldId}>
                                       <span className="font-medium">{change.label}:</span>{" "}
-                                      <span className="line-through text-gray-400">{fromText}</span> → <span className="text-green-700">{toText}</span>
+                                      <span className="line-through text-gray-600">{fromText}</span> → <span className="text-green-800">{toText}</span>
                                     </div>
                                   )
                                 })}
@@ -551,7 +551,7 @@ export default function SignupResponsesPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium" style={{ color: colors.textDark }}>{name}</span>
                             {isMemberLinked && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-900">
                                 Member
                               </span>
                             )}
@@ -564,7 +564,7 @@ export default function SignupResponsesPage() {
                                 {MONTHS[month - 1]}
                               </span>
                             ) : (
-                              <span className="text-gray-400">—</span>
+                              <span className="text-gray-600">—</span>
                             )}
                           </td>
                         )}

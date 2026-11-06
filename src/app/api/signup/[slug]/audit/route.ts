@@ -42,7 +42,7 @@ export async function GET(
 
   // Filter by formId in the changes JSONB field
   const relevantLogs = (auditLogs || []).filter(
-    (log) => log.changes && (log.changes as any).formId === form.id
+    (log) => log.changes && (log.changes as { formId?: string }).formId === form.id
   )
 
   return NextResponse.json({ logs: relevantLogs })
