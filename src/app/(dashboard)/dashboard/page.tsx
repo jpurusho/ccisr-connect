@@ -780,6 +780,7 @@ export default function DashboardPage() {
         templateDefaultsRes,
         eventTypesRes,
         composedInstancesRes,
+        recentInstancesRes,
       ] = await Promise.all([
         // Stats
         supabase
@@ -911,6 +912,15 @@ export default function DashboardPage() {
           .eq("is_active", true)
           .or(`week_start.eq.${wkSunISO},and(is_recurring.eq.true,week_start.lte.${wkSunISO})`)
           .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; subject_prefix: string | null; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null; updated_at: string }[]>(),
+
+        // Most recent instances (for subject/prefix persistence when no current-week instance)
+        supabase
+          .from("composed_instances")
+          .select("template_type, subject, subject_prefix")
+          .eq("is_active", true)
+          .order("updated_at", { ascending: false })
+          .limit(20)
+          .returns<{ template_type: string; subject: string; subject_prefix: string | null }[]>(),
 
       ])
 
@@ -2067,6 +2077,19 @@ export default function DashboardPage() {
         const ci = composedMap[ct]
         if (ci?.subject) resolvedSubjects[ct] = ci.subject
         if (ci?.subject_prefix) resolvedPrefixes[ct] = ci.subject_prefix
+      }
+
+      // Fallback: use most recent instance's subject if no current-week instance exists
+      // This makes subject customizations persist across weeks
+      const recentInstances = recentInstancesRes.data ?? []
+      for (const ct of commTypeKeys) {
+        if (!resolvedSubjects[ct] && !resolvedPrefixes[ct]) {
+          const recent = recentInstances.find(ri => ri.template_type === ct)
+          if (recent) {
+            if (recent.subject) resolvedSubjects[ct] = recent.subject
+            if (recent.subject_prefix) resolvedPrefixes[ct] = recent.subject_prefix
+          }
+        }
       }
 
       // ---- Match dispatches to communication types (count all, keep latest) ----
