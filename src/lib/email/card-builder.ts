@@ -963,8 +963,10 @@ export function buildGenericEventCard(
 
         const details: { label: string; value: string }[] = [];
         if (loc.hostName) details.push({ label: "Host", value: loc.hostName });
-        const addrParts = [loc.address, loc.city].filter(Boolean).join("<br/>");
-        if (addrParts) details.push({ label: "Where", value: addrParts });
+        // Only add city if it's not already in the address
+        const showCity = loc.city && loc.address && !loc.address.toLowerCase().includes(loc.city.toLowerCase());
+        const addrValue = loc.address + (showCity ? `<br/>${loc.city}` : "");
+        if (addrValue) details.push({ label: "Where", value: addrValue });
         if (loc.phone) details.push({ label: "Contact", value: loc.phone });
 
         if (details.length === 0) return "";
