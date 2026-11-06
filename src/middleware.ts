@@ -2,10 +2,19 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import { ensureCsrfToken } from '@/lib/csrf'
 
-const PUBLIC_ROUTES = ['/login', '/unauthorized', '/api/auth/callback', '/api/cards/preview', '/api/dispatch/cron', '/api/dispatch/send', '/signup', '/api/signup']
+const PUBLIC_ROUTES = ['/login', '/unauthorized', '/api/auth/callback', '/api/cards/preview', '/api/dispatch/cron', '/signup', '/api/signup']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Check if this is a server-to-server call (cron/scheduled sends)
+  const serverSecret = request.headers.get("x-server-secret")
+  const isServerCall = serverSecret && serverSecret === process.env.CRON_SECRET
+
+  // Server-to-server calls bypass all middleware checks
+  if (isServerCall) {
+    return NextResponse.next()
+  }
 
   // Allow public routes through without auth check
   if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {

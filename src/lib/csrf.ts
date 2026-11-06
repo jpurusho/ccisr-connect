@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 const CSRF_TOKEN_LENGTH = 32
-const CSRF_COOKIE_NAME = "csrf_token"
+const CSRF_COOKIE_NAME = "csrf-token" // Must match client-csrf.ts
 const CSRF_HEADER_NAME = "x-csrf-token"
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
 
@@ -36,7 +36,7 @@ export async function setCsrfCookie(response: NextResponse, token: string): Prom
   const expires = new Date(Date.now() + TOKEN_EXPIRY_MS)
 
   response.cookies.set(CSRF_COOKIE_NAME, hashed, {
-    httpOnly: true,
+    httpOnly: false, // Must be readable by JavaScript for double-submit pattern
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
