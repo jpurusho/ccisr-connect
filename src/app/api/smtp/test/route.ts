@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import nodemailer from "nodemailer"
 import { ApiError, successResponse } from "@/lib/api-response"
-import { verifyAdmin } from "@/lib/auth-checks"
+import { verifyAdminFromCookies } from "@/lib/auth-checks"
 import { requireCsrfToken } from "@/lib/csrf"
 import type { SmtpConfig } from "@/types/api"
 
@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
     return csrfError
   }
 
-  // Verify admin authorization
-  const auth = await verifyAdmin(req)
+  // Verify admin authorization from cookies (browser request)
+  const auth = await verifyAdminFromCookies()
   if (!auth.authorized) {
     return auth.error
   }

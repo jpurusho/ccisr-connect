@@ -5,7 +5,7 @@ import { rateLimitByIp } from "@/lib/rate-limit"
 import { ApiError, successResponse } from "@/lib/api-response"
 import { dispatchSendSchema, validateRequest } from "@/lib/validation-schemas"
 import { requireCsrfToken } from "@/lib/csrf"
-import { verifyAdmin } from "@/lib/auth-checks"
+import { verifyAdminFromCookies } from "@/lib/auth-checks"
 import type { EmailRecipients, SmtpConfig, RecipientType } from "@/types/api"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   // Verify admin authorization (only for browser-based requests)
   // Server calls are already authenticated via CRON_SECRET
   if (!isServerCall) {
-    const auth = await verifyAdmin(req)
+    const auth = await verifyAdminFromCookies()
     if (!auth.authorized) {
       return auth.error
     }

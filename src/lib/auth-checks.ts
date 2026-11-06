@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 import { ApiError } from "./api-response"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -89,6 +90,68 @@ export async function verifySuperAdmin(req: NextRequest): Promise<AuthResult> {
     return {
       authorized: false,
       error: ApiError.forbidden("Super admin access required"),
+    }
+  }
+
+  return auth
+}
+
+/**
+ * Verify browser-based authentication from cookies (for browser requests).
+ * This is for API routes called from the frontend that use cookie-based auth.
+ */
+export async function verifyAuthFromCookies(): Promise<AuthResult> {
+  try {
+    const supabase = await createServerClient()
+    const { data: { user }, error: userErr } = await supabase.auth.getUser()
+
+    if (userErr || !user) {
+      return {
+        authorized: false,
+        error: ApiError.unauthorized("Not authenticated"),
+      }
+    }
+
+    // Fetch user role from app_users table
+    const { data: appUser } = await supabase
+      .from("app_users")
+      .select("role, is_active")
+      .eq("id", user.id)
+      .single()
+
+    if (!appUser || !appUser.is_active) {
+      return {
+        authorized: false,
+        error: ApiError.forbidden("User is not active"),
+      }
+    }
+
+    return {
+      authorized: true,
+      userId: user.id,
+      role: appUser.role as string,
+    }
+  } catch {
+    return {
+      authorized: false,
+      error: ApiError.unauthorized("Authentication failed"),
+    }
+  }
+}
+
+/**
+ * Verify the browser user is an admin (uses cookie-based auth).
+ */
+export async function verifyAdminFromCookies(): Promise<AuthResult> {
+  const auth = await verifyAuthFromCookies()
+  if (!auth.authorized) {
+    return auth
+  }
+
+  if (auth.role !== "super_admin" && auth.role !== "admin") {
+    return {
+      authorized: false,
+      error: ApiError.forbidden("Admin access required"),
     }
   }
 

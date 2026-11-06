@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { verifyAdmin } from "@/lib/auth-checks"
+import { verifyAdminFromCookies } from "@/lib/auth-checks"
 import type { SignupCapacityUpdateRequest } from "@/types/api"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(req: NextRequest) {
-  // Verify admin authorization
-  const auth = await verifyAdmin(req)
+  // Verify admin authorization from cookies (browser request)
+  const auth = await verifyAdminFromCookies()
   if (!auth.authorized) {
     return auth.error
   }
