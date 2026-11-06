@@ -365,7 +365,11 @@ export default function EventTypesPage() {
               <Label>Linked Template</Label>
               <Select value={formTemplateId || "none"} onValueChange={(v) => setFormTemplateId(v === "none" ? "" : (v ?? ""))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="None" />
+                  <SelectValue>
+                    {formTemplateId && formTemplateId !== "none"
+                      ? templates.find((tp) => tp.id === formTemplateId)?.name || "None"
+                      : "None"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
