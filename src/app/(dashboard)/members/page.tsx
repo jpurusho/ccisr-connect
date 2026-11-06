@@ -272,6 +272,7 @@ function MembersPageContent() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="individual">Individual</SelectItem>
             <SelectItem value="husband">Husband</SelectItem>
             <SelectItem value="wife">Wife</SelectItem>
             <SelectItem value="child">Child</SelectItem>
