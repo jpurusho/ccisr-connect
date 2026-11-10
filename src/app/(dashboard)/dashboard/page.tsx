@@ -3514,6 +3514,13 @@ export default function DashboardPage() {
     ]
   }, [bulletinForm])
 
+  const shoeboxMinistrySummary = useMemo(() => {
+    return [
+      `Due: ${shoeboxMinistryForm.dueDate}`,
+      shoeboxMinistryForm.onlineLink ? "Online builder link included" : "",
+    ].filter(Boolean)
+  }, [shoeboxMinistryForm])
+
   // ---- Error state ----
   if (error) {
     return (
@@ -3613,6 +3620,7 @@ export default function DashboardPage() {
               womens_study: womensStudyForm.date !== "No study this week",
               prayer_meeting: !!prayerMeetingForm.date && prayerMeetingForm.date !== "",
               bulletin: true,
+              shoebox_ministry: !!shoeboxMinistryForm.dueDate,
             }
 
             const cardTitles: Record<CommType, string> = {
@@ -3622,6 +3630,7 @@ export default function DashboardPage() {
               womens_study: "Women's Study",
               prayer_meeting: "Prayer Meeting",
               bulletin: "Weekly Bulletin",
+              shoebox_ministry: "Shoebox Ministry",
             }
 
             const shortSummaries: Record<CommType, string> = {
@@ -3641,6 +3650,7 @@ export default function DashboardPage() {
                 ? `${prayerMeetingForm.date} at ${prayerMeetingForm.time}`
                 : "Not scheduled",
               bulletin: `${bulletinForm.birthdays.length + bulletinForm.anniversaries.length + bulletinForm.events.length} items`,
+              shoebox_ministry: shoeboxMinistryForm.dueDate || "No due date set",
             }
 
             const fullSummaries: Record<CommType, string[]> = {
@@ -3650,6 +3660,7 @@ export default function DashboardPage() {
               womens_study: womensStudySummary,
               prayer_meeting: prayerMeetingSummary,
               bulletin: bulletinSummary,
+              shoebox_ministry: shoeboxMinistrySummary,
             }
 
             const links: Record<CommType, { label: string; url: string }[]> = {
@@ -3665,6 +3676,10 @@ export default function DashboardPage() {
                 ...(prayerMeetingForm.resourceLinks ?? []).filter((l) => l.url),
               ],
               bulletin: bulletinForm.resourceLinks.filter((l) => l.url),
+              shoebox_ministry: [
+                ...(shoeboxMinistryForm.onlineLink ? [{ label: "Build a Shoebox Online", url: shoeboxMinistryForm.onlineLink }] : []),
+                ...(shoeboxMinistryForm.resourceLinks ?? []).filter((l) => l.url),
+              ],
             }
 
             const editForms: Record<CommType, React.ReactNode> = {
