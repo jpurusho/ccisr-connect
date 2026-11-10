@@ -33,12 +33,12 @@ export function ShoeboxMinistryTemplateForm({ data, onChange, styleSettings }: S
           placeholder="https://build-a-shoebox.samaritanspurse.org/..."
         />
       </Field>
-      <Field label="Gift Suggestions PDF Path" htmlFor="sbx-pdf" hint="Path to gift suggestions PDF for attachment">
+      <Field label="Gift Suggestions PDF Link" htmlFor="sbx-pdf" hint="Link to gift suggestions PDF (Google Drive, Dropbox, etc.)">
         <Input
           id="sbx-pdf"
           value={data.pdfPath || ""}
           onChange={(e) => onChange((prev) => ({ ...prev, pdfPath: e.target.value }))}
-          placeholder="/Users/.../2026-Gift-Suggestions.pdf"
+          placeholder="https://drive.google.com/file/d/..."
         />
       </Field>
       <Field label="Reminder Message" htmlFor="sbx-msg" hint="Main message body">

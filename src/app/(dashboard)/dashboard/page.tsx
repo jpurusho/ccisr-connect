@@ -550,7 +550,7 @@ export default function DashboardPage() {
   const [shoeboxMinistryForm, setShoeboxMinistryForm] = useState<ShoeboxMinistryFormData>({
     dueDate: "Sunday, November 15th",
     onlineLink: "https://build-a-shoebox.samaritanspurse.org/view/3e945c78-8c3d-4d1d-99fc-62883ef061f1",
-    pdfPath: "/Users/jpurshot/Downloads/2026-Gift-Suggestions.pdf",
+    pdfPath: "https://drive.google.com/file/d/1msETWeHPTpBlrgEBBn_d4hZ1OuhdFIAV/view?usp=sharing",
     resourceLinks: [],
     customSections: [],
     message: "",

@@ -1960,12 +1960,12 @@ export function ShoeboxMinistryEditForm({
           placeholder="https://build-a-shoebox.samaritanspurse.org/..."
         />
       </Field>
-      <Field label="Gift Suggestions PDF Path" htmlFor="sbx-pdf">
+      <Field label="Gift Suggestions PDF Link" htmlFor="sbx-pdf">
         <Input
           id="sbx-pdf"
           value={data.pdfPath}
           onChange={(e) => set("pdfPath", e.target.value)}
-          placeholder="/path/to/2026-Gift-Suggestions.pdf"
+          placeholder="https://drive.google.com/file/d/..."
         />
       </Field>
     </div>

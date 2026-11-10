@@ -874,7 +874,7 @@ export function buildShoeboxMinistryCard(data: ShoeboxMinistryCardData, style?: 
     : "";
 
   const pdfNoteHtml = data.pdfPath
-    ? `<p style="margin:16px 0 0;padding:12px 16px;background:${greenLight};border:1.5px solid #A7F3D0;border-radius:8px;font-size:${sz.body - 1}px;color:#065F46;line-height:1.6;text-align:center;box-shadow:0 0 8px rgba(5,150,105,0.15)">📎 <strong>Gift Suggestions PDF attached</strong> — Ideas for age-appropriate gifts</p>`
+    ? `<p style="margin:16px 0 0;padding:12px 16px;background:${greenLight};border:1.5px solid #A7F3D0;border-radius:8px;font-size:${sz.body - 1}px;color:#065F46;line-height:1.6;text-align:center;box-shadow:0 0 8px rgba(5,150,105,0.15)">📎 <strong><a href="${data.pdfPath}" style="color:#065F46;text-decoration:underline" target="_blank">Gift Suggestions PDF</a></strong> — Ideas for age-appropriate gifts</p>`
     : "";
 
   const content =
