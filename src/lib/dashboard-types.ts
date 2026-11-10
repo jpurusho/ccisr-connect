@@ -7,6 +7,7 @@ export type CommType =
   | "womens_study"
   | "prayer_meeting"
   | "bulletin"
+  | "shoebox_ministry"
 
 export function inferCommType(name: string): CommType | null {
   const n = name.toLowerCase()
@@ -16,6 +17,7 @@ export function inferCommType(name: string): CommType | null {
   if (n.includes("birthday")) return "birthday"
   if (n.includes("anniversary")) return "anniversary"
   if (n.includes("bulletin")) return "bulletin"
+  if (n.includes("shoebox") || n.includes("operation christmas")) return "shoebox_ministry"
   return null
 }
 
@@ -51,6 +53,7 @@ export const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> =
   womens_study: (s) => /women.*(?:bible|study)/i.test(s),
   prayer_meeting: (s) => /prayer/i.test(s),
   bulletin: (s) => /bulletin/i.test(s),
+  shoebox_ministry: (s) => /shoebox|operation christmas child/i.test(s),
 }
 
 export function formatRelativeTime(isoStr: string | null | undefined): string | null {

@@ -46,6 +46,7 @@ import {
   Send,
   X,
   CalendarDays,
+  Gift,
 } from "lucide-react"
 import { getIconComponent } from "@/components/ui/icon-picker"
 import { createClient } from "@/lib/supabase/client"
@@ -57,6 +58,7 @@ import {
   buildWomensStudyCard,
   buildPrayerMeetingCard,
   buildBulletinCard,
+  buildShoeboxMinistryCard,
   buildCustomCard,
   buildGenericEventCard,
   buildStyleContext,
@@ -119,12 +121,14 @@ import {
   WomensStudyEditForm,
   PrayerMeetingEditForm,
   BulletinEditForm,
+  ShoeboxMinistryEditForm,
   type BirthdayFormData,
   type AnniversaryFormData,
   type BibleStudyFormData,
   type WomensStudyFormData,
   type PrayerMeetingFormData,
   type BulletinFormData,
+  type ShoeboxMinistryFormData,
   type BaseFormData,
   CustomSectionsEditor,
   ResourceLinksEditor,
@@ -298,6 +302,7 @@ const BUILTIN_TEMPLATES: { type: CommType; label: string; color: string; icon: t
   { type: "bible_study", label: "Bible Study", color: "#0D9488", icon: BookOpen },
   { type: "womens_study", label: "Women's Study", color: "#DB2777", icon: Users },
   { type: "prayer_meeting", label: "Prayer Meeting", color: "#059669", icon: HandHelping },
+  { type: "shoebox_ministry", label: "Shoebox Ministry", color: "#DC2626", icon: Gift },
 ]
 
 const BUILTIN_LABEL: Record<CommType, string> = Object.fromEntries(BUILTIN_TEMPLATES.map((t) => [t.type, t.label])) as Record<CommType, string>
@@ -415,6 +420,7 @@ export default function DashboardPage() {
     womens_study: "womens_study",
     prayer_meeting: "prayer_meeting",
     bulletin: "bulletin",
+    shoebox_ministry: "Shoebox Ministry",
   })
   const [commTypeIcons, setCommTypeIcons] = useState<Partial<Record<CommType, string>>>({})
   const [templateStyles, setTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
@@ -444,6 +450,7 @@ export default function DashboardPage() {
     womens_study: null,
     prayer_meeting: null,
     bulletin: null,
+    shoebox_ministry: null,
   })
 
   // ---- Form state for each communication ----
@@ -531,6 +538,19 @@ export default function DashboardPage() {
     anniversaries: [],
     helpers: [],
     events: [],
+    resourceLinks: [],
+    customSections: [],
+    message: "",
+    headerTitle: "",
+    headerSubtitle: "",
+    headerEmoji: "",
+    primaryColor: "",
+    footerVerse: "",
+  })
+  const [shoeboxMinistryForm, setShoeboxMinistryForm] = useState<ShoeboxMinistryFormData>({
+    dueDate: "Sunday, November 15th",
+    onlineLink: "https://build-a-shoebox.samaritanspurse.org/view/3e945c78-8c3d-4d1d-99fc-62883ef061f1",
+    pdfPath: "/Users/jpurshot/Downloads/2026-Gift-Suggestions.pdf",
     resourceLinks: [],
     customSections: [],
     message: "",
@@ -668,6 +688,7 @@ export default function DashboardPage() {
     womens_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
     prayer_meeting: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
     bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+    shoebox_ministry: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
   })
 
   // ---- Dispatch counts per type ----
@@ -678,6 +699,7 @@ export default function DashboardPage() {
     womens_study: 0,
     prayer_meeting: 0,
     bulletin: 0,
+    shoebox_ministry: 0,
   })
 
   // ---- Multi-event count per comm type ----
@@ -718,7 +740,7 @@ export default function DashboardPage() {
     if (cardParamApplied) return
     const params = new URLSearchParams(window.location.search)
     const cardParam = params.get("card")
-    const valid: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
+    const valid: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
     if (cardParam && valid.includes(cardParam as CommType)) {
       setActiveCardKey(cardParam)
     }
@@ -726,7 +748,7 @@ export default function DashboardPage() {
   }, [cardParamApplied])
 
   // Derived helpers for the unified selection
-  const selectedCard = (["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"].includes(activeCardKey) ? activeCardKey : "") as CommType
+  const selectedCard = (["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"].includes(activeCardKey) ? activeCardKey : "") as CommType
   const selectedCustomCard = activeCardKey.startsWith("custom:") ? activeCardKey.slice(7) : null
 
   // ---- Week offset for future scheduling (0 = this week, 1 = next week, etc.) ----
@@ -1032,7 +1054,7 @@ export default function DashboardPage() {
       const resolvedInstanceIds: Partial<Record<CommType, string>> = {}
       const resolvedInstanceWeeks: Partial<Record<CommType, string>> = {}
       const resolvedInstanceUpdatedAt: Partial<Record<CommType, string>> = {}
-      const commTypeKeys: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
+      const commTypeKeys: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
       for (const ct of commTypeKeys) {
         if (composedMap[ct]) {
           resolvedInstanceIds[ct] = composedMap[ct].id
@@ -1812,7 +1834,7 @@ export default function DashboardPage() {
       }
 
       // ---- Generic event cards (non-built-in event types with occurrences this week) ----
-      const builtinCommTypes = new Set<string>(["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"])
+      const builtinCommTypes = new Set<string>(["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"])
       // Event types that have a linked custom template already get their own card
       const etIdsWithCustomTemplate = new Set(
         (eventTypesRes.data ?? []).filter((et) => et.default_template_id).map((et) => et.id)
@@ -2052,7 +2074,7 @@ export default function DashboardPage() {
       setSmtpConfigs(smtpConfigsRes.data ?? [])
 
       // ---- Pre-fill mailing list + SMTP from composed instances ----
-      const commTypes: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
+      const commTypes: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
       const prefilledOptions: Record<CommType, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }> = {
         birthday: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
@@ -2060,6 +2082,7 @@ export default function DashboardPage() {
         womens_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         prayer_meeting: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+        shoebox_ministry: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
       }
       for (const ct of commTypes) {
         const ci = composedMap[ct]
@@ -2112,6 +2135,7 @@ export default function DashboardPage() {
         womens_study: null,
         prayer_meeting: null,
         bulletin: null,
+        shoebox_ministry: null,
       }
       const counts: Record<CommType, number> = {
         birthday: 0,
@@ -2120,6 +2144,7 @@ export default function DashboardPage() {
         womens_study: 0,
         prayer_meeting: 0,
         bulletin: 0,
+        shoebox_ministry: 0,
       }
 
       for (const d of weekDispatches) {
@@ -2330,6 +2355,15 @@ export default function DashboardPage() {
     }, buildStyleContext(templateStyles.bulletin))
   }, [bulletinForm, weekLabel, templateStyles])
 
+  const shoeboxMinistryPreview = useMemo(() => {
+    return buildShoeboxMinistryCard({
+      dueDate: shoeboxMinistryForm.dueDate,
+      onlineLink: shoeboxMinistryForm.onlineLink,
+      pdfPath: shoeboxMinistryForm.pdfPath,
+      ...extractCommonCardData(shoeboxMinistryForm),
+    }, buildStyleContext(templateStyles.shoebox_ministry))
+  }, [shoeboxMinistryForm, templateStyles])
+
   // ---- Subject lines (custom override or auto-generated) ----
   function getSubjectVars(type: CommType) {
     switch (type) {
@@ -2339,6 +2373,7 @@ export default function DashboardPage() {
       case "womens_study":   return makeEventVars(weekLabel, cleanDateForSubject(womensStudyForm.date), womensStudyForm.time, womensStudyForm.topic || "")
       case "prayer_meeting": return makeEventVars(weekLabel, cleanDateForSubject(prayerMeetingForm.date || ""), prayerMeetingForm.time, "")
       case "bulletin":       return makeBulletinVars(weekLabel, weekLabel)
+      case "shoebox_ministry": return { weekLabel, date: shoeboxMinistryForm.dueDate }
     }
   }
 
@@ -2387,6 +2422,7 @@ export default function DashboardPage() {
       case "womens_study":   return `Women's Bible Study This Wednesday`
       case "prayer_meeting": return `Monthly Prayer Meeting — ${cleanDateForSubject(prayerMeetingForm.date || "Date TBD")}`
       case "bulletin":       return `Weekly Bulletin for ${bulletinForm.weekLabel}`
+      case "shoebox_ministry": return `Operation Christmas Child — Shoebox Ministry`
     }
   }
 
@@ -2415,6 +2451,7 @@ export default function DashboardPage() {
       case "womens_study":   return womensStudyPreview
       case "prayer_meeting": return prayerMeetingPreview
       case "bulletin":       return bulletinPreview
+      case "shoebox_ministry": return shoeboxMinistryPreview
     }
   }
 
@@ -2427,6 +2464,7 @@ export default function DashboardPage() {
       case "womens_study":   return womensStudyPreview
       case "prayer_meeting": return prayerMeetingPreview
       case "bulletin":       return bulletinPreview
+      case "shoebox_ministry": return shoeboxMinistryPreview
     }
   }
 
@@ -2439,6 +2477,7 @@ export default function DashboardPage() {
       case "womens_study": return womensStudyForm as unknown as Record<string, unknown>
       case "prayer_meeting": return prayerMeetingForm as unknown as Record<string, unknown>
       case "bulletin": return bulletinForm as unknown as Record<string, unknown>
+      case "shoebox_ministry": return shoeboxMinistryForm as unknown as Record<string, unknown>
     }
   }
 
@@ -2469,7 +2508,7 @@ export default function DashboardPage() {
 
   function snapshotAllForms() {
     const snap: Partial<Record<CommType, Record<string, unknown>>> = {}
-    const types: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin"]
+    const types: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
     for (const t of types) snap[t] = structuredClone(getFormData(t))
     setSavedSnapshots(snap)
   }
@@ -3710,6 +3749,7 @@ export default function DashboardPage() {
                   events: [...dbBulletinEvents, ...prev.events.filter((e) => !dbBulletinEvents.some((ae) => ae.title === e.title))],
                 }))
               }} />,
+              shoebox_ministry: <ShoeboxMinistryEditForm data={shoeboxMinistryForm} onChange={setShoeboxMinistryForm} />,
             }
 
             const visibleCards = BUILTIN_TEMPLATES.filter((t) => visibleTemplates.includes(t.type))

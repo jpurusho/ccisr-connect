@@ -1919,3 +1919,55 @@ function InlineListSection<T extends Record<string, string>>({
     </div>
   )
 }
+
+// ---------- Shoebox Ministry ----------
+
+export interface ShoeboxMinistryFormData extends BaseFormData {
+  dueDate: string
+  onlineLink: string
+  pdfPath: string
+}
+
+export function ShoeboxMinistryEditForm({
+  data,
+  onChange,
+}: {
+  data: ShoeboxMinistryFormData
+  onChange: (data: ShoeboxMinistryFormData) => void
+}) {
+  function set<K extends keyof ShoeboxMinistryFormData>(
+    field: K,
+    value: ShoeboxMinistryFormData[K]
+  ) {
+    onChange({ ...data, [field]: value })
+  }
+
+  return (
+    <div className="space-y-4">
+      <Field label="Shoebox Due Date" htmlFor="sbx-due">
+        <Input
+          id="sbx-due"
+          value={data.dueDate}
+          onChange={(e) => set("dueDate", e.target.value)}
+          placeholder="Sunday, November 15th"
+        />
+      </Field>
+      <Field label="Online Builder Link" htmlFor="sbx-link">
+        <Input
+          id="sbx-link"
+          value={data.onlineLink}
+          onChange={(e) => set("onlineLink", e.target.value)}
+          placeholder="https://build-a-shoebox.samaritanspurse.org/..."
+        />
+      </Field>
+      <Field label="Gift Suggestions PDF Path" htmlFor="sbx-pdf">
+        <Input
+          id="sbx-pdf"
+          value={data.pdfPath}
+          onChange={(e) => set("pdfPath", e.target.value)}
+          placeholder="/path/to/2026-Gift-Suggestions.pdf"
+        />
+      </Field>
+    </div>
+  )
+}
