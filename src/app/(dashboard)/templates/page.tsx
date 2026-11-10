@@ -14,6 +14,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import {
@@ -129,12 +131,15 @@ export default function TemplatesPage() {
     FALLBACK_DEFAULTS.shoebox_ministry.data as ShoeboxMinistryDefaults
   )
 
+  // Dashboard visibility settings per template type
+  const [dashboardSettings, setDashboardSettings] = useState<Record<string, { showInDashboard: boolean; displayOrder: number; iconName: string; cardColor: string }>>({})
+
   const fetchTemplates = useCallback(async () => {
     setLoading(true)
     const supabase = createClient()
 
     const [etRes, tmplRes, customRes] = await Promise.all([
-      supabase.from("event_types").select("id, name, comm_type").order("name").returns<{ id: string; name: string; comm_type: string | null }[]>(),
+      supabase.from("event_types").select("id, name, comm_type, show_in_dashboard, display_order, icon_name, card_color").order("name").returns<{ id: string; name: string; comm_type: string | null; show_in_dashboard: boolean | null; display_order: number | null; icon_name: string | null; card_color: string | null }[]>(),
       supabase
         .from("email_templates")
         .select("id, event_type_id, subject_template, body_template, style_settings")
@@ -152,13 +157,21 @@ export default function TemplatesPage() {
 
     const idToTabName: Record<string, string> = {}
     const tabNameToId: Record<string, string> = {}
+    const dashSettings: Record<string, { showInDashboard: boolean; displayOrder: number; iconName: string; cardColor: string }> = {}
     if (etRes.data) {
       for (const et of etRes.data) {
         const tabName = (et.comm_type as string) ?? inferCommType(et.name) ?? et.name
         idToTabName[et.id] = tabName
         tabNameToId[tabName] = et.id
+        dashSettings[tabName] = {
+          showInDashboard: et.show_in_dashboard ?? true,
+          displayOrder: et.display_order ?? 0,
+          iconName: et.icon_name ?? "Calendar",
+          cardColor: et.card_color ?? "#4F46E5",
+        }
       }
       setEventTypeIds(tabNameToId)
+      setDashboardSettings(dashSettings)
     }
 
     setBirthdayData({})
@@ -408,6 +421,25 @@ export default function TemplatesPage() {
       const supabase = createClient()
       const bodyJson = JSON.stringify(getDataForType(typeName))
       const subjectTmpl = subjects[typeName] || SUBJECT_FALLBACKS[typeName] || ""
+
+      // Update dashboard settings in event_types table
+      const dashSettings = dashboardSettings[typeName]
+      if (dashSettings) {
+        const { error: etError } = await supabase
+          .from("event_types")
+          .update({
+            show_in_dashboard: dashSettings.showInDashboard,
+            display_order: dashSettings.displayOrder,
+            icon_name: dashSettings.iconName,
+            card_color: dashSettings.cardColor,
+          } as never)
+          .eq("id", etId)
+
+        if (etError) {
+          toast.error(`Dashboard settings update failed: ${etError.message}`)
+          return
+        }
+      }
 
       const existing = templates.find((t) => t.event_type_name === typeName)
 
@@ -699,6 +731,39 @@ export default function TemplatesPage() {
                     value={styleSettings[tab.name] ?? {}}
                     onChange={(s) => setStyleSettings((prev) => ({ ...prev, [tab.name]: s }))}
                   />
+
+                  {/* Dashboard Visibility Settings */}
+                  <div className="border-t pt-4 space-y-3">
+                    <h3 className="font-medium text-sm">Dashboard Settings</h3>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`${tab.name}-show-dashboard`} className="text-sm">
+                        Show in Dashboard
+                      </Label>
+                      <Switch
+                        id={`${tab.name}-show-dashboard`}
+                        checked={dashboardSettings[tab.name]?.showInDashboard ?? true}
+                        onCheckedChange={(checked) => {
+                          setDashboardSettings((prev) => ({
+                            ...prev,
+                            [tab.name]: { ...prev[tab.name], showInDashboard: checked },
+                          }))
+                        }}
+                      />
+                    </div>
+                    <Field label="Display Order" htmlFor={`${tab.name}-display-order`} hint="Lower numbers appear first">
+                      <Input
+                        id={`${tab.name}-display-order`}
+                        type="number"
+                        value={dashboardSettings[tab.name]?.displayOrder ?? 0}
+                        onChange={(e) => {
+                          setDashboardSettings((prev) => ({
+                            ...prev,
+                            [tab.name]: { ...prev[tab.name], displayOrder: parseInt(e.target.value) || 0 },
+                          }))
+                        }}
+                      />
+                    </Field>
+                  </div>
 
                   {tab.name === "birthday" && (
                     <BirthdayTemplateForm data={birthdayData} onChange={setBirthdayData} styleSettings={styleSettings[tab.name]} />
