@@ -857,20 +857,24 @@ export function buildShoeboxMinistryCard(data: ShoeboxMinistryCardData, style?: 
     data.message ||
     "Our packed shoeboxes are due this Sunday! These simple gifts bring joy and the Gospel to children in need around the world.\n\nIf you haven't packed a box yet, you can still participate using the online builder, or bring an unpacked box to church.";
 
+  // Christmas green accent color
+  const christmasGreen = "#059669";
+  const greenLight = "#D1FAE5";
+
   const details: { label: string; value: string }[] = [];
   details.push({ label: "📦 Shoeboxes Due", value: data.dueDate });
   if (data.onlineLink) {
-    details.push({ label: "🌐 Build Online", value: `<a href="${data.onlineLink}" style="color:${colors.primary};text-decoration:none;font-weight:600">Build a Shoebox Online</a>` });
+    details.push({ label: "🌐 Build Online", value: `<a href="${data.onlineLink}" style="color:${christmasGreen};text-decoration:none;font-weight:600">Build a Shoebox Online</a>` });
   }
 
   const onlineButtonHtml = data.onlineLink
     ? `<div style="text-align:center;margin-top:16px">
-<a href="${data.onlineLink}" style="display:inline-block;background:${colors.primary};color:#ffffff;padding:12px 32px;border-radius:6px;font-size:${sz.body}px;font-weight:600;text-decoration:none">🎁 Build a Shoebox Online</a>
+<a href="${data.onlineLink}" style="display:inline-block;background:${christmasGreen};color:#ffffff;padding:12px 32px;border-radius:6px;font-size:${sz.body}px;font-weight:600;text-decoration:none;box-shadow:0 2px 8px rgba(5,150,105,0.3)">🎁 Build a Shoebox Online</a>
 </div>`
     : "";
 
   const pdfNoteHtml = data.pdfPath
-    ? `<p style="margin:16px 0 0;padding:12px 16px;background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:8px;font-size:${sz.body - 1}px;color:#92400E;line-height:1.6;text-align:center">📎 <strong>Gift Suggestions PDF attached</strong> — Ideas for age-appropriate gifts</p>`
+    ? `<p style="margin:16px 0 0;padding:12px 16px;background:${greenLight};border:1.5px solid #A7F3D0;border-radius:8px;font-size:${sz.body - 1}px;color:#065F46;line-height:1.6;text-align:center;box-shadow:0 0 8px rgba(5,150,105,0.15)">📎 <strong>Gift Suggestions PDF attached</strong> — Ideas for age-appropriate gifts</p>`
     : "";
 
   const content =

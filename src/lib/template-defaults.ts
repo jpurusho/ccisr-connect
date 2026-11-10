@@ -190,6 +190,8 @@ export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
       pdfPath: "/Users/jpurshot/Downloads/2026-Gift-Suggestions.pdf",
       primaryColor: "#dc2626",
       headerEmoji: "🎁",
+      messageBgColor: "#FFE4E4",
+      message: "🎄 It's time for Operation Christmas Child! Our packed shoeboxes bring joy and the Gospel to children around the world.\n\nPacked boxes are due in church this Sunday. If you haven't packed one yet, you can still participate using the online builder!",
     },
   },
 }
