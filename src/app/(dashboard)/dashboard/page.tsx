@@ -89,6 +89,7 @@ import {
   getWeekDays,
   mapDispatchStatus,
 } from "@/lib/dashboard-types"
+import { templateRegistry, type TemplateConfig } from "@/lib/template-registry"
 import { useCardVisibility } from "@/hooks/dashboard/use-card-visibility"
 import { resolveSignupAutoFill, type SignupFieldMap, type AutoFillResult } from "@/lib/signup/auto-fill"
 import { getBreakStatus } from "@/lib/dashboard/break-utils"
@@ -295,17 +296,14 @@ const EMPTY_CUSTOM_FORM: CustomDashFormData = {
 
 // ── Template visibility ──────────────────────────────────────────────────
 
-const BUILTIN_TEMPLATES: { type: CommType; label: string; color: string; icon: typeof Cake }[] = [
-  { type: "bulletin", label: "Bulletin", color: "#4F46E5", icon: Newspaper },
-  { type: "birthday", label: "Birthdays", color: "#7C3AED", icon: Cake },
-  { type: "anniversary", label: "Anniversaries", color: "#D97706", icon: Heart },
-  { type: "bible_study", label: "Bible Study", color: "#0D9488", icon: BookOpen },
-  { type: "womens_study", label: "Women's Study", color: "#DB2777", icon: Users },
-  { type: "prayer_meeting", label: "Prayer Meeting", color: "#059669", icon: HandHelping },
-  { type: "shoebox_ministry", label: "Shoebox Ministry", color: "#DC2626", icon: Gift },
-]
-
-const BUILTIN_LABEL: Record<CommType, string> = Object.fromEntries(BUILTIN_TEMPLATES.map((t) => [t.type, t.label])) as Record<CommType, string>
+// Interface for loaded templates
+interface LoadedTemplate {
+  type: CommType
+  label: string
+  color: string
+  icon: typeof Cake
+  displayOrder: number
+}
 
 // StatCardConfig kept for potential future use
 interface StatCardConfig {
@@ -411,6 +409,17 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [weekLabel, setWeekLabel] = useState("")
+
+  // ---- Dynamic template loading ----
+  const [loadedTemplates, setLoadedTemplates] = useState<LoadedTemplate[]>([])
+
+  // Generate BUILTIN_TEMPLATES dynamically from loaded templates
+  const BUILTIN_TEMPLATES = useMemo(() => loadedTemplates, [loadedTemplates])
+
+  const BUILTIN_LABEL: Record<string, string> = useMemo(
+    () => Object.fromEntries(BUILTIN_TEMPLATES.map((t) => [t.type, t.label])),
+    [BUILTIN_TEMPLATES]
+  )
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
   const [savedTemplateData, setSavedTemplateData] = useState<Record<string, Record<string, unknown>>>({})
   const [commTypeEtNames, setCommTypeEtNames] = useState<Record<CommType, string>>({
@@ -923,11 +932,11 @@ export default function DashboardPage() {
           .eq("is_default", true)
           .returns<{ id: string; event_type_id: string; subject_template: string; body_template: string; style_settings: Record<string, unknown> | null }[]>(),
 
-        // Event type id-to-name map (+ template link, color, icon, signup link, bulletin detail template, comm_type, info sections)
+        // Event type id-to-name map (+ template link, color, icon, signup link, bulletin detail template, comm_type, info sections, visibility)
         supabase
           .from("event_types")
-          .select("id, name, icon, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template, comm_type, info_sections, show_info_in_bulletin")
-          .returns<{ id: string; name: string; icon: string | null; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null; comm_type: string | null; info_sections: unknown; show_info_in_bulletin: boolean }[]>(),
+          .select("id, name, icon, default_template_id, color_scheme, linked_signup_form_id, signup_field_map, bulletin_detail_template, comm_type, info_sections, show_info_in_bulletin, show_in_dashboard, display_order, icon_name, card_color")
+          .returns<{ id: string; name: string; icon: string | null; default_template_id: string | null; color_scheme: { primary: string } | null; linked_signup_form_id: string | null; signup_field_map: import("@/lib/signup/auto-fill").SignupFieldMap | null; bulletin_detail_template: string | null; comm_type: string | null; info_sections: unknown; show_info_in_bulletin: boolean; show_in_dashboard: boolean | null; display_order: number | null; icon_name: string | null; card_color: string | null }[]>(),
 
         // Composed instances: match current week, bulletin week, or recurring
         supabase
@@ -978,6 +987,28 @@ export default function DashboardPage() {
         if (ct && et.icon) iconOverrides[ct as CommType] = et.icon
       }
       setCommTypeIcons(iconOverrides)
+
+      // Build loaded templates list from database + registry
+      const visibleTemplates: LoadedTemplate[] = []
+      for (const et of (eventTypesRes.data ?? [])) {
+        const ct = etIdToCommType[et.id]
+        if (!ct || (et.show_in_dashboard === false)) continue // Skip hidden templates
+
+        const templateConfig = templateRegistry.get(ct)
+        if (!templateConfig) continue // Skip if not in registry
+
+        visibleTemplates.push({
+          type: ct as CommType,
+          label: templateConfig.label,
+          color: et.card_color || templateConfig.color,
+          icon: templateConfig.icon, // Use registry icon (Lucide component)
+          displayOrder: et.display_order ?? 999,
+        })
+      }
+
+      // Sort by display order and set loaded templates
+      visibleTemplates.sort((a, b) => a.displayOrder - b.displayOrder)
+      setLoadedTemplates(visibleTemplates)
 
       const etInfoSections: Record<string, { sections: unknown; showInBulletin: boolean }> = {}
       if (eventTypesRes.data) {
@@ -4015,7 +4046,8 @@ export default function DashboardPage() {
 
           {/* ── Expanded card detail ── */}
           {visibleTemplates.includes(selectedCard) && !selectedCustomCard && (() => {
-            const tmpl = BUILTIN_TEMPLATES.find((t) => t.type === selectedCard)!
+            const tmpl = BUILTIN_TEMPLATES.find((t) => t.type === selectedCard)
+            if (!tmpl) return null // Template not loaded yet
             const type = selectedCard
 
             // Build status indicators for the full card

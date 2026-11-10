@@ -182,6 +182,10 @@ export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
       events: [],
     },
   },
+  prayer_meeting: {
+    type: "prayer_meeting",
+    data: {},
+  },
   shoebox_ministry: {
     type: "shoebox_ministry",
     data: {
