@@ -123,6 +123,7 @@ export type CardType =
   | "womens_study"
   | "prayer_meeting"
   | "bulletin"
+  | "shoebox_ministry"
 
 export interface CardPreviewParams {
   type: CardType

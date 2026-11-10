@@ -37,6 +37,7 @@ import {
   buildWomensStudyCard,
   buildPrayerMeetingCard,
   buildBulletinCard,
+  buildShoeboxMinistryCard,
   extractCommonCardData,
   buildStyleContext,
 } from "@/lib/email/card-builder"
@@ -47,6 +48,7 @@ import {
   type BirthdayDefaults,
   type AnniversaryDefaults,
   type BulletinDefaults,
+  type ShoeboxMinistryDefaults,
   parseBodyTemplate,
   FALLBACK_DEFAULTS,
   SUBJECT_FALLBACKS,
@@ -71,6 +73,7 @@ import { BibleStudyTemplateForm } from "@/components/templates/bible-study-templ
 import { WomensStudyTemplateForm } from "@/components/templates/womens-study-template-form"
 import { PrayerMeetingTemplateForm } from "@/components/templates/prayer-meeting-template-form"
 import { BulletinTemplateForm } from "@/components/templates/bulletin-template-form"
+import { ShoeboxMinistryTemplateForm } from "@/components/templates/shoebox-ministry-template-form"
 import { CustomTemplateEditor } from "@/components/templates/custom-template-editor"
 import { TemplateGrid } from "@/components/templates/template-grid"
 import { CustomTemplateList } from "@/components/templates/custom-template-list"
@@ -91,6 +94,7 @@ const EVENT_TYPE_TABS = [
   { name: "womens_study", label: "Women's Study", icon: Users, color: "#DB2777" },
   { name: "prayer_meeting", label: "Prayer Meeting", icon: HandHelping, color: "#059669" },
   { name: "bulletin", label: "Bulletin", icon: Newspaper, color: "#4F46E5" },
+  { name: "shoebox_ministry", label: "Shoebox Ministry", icon: Plus, color: "#DC2626" },
 ]
 
 export default function TemplatesPage() {
@@ -120,6 +124,9 @@ export default function TemplatesPage() {
   const [prayerMeetingData, setPrayerMeetingData] = useState<PrayerMeetingDefaults>({})
   const [bulletinData, setBulletinData] = useState<BulletinDefaults>(
     FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults
+  )
+  const [shoeboxMinistryData, setShoeboxMinistryData] = useState<ShoeboxMinistryDefaults>(
+    FALLBACK_DEFAULTS.shoebox_ministry.data as ShoeboxMinistryDefaults
   )
 
   const fetchTemplates = useCallback(async () => {
@@ -160,6 +167,7 @@ export default function TemplatesPage() {
     setWomensStudyData(FALLBACK_DEFAULTS.womens_study.data as WomensStudyDefaults)
     setPrayerMeetingData({})
     setBulletinData(FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults)
+    setShoeboxMinistryData(FALLBACK_DEFAULTS.shoebox_ministry.data as ShoeboxMinistryDefaults)
 
     const saved: SavedTemplate[] = []
     const subjs: Record<string, string> = { ...SUBJECT_FALLBACKS }
@@ -203,6 +211,9 @@ export default function TemplatesPage() {
             case "bulletin":
               setBulletinData({ ...(FALLBACK_DEFAULTS.bulletin.data as BulletinDefaults), ...parsed.data })
               break
+            case "shoebox_ministry":
+              setShoeboxMinistryData({ ...(FALLBACK_DEFAULTS.shoebox_ministry.data as ShoeboxMinistryDefaults), ...parsed.data })
+              break
           }
         }
       }
@@ -226,6 +237,7 @@ export default function TemplatesPage() {
       case "womens_study": return womensStudyData
       case "prayer_meeting": return prayerMeetingData
       case "bulletin": return bulletinData
+      case "shoebox_ministry": return shoeboxMinistryData
       default: return {}
     }
   }
@@ -237,6 +249,7 @@ export default function TemplatesPage() {
     womens_study: "womens_study",
     prayer_meeting: "prayer_meeting",
     bulletin: "bulletin",
+    shoebox_ministry: "shoebox_ministry",
   }
 
   async function checkAndOfferDraftRefresh(typeName: string, bodyJson: string, subjectTmpl: string) {
@@ -532,10 +545,18 @@ export default function TemplatesPage() {
           footerVerse: interp(bulletinData.footerVerse, vars) || undefined,
         }, sc)
       }
+      case "shoebox_ministry": {
+        return buildShoeboxMinistryCard({
+          dueDate: shoeboxMinistryData.dueDate || "Sunday, November 15th, 2026",
+          onlineLink: shoeboxMinistryData.onlineLink || "https://build-a-shoebox.samaritanspurse.org/view/3e945c78-8c3d-4d1d-99fc-62883ef061f1",
+          pdfPath: shoeboxMinistryData.pdfPath,
+          ...extractCommonCardData(shoeboxMinistryData),
+        }, sc)
+      }
       default:
         return ""
     }
-  }, [activeTab, birthdayData, anniversaryData, bibleStudyData, womensStudyData, prayerMeetingData, bulletinData, styleSettings])
+  }, [activeTab, birthdayData, anniversaryData, bibleStudyData, womensStudyData, prayerMeetingData, bulletinData, shoeboxMinistryData, styleSettings])
 
   if (loading) {
     return (
@@ -657,6 +678,7 @@ export default function TemplatesPage() {
                       : tab.name === "womens_study" ? womensStudyData.primaryColor
                       : tab.name === "prayer_meeting" ? prayerMeetingData.primaryColor
                       : tab.name === "bulletin" ? bulletinData.primaryColor
+                      : tab.name === "shoebox_ministry" ? shoeboxMinistryData.primaryColor
                       : undefined
                     }
                     defaultColor={tab.color}
@@ -668,6 +690,7 @@ export default function TemplatesPage() {
                         case "womens_study": setWomensStudyData((p) => ({ ...p, primaryColor: color })); break
                         case "prayer_meeting": setPrayerMeetingData((p) => ({ ...p, primaryColor: color })); break
                         case "bulletin": setBulletinData((p) => ({ ...p, primaryColor: color })); break
+                        case "shoebox_ministry": setShoeboxMinistryData((p) => ({ ...p, primaryColor: color })); break
                       }
                     }}
                   />
@@ -699,6 +722,10 @@ export default function TemplatesPage() {
 
                   {tab.name === "bulletin" && (
                     <BulletinTemplateForm data={bulletinData} onChange={setBulletinData} styleSettings={styleSettings[tab.name]} />
+                  )}
+
+                  {tab.name === "shoebox_ministry" && (
+                    <ShoeboxMinistryTemplateForm data={shoeboxMinistryData} onChange={setShoeboxMinistryData} styleSettings={styleSettings[tab.name]} />
                   )}
 
                   <div className="flex gap-2 pt-2">

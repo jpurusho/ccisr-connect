@@ -43,6 +43,7 @@ export type TemplateType =
   | "womens_study"
   | "prayer_meeting"
   | "bulletin"
+  | "shoebox_ministry"
   | "custom"
 
 export interface BaseTemplate {

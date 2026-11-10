@@ -232,6 +232,15 @@ export const EVENT_COLORS: Record<string, CardColors> = {
     border: "#C7D2FE",
     bgLight: "#EEF2FF",
   },
+  shoebox_ministry: {
+    primary: "#DC2626",
+    primaryLight: "#FEE2E2",
+    accent: "#EF4444",
+    textDark: "#1E293B",
+    textLight: "#64748B",
+    border: "#FECACA",
+    bgLight: "#FEF2F2",
+  },
 };
 
 export interface CardCustomSection {
@@ -826,6 +835,66 @@ ${commonTrailingHtml(data, colors, undefined, style)}`, colors) +
       data.footerVerse || "Christ Church of India, San Ramon — CCISR Connect",
       colors,
       undefined,
+      style,
+      data.footerVerseTextColor
+    );
+
+  return wrapCard(content, colors, style);
+}
+
+// ---------- Operation Christmas Child - Shoebox Ministry ----------
+
+export interface ShoeboxMinistryCardData extends BaseCardData {
+  dueDate: string;
+  onlineLink: string;
+  pdfPath?: string;
+}
+
+export function buildShoeboxMinistryCard(data: ShoeboxMinistryCardData, style?: StyleContext): string {
+  const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.shoebox_ministry;
+  const sz = style?.sizes ?? SIZE_SCALES.default;
+  const message =
+    data.message ||
+    "Our packed shoeboxes are due this Sunday! These simple gifts bring joy and the Gospel to children in need around the world.\n\nIf you haven't packed a box yet, you can still participate using the online builder, or bring an unpacked box to church.";
+
+  const details: { label: string; value: string }[] = [];
+  details.push({ label: "📦 Shoeboxes Due", value: data.dueDate });
+  if (data.onlineLink) {
+    details.push({ label: "🌐 Build Online", value: `<a href="${data.onlineLink}" style="color:${colors.primary};text-decoration:none;font-weight:600">Build a Shoebox Online</a>` });
+  }
+
+  const onlineButtonHtml = data.onlineLink
+    ? `<div style="text-align:center;margin-top:16px">
+<a href="${data.onlineLink}" style="display:inline-block;background:${colors.primary};color:#ffffff;padding:12px 32px;border-radius:6px;font-size:${sz.body}px;font-weight:600;text-decoration:none">🎁 Build a Shoebox Online</a>
+</div>`
+    : "";
+
+  const pdfNoteHtml = data.pdfPath
+    ? `<p style="margin:16px 0 0;padding:12px 16px;background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:8px;font-size:${sz.body - 1}px;color:#92400E;line-height:1.6;text-align:center">📎 <strong>Gift Suggestions PDF attached</strong> — Ideas for age-appropriate gifts</p>`
+    : "";
+
+  const content =
+    headerRow(
+      data.headerTitle || "Operation Christmas Child",
+      data.headerSubtitle || "Shoebox Ministry 2026",
+      data.headerEmoji || "🎁",
+      colors,
+      style,
+      data.headerTitleColor,
+      data.headerSubtitleColor
+    ) +
+    contentRow(
+      `${msgBlock(message, data.messageBgColor, colors, "0 0 16px", style, data.messageTextColor)}
+${buildDetailTable(details, colors, style, { withBackground: true })}
+${onlineButtonHtml}
+${pdfNoteHtml}
+${commonTrailingHtml(data, colors, undefined, style)}`,
+      colors
+    ) +
+    footerRow(
+      data.footerVerse || '"Every good and perfect gift is from above." — James 1:17',
+      colors,
+      data.footerVerseBgColor,
       style,
       data.footerVerseTextColor
     );

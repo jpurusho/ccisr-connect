@@ -73,6 +73,12 @@ export interface PrayerMeetingDefaults extends CommonCardFields {
   signupLink?: string
 }
 
+export interface ShoeboxMinistryDefaults extends CommonCardFields {
+  dueDate?: string
+  onlineLink?: string
+  pdfPath?: string
+}
+
 /**
  * Extract common card fields from a defaults object with safe fallbacks.
  * Eliminates the `(def as Record<string, unknown>).field as string ?? ""` pattern.
@@ -118,6 +124,7 @@ export type TemplateDefaults =
   | { type: "womens_study"; data: WomensStudyDefaults }
   | { type: "bulletin"; data: BulletinDefaults }
   | { type: "prayer_meeting"; data: PrayerMeetingDefaults }
+  | { type: "shoebox_ministry"; data: ShoeboxMinistryDefaults }
 
 export function parseBodyTemplate(eventTypeName: string, bodyJson: string): TemplateDefaults | null {
   try {
@@ -135,6 +142,8 @@ export function parseBodyTemplate(eventTypeName: string, bodyJson: string): Temp
         return { type: "bulletin", data: data as BulletinDefaults }
       case "prayer_meeting":
         return { type: "prayer_meeting", data: data as PrayerMeetingDefaults }
+      case "shoebox_ministry":
+        return { type: "shoebox_ministry", data: data as ShoeboxMinistryDefaults }
       default:
         return null
     }
@@ -173,6 +182,16 @@ export const FALLBACK_DEFAULTS: Record<string, TemplateDefaults> = {
       events: [],
     },
   },
+  shoebox_ministry: {
+    type: "shoebox_ministry",
+    data: {
+      dueDate: "Sunday, November 15th",
+      onlineLink: "https://build-a-shoebox.samaritanspurse.org/view/3e945c78-8c3d-4d1d-99fc-62883ef061f1",
+      pdfPath: "/Users/jpurshot/Downloads/2026-Gift-Suggestions.pdf",
+      primaryColor: "#dc2626",
+      headerEmoji: "🎁",
+    },
+  },
 }
 
 export const SUBJECT_FALLBACKS: Record<string, string> = {
@@ -182,6 +201,7 @@ export const SUBJECT_FALLBACKS: Record<string, string> = {
   womens_study: "Women's Bible Study This Wednesday",
   prayer_meeting: "Monthly Prayer Meeting — {{date}}",
   bulletin: "Weekly Bulletin — {{weekLabel}}",
+  shoebox_ministry: "Operation Christmas Child — Shoebox Ministry",
 }
 
 export interface PlaceholderDef {
@@ -221,6 +241,10 @@ export const TEMPLATE_PLACEHOLDERS: Record<string, PlaceholderDef[]> = {
   bulletin: [
     { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
     { token: "{{date}}", description: "Current date", example: "April 27, 2026" },
+  ],
+  shoebox_ministry: [
+    { token: "{{weekLabel}}", description: "Week range", example: "Nov 9 – Nov 15" },
+    { token: "{{date}}", description: "Due date", example: "Sunday, November 15th" },
   ],
   custom: [
     { token: "{{weekLabel}}", description: "Week range", example: "Apr 26 – May 2" },
