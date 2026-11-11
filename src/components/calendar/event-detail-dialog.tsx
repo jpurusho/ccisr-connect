@@ -230,6 +230,14 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
   }
 
   async function handleDeleteBreak(id: string) {
+    const breakToDelete = breaks.find((b) => b.id === id)
+    if (!breakToDelete) return
+
+    const dateRange = `${format(new Date(breakToDelete.start_date + "T00:00:00"), "MMM d, yyyy")} → ${format(new Date(breakToDelete.end_date + "T00:00:00"), "MMM d, yyyy")}`
+    const confirmMessage = `Delete this break?\n\n${dateRange}${breakToDelete.message ? `\n"${breakToDelete.message}"` : ""}`
+
+    if (!confirm(confirmMessage)) return
+
     const supabase = createClient()
     const { error } = await supabase.from("event_breaks").delete().eq("id", id)
     if (error) {
@@ -245,20 +253,22 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
 
   if (loading) return null
 
-  const refDate = format(eventDate, "yyyy-MM-dd")
+  const clickedDate = format(eventDate, "yyyy-MM-dd")
   const today = format(new Date(), "yyyy-MM-dd")
 
-  // Categorize breaks by status relative to today
-  const activeBreaks = breaks.filter((b) => b.start_date <= today && b.end_date >= today)
-  const upcomingBreaks = breaks.filter((b) => b.start_date > today)
-  const pastBreaks = breaks.filter((b) => b.end_date < today)
+  // Categorize breaks relative to the CLICKED DATE (not today)
+  // This way when viewing future dates, you only see relevant breaks
+  const activeOnClickedDate = breaks.filter((b) => b.start_date <= clickedDate && b.end_date >= clickedDate)
+  const upcomingFromClickedDate = breaks.filter((b) => b.start_date > clickedDate)
+  const pastBeforeClickedDate = breaks.filter((b) => b.end_date < clickedDate)
 
-  const visibleBreaks = showPastBreaks ? breaks : [...activeBreaks, ...upcomingBreaks]
+  // By default, show breaks that are relevant to the clicked date
+  const visibleBreaks = showPastBreaks ? breaks : [...activeOnClickedDate, ...upcomingFromClickedDate]
 
-  // Only show the breaks section if there are active/upcoming breaks OR user wants to see past breaks
-  const showBreaksSection = activeBreaks.length > 0 || upcomingBreaks.length > 0 || (pastBreaks.length > 0 && showPastBreaks)
+  // Only show the breaks section if there are relevant breaks
+  const showBreaksSection = activeOnClickedDate.length > 0 || upcomingFromClickedDate.length > 0 || (pastBeforeClickedDate.length > 0 && showPastBreaks)
 
-  // Helper to determine break status
+  // Helper to determine break status relative to TODAY (for badge coloring)
   const getBreakStatus = (brk: typeof breaks[0]) => {
     if (brk.start_date <= today && brk.end_date >= today) return "active"
     if (brk.start_date > today) return "upcoming"
@@ -282,16 +292,23 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
       {showBreaksSection && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2 dark:border-amber-800 dark:bg-amber-950/20">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Scheduled Breaks</p>
-            {pastBreaks.length > 0 && (
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+              Scheduled Breaks
+              {clickedDate !== today && (
+                <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                  (viewing {format(new Date(clickedDate + "T00:00:00"), "MMM d")})
+                </span>
+              )}
+            </p>
+            {pastBeforeClickedDate.length > 0 && (
               <button
                 type="button"
                 onClick={() => setShowPastBreaks(!showPastBreaks)}
                 className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
                 aria-expanded={showPastBreaks}
-                aria-label={showPastBreaks ? "Hide past breaks" : `Show past breaks (${pastBreaks.length})`}
+                aria-label={showPastBreaks ? "Hide past breaks" : `Show past breaks (${pastBeforeClickedDate.length})`}
               >
-                {showPastBreaks ? "Hide past" : `Show past (${pastBreaks.length})`}
+                {showPastBreaks ? "Hide past" : `Show past (${pastBeforeClickedDate.length})`}
               </button>
             )}
           </div>
