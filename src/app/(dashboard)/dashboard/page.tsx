@@ -2137,10 +2137,10 @@ export default function DashboardPage() {
 
       // Fallback: use most recent instance's subject if no current-week instance exists
       // This makes subject customizations persist across weeks
-      // BUT: Skip subject persistence for date-dependent templates (bible_study, prayer_meeting)
+      // BUT: Skip subject persistence for date-dependent templates (bible_study, prayer_meeting, bulletin)
       // because the saved subject has the old date baked in
       const recentInstances = recentInstancesRes.data ?? []
-      const skipSubjectPersistence = new Set(["bible_study", "prayer_meeting"])
+      const skipSubjectPersistence = new Set(["bible_study", "prayer_meeting", "bulletin"])
       for (const ct of commTypeKeys) {
         if (!resolvedSubjects[ct] && !resolvedPrefixes[ct]) {
           const recent = recentInstances.find(ri => ri.template_type === ct)
