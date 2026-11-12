@@ -745,7 +745,12 @@ export default function TemplatesPage() {
                         onCheckedChange={(checked) => {
                           setDashboardSettings((prev) => ({
                             ...prev,
-                            [tab.name]: { ...prev[tab.name], showInDashboard: checked },
+                            [tab.name]: {
+                              showInDashboard: checked,
+                              displayOrder: prev[tab.name]?.displayOrder ?? 0,
+                              iconName: prev[tab.name]?.iconName ?? "Calendar",
+                              cardColor: prev[tab.name]?.cardColor ?? "#4F46E5",
+                            },
                           }))
                         }}
                       />
@@ -758,7 +763,12 @@ export default function TemplatesPage() {
                         onChange={(e) => {
                           setDashboardSettings((prev) => ({
                             ...prev,
-                            [tab.name]: { ...prev[tab.name], displayOrder: parseInt(e.target.value) || 0 },
+                            [tab.name]: {
+                              showInDashboard: prev[tab.name]?.showInDashboard ?? true,
+                              displayOrder: parseInt(e.target.value) || 0,
+                              iconName: prev[tab.name]?.iconName ?? "Calendar",
+                              cardColor: prev[tab.name]?.cardColor ?? "#4F46E5",
+                            },
                           }))
                         }}
                       />

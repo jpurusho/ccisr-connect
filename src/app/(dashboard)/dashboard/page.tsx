@@ -3985,10 +3985,10 @@ export default function DashboardPage() {
 
           {/* ── Settings link ── */}
           <div className="flex justify-end">
-            <Link href="/templates">
+            <Link href="/settings/templates">
               <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
                 <Settings2 className="size-3.5" />
-                Manage Templates
+                Template Visibility
               </Button>
             </Link>
           </div>
