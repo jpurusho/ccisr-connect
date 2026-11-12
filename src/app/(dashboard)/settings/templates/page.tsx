@@ -68,27 +68,15 @@ export default function TemplateSettingsPage() {
     const allTemplates: TemplateSettings[] = []
 
     // Add built-in templates
-    // When multiple event_types share comm_type, show only the "primary" (lowest display_order)
+    // v1.85.0: Show ALL event_types, not just primary per comm_type
+    // Each location gets its own row in settings
     type EventTypeRow = NonNullable<typeof eventTypesRes.data>[0]
-    const primaryEventTypes = new Map<string, EventTypeRow>()
     if (eventTypesRes.data) {
       for (const et of eventTypesRes.data) {
-        const existing = primaryEventTypes.get(et.comm_type!)
-        if (existing) {
-          // Keep the one with lower display_order
-          if ((et.display_order ?? 999) < (existing.display_order ?? 999)) {
-            primaryEventTypes.set(et.comm_type!, et)
-          }
-        } else {
-          primaryEventTypes.set(et.comm_type!, et)
-        }
-      }
-
-      for (const et of primaryEventTypes.values()) {
         const config = templateRegistry.get(et.comm_type!)
         allTemplates.push({
           id: et.id,
-          name: config?.label || et.name,
+          name: et.name, // Use actual event_type name (e.g., "Mountain House Bible Study")
           type: "builtin",
           show_in_dashboard: et.show_in_dashboard ?? true,
           display_order: et.display_order ?? 999,
