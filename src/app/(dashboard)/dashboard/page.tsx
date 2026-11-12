@@ -971,19 +971,6 @@ export default function DashboardPage() {
       const { commTypeToEtName, etIdToCommType } = buildCommTypeMappings(eventTypesRes.data ?? [])
       setCommTypeEtNames(commTypeToEtName)
 
-      // Debug: Check event_types data
-      console.log("=== event_types Query Result ===")
-      console.log("Total event_types rows:", eventTypesRes.data?.length || 0)
-      const commTypeCounts: Record<string, number> = {}
-      eventTypesRes.data?.forEach(et => {
-        if (et.comm_type) {
-          commTypeCounts[et.comm_type] = (commTypeCounts[et.comm_type] || 0) + 1
-        }
-      })
-      Object.entries(commTypeCounts).forEach(([ct, count]) => {
-        if (count > 1) console.error(`❌ DATABASE DUPLICATE: comm_type='${ct}' has ${count} rows`)
-      })
-
       // Build icon overrides from DB
       const iconOverrides: Partial<Record<CommType, string>> = {}
       for (const et of (eventTypesRes.data ?? [])) {
@@ -996,25 +983,40 @@ export default function DashboardPage() {
       const visibleTemplates: LoadedTemplate[] = []
       const seenTypes = new Set<string>()
 
+      console.log("=== Dashboard Loading Templates ===")
       for (const et of (eventTypesRes.data ?? [])) {
         const ct = etIdToCommType[et.id]
-        if (!ct || (et.show_in_dashboard === false)) continue // Skip hidden templates
+        console.log(`Checking: id=${et.id}, comm_type=${ct}, show_in_dashboard=${et.show_in_dashboard}`)
+
+        if (!ct) {
+          console.log(`  → Skipped: no comm_type mapping`)
+          continue
+        }
+
+        if (et.show_in_dashboard === false) {
+          console.log(`  → Skipped: show_in_dashboard is false`)
+          continue
+        }
 
         // Skip duplicates - keep only the first occurrence of each comm_type
         if (seenTypes.has(ct)) {
-          console.warn(`⚠️ Skipping duplicate comm_type='${ct}' from event_types id=${et.id}`)
+          console.warn(`  → Skipped: duplicate comm_type='${ct}'`)
           continue
         }
         seenTypes.add(ct)
 
         const templateConfig = templateRegistry.get(ct)
-        if (!templateConfig) continue // Skip if not in registry
+        if (!templateConfig) {
+          console.log(`  → Skipped: not in registry`)
+          continue
+        }
 
+        console.log(`  ✓ Added to visible templates`)
         visibleTemplates.push({
           type: ct as CommType,
           label: templateConfig.label,
           color: et.card_color || templateConfig.color,
-          icon: templateConfig.icon, // Use registry icon (Lucide component)
+          icon: templateConfig.icon,
           displayOrder: et.display_order ?? 999,
         })
       }
@@ -1022,10 +1024,7 @@ export default function DashboardPage() {
       // Sort by display order and set loaded templates
       visibleTemplates.sort((a, b) => a.displayOrder - b.displayOrder)
 
-      // Debug: Check for duplicates
-      console.log("=== Dashboard Template Debug ===")
-      console.log("Total templates loaded:", visibleTemplates.length)
-      console.log("Templates:", visibleTemplates.map(t => `${t.type} (${t.label})`))
+      console.log("=== Final visible templates:", visibleTemplates.map(t => t.type).join(", "))
 
       setLoadedTemplates(visibleTemplates)
 

@@ -120,10 +120,13 @@ export default function TemplateSettingsPage() {
     const supabase = createClient()
 
     try {
+      console.log("=== Saving template settings ===")
+
       // Update built-in templates in event_types
-      const builtinUpdates = templates
-        .filter((t) => t.type === "builtin")
-        .map((t) =>
+      const builtinTemplates = templates.filter((t) => t.type === "builtin")
+      console.log("Built-in templates to update:", builtinTemplates.map(t => `${t.name}: show=${t.show_in_dashboard}, order=${t.display_order}`))
+
+      const builtinUpdates = builtinTemplates.map((t) =>
           supabase
             .from("event_types")
             .update({
