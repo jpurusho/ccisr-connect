@@ -983,35 +983,22 @@ export default function DashboardPage() {
       const visibleTemplates: LoadedTemplate[] = []
       const seenTypes = new Set<string>()
 
-      console.log("=== Dashboard Loading Templates ===")
       for (const et of (eventTypesRes.data ?? [])) {
         const ct = etIdToCommType[et.id]
-        console.log(`Checking: id=${et.id}, comm_type=${ct}, show_in_dashboard=${et.show_in_dashboard}`)
 
-        if (!ct) {
-          console.log(`  → Skipped: no comm_type mapping`)
-          continue
-        }
-
-        if (et.show_in_dashboard === false) {
-          console.log(`  → Skipped: show_in_dashboard is false`)
-          continue
-        }
+        if (!ct) continue
+        if (et.show_in_dashboard === false) continue
 
         // Skip duplicates - keep only the first occurrence of each comm_type
         if (seenTypes.has(ct)) {
-          console.warn(`  → Skipped: duplicate comm_type='${ct}'`)
+          console.warn(`⚠️ Skipping duplicate comm_type='${ct}' from event_types id=${et.id}`)
           continue
         }
         seenTypes.add(ct)
 
         const templateConfig = templateRegistry.get(ct)
-        if (!templateConfig) {
-          console.log(`  → Skipped: not in registry`)
-          continue
-        }
+        if (!templateConfig) continue
 
-        console.log(`  ✓ Added to visible templates`)
         visibleTemplates.push({
           type: ct as CommType,
           label: templateConfig.label,
@@ -1023,9 +1010,6 @@ export default function DashboardPage() {
 
       // Sort by display order and set loaded templates
       visibleTemplates.sort((a, b) => a.displayOrder - b.displayOrder)
-
-      console.log("=== Final visible templates:", visibleTemplates.map(t => t.type).join(", "))
-
       setLoadedTemplates(visibleTemplates)
 
       const etInfoSections: Record<string, { sections: unknown; showInBulletin: boolean }> = {}

@@ -35,12 +35,10 @@ async function testTemplateVisibility() {
   console.log("║        TEMPLATE VISIBILITY TEST - DATABASE vs RENDER           ║")
   console.log("╚════════════════════════════════════════════════════════════════╝\n")
 
-  // Query event_types from database
+  // Query event_types from database (EXACT same query as dashboard)
   const { data: eventTypes, error } = await supabase
     .from("event_types")
     .select("id, name, comm_type, show_in_dashboard, display_order, icon_name, card_color")
-    .not("comm_type", "is", null)
-    .order("display_order")
     .returns<EventType[]>()
 
   if (error) {
