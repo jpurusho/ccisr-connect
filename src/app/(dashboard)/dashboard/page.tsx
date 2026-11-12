@@ -980,8 +980,12 @@ export default function DashboardPage() {
       setCommTypeIcons(iconOverrides)
 
       // Build loaded templates list from database + registry
-      const visibleTemplates: LoadedTemplate[] = []
-      const seenTypes = new Set<string>()
+      // When multiple event_types share the same comm_type, keep the "primary" one (lowest display_order)
+      type EventTypeRow = NonNullable<typeof eventTypesRes.data>[0]
+      const templatesByCommType = new Map<string, {
+        et: EventTypeRow
+        displayOrder: number
+      }>()
 
       for (const et of (eventTypesRes.data ?? [])) {
         const ct = etIdToCommType[et.id]
@@ -989,13 +993,27 @@ export default function DashboardPage() {
         if (!ct) continue
         if (et.show_in_dashboard === false) continue
 
-        // Skip duplicates - keep only the first occurrence of each comm_type
-        if (seenTypes.has(ct)) {
-          console.warn(`⚠️ Skipping duplicate comm_type='${ct}' from event_types id=${et.id}`)
+        const currentDisplayOrder = et.display_order ?? 999
+
+        // Check if we already have this comm_type
+        const existing = templatesByCommType.get(ct)
+        if (existing) {
+          // Keep the one with lower display_order (primary)
+          if (currentDisplayOrder < existing.displayOrder) {
+            console.log(`✓ Replacing ${ct}: ${existing.et.name} (order ${existing.displayOrder}) with ${et.name} (order ${currentDisplayOrder}) as primary`)
+            templatesByCommType.set(ct, { et, displayOrder: currentDisplayOrder })
+          } else {
+            console.log(`ℹ️ Keeping ${ct}: ${existing.et.name} as primary over ${et.name}`)
+          }
           continue
         }
-        seenTypes.add(ct)
 
+        templatesByCommType.set(ct, { et, displayOrder: currentDisplayOrder })
+      }
+
+      // Convert to visible templates array
+      const visibleTemplates: LoadedTemplate[] = []
+      for (const [ct, { et, displayOrder }] of templatesByCommType) {
         const templateConfig = templateRegistry.get(ct)
         if (!templateConfig) continue
 
@@ -1004,7 +1022,7 @@ export default function DashboardPage() {
           label: templateConfig.label,
           color: et.card_color || templateConfig.color,
           icon: templateConfig.icon,
-          displayOrder: et.display_order ?? 999,
+          displayOrder,
         })
       }
 
