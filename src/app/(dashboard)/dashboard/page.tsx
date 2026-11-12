@@ -21,14 +21,8 @@ import {
   SheetFooter,
   SheetClose,
 } from "@/components/ui/sheet"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import {
   Users,
   Home,
@@ -90,7 +84,6 @@ import {
   mapDispatchStatus,
 } from "@/lib/dashboard-types"
 import { templateRegistry, type TemplateConfig } from "@/lib/template-registry"
-import { useCardVisibility } from "@/hooks/dashboard/use-card-visibility"
 import { resolveSignupAutoFill, type SignupFieldMap, type AutoFillResult } from "@/lib/signup/auto-fill"
 import { getBreakStatus } from "@/lib/dashboard/break-utils"
 import { batchResolveHostFamilies } from "@/lib/queries/batch-host-families"
@@ -433,8 +426,6 @@ export default function DashboardPage() {
   })
   const [commTypeIcons, setCommTypeIcons] = useState<Partial<Record<CommType, string>>>({})
   const [templateStyles, setTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
-  // ---- Template visibility (extracted hook) ----
-  const { visibleTemplates, toggleTemplate, isCustomVisible, toggleCustomTemplate } = useCardVisibility()
 
   // ---- Composed instance tracking ----
   const [instanceIds, setInstanceIds] = useState<Partial<Record<CommType, string>>>({})
@@ -3798,12 +3789,10 @@ export default function DashboardPage() {
               shoebox_ministry: <ShoeboxMinistryEditForm data={shoeboxMinistryForm} onChange={setShoeboxMinistryForm} />,
             }
 
-            const visibleCards = BUILTIN_TEMPLATES.filter((t) => visibleTemplates.includes(t.type))
-
             return <>
           {/* ── Mini-card grid ── */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleCards.map(({ type, label, color, icon: DefaultIcon }) => {
+            {BUILTIN_TEMPLATES.map(({ type, label, color, icon: DefaultIcon }) => {
               const TIcon = commTypeIcons[type] ? getIconComponent(commTypeIcons[type]) : DefaultIcon
               const status = getStatus(type)
               const count = dispatchCounts[type]
@@ -3918,7 +3907,7 @@ export default function DashboardPage() {
               )
             })}
             {/* Custom template cards — in same grid */}
-            {customDashTemplates.filter((ct) => isCustomVisible(ct.id)).map((ct) => {
+            {customDashTemplates.map((ct) => {
               const di = customDispatches[ct.id] ?? { status: "draft", count: 0 }
               const hasDraft = !!customInstanceIds[ct.id]
               const isSelected = selectedCustomCard === ct.id
@@ -3994,58 +3983,18 @@ export default function DashboardPage() {
             })}
           </div>
 
-          {/* ── Settings popover ── */}
+          {/* ── Settings link ── */}
           <div className="flex justify-end">
-            <Popover>
-              <PopoverTrigger
-                render={
-                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
-                    <Settings2 className="size-3.5" />
-                    Customize cards
-                  </Button>
-                }
-              />
-              <PopoverContent align="end" className="w-64">
-                <p className="text-sm font-medium mb-3">Show on Dashboard</p>
-                <div className="space-y-2">
-                  {BUILTIN_TEMPLATES.map(({ type, label, icon: TIcon, color }) => (
-                    <div key={type} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <TIcon className="size-3.5" style={{ color }} />
-                        <span className="text-sm">{label}</span>
-                      </div>
-                      <Switch
-                        size="sm"
-                        checked={visibleTemplates.includes(type)}
-                        onCheckedChange={() => toggleTemplate(type)}
-                      />
-                    </div>
-                  ))}
-                  {customDashTemplates.length > 0 && (
-                    <>
-                      <div className="border-t pt-2 mt-2" />
-                      {customDashTemplates.map((ct) => (
-                        <div key={ct.id} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">{ct.emoji}</span>
-                            <span className="text-sm truncate max-w-36">{ct.name}</span>
-                          </div>
-                          <Switch
-                            size="sm"
-                            checked={isCustomVisible(ct.id)}
-                            onCheckedChange={() => toggleCustomTemplate(ct.id)}
-                          />
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Link href="/templates">
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
+                <Settings2 className="size-3.5" />
+                Manage Templates
+              </Button>
+            </Link>
           </div>
 
           {/* ── Expanded card detail ── */}
-          {visibleTemplates.includes(selectedCard) && !selectedCustomCard && (() => {
+          {BUILTIN_TEMPLATES.find((t) => t.type === selectedCard) && !selectedCustomCard && (() => {
             const tmpl = BUILTIN_TEMPLATES.find((t) => t.type === selectedCard)
             if (!tmpl) return null // Template not loaded yet
             const type = selectedCard
