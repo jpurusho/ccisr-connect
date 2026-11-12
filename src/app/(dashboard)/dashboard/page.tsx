@@ -149,6 +149,7 @@ interface DispatchRecord {
   scheduled_at: string | null
   sent_at: string | null
   created_at: string
+  event_type_id: string | null
   template_type: string | null
   week_start: string | null
   mailing_list_id: string | null
@@ -558,6 +559,7 @@ export default function DashboardPage() {
     emoji: string
     iconName: string | null
     defaults: Record<string, unknown>
+    linkedEventTypeId?: string | null
     eventInfo?: {
       eventTypeName: string
       eventDate: string | null
@@ -863,7 +865,7 @@ export default function DashboardPage() {
         // This week dispatches (for card status — matched by target week)
         supabase
           .from("dispatch_queue")
-          .select("id, subject, body_html, status, scheduled_at, sent_at, created_at, template_type, week_start, mailing_list_id, smtp_config_id, additional_recipients")
+          .select("id, subject, body_html, status, scheduled_at, sent_at, created_at, event_type_id, template_type, week_start, mailing_list_id, smtp_config_id, additional_recipients")
           .not("status", "eq", "cancelled")
           .or(`week_start.eq.${wkSunISO},and(week_start.is.null,created_at.gte.${wkSunISO},created_at.lte.${wkSatISO}T23:59:59)`)
           .order("created_at", { ascending: false })
@@ -900,19 +902,19 @@ export default function DashboardPage() {
         // Composed instances: match current week, bulletin week, or recurring
         supabase
           .from("composed_instances")
-          .select("id, template_type, form_data, subject, subject_prefix, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until, updated_at")
+          .select("id, event_type_id, template_type, form_data, subject, subject_prefix, mailing_list_id, smtp_config_id, additional_recipients, week_start, is_recurring, recur_until, updated_at")
           .eq("is_active", true)
           .or(`week_start.eq.${wkSunISO},and(is_recurring.eq.true,week_start.lte.${wkSunISO})`)
-          .returns<{ id: string; template_type: string; form_data: Record<string, unknown>; subject: string; subject_prefix: string | null; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null; updated_at: string }[]>(),
+          .returns<{ id: string; event_type_id: string | null; template_type: string; form_data: Record<string, unknown>; subject: string; subject_prefix: string | null; mailing_list_id: string | null; smtp_config_id: string | null; additional_recipients: string | null; week_start: string | null; is_recurring: boolean; recur_until: string | null; updated_at: string }[]>(),
 
         // Most recent instances (for subject/prefix persistence when no current-week instance)
         supabase
           .from("composed_instances")
-          .select("template_type, subject, subject_prefix")
+          .select("event_type_id, template_type, subject, subject_prefix")
           .eq("is_active", true)
           .order("updated_at", { ascending: false })
           .limit(20)
-          .returns<{ template_type: string; subject: string; subject_prefix: string | null }[]>(),
+          .returns<{ event_type_id: string | null; template_type: string; subject: string; subject_prefix: string | null }[]>(),
 
       ])
 
@@ -1014,29 +1016,38 @@ export default function DashboardPage() {
         Object.fromEntries(Object.entries(savedDefaults).map(([k, v]) => [k, v.data]))
       )
 
-      // Build composed instances map (template_type → data)
+      // Build composed instances map (event_type_id → data)
       type CIRow = (typeof composedInstancesRes.data extends (infer U)[] | null ? U : never)
       const composedMap: Record<string, CIRow> = {}
+      // Also maintain legacy template_type map for backwards compatibility with custom templates
+      const composedMapByTemplateType: Record<string, CIRow> = {}
+
       if (composedInstancesRes.data) {
         for (const ci of composedInstancesRes.data) {
           if (ci.is_recurring && ci.recur_until && ci.recur_until < wkSunISO) continue
-          const existing = composedMap[ci.template_type]
-          if (!existing) {
-            composedMap[ci.template_type] = ci
-          } else {
-            // Ranking: same week (2) > recurring (1) > other (0)
-            // If ranks are equal, prefer most recently updated
+
+          // Helper: determine which instance to keep based on rank
+          const shouldReplaceInstance = (newInst: CIRow, existingInst: CIRow): boolean => {
             const rank = (c: CIRow) => c.week_start === wkSunISO ? 2 : c.is_recurring ? 1 : 0
-            const ciRank = rank(ci)
-            const existingRank = rank(existing)
-            if (ciRank > existingRank) {
-              composedMap[ci.template_type] = ci
-            } else if (ciRank === existingRank) {
-              // Same rank - use most recently updated
-              if (ci.updated_at > existing.updated_at) {
-                composedMap[ci.template_type] = ci
-              }
+            const newRank = rank(newInst)
+            const existingRank = rank(existingInst)
+            if (newRank > existingRank) return true
+            if (newRank === existingRank && newInst.updated_at > existingInst.updated_at) return true
+            return false
+          }
+
+          // Map by event_type_id (primary key for multi-location architecture)
+          if (ci.event_type_id) {
+            const existing = composedMap[ci.event_type_id]
+            if (!existing || shouldReplaceInstance(ci, existing)) {
+              composedMap[ci.event_type_id] = ci
             }
+          }
+
+          // Also map by template_type for legacy compatibility (custom templates, etc.)
+          const existingByType = composedMapByTemplateType[ci.template_type]
+          if (!existingByType || shouldReplaceInstance(ci, existingByType)) {
+            composedMapByTemplateType[ci.template_type] = ci
           }
         }
       }
@@ -1049,13 +1060,12 @@ export default function DashboardPage() {
       // For each visible template (event_type), check if there's a composed instance
       for (const tmpl of visibleTemplates) {
         const eventTypeId = tmpl.eventTypeId
-        const templateType = tmpl.templateType
 
-        // Check if there's a composed instance for this template type
-        if (composedMap[templateType]) {
-          resolvedInstanceIds[eventTypeId] = composedMap[templateType].id
-          if (composedMap[templateType].week_start) resolvedInstanceWeeks[eventTypeId] = composedMap[templateType].week_start!
-          if (composedMap[templateType].updated_at) resolvedInstanceUpdatedAt[eventTypeId] = composedMap[templateType].updated_at
+        // Match by event_type_id (new architecture)
+        if (composedMap[eventTypeId]) {
+          resolvedInstanceIds[eventTypeId] = composedMap[eventTypeId].id
+          if (composedMap[eventTypeId].week_start) resolvedInstanceWeeks[eventTypeId] = composedMap[eventTypeId].week_start!
+          if (composedMap[eventTypeId].updated_at) resolvedInstanceUpdatedAt[eventTypeId] = composedMap[eventTypeId].updated_at
         }
       }
 
@@ -1065,7 +1075,7 @@ export default function DashboardPage() {
 
       // Priority: composed instance > template defaults > hardcoded fallbacks
       const resolve = (ciKey: string, etKey: string, fallbackKey?: string): CommonCardFields & Record<string, unknown> =>
-        (composedMap[ciKey]?.form_data ?? savedDefaults[etKey]?.data ?? (fallbackKey ? FALLBACK_DEFAULTS[fallbackKey].data : {})) as CommonCardFields & Record<string, unknown>
+        (composedMapByTemplateType[ciKey]?.form_data ?? savedDefaults[etKey]?.data ?? (fallbackKey ? FALLBACK_DEFAULTS[fallbackKey].data : {})) as CommonCardFields & Record<string, unknown>
 
       const bsDef = resolve("bible_study", "bible_study", "bible_study") as BibleStudyDefaults
       const wsDef = resolve("womens_study", "womens_study", "womens_study") as WomensStudyDefaults
@@ -1114,10 +1124,10 @@ export default function DashboardPage() {
         .filter((m) => !isActiveMember(m))
         .map((m) => `${m.full_name} (${m.birth_month}/${m.birth_day})`)
 
-      const hasBdDraft = !!composedMap["birthday"]
+      const hasBdDraft = !!composedMapByTemplateType["birthday"]
       const bdCommon = extractCommonFields(bdDef)
       if (hasBdDraft) {
-        const fd = composedMap["birthday"].form_data as Record<string, unknown>
+        const fd = composedMapByTemplateType["birthday"].form_data as Record<string, unknown>
         setBirthdayForm({
           weekLabel: (fd.weekLabel as string) ?? wl,
           birthdays: (fd.birthdays as BirthdayFormData["birthdays"]) ?? bdayEntries,
@@ -1163,10 +1173,10 @@ export default function DashboardPage() {
       }))
       setDbAnniEntries(anniEntries)
 
-      const hasAnDraft = !!composedMap["anniversary"]
+      const hasAnDraft = !!composedMapByTemplateType["anniversary"]
       const anCommon = extractCommonFields(anDef)
       if (hasAnDraft) {
-        const fd = composedMap["anniversary"].form_data as Record<string, unknown>
+        const fd = composedMapByTemplateType["anniversary"].form_data as Record<string, unknown>
         setAnniversaryForm({
           weekLabel: (fd.weekLabel as string) ?? wl,
           anniversaries: (fd.anniversaries as AnniversaryFormData["anniversaries"]) ?? anniEntries,
@@ -1237,7 +1247,7 @@ export default function DashboardPage() {
       const autoFills: Partial<Record<string, AutoFillResult>> = {}
 
       // ---- Process Bible Study ----
-      const hasBsDraft = !!composedMap["bible_study"]
+      const hasBsDraft = !!composedMapByTemplateType["bible_study"]
       const bsEvent = findEventByType("bible_study")
       const bsOccurrences = bsEvent ? getOccurrences(bsEvent.recurrence_rule, wkSun, wkSat) : []
       let bsRawDate = bsOccurrences.length > 0 ? bsOccurrences[0] : null
@@ -1280,7 +1290,7 @@ export default function DashboardPage() {
       }
 
       if (hasBsDraft) {
-        const fd = composedMap["bible_study"].form_data as Record<string, unknown>
+        const fd = composedMapByTemplateType["bible_study"].form_data as Record<string, unknown>
         setBibleStudyForm({
           title: (fd.title as string) ?? bsDef.title ?? "Bible Study This Friday",
           date: bsOnBreak ? bsBreakMessage : bsDateStr,
@@ -1343,7 +1353,7 @@ export default function DashboardPage() {
       }
 
       // ---- Women's Study (recurrence-based) ----
-      const hasWsDraft = !!composedMap["womens_study"]
+      const hasWsDraft = !!composedMapByTemplateType["womens_study"]
       const wsEvent = findEventByType("womens_study")
       const wsOccurrences = wsEvent ? getOccurrences(wsEvent.recurrence_rule, wkSun, wkSat) : []
       let wsRawDate = wsOccurrences.length > 0 ? wsOccurrences[0] : null
@@ -1379,7 +1389,7 @@ export default function DashboardPage() {
 
       const wsCommon = extractCommonFields(wsDef)
       if (hasWsDraft) {
-        const fd = composedMap["womens_study"].form_data as Record<string, unknown>
+        const fd = composedMapByTemplateType["womens_study"].form_data as Record<string, unknown>
         setWomensStudyForm({
           title: (fd.title as string) ?? wsDef.title ?? "Women's Bible Study",
           topic: (fd.topic as string) ?? wsDef.topic ?? "Building a Relationship with God",
@@ -1406,7 +1416,7 @@ export default function DashboardPage() {
       }
 
       // ---- Prayer Meeting ----
-      const hasPmDraft = !!composedMap["prayer_meeting"]
+      const hasPmDraft = !!composedMapByTemplateType["prayer_meeting"]
       const pmEvent = findEventByType("prayer_meeting")
       const pmOccurrences = pmEvent ? getOccurrences(pmEvent.recurrence_rule, wkSun, wkSat) : []
       let pmRawDate = pmOccurrences.length > 0 ? pmOccurrences[0] : null
@@ -1443,7 +1453,7 @@ export default function DashboardPage() {
 
       const pmCommon = extractCommonFields(pmDef)
       if (hasPmDraft) {
-        const fd = composedMap["prayer_meeting"].form_data as Record<string, unknown>
+        const fd = composedMapByTemplateType["prayer_meeting"].form_data as Record<string, unknown>
         setPrayerMeetingForm({
           date: pmOnBreak ? pmBreakMessage : (pmDateStr ?? (pmEvent ? "Not scheduled this week" : (fd.date as string) ?? "")),
           time: pmTimeStr ?? ((fd.time as string) ?? pmDef.time ?? "6:00 PM"),
@@ -1691,7 +1701,7 @@ export default function DashboardPage() {
       setDbBulletinEvents([...bulletinAutoEvents, ...manualBulletinItems])
 
       // ---- Bulletin (same week as everything else) ----
-      const hasBulDraft = !!composedMap["bulletin"]
+      const hasBulDraft = !!composedMapByTemplateType["bulletin"]
       const bulCommon = extractCommonFields(bulDef)
 
       // Auto-fill helpers from signup form (if bulletin event type has a linked form)
@@ -1792,7 +1802,7 @@ export default function DashboardPage() {
       }
 
       if (hasBulDraft) {
-        const fd = composedMap["bulletin"].form_data as Record<string, unknown>
+        const fd = composedMapByTemplateType["bulletin"].form_data as Record<string, unknown>
         // Merge: keep only user-added draft events not covered by live events or active calendar events
         const draftEvents = (fd.events as BulletinFormData["events"]) ?? []
         const activeEventTitles = activeEvents.map((e) => e.title.toLowerCase())
@@ -2010,6 +2020,7 @@ export default function DashboardPage() {
       for (const ct of dashCustom) {
         const linkedEt = (eventTypesRes.data ?? []).find((et) => et.default_template_id === ct.id)
         if (!linkedEt) continue
+        ct.linkedEventTypeId = linkedEt.id
         const linkedEvents = activeEvents.filter((e) => e.event_type_id === linkedEt.id)
         const linkedColor = linkedEt.color_scheme?.primary
         if (linkedColor) ct.color = linkedColor
@@ -2071,36 +2082,24 @@ export default function DashboardPage() {
       setMailingLists(mailingListsRes.data ?? [])
       setSmtpConfigs(smtpConfigsRes.data ?? [])
 
-      // ---- Pre-fill mailing list + SMTP from composed instances ----
-      const templateTypes: string[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
-      const prefilledOptions: Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }> = {
-        birthday: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-        anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-        bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-        womens_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-        prayer_meeting: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-        bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-        shoebox_ministry: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-        mountain_house_bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-      }
-      for (const ct of templateTypes) {
-        const ci = composedMap[ct]
-        if (ci) {
-          prefilledOptions[ct] = {
-            mailingListId: ci.mailing_list_id || "",
-            smtpConfigId: ci.smtp_config_id || "",
-            additionalRecipients: ci.additional_recipients || "",
-          }
+      // ---- Pre-fill mailing list + SMTP from composed instances (keyed by event_type.id) ----
+      const prefilledOptions: Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }> = {}
+      for (const tmpl of visibleTemplates) {
+        const ci = composedMap[tmpl.eventTypeId]
+        prefilledOptions[tmpl.eventTypeId] = {
+          mailingListId: ci?.mailing_list_id || "",
+          smtpConfigId: ci?.smtp_config_id || "",
+          additionalRecipients: ci?.additional_recipients || "",
         }
       }
 
-      // Pre-fill subject overrides and prefixes from composed instances
+      // Pre-fill subject overrides and prefixes from composed instances (keyed by event_type.id)
       const resolvedSubjects: Record<string, string> = {}
       const resolvedPrefixes: Record<string, string> = {}
-      for (const ct of templateTypes) {
-        const ci = composedMap[ct]
-        if (ci?.subject) resolvedSubjects[ct] = ci.subject
-        if (ci?.subject_prefix) resolvedPrefixes[ct] = ci.subject_prefix
+      for (const tmpl of visibleTemplates) {
+        const ci = composedMap[tmpl.eventTypeId]
+        if (ci?.subject) resolvedSubjects[tmpl.eventTypeId] = ci.subject
+        if (ci?.subject_prefix) resolvedPrefixes[tmpl.eventTypeId] = ci.subject_prefix
       }
 
       // Fallback: use most recent instance's subject if no current-week instance exists
@@ -2109,61 +2108,70 @@ export default function DashboardPage() {
       // because the saved subject has the old date baked in
       const recentInstances = recentInstancesRes.data ?? []
       const skipSubjectPersistence = new Set(["bible_study", "prayer_meeting", "bulletin"])
-      for (const ct of templateTypes) {
-        if (!resolvedSubjects[ct] && !resolvedPrefixes[ct]) {
-          const recent = recentInstances.find(ri => ri.template_type === ct)
+      for (const tmpl of visibleTemplates) {
+        const templateType = tmpl.templateType
+        const eventTypeId = tmpl.eventTypeId
+        if (!resolvedSubjects[eventTypeId] && !resolvedPrefixes[eventTypeId]) {
+          const recent = recentInstances.find(ri => ri.template_type === templateType || ri.event_type_id === eventTypeId)
           if (recent) {
             // Only persist subject for non-date-dependent templates
-            if (recent.subject && !skipSubjectPersistence.has(ct)) {
-              resolvedSubjects[ct] = recent.subject
+            if (recent.subject && !skipSubjectPersistence.has(templateType)) {
+              resolvedSubjects[eventTypeId] = recent.subject
             }
             // Always persist prefix (it doesn't contain dates)
             if (recent.subject_prefix) {
-              resolvedPrefixes[ct] = recent.subject_prefix
+              resolvedPrefixes[eventTypeId] = recent.subject_prefix
             }
           }
         }
       }
 
-      // ---- Match dispatches to communication types (count all, keep latest) ----
+      // ---- Match dispatches to communication types (keyed by event_type.id) ----
       const weekDispatches = weekDispatchesRes.data ?? []
-      const matchedDispatches: Record<string, DispatchRecord | null> = {
-        birthday: null,
-        anniversary: null,
-        bible_study: null,
-        womens_study: null,
-        prayer_meeting: null,
-        bulletin: null,
-        shoebox_ministry: null,
-        mountain_house_bible_study: null,
-      }
-      const counts: Record<string, number> = {
-        birthday: 0,
-        anniversary: 0,
-        bible_study: 0,
-        womens_study: 0,
-        prayer_meeting: 0,
-        bulletin: 0,
-        shoebox_ministry: 0,
-        mountain_house_bible_study: 0,
+      const matchedDispatches: Record<string, DispatchRecord | null> = {}
+      const counts: Record<string, number> = {}
+
+      // Initialize dispatch tracking for all visible event types
+      for (const tmpl of visibleTemplates) {
+        matchedDispatches[tmpl.eventTypeId] = null
+        counts[tmpl.eventTypeId] = 0
       }
 
+      // Match dispatches by event_type_id (primary) or template_type (fallback for legacy)
       for (const d of weekDispatches) {
         let matched = false
-        // Prefer explicit template_type over subject regex
-        if (d.template_type && d.template_type in counts) {
-          const ct = d.template_type
-          counts[ct]++
-          if (!matchedDispatches[ct]) matchedDispatches[ct] = d
+
+        // Primary: match by event_type_id
+        if (d.event_type_id && d.event_type_id in matchedDispatches) {
+          const etId = d.event_type_id
+          counts[etId] = (counts[etId] || 0) + 1
+          if (!matchedDispatches[etId]) matchedDispatches[etId] = d
           matched = true
         }
-        // Fallback: regex match for legacy dispatches without template_type
+
+        // Fallback: match by template_type (for legacy records or records without event_type_id)
+        if (!matched && d.template_type) {
+          // Find event_type.id that matches this template_type
+          const tmpl = visibleTemplates.find(t => t.templateType === d.template_type)
+          if (tmpl) {
+            const etId = tmpl.eventTypeId
+            counts[etId] = (counts[etId] || 0) + 1
+            if (!matchedDispatches[etId]) matchedDispatches[etId] = d
+            matched = true
+          }
+        }
+
+        // Last resort: regex match for legacy dispatches without event_type_id or template_type
         if (!matched) {
           for (const [type, matcher] of Object.entries(DISPATCH_MATCHERS)) {
             if (matcher(d.subject)) {
-              counts[type]++
-              if (!matchedDispatches[type]) {
-                matchedDispatches[type] = d
+              const tmpl = visibleTemplates.find(t => t.templateType === type)
+              if (tmpl) {
+                const etId = tmpl.eventTypeId
+                counts[etId] = (counts[etId] || 0) + 1
+                if (!matchedDispatches[etId]) {
+                  matchedDispatches[etId] = d
+                }
               }
             }
           }
@@ -2174,11 +2182,12 @@ export default function DashboardPage() {
       setDispatchCounts(counts)
 
       // Fallback: pre-fill mailing list + SMTP from dispatches when no composed instance
-      for (const ct of templateTypes) {
-        if (!prefilledOptions[ct].mailingListId && !prefilledOptions[ct].smtpConfigId) {
-          const d = matchedDispatches[ct]
+      for (const tmpl of visibleTemplates) {
+        const etId = tmpl.eventTypeId
+        if (!prefilledOptions[etId].mailingListId && !prefilledOptions[etId].smtpConfigId) {
+          const d = matchedDispatches[etId]
           if (d) {
-            prefilledOptions[ct] = {
+            prefilledOptions[etId] = {
               mailingListId: d.mailing_list_id || "",
               smtpConfigId: d.smtp_config_id || "",
               additionalRecipients: d.additional_recipients || "",
@@ -2542,26 +2551,33 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      const weekStart = getWeekStartForSave(eventTypeIdOrTemplateType)
-      const templateName = BUILTIN_LABEL[eventTypeIdOrTemplateType] || eventTypeIdOrTemplateType
-      const baseSubject = getSubject(eventTypeIdOrTemplateType)
+      // Resolve event_type_id and template_type from the key
+      const tmpl = BUILTIN_TEMPLATES.find(t => t.eventTypeId === eventTypeIdOrTemplateType)
+      const eventTypeId = tmpl?.eventTypeId || null
+      const templateType = tmpl?.templateType || eventTypeIdOrTemplateType
+
+      const weekStart = getWeekStartForSave(templateType)
+      const templateName = BUILTIN_LABEL[templateType] || eventTypeIdOrTemplateType
+      const baseSubject = getSubject(templateType)
 
       // DEBUG: Trace subject resolution
       console.log('[SAVE DEBUG]', {
-        type: eventTypeIdOrTemplateType,
+        eventTypeId,
+        templateType,
         subjectOverride: subjectOverrides[eventTypeIdOrTemplateType],
-        savedTemplate: savedSubjectTemplates[eventTypeIdOrTemplateType],
+        savedTemplate: savedSubjectTemplates[templateType],
         dispatchSubject: dispatches[eventTypeIdOrTemplateType]?.subject,
         baseSubject,
         prefix: subjectPrefixes[eventTypeIdOrTemplateType]
       })
 
       const payload = {
-        template_type: eventTypeIdOrTemplateType,
+        event_type_id: eventTypeId,
+        template_type: templateType,
         name: templateName,
         subject: baseSubject,  // Store ONLY base subject (no prefix)
         subject_prefix: subjectPrefixes[eventTypeIdOrTemplateType] || null,  // Store prefix separately
-        form_data: getFormData(eventTypeIdOrTemplateType),
+        form_data: getFormData(templateType),
         mailing_list_id: commOptions[eventTypeIdOrTemplateType].mailingListId || null,
         smtp_config_id: commOptions[eventTypeIdOrTemplateType].smtpConfigId || null,
         additional_recipients: commOptions[eventTypeIdOrTemplateType].additionalRecipients || null,
@@ -2738,7 +2754,12 @@ export default function DashboardPage() {
 
   // ---- Queue / Send ----
   const handleSendNow = useCallback(
-    async (templateType: string) => {
+    async (eventTypeIdOrTemplateType: string) => {
+      // Resolve event_type_id and template_type from the key
+      const tmpl = BUILTIN_TEMPLATES.find(t => t.eventTypeId === eventTypeIdOrTemplateType)
+      const eventTypeId = tmpl?.eventTypeId || eventTypeIdOrTemplateType
+      const templateType = tmpl?.templateType || eventTypeIdOrTemplateType
+
       const html = getLivePreview(templateType)
       if (!html) {
         toast.error("No content to send. Please add data first.")
@@ -2746,7 +2767,7 @@ export default function DashboardPage() {
       }
 
       // Track if this is a reminder (resending an already sent email)
-      const currentStatus = getStatus(templateType)
+      const currentStatus = getStatus(eventTypeId)
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
       // Get base subject - for reminders, generate fresh (skip old sent subject)
@@ -2754,11 +2775,11 @@ export default function DashboardPage() {
 
       // Apply ONLY user's explicit prefix (if they set one)
       // Prefix is layered at runtime, never stored in DB
-      const finalSubject = subjectPrefixes[templateType]?.trim()
-        ? combineSubject(baseSubject, templateType)
+      const finalSubject = subjectPrefixes[eventTypeId]?.trim()
+        ? combineSubject(baseSubject, eventTypeId)
         : baseSubject
 
-      const opts = commOptions[templateType]
+      const opts = commOptions[eventTypeId]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
         toast.error("Please select a mailing list or add recipient emails before sending.")
         return
@@ -2768,7 +2789,7 @@ export default function DashboardPage() {
         return
       }
 
-      setSendingType(templateType)
+      setSendingType(eventTypeId)
       try {
         const supabase = createClient()
         const {
@@ -2779,12 +2800,13 @@ export default function DashboardPage() {
 
         // Auto-save draft before dispatching so form data persists
         // IMPORTANT: Store ONLY base subject (no prefix) to avoid accumulation
-        const templateName = BUILTIN_LABEL[templateType] || templateType
+        const templateName = BUILTIN_LABEL[templateType] || eventTypeIdOrTemplateType
         const draftPayload = {
+          event_type_id: tmpl?.eventTypeId || null,
           template_type: templateType,
           name: templateName,
           subject: baseSubject,  // Store base subject WITHOUT prefix
-          subject_prefix: subjectPrefixes[templateType] || null,  // Store prefix separately
+          subject_prefix: subjectPrefixes[eventTypeId] || null,  // Store prefix separately
           form_data: getFormData(templateType),
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
@@ -2795,12 +2817,12 @@ export default function DashboardPage() {
           recur_until: null,
           created_by: user?.id ?? null,
         }
-        const existingDraftId = instanceIds[templateType]
+        const existingDraftId = instanceIds[eventTypeId]
         if (existingDraftId) {
           await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingDraftId)
         } else {
           const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
-          if (newDraft) setInstanceIds((prev) => ({ ...prev, [templateType]: newDraft.id }))
+          if (newDraft) setInstanceIds((prev) => ({ ...prev, [eventTypeId]: newDraft.id }))
         }
         snapshotForm(templateType)
 
@@ -2815,7 +2837,7 @@ export default function DashboardPage() {
         const listName = mailingLists.find((ml) => ml.id === opts.mailingListId)?.name || "Direct recipients"
 
         // Show confirmation dialog instead of sending immediately
-        setSendConfirm({ open: true, eventTypeId: templateType, subject: finalSubject, recipientCount: totalRecipients, listName, isReminder })
+        setSendConfirm({ open: true, eventTypeId, subject: finalSubject, recipientCount: totalRecipients, listName, isReminder })
         setSendingType(null)
         return
       } catch {
@@ -2829,8 +2851,13 @@ export default function DashboardPage() {
   )
 
   async function handleQueue(eventTypeIdOrTemplateType: string) {
-    const html = getLivePreview(eventTypeIdOrTemplateType)
-    const baseSubject = getSubject(eventTypeIdOrTemplateType)
+    // Resolve event_type_id and template_type from the key
+    const tmpl = BUILTIN_TEMPLATES.find(t => t.eventTypeId === eventTypeIdOrTemplateType)
+    const eventTypeId = tmpl?.eventTypeId || null
+    const templateType = tmpl?.templateType || eventTypeIdOrTemplateType
+
+    const html = getLivePreview(templateType)
+    const baseSubject = getSubject(templateType)
     const subject = combineSubject(baseSubject, eventTypeIdOrTemplateType)
     if (!html) { toast.error("No content to queue. Please add data first."); return }
 
@@ -2848,16 +2875,17 @@ export default function DashboardPage() {
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      const dispatchWeekStart = getWeekStartForSave(eventTypeIdOrTemplateType)
+      const dispatchWeekStart = getWeekStartForSave(templateType)
 
       // Auto-save draft
-      const templateName = BUILTIN_LABEL[eventTypeIdOrTemplateType] || eventTypeIdOrTemplateType
+      const templateName = BUILTIN_LABEL[templateType] || eventTypeIdOrTemplateType
       const draftPayload = {
-        template_type: eventTypeIdOrTemplateType,
+        event_type_id: eventTypeId,
+        template_type: templateType,
         name: templateName,
         subject: baseSubject,  // Store base subject WITHOUT prefix
         subject_prefix: subjectPrefixes[eventTypeIdOrTemplateType] || null,  // Store prefix separately
-        form_data: getFormData(eventTypeIdOrTemplateType),
+        form_data: getFormData(templateType),
         mailing_list_id: opts.mailingListId || null,
         smtp_config_id: opts.smtpConfigId || null,
         additional_recipients: opts.additionalRecipients.trim() || null,
@@ -2874,17 +2902,18 @@ export default function DashboardPage() {
         const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
         if (newDraft) setInstanceIds((prev) => ({ ...prev, [eventTypeIdOrTemplateType]: newDraft.id }))
       }
-      snapshotForm(eventTypeIdOrTemplateType)
+      snapshotForm(templateType)
 
       // Insert into dispatch_queue as "pending" (for review, not sent)
       const { error } = await supabase
         .from("dispatch_queue")
         .insert({
+          event_type_id: eventTypeId,
           subject,
           body_html: html,
           scheduled_at: new Date().toISOString(),
           status: "pending",
-          template_type: eventTypeIdOrTemplateType,
+          template_type: templateType,
           week_start: dispatchWeekStart,
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
@@ -2909,6 +2938,12 @@ export default function DashboardPage() {
   const executeSend = useCallback(async () => {
     if (!sendConfirm.eventTypeId) return
     const eventTypeIdOrTemplateType = sendConfirm.eventTypeId
+
+    // Resolve event_type_id and template_type from the key
+    const tmpl = BUILTIN_TEMPLATES.find(t => t.eventTypeId === eventTypeIdOrTemplateType)
+    const eventTypeId = tmpl?.eventTypeId || null
+    const templateType = tmpl?.templateType || eventTypeIdOrTemplateType
+
     const subject = sendConfirm.subject
     const isReminder = sendConfirm.isReminder
     setSendConfirm((prev) => ({ ...prev, open: false }))
@@ -2918,17 +2953,18 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       const opts = commOptions[eventTypeIdOrTemplateType]
-      const html = getLivePreview(eventTypeIdOrTemplateType)
-      const dispatchWeekStart = getWeekStartForSave(eventTypeIdOrTemplateType)
+      const html = getLivePreview(templateType)
+      const dispatchWeekStart = getWeekStartForSave(templateType)
 
       const { data: inserted, error } = await supabase
           .from("dispatch_queue")
           .insert({
+            event_type_id: eventTypeId,
             subject,
             body_html: html,
             scheduled_at: new Date().toISOString(),
             status: "sending",
-            template_type: eventTypeIdOrTemplateType,
+            template_type: templateType,
             week_start: dispatchWeekStart,
             mailing_list_id: opts.mailingListId || null,
             smtp_config_id: opts.smtpConfigId || null,
@@ -2963,7 +2999,8 @@ export default function DashboardPage() {
               scheduled_at: new Date().toISOString(),
               sent_at: null,
               created_at: new Date().toISOString(),
-              template_type: eventTypeIdOrTemplateType,
+              event_type_id: eventTypeId,
+              template_type: templateType,
               week_start: dispatchWeekStart,
               mailing_list_id: opts.mailingListId || null,
               smtp_config_id: opts.smtpConfigId || null,
@@ -3009,7 +3046,11 @@ export default function DashboardPage() {
   )
 
   async function handleTestSend(eventTypeIdOrTemplateType: string) {
-    const html = getLivePreview(eventTypeIdOrTemplateType)
+    // Resolve event_type_id and template_type from the key
+    const tmpl = BUILTIN_TEMPLATES.find(t => t.eventTypeId === eventTypeIdOrTemplateType)
+    const templateType = tmpl?.templateType || eventTypeIdOrTemplateType
+
+    const html = getLivePreview(templateType)
     if (!html) { toast.error("No content to send."); return }
     const opts = commOptions[eventTypeIdOrTemplateType]
     if (!opts.smtpConfigId) { toast.error("Select a Send From account first."); return }
@@ -3017,7 +3058,7 @@ export default function DashboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const adminEmail = user?.email
     if (!adminEmail) { toast.error("Could not determine your email."); return }
-    const baseSubject = getSubject(eventTypeIdOrTemplateType)
+    const baseSubject = getSubject(templateType)
     const subject = combineSubject(baseSubject, eventTypeIdOrTemplateType)
     try {
       const res = await fetch("/api/dispatch/test", {
@@ -3057,6 +3098,7 @@ export default function DashboardPage() {
       const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
 
       const draftPayload = {
+        event_type_id: ct.linkedEventTypeId || null,
         template_type: ctKey,
         name: ct.name,
         subject: baseSubj,  // Store base subject WITHOUT prefix
@@ -3081,6 +3123,7 @@ export default function DashboardPage() {
       setCustomSnapshots((prev) => ({ ...prev, [ctId]: structuredClone(form as unknown as Record<string, unknown>) }))
 
       const { data: inserted, error } = await supabase.from("dispatch_queue").insert({
+        event_type_id: ct.linkedEventTypeId || null,
         subject: subj,
         body_html: html,
         scheduled_at: new Date().toISOString(),
@@ -3129,6 +3172,7 @@ export default function DashboardPage() {
       const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
 
       const draftPayload = {
+        event_type_id: ct.linkedEventTypeId || null,
         template_type: ctKey,
         name: ct.name,
         subject: baseSubj,  // Store base subject WITHOUT prefix
@@ -3153,6 +3197,7 @@ export default function DashboardPage() {
       setCustomSnapshots((prev) => ({ ...prev, [ctId]: structuredClone(form as unknown as Record<string, unknown>) }))
 
       const { error } = await supabase.from("dispatch_queue").insert({
+        event_type_id: ct.linkedEventTypeId || null,
         subject: subj,
         body_html: html,
         scheduled_at: new Date().toISOString(),
@@ -3185,6 +3230,7 @@ export default function DashboardPage() {
       const weekStart = format(startOfWeek(addDays(new Date(), weekOffset * 7), { weekStartsOn: 0 }), "yyyy-MM-dd")
       const opts = commOptions[ctId]
       const payload = {
+        event_type_id: ct.linkedEventTypeId || null,
         template_type: ctKey,
         name: ct.name,
         subject: subj,
@@ -3320,8 +3366,13 @@ export default function DashboardPage() {
     const eventTypeIdOrTemplateType = scheduleDialog.eventTypeId
     if (!eventTypeIdOrTemplateType) return
 
-    const html = getLivePreview(eventTypeIdOrTemplateType)
-    const subject = getSubject(eventTypeIdOrTemplateType)
+    // Resolve event_type_id and template_type from the key
+    const tmpl = BUILTIN_TEMPLATES.find(t => t.eventTypeId === eventTypeIdOrTemplateType)
+    const eventTypeId = tmpl?.eventTypeId || null
+    const templateType = tmpl?.templateType || eventTypeIdOrTemplateType
+
+    const html = getLivePreview(templateType)
+    const subject = getSubject(templateType)
     if (!html) return
 
     const opts = commOptions[eventTypeIdOrTemplateType]
@@ -3336,16 +3387,17 @@ export default function DashboardPage() {
         data: { user },
       } = await supabase.auth.getUser()
 
-      const schedWeekStart = getWeekStartForSave(eventTypeIdOrTemplateType)
+      const schedWeekStart = getWeekStartForSave(templateType)
 
       const { data: inserted, error } = await supabase
         .from("dispatch_queue")
         .insert({
+          event_type_id: eventTypeId,
           subject,
           body_html: html,
           scheduled_at: scheduledAt,
           status: "pending",
-          template_type: eventTypeIdOrTemplateType,
+          template_type: templateType,
           week_start: schedWeekStart,
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
@@ -3371,7 +3423,8 @@ export default function DashboardPage() {
             scheduled_at: scheduledAt,
             sent_at: null,
             created_at: new Date().toISOString(),
-            template_type: eventTypeIdOrTemplateType,
+            event_type_id: eventTypeId,
+            template_type: templateType,
             week_start: schedWeekStart,
             mailing_list_id: opts.mailingListId || null,
             smtp_config_id: opts.smtpConfigId || null,
@@ -4036,7 +4089,7 @@ export default function DashboardPage() {
                 previewHtml={getPreview(templateType)}
                 resourceLinks={links[templateType]}
                 onQueue={() => handleQueue(eventTypeId)}
-                onSendNow={() => handleSendNow(templateType)}
+                onSendNow={() => handleSendNow(eventTypeId)}
                 onTestSend={() => handleTestSend(eventTypeId)}
                 onSave={() => handleSaveInstance(eventTypeId)}
                 onDelete={() => handleDeleteInstance(eventTypeId)}
