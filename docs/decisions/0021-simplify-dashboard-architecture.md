@@ -1,7 +1,14 @@
 # Dashboard Architecture Simplification
 
 **Date**: 2026-08-18  
-**Status**: Proposed
+**Status**: ~~Proposed~~ → **Superseded by v1.84.0 Multi-Location Architecture**
+
+> **Note:** This document proposed solutions to the hardcoded `CommType` limitation. The v1.84.0 release resolved these issues by introducing:
+> - Template registry pattern (form components + card builders)
+> - ID-based dashboard state (`event_type.id` instead of `CommType`)
+> - Scalable multi-location system (zero code changes to add locations)
+> 
+> This document is preserved for historical context.
 
 ## Current Problems
 

@@ -169,7 +169,7 @@ supabase db push
 
 ## Benefits
 
-### Before Dynamic System
+### Before Dynamic System (Pre-v1.49.0)
 
 Adding a new template required changes in **~15 files**:
 - Hardcoded `CommType` union in `dashboard-types.ts`
@@ -179,7 +179,11 @@ Adding a new template required changes in **~15 files**:
 - Database migration
 - Manual testing of every affected file
 
-### After Dynamic System
+### Before Multi-Location System (v1.49.0 - v1.83.x)
+
+Adding a new **location** for an existing template was impossible without duplicating the template type and all its code.
+
+### After Dynamic System (v1.49.0+)
 
 Adding a new template requires changes in **4 files + 1 migration**:
 1. Template form component (new or existing file)
@@ -189,6 +193,25 @@ Adding a new template requires changes in **4 files + 1 migration**:
 5. Database migration (one INSERT statement)
 
 **No dashboard code changes needed!**
+
+### After Multi-Location System (v1.84.0+)
+
+Adding a new **location** for an existing template requires **only a database INSERT**:
+```sql
+INSERT INTO event_types (name, template_type, is_primary, show_in_dashboard)
+VALUES ('Mountain House Bible Study', 'bible_study', false, true);
+```
+
+**Zero code changes needed!** The dashboard automatically:
+- Shows a new card for the location
+- Uses the correct form component (from template registry)
+- Maintains independent state per location
+- Builds cards with the registered card builder
+
+**Key architectural change:**
+- Dashboard state keyed by `event_type.id` (numeric, unique per location)
+- `template_type` identifies which template to use (e.g., "bible_study")
+- Multiple locations = multiple event_types with same `template_type`
 
 ## Database Schema
 
@@ -341,19 +364,22 @@ Changes are saved when clicking "Save Defaults" button.
 ## Future Enhancements
 
 ### Completed
-- ✅ Dynamic template loading
-- ✅ Database-driven visibility control
-- ✅ UI for editing visibility settings
-- ✅ Template registry pattern
-- ✅ Documentation and test checklist
+- ✅ Dynamic template loading (v1.49.0)
+- ✅ Database-driven visibility control (v1.49.0)
+- ✅ UI for editing visibility settings (v1.49.0)
+- ✅ Template registry pattern (v1.49.0)
+- ✅ Documentation and test checklist (v1.49.0)
+- ✅ Replace CommType union with TemplateType string (v1.84.0)
+- ✅ Multi-location support with zero code changes (v1.84.0)
+- ✅ ID-based dashboard state (v1.84.0)
 
 ### Potential Future Work
-- ⏳ Make CommType a dynamic string type instead of hardcoded union
 - ⏳ Icon picker UI in Templates page
 - ⏳ Color picker UI in Templates page (already exists for card content)
 - ⏳ Drag-and-drop reordering on dashboard
 - ⏳ Template categories/groups
 - ⏳ Template permissions (role-based visibility)
+- ⏳ Location-specific template overrides (different defaults per location)
 
 ## Troubleshooting
 

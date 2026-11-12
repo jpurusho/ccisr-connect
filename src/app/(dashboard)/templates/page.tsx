@@ -58,7 +58,7 @@ import {
 import { interp, makeBirthdayVars, makeAnniversaryVars, makeEventVars, makeBulletinVars } from "@/lib/interpolate"
 import { TemplateStyleEditor } from "@/components/dashboard/template-style-editor"
 import { type TemplateStyleSettings } from "@/lib/email/card-builder"
-import { type CommType, inferCommType } from "@/lib/dashboard-types"
+import { type TemplateType, inferTemplateType } from "@/lib/dashboard-types"
 import {
   Sheet,
   SheetClose,
@@ -160,7 +160,7 @@ export default function TemplatesPage() {
     const dashSettings: Record<string, { showInDashboard: boolean; displayOrder: number; iconName: string; cardColor: string }> = {}
     if (etRes.data) {
       for (const et of etRes.data) {
-        const tabName = (et.comm_type as string) ?? inferCommType(et.name) ?? et.name
+        const tabName = (et.comm_type as string) ?? inferTemplateType(et.name) ?? et.name
         idToTabName[et.id] = tabName
         tabNameToId[tabName] = et.id
         dashSettings[tabName] = {

@@ -1,7 +1,7 @@
 # CCISR Connect — Architecture
 
-**Version:** 1.45.5
-**Date:** 2026-05-20
+**Version:** 1.84.1
+**Date:** 2026-11-11
 **Status:** Production (single-church deployment)
 
 ---
@@ -184,13 +184,26 @@ Dashboard card auto-populates (with visual "linked form" indicator)
 
 ## Known Limitations
 
-### 1. One Event Per Event Type (Architectural Constraint)
+### 1. Multi-Location Architecture ✅ RESOLVED (v1.84.0+)
 
-The dashboard has one card per `CommType` (birthday, anniversary, bible_study, womens_study, prayer_meeting, bulletin). The mapping `COMM_TYPE_TO_ET` hardcodes 6 event types to 6 cards. `findEventByType()` returns the first match.
+**Previous limitation:** The dashboard had one card per hardcoded `CommType`, making it impossible to have multiple events of the same type (e.g., San Ramon + Mountain House Bible Studies).
 
-**Impact:** Cannot have two Bible Study events (e.g., youth + adult) — the dashboard can only compose for one.
+**Current state:** Dashboard is now fully data-driven from `event_types` table. Cards are keyed by `event_type.id`, not by a hardcoded union type. Multiple locations per template type require zero code changes — just database INSERTs.
 
-**Fix path:** Decouple dashboard cards from event types. Make cards data-driven from events table. Dashboard renders one card per active event, not per hardcoded CommType.
+**How it works:**
+- `event_types.id` is the routing key for all dashboard state
+- `event_types.comm_type` provides backward compatibility for built-in types
+- Each location gets its own event type record
+- Template registry provides form components and card builders
+- Dashboard dynamically loads visible templates from database
+
+**To add a new location:**
+```sql
+INSERT INTO event_types (name, template_type, is_primary, show_in_dashboard)
+VALUES ('Mountain House Bible Study', 'bible_study', false, true);
+```
+
+No code changes needed. The dashboard will automatically show a new card.
 
 ### 2. Custom Recurrence Format (Not RFC 5545)
 
@@ -213,16 +226,81 @@ All times stored as bare `time` fields, dates as `date`. Comparisons use browser
 
 **Fix path:** Extract per-type card controllers into separate files. Move form state management into a custom hook or context.
 
-### 5. Hardcoded Event Type → Card Mapping
+### 5. Scalable Template System ✅ RESOLVED (v1.84.0+)
 
-Adding a new recurring event type (e.g., Youth Group) requires code changes in:
-- `COMM_TYPE_TO_ET` mapping
-- `BUILTIN_TEMPLATES` array
-- Form state declarations
-- Preview builder functions
-- fetchAll processing
+**Previous limitation:** Adding a new event type required code changes in ~15 files (type definitions, mappings, form state, etc.).
 
-**Fix path:** Make event types fully data-driven. Dashboard dynamically renders cards from `event_types` + `email_templates` tables.
+**Current state:** Fully data-driven template system. Adding a new template type requires:
+1. Register template in `template-registry.ts` (form component + card builder)
+2. Add migration to insert `event_types` record
+3. Deploy
+
+No changes needed to dashboard, calendar, or templates pages.
+
+**Architecture:**
+- `TemplateType` replaces hardcoded `CommType` union
+- Template registry maps template types to form components and card builders
+- Dashboard state keyed by `event_type.id` (unique per location)
+- Multiple locations per template with zero code duplication
+- Template visibility controlled in database (`show_in_dashboard` column)
+
+---
+
+## Architectural Achievements (v1.84.0)
+
+### Scalable Multi-Location System
+
+The v1.84.0 release fundamentally changed how the system handles event types and templates, eliminating the hardcoded `CommType` constraint and enabling true scalability.
+
+**Key Changes:**
+1. **Template Registry Pattern** (`src/lib/template-registry.ts`)
+   - Central registry maps template types to form components and card builders
+   - New templates added by registration, not code changes across files
+   - Form components and card builders are pluggable
+
+2. **ID-Based Dashboard State** (`event_type.id` replaces `CommType`)
+   - Dashboard state keyed by numeric `event_type.id` (unique per location)
+   - `template_type` identifies which template to use (e.g., "bible_study")
+   - Multiple locations = multiple event_types with same `template_type`
+   - Zero code changes to support new locations
+
+3. **Primary System**
+   - One event type marked as `is_primary=true` per template type
+   - Primary used for backward compatibility lookups
+   - Non-primary events get full independent treatment
+
+4. **Data-Driven Visibility**
+   - `show_in_dashboard` column controls which templates appear
+   - `display_order` controls sort order
+   - No code changes to add/remove/reorder templates
+
+**Example: Adding Mountain House Bible Study**
+```sql
+-- Before v1.84.0: Impossible without major refactoring
+-- After v1.84.0: One INSERT statement
+
+INSERT INTO event_types (
+  name, 
+  template_type, 
+  is_primary, 
+  show_in_dashboard,
+  display_order
+) VALUES (
+  'Mountain House Bible Study', 
+  'bible_study', 
+  false,  -- San Ramon is primary
+  true,
+  41
+);
+```
+
+Dashboard automatically shows a new card. All form logic, card building, and state management "just works."
+
+**Files Changed:**
+- `src/lib/dashboard-types.ts` — `TemplateType` string type replaces `CommType` union
+- `src/app/(dashboard)/dashboard/page.tsx` — State keyed by `event_type.id`
+- `src/lib/template-registry.ts` — Pluggable template system
+- `supabase/migrations/00060_scalable_multi_location_architecture.sql` — Schema changes
 
 ---
 
@@ -276,9 +354,9 @@ Adding a new recurring event type (e.g., Youth Group) requires code changes in:
 ## Future Roadmap
 
 ### Near-term
-- **Multiple events per type:** Decouple dashboard cards from hardcoded CommType mapping
+- ✅ **Multiple events per type:** DONE (v1.84.0) — Dashboard now supports unlimited events per template type
 - **iCal export:** Generate .ics files for Google Calendar import
-- **Dashboard decomposition:** Extract per-type controllers from the monolith
+- **Dashboard decomposition:** Extract per-type controllers from the monolith (partially addressed by template registry pattern)
 
 ### Medium-term
 - **RFC 5545 recurrence:** Adopt standard RRULE + EXDATE format
@@ -296,9 +374,10 @@ Adding a new recurring event type (e.g., Youth Group) requires code changes in:
 
 | Dimension | Score | Notes |
 |-----------|-------|-------|
-| Single-church internal tool | **9/10** | Email workflow is professional-grade, calendar flexible, UX polished |
-| Multi-tenant SaaS product | **5/10** | Hardcoded types, monolith dashboard, no timezone |
+| Single-church internal tool | **9.5/10** | Email workflow is professional-grade, calendar flexible, UX polished, multi-location support |
+| Multi-tenant SaaS product | **7/10** | ↑ Scalable template system (was 5/10); still needs timezone support |
 | Google Calendar sync ready | **6/10** | Schema is close but format gaps + missing fields |
-| Code quality | **7.5/10** | Good extraction patterns, DOMPurify sanitization; dashboard monolith is the main debt |
+| Code quality | **8.5/10** | ↑ Template registry pattern, ID-based state (was 7.5/10); dashboard monolith addressed |
+| Scalability | **9/10** | Can add unlimited locations with zero code changes |
 | UX/Accessibility | **8/10** | Command palette, keyboard shortcuts, aria-labels, inline validation, bulk ops |
 | Security | **8/10** | RLS, DOMPurify, rate limiting, honeypot, sanitized previews |

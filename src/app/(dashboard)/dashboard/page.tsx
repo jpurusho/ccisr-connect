@@ -76,9 +76,9 @@ import { getOccurrences } from "@/lib/recurrence"
 import { type SmartSectionContext, buildSmartSectionsHtml } from "@/lib/email/smart-section-builder"
 import { type VisualConfig, isSmartSection } from "@/lib/email/visual-config-types"
 import {
-  type CommType,
+  type TemplateType,
   DISPATCH_MATCHERS,
-  buildCommTypeMappings,
+  buildEventTypeMappings,
   formatRelativeTime,
   getWeekDays,
   mapDispatchStatus,
@@ -291,7 +291,8 @@ const EMPTY_CUSTOM_FORM: CustomDashFormData = {
 
 // Interface for loaded templates
 interface LoadedTemplate {
-  type: CommType
+  eventTypeId: string
+  templateType: string
   label: string
   color: string
   icon: typeof Cake
@@ -410,48 +411,31 @@ export default function DashboardPage() {
   const BUILTIN_TEMPLATES = useMemo(() => loadedTemplates, [loadedTemplates])
 
   const BUILTIN_LABEL: Record<string, string> = useMemo(
-    () => Object.fromEntries(BUILTIN_TEMPLATES.map((t) => [t.type, t.label])),
+    () => Object.fromEntries(BUILTIN_TEMPLATES.map((t) => [t.templateType, t.label])),
     [BUILTIN_TEMPLATES]
   )
   const [savedSubjectTemplates, setSavedSubjectTemplates] = useState<Record<string, string>>({})
   const [savedTemplateData, setSavedTemplateData] = useState<Record<string, Record<string, unknown>>>({})
-  const [commTypeEtNames, setCommTypeEtNames] = useState<Record<CommType, string>>({
-    birthday: "birthday",
-    anniversary: "anniversary",
-    bible_study: "bible_study",
-    womens_study: "womens_study",
-    prayer_meeting: "prayer_meeting",
-    bulletin: "bulletin",
-    shoebox_ministry: "Shoebox Ministry",
-  })
-  const [commTypeIcons, setCommTypeIcons] = useState<Partial<Record<CommType, string>>>({})
+  const [etIdToNames, setEtIdToNames] = useState<Record<string, string>>({})
+  const [etIdToIcons, setEtIdToIcons] = useState<Record<string, string>>({})
+  const [etIdToTemplateType, setEtIdToTemplateType] = useState<Record<string, string>>({})
   const [templateStyles, setTemplateStyles] = useState<Record<string, TemplateStyleSettings>>({})
 
-  // ---- Composed instance tracking ----
-  const [instanceIds, setInstanceIds] = useState<Partial<Record<CommType, string>>>({})
-  const [instanceWeeks, setInstanceWeeks] = useState<Partial<Record<CommType, string>>>({})
-  const [instanceUpdatedAt, setInstanceUpdatedAt] = useState<Partial<Record<CommType, string>>>({})
-  const [savingInstance, setSavingInstance] = useState<CommType | null>(null)
+  // ---- Composed instance tracking (keyed by event_type.id) ----
+  const [instanceIds, setInstanceIds] = useState<Record<string, string>>({})
+  const [instanceWeeks, setInstanceWeeks] = useState<Record<string, string>>({})
+  const [instanceUpdatedAt, setInstanceUpdatedAt] = useState<Record<string, string>>({})
+  const [savingInstance, setSavingInstance] = useState<string | null>(null)
 
-  // ---- Signup auto-fill tracking ----
-  const [signupAutoFills, setSignupAutoFills] = useState<Partial<Record<CommType, AutoFillResult>>>({})
-  const [signupLinks, setSignupLinks] = useState<Partial<Record<CommType, { formId: string; fieldMap: SignupFieldMap }>>>({})
+  // ---- Signup auto-fill tracking (keyed by event_type.id) ----
+  const [signupAutoFills, setSignupAutoFills] = useState<Record<string, AutoFillResult>>({})
+  const [signupLinks, setSignupLinks] = useState<Record<string, { formId: string; fieldMap: SignupFieldMap }>>({})
 
   // ---- Smart section context (resolved per week for visual builder templates) ----
   const [smartContext, setSmartContext] = useState<SmartSectionContext | null>(null)
 
-
-  const [dispatches, setDispatches] = useState<
-    Record<CommType, DispatchRecord | null>
-  >({
-    birthday: null,
-    anniversary: null,
-    bible_study: null,
-    womens_study: null,
-    prayer_meeting: null,
-    bulletin: null,
-    shoebox_ministry: null,
-  })
+  // ---- Dispatches (keyed by event_type.id) ----
+  const [dispatches, setDispatches] = useState<Record<string, DispatchRecord | null>>({})
 
   // ---- Form state for each communication ----
   const [birthdayForm, setBirthdayForm] = useState<BirthdayFormData>({
@@ -669,57 +653,41 @@ export default function DashboardPage() {
     })
   }
 
-  // ---- Saved form snapshots for cancel/revert ----
-  const [savedSnapshots, setSavedSnapshots] = useState<Partial<Record<CommType, Record<string, unknown>>>>({})
+  // ---- Saved form snapshots for cancel/revert (still keyed by template type for backward compat with individual forms) ----
+  const [savedSnapshots, setSavedSnapshots] = useState<Record<string, Record<string, unknown>>>({})
 
-  // ---- Subject overrides (built-in CommType keys + custom template IDs) ----
+  // ---- Subject overrides (keyed by event_type.id) ----
   const [subjectOverrides, setSubjectOverrides] = useState<Record<string, string>>({})
   const [subjectPrefixes, setSubjectPrefixes] = useState<Record<string, string>>({})
 
-  // ---- Mailing list + SMTP state (per-card, keyed by CommType or custom template ID) ----
+  // ---- Mailing list + SMTP state (per-card, keyed by event_type.id) ----
   const [mailingLists, setMailingLists] = useState<MailingListOption[]>([])
   const [smtpConfigs, setSmtpConfigs] = useState<SmtpConfigOption[]>([])
   const [commOptions, setCommOptions] = useState<
     Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }>
-  >({
-    birthday: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-    anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-    bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-    womens_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-    prayer_meeting: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-    bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-    shoebox_ministry: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
-  })
+  >({})
 
-  // ---- Dispatch counts per type ----
-  const [dispatchCounts, setDispatchCounts] = useState<Record<CommType, number>>({
-    birthday: 0,
-    anniversary: 0,
-    bible_study: 0,
-    womens_study: 0,
-    prayer_meeting: 0,
-    bulletin: 0,
-    shoebox_ministry: 0,
-  })
+  // ---- Dispatch counts per event type ----
+  const [dispatchCounts, setDispatchCounts] = useState<Record<string, number>>({})
 
-  // ---- Multi-event count per comm type ----
-  const [eventCounts, setEventCounts] = useState<Partial<Record<CommType, number>>>({})
+  // ---- Multi-event count per template type ----
+  const [eventCounts, setEventCounts] = useState<Record<string, number>>({})
 
   // ---- Schedule dialog state ----
   const [scheduleDialog, setScheduleDialog] = useState<{
     open: boolean
-    commType: CommType | null
+    eventTypeId: string | null
     dateTime: string
-  }>({ open: false, commType: null, dateTime: "" })
-  const [sendingType, setSendingType] = useState<CommType | null>(null)
+  }>({ open: false, eventTypeId: null, dateTime: "" })
+  const [sendingType, setSendingType] = useState<string | null>(null)
   const [sendConfirm, setSendConfirm] = useState<{
     open: boolean
-    type: CommType | null
+    eventTypeId: string | null
     subject: string
     recipientCount: number
     listName: string
     isReminder: boolean
-  }>({ open: false, type: null, subject: "", recipientCount: 0, listName: "", isReminder: false })
+  }>({ open: false, eventTypeId: null, subject: "", recipientCount: 0, listName: "", isReminder: false })
 
   // ---- Sent email preview ----
   const [sentEmailPreview, setSentEmailPreview] = useState<{
@@ -740,15 +708,15 @@ export default function DashboardPage() {
     if (cardParamApplied) return
     const params = new URLSearchParams(window.location.search)
     const cardParam = params.get("card")
-    const valid: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
-    if (cardParam && valid.includes(cardParam as CommType)) {
+    // Accept any card parameter (could be event_type.id or template type for backward compat)
+    if (cardParam) {
       setActiveCardKey(cardParam)
     }
     setCardParamApplied(true)
   }, [cardParamApplied])
 
   // Derived helpers for the unified selection
-  const selectedCard = (["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"].includes(activeCardKey) ? activeCardKey : "") as CommType
+  // selectedCard is no longer needed - use activeCardKey directly as event_type.id
   const selectedCustomCard = activeCardKey.startsWith("custom:") ? activeCardKey.slice(7) : null
 
   // ---- Week offset for future scheduling (0 = this week, 1 = next week, etc.) ----
@@ -962,67 +930,42 @@ export default function DashboardPage() {
       if (smtpConfigsRes.error) throw smtpConfigsRes.error
 
       // ---- Parse saved template defaults (no FK join, resolve in JS) ----
-      const etIdToName: Record<string, string> = {}
-      const etIdToTabName: Record<string, string> = {}
       const etSignupLinks: Record<string, { formId: string; fieldMap: SignupFieldMap }> = {}
       const etBulletinTemplates: Record<string, string> = {}
 
-      // Build DB-driven comm_type mappings
-      const { commTypeToEtName, etIdToCommType } = buildCommTypeMappings(eventTypesRes.data ?? [])
-      setCommTypeEtNames(commTypeToEtName)
+      // Build DB-driven event type mappings
+      const { etIdToTemplateType: mappedEtIdToTemplateType, etIdToName: mappedEtIdToName } = buildEventTypeMappings(eventTypesRes.data ?? [])
+      setEtIdToTemplateType(mappedEtIdToTemplateType)
+      setEtIdToNames(mappedEtIdToName)
 
-      // Build icon overrides from DB
-      const iconOverrides: Partial<Record<CommType, string>> = {}
+      // Build icon overrides from DB (keyed by event_type.id)
+      const iconOverrides: Record<string, string> = {}
       for (const et of (eventTypesRes.data ?? [])) {
-        const ct = etIdToCommType[et.id]
-        if (ct && et.icon) iconOverrides[ct as CommType] = et.icon
+        if (et.icon) iconOverrides[et.id] = et.icon
       }
-      setCommTypeIcons(iconOverrides)
+      setEtIdToIcons(iconOverrides)
 
       // Build loaded templates list from database + registry
-      // When multiple event_types share the same comm_type, keep the "primary" one (lowest display_order)
+      // Each event_type with show_in_dashboard=true gets its own card
       type EventTypeRow = NonNullable<typeof eventTypesRes.data>[0]
-      const templatesByCommType = new Map<string, {
-        et: EventTypeRow
-        displayOrder: number
-      }>()
+      const visibleTemplates: LoadedTemplate[] = []
 
       for (const et of (eventTypesRes.data ?? [])) {
-        const ct = etIdToCommType[et.id]
-
-        if (!ct) continue
         if (et.show_in_dashboard === false) continue
 
-        const currentDisplayOrder = et.display_order ?? 999
+        const templateType = mappedEtIdToTemplateType[et.id]
+        if (!templateType) continue
 
-        // Check if we already have this comm_type
-        const existing = templatesByCommType.get(ct)
-        if (existing) {
-          // Keep the one with lower display_order (primary)
-          if (currentDisplayOrder < existing.displayOrder) {
-            console.log(`✓ Replacing ${ct}: ${existing.et.name} (order ${existing.displayOrder}) with ${et.name} (order ${currentDisplayOrder}) as primary`)
-            templatesByCommType.set(ct, { et, displayOrder: currentDisplayOrder })
-          } else {
-            console.log(`ℹ️ Keeping ${ct}: ${existing.et.name} as primary over ${et.name}`)
-          }
-          continue
-        }
-
-        templatesByCommType.set(ct, { et, displayOrder: currentDisplayOrder })
-      }
-
-      // Convert to visible templates array
-      const visibleTemplates: LoadedTemplate[] = []
-      for (const [ct, { et, displayOrder }] of templatesByCommType) {
-        const templateConfig = templateRegistry.get(ct)
+        const templateConfig = templateRegistry.get(templateType)
         if (!templateConfig) continue
 
         visibleTemplates.push({
-          type: ct as CommType,
-          label: templateConfig.label,
+          eventTypeId: et.id,
+          templateType,
+          label: et.name,
           color: et.card_color || templateConfig.color,
           icon: templateConfig.icon,
-          displayOrder,
+          displayOrder: et.display_order ?? 999,
         })
       }
 
@@ -1033,11 +976,8 @@ export default function DashboardPage() {
       const etInfoSections: Record<string, { sections: unknown; showInBulletin: boolean }> = {}
       if (eventTypesRes.data) {
         for (const et of eventTypesRes.data) {
-          etIdToName[et.id] = et.name
-          const tabName = etIdToCommType[et.id] ?? et.name
-          etIdToTabName[et.id] = tabName
           if (et.linked_signup_form_id && et.signup_field_map) {
-            etSignupLinks[tabName] = { formId: et.linked_signup_form_id, fieldMap: et.signup_field_map }
+            etSignupLinks[et.id] = { formId: et.linked_signup_form_id, fieldMap: et.signup_field_map }
           }
           if (et.bulletin_detail_template) {
             etBulletinTemplates[et.id] = et.bulletin_detail_template
@@ -1053,16 +993,16 @@ export default function DashboardPage() {
       const loadedStyles: Record<string, TemplateStyleSettings> = {}
       if (templateDefaultsRes.data) {
         for (const t of templateDefaultsRes.data) {
-          const tabName = etIdToTabName[t.event_type_id]
-          if (!tabName) continue
-          const parsed = parseBodyTemplate(tabName, t.body_template)
+          const templateType = mappedEtIdToTemplateType[t.event_type_id]
+          if (!templateType) continue
+          const parsed = parseBodyTemplate(templateType, t.body_template)
           if (parsed) {
-            savedDefaults[tabName] = {
+            savedDefaults[templateType] = {
               subject: t.subject_template,
               data: parsed.data as Record<string, unknown>,
             }
           }
-          if (t.style_settings) loadedStyles[tabName] = t.style_settings as TemplateStyleSettings
+          if (t.style_settings) loadedStyles[templateType] = t.style_settings as TemplateStyleSettings
         }
       }
       setTemplateStyles(loadedStyles)
@@ -1101,18 +1041,24 @@ export default function DashboardPage() {
         }
       }
 
-      // Track composed instance IDs, week_start, and updated_at for save/delete
-      const resolvedInstanceIds: Partial<Record<CommType, string>> = {}
-      const resolvedInstanceWeeks: Partial<Record<CommType, string>> = {}
-      const resolvedInstanceUpdatedAt: Partial<Record<CommType, string>> = {}
-      const commTypeKeys: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
-      for (const ct of commTypeKeys) {
-        if (composedMap[ct]) {
-          resolvedInstanceIds[ct] = composedMap[ct].id
-          if (composedMap[ct].week_start) resolvedInstanceWeeks[ct] = composedMap[ct].week_start!
-          if (composedMap[ct].updated_at) resolvedInstanceUpdatedAt[ct] = composedMap[ct].updated_at
+      // Track composed instance IDs, week_start, and updated_at for save/delete (keyed by event_type.id)
+      const resolvedInstanceIds: Record<string, string> = {}
+      const resolvedInstanceWeeks: Record<string, string> = {}
+      const resolvedInstanceUpdatedAt: Record<string, string> = {}
+
+      // For each visible template (event_type), check if there's a composed instance
+      for (const tmpl of visibleTemplates) {
+        const eventTypeId = tmpl.eventTypeId
+        const templateType = tmpl.templateType
+
+        // Check if there's a composed instance for this template type
+        if (composedMap[templateType]) {
+          resolvedInstanceIds[eventTypeId] = composedMap[templateType].id
+          if (composedMap[templateType].week_start) resolvedInstanceWeeks[eventTypeId] = composedMap[templateType].week_start!
+          if (composedMap[templateType].updated_at) resolvedInstanceUpdatedAt[eventTypeId] = composedMap[templateType].updated_at
         }
       }
+
       setInstanceIds(resolvedInstanceIds)
       setInstanceWeeks(resolvedInstanceWeeks)
       setInstanceUpdatedAt(resolvedInstanceUpdatedAt)
@@ -1274,20 +1220,21 @@ export default function DashboardPage() {
 
       // Find events by internal tab name
       const findEventsByType = (typeName: string) =>
-        activeEvents.filter((e) => etIdToTabName[e.event_type_id] === typeName)
+        activeEvents.filter((e) => mappedEtIdToTemplateType[e.event_type_id] === typeName)
       const findEventByType = (typeName: string) => findEventsByType(typeName)[0] ?? undefined
 
       // Track event counts per comm type for multi-event indicator
       {
-        const counts: Partial<Record<CommType, number>> = {}
-        for (const ct of Object.keys(commTypeToEtName)) {
-          counts[ct as CommType] = findEventsByType(ct).length
+        const counts: Record<string, number> = {}
+        const coreTemplateTypes = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
+        for (const templateType of coreTemplateTypes) {
+          counts[templateType] = findEventsByType(templateType).length
         }
         setEventCounts(counts)
       }
 
       // ---- Signup auto-fill accumulator ----
-      const autoFills: Partial<Record<CommType, AutoFillResult>> = {}
+      const autoFills: Partial<Record<string, AutoFillResult>> = {}
 
       // ---- Process Bible Study ----
       const hasBsDraft = !!composedMap["bible_study"]
@@ -1599,8 +1546,8 @@ export default function DashboardPage() {
       }
 
       for (const evt of activeEvents) {
-        const etTabName = etIdToTabName[evt.event_type_id] ?? ""
-        if (bulletinSkipTypes.has(etTabName)) continue
+        const etTemplateType = mappedEtIdToTemplateType[evt.event_type_id] ?? ""
+        if (bulletinSkipTypes.has(etTemplateType)) continue
         if (evt.recurrence_rule) {
           // Recurring events — resolve occurrences for the week
           const occs = getOccurrences(evt.recurrence_rule, wkSun, wkSat)
@@ -1893,9 +1840,9 @@ export default function DashboardPage() {
       const resolvedGenericCards: GenericCardData[] = []
 
       for (const evt of activeEvents) {
-        const etTabName = etIdToTabName[evt.event_type_id] ?? ""
+        const etTemplateType = mappedEtIdToTemplateType[evt.event_type_id] ?? ""
         // Skip if this event belongs to a built-in comm type
-        if (builtinCommTypes.has(etTabName)) continue
+        if (builtinCommTypes.has(etTemplateType)) continue
         // Skip if this event type has a custom template (already shown as custom card)
         if (etIdsWithCustomTemplate.has(evt.event_type_id)) continue
         // Skip if there's already a generic card for this event type
@@ -1963,7 +1910,7 @@ export default function DashboardPage() {
 
         resolvedGenericCards.push({
           eventTypeId: evt.event_type_id,
-          eventTypeName: etIdToName[evt.event_type_id] || evt.title,
+          eventTypeName: mappedEtIdToName[evt.event_type_id] || evt.title,
           eventId: evt.id,
           title: evt.title,
           date: format(occDate, "EEEE, MMMM do"),
@@ -2125,8 +2072,8 @@ export default function DashboardPage() {
       setSmtpConfigs(smtpConfigsRes.data ?? [])
 
       // ---- Pre-fill mailing list + SMTP from composed instances ----
-      const commTypes: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
-      const prefilledOptions: Record<CommType, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }> = {
+      const templateTypes: string[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
+      const prefilledOptions: Record<string, { mailingListId: string; smtpConfigId: string; additionalRecipients: string }> = {
         birthday: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         anniversary: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
@@ -2134,8 +2081,9 @@ export default function DashboardPage() {
         prayer_meeting: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         bulletin: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
         shoebox_ministry: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
+        mountain_house_bible_study: { mailingListId: "", smtpConfigId: "", additionalRecipients: "" },
       }
-      for (const ct of commTypes) {
+      for (const ct of templateTypes) {
         const ci = composedMap[ct]
         if (ci) {
           prefilledOptions[ct] = {
@@ -2149,7 +2097,7 @@ export default function DashboardPage() {
       // Pre-fill subject overrides and prefixes from composed instances
       const resolvedSubjects: Record<string, string> = {}
       const resolvedPrefixes: Record<string, string> = {}
-      for (const ct of commTypeKeys) {
+      for (const ct of templateTypes) {
         const ci = composedMap[ct]
         if (ci?.subject) resolvedSubjects[ct] = ci.subject
         if (ci?.subject_prefix) resolvedPrefixes[ct] = ci.subject_prefix
@@ -2161,7 +2109,7 @@ export default function DashboardPage() {
       // because the saved subject has the old date baked in
       const recentInstances = recentInstancesRes.data ?? []
       const skipSubjectPersistence = new Set(["bible_study", "prayer_meeting", "bulletin"])
-      for (const ct of commTypeKeys) {
+      for (const ct of templateTypes) {
         if (!resolvedSubjects[ct] && !resolvedPrefixes[ct]) {
           const recent = recentInstances.find(ri => ri.template_type === ct)
           if (recent) {
@@ -2179,7 +2127,7 @@ export default function DashboardPage() {
 
       // ---- Match dispatches to communication types (count all, keep latest) ----
       const weekDispatches = weekDispatchesRes.data ?? []
-      const matchedDispatches: Record<CommType, DispatchRecord | null> = {
+      const matchedDispatches: Record<string, DispatchRecord | null> = {
         birthday: null,
         anniversary: null,
         bible_study: null,
@@ -2187,8 +2135,9 @@ export default function DashboardPage() {
         prayer_meeting: null,
         bulletin: null,
         shoebox_ministry: null,
+        mountain_house_bible_study: null,
       }
-      const counts: Record<CommType, number> = {
+      const counts: Record<string, number> = {
         birthday: 0,
         anniversary: 0,
         bible_study: 0,
@@ -2196,13 +2145,14 @@ export default function DashboardPage() {
         prayer_meeting: 0,
         bulletin: 0,
         shoebox_ministry: 0,
+        mountain_house_bible_study: 0,
       }
 
       for (const d of weekDispatches) {
         let matched = false
         // Prefer explicit template_type over subject regex
-        if (d.template_type && (d.template_type as CommType) in counts) {
-          const ct = d.template_type as CommType
+        if (d.template_type && d.template_type in counts) {
+          const ct = d.template_type
           counts[ct]++
           if (!matchedDispatches[ct]) matchedDispatches[ct] = d
           matched = true
@@ -2211,9 +2161,9 @@ export default function DashboardPage() {
         if (!matched) {
           for (const [type, matcher] of Object.entries(DISPATCH_MATCHERS)) {
             if (matcher(d.subject)) {
-              counts[type as CommType]++
-              if (!matchedDispatches[type as CommType]) {
-                matchedDispatches[type as CommType] = d
+              counts[type]++
+              if (!matchedDispatches[type]) {
+                matchedDispatches[type] = d
               }
             }
           }
@@ -2224,7 +2174,7 @@ export default function DashboardPage() {
       setDispatchCounts(counts)
 
       // Fallback: pre-fill mailing list + SMTP from dispatches when no composed instance
-      for (const ct of commTypes) {
+      for (const ct of templateTypes) {
         if (!prefilledOptions[ct].mailingListId && !prefilledOptions[ct].smtpConfigId) {
           const d = matchedDispatches[ct]
           if (d) {
@@ -2264,8 +2214,8 @@ export default function DashboardPage() {
         }
         return result
       })
-      setSignupAutoFills(autoFills)
-      setSignupLinks(etSignupLinks as Partial<Record<CommType, { formId: string; fieldMap: SignupFieldMap }>>)
+      setSignupAutoFills(autoFills as Record<string, AutoFillResult>)
+      setSignupLinks(etSignupLinks)
 
       // Build smart section context from resolved week data
       setSmartContext({
@@ -2298,15 +2248,15 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
-  // ---- Computed status for each communication ----
-  function getStatus(type: CommType): CommunicationStatus {
-    const d = dispatches[type]
+  // ---- Computed status for each communication (keyed by event_type.id or template type) ----
+  function getStatus(eventTypeIdOrTemplateType: string): CommunicationStatus {
+    const d = dispatches[eventTypeIdOrTemplateType]
     if (!d) return "draft"
     return mapDispatchStatus(d.status)
   }
 
-  function getScheduledAt(type: CommType): Date | null {
-    const d = dispatches[type]
+  function getScheduledAt(eventTypeIdOrTemplateType: string): Date | null {
+    const d = dispatches[eventTypeIdOrTemplateType]
     if (!d?.scheduled_at) return null
     return new Date(d.scheduled_at)
   }
@@ -2416,15 +2366,18 @@ export default function DashboardPage() {
   }, [shoeboxMinistryForm, templateStyles])
 
   // ---- Subject lines (custom override or auto-generated) ----
-  function getSubjectVars(type: CommType) {
-    switch (type) {
+  function getSubjectVars(templateType: string) {
+    switch (templateType) {
       case "birthday":       return makeBirthdayVars(weekLabel, birthdayForm.birthdays.map(b => b.name))
       case "anniversary":    return makeAnniversaryVars(weekLabel, anniversaryForm.anniversaries.map(a => `${a.husbandName} & ${a.wifeName}`))
-      case "bible_study":    return makeEventVars(weekLabel, cleanDateForSubject(bibleStudyForm.date), bibleStudyForm.time, bibleStudyForm.topic || "")
+      case "bible_study":
+      case "mountain_house_bible_study":
+        return makeEventVars(weekLabel, cleanDateForSubject(bibleStudyForm.date), bibleStudyForm.time, bibleStudyForm.topic || "")
       case "womens_study":   return makeEventVars(weekLabel, cleanDateForSubject(womensStudyForm.date), womensStudyForm.time, womensStudyForm.topic || "")
       case "prayer_meeting": return makeEventVars(weekLabel, cleanDateForSubject(prayerMeetingForm.date || ""), prayerMeetingForm.time, "")
       case "bulletin":       return makeBulletinVars(weekLabel, weekLabel)
       case "shoebox_ministry": return { weekLabel, date: shoeboxMinistryForm.dueDate }
+      default: return { weekLabel }
     }
   }
 
@@ -2453,20 +2406,20 @@ export default function DashboardPage() {
    * - Send reminder: forceFresh=true to generate fresh subject
    * - Draft emails: forceFresh=false (default)
    */
-  function getSubject(type: CommType, forceFresh = false): string {
+  function getSubject(templateType: string, forceFresh = false): string {
     // Subject override takes precedence (user is actively editing)
-    if (subjectOverrides[type]) return subjectOverrides[type]!
+    if (subjectOverrides[templateType]) return subjectOverrides[templateType]!
 
     // If dispatched (sent/sending), show the exact subject that was sent
     // UNLESS forceFresh is true (for reminders, we want a fresh subject)
-    const d = dispatches[type]
+    const d = dispatches[templateType]
     if (!forceFresh && d && (d.status === "sent" || d.status === "sending")) return d.subject
 
     // savedSubjectTemplates is keyed by comm_type, not event type name
-    const savedTmpl = savedSubjectTemplates[type]
-    if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(type))
+    const savedTmpl = savedSubjectTemplates[templateType]
+    if (savedTmpl) return interpolate(savedTmpl, getSubjectVars(templateType))
 
-    switch (type) {
+    switch (templateType) {
       case "birthday":       return `Happy Birthday! — Week of ${weekLabel}`
       case "anniversary":    return `Happy Anniversary! — Week of ${weekLabel}`
       case "bible_study":    return `Bible Study This Friday — ${cleanDateForSubject(bibleStudyForm.date)}`
@@ -2474,11 +2427,12 @@ export default function DashboardPage() {
       case "prayer_meeting": return `Monthly Prayer Meeting — ${cleanDateForSubject(prayerMeetingForm.date || "Date TBD")}`
       case "bulletin":       return `Weekly Bulletin for ${bulletinForm.weekLabel}`
       case "shoebox_ministry": return `Operation Christmas Child — Shoebox Ministry`
+      default:               return `Communication — Week of ${weekLabel}`
     }
   }
 
-  function setSubjectOverride(type: CommType, value: string) {
-    setSubjectOverrides((prev) => ({ ...prev, [type]: value }))
+  function setSubjectOverride(key: string, value: string) {
+    setSubjectOverrides((prev) => ({ ...prev, [key]: value }))
   }
 
   function setSubjectPrefix(keyOrType: string, value: string) {
@@ -2488,14 +2442,14 @@ export default function DashboardPage() {
   // ---- Get preview for type ----
   // If dispatched/queued, show the exact HTML that was sent/queued.
   // Otherwise show the live-computed preview for editing.
-  function getPreview(type: CommType): string | null {
+  function getPreview(templateType: string): string | null {
     // Always show live preview from current form state — dispatch HTML is only for "View Sent Email"
-    const d = dispatches[type]
+    const d = dispatches[templateType]
     if (d?.body_html && (d.status === "pending" || d.status === "previewed" || d.status === "approved" || d.status === "sending")) {
       // Only use dispatch HTML for queued/pending items (not yet sent, form isn't editable)
       return d.body_html
     }
-    switch (type) {
+    switch (templateType) {
       case "birthday":       return birthdayPreview
       case "anniversary":    return anniversaryPreview
       case "bible_study":    return bibleStudyPreview
@@ -2503,12 +2457,13 @@ export default function DashboardPage() {
       case "prayer_meeting": return prayerMeetingPreview
       case "bulletin":       return bulletinPreview
       case "shoebox_ministry": return shoeboxMinistryPreview
+      default:               return null
     }
   }
 
   // Get the live-computed preview (ignoring dispatch state) — used when creating new dispatches
-  function getLivePreview(type: CommType): string | null {
-    switch (type) {
+  function getLivePreview(templateType: string): string | null {
+    switch (templateType) {
       case "birthday":       return birthdayPreview
       case "anniversary":    return anniversaryPreview
       case "bible_study":    return bibleStudyPreview
@@ -2516,12 +2471,13 @@ export default function DashboardPage() {
       case "prayer_meeting": return prayerMeetingPreview
       case "bulletin":       return bulletinPreview
       case "shoebox_ministry": return shoeboxMinistryPreview
+      default:               return null
     }
   }
 
   // ---- Form data helper (for save) ----
-  function getFormData(type: CommType): Record<string, unknown> {
-    switch (type) {
+  function getFormData(templateType: string): Record<string, unknown> {
+    switch (templateType) {
       case "birthday": return birthdayForm as unknown as Record<string, unknown>
       case "anniversary": return anniversaryForm as unknown as Record<string, unknown>
       case "bible_study": return bibleStudyForm as unknown as Record<string, unknown>
@@ -2529,14 +2485,15 @@ export default function DashboardPage() {
       case "prayer_meeting": return prayerMeetingForm as unknown as Record<string, unknown>
       case "bulletin": return bulletinForm as unknown as Record<string, unknown>
       case "shoebox_ministry": return shoeboxMinistryForm as unknown as Record<string, unknown>
+      default: return {}
     }
   }
 
-  const EVENT_BASED_TYPES: CommType[] = ["bible_study", "womens_study", "prayer_meeting"]
+  const EVENT_BASED_TYPES: string[] = ["bible_study", "womens_study", "prayer_meeting"]
 
-  function getWeekStartForSave(type: CommType): string {
-    if (EVENT_BASED_TYPES.includes(type)) {
-      const formData = getFormData(type)
+  function getWeekStartForSave(templateType: string): string {
+    if (EVENT_BASED_TYPES.includes(templateType)) {
+      const formData = getFormData(templateType)
       const dateStr = formData.date as string | undefined
       if (dateStr && !dateStr.toLowerCase().includes("no ") && !dateStr.toLowerCase().includes("not ")) {
         try {
@@ -2553,22 +2510,22 @@ export default function DashboardPage() {
     return format(startOfWeek(base, { weekStartsOn: 0 }), "yyyy-MM-dd")
   }
 
-  function snapshotForm(type: CommType) {
-    setSavedSnapshots((prev) => ({ ...prev, [type]: structuredClone(getFormData(type)) }))
+  function snapshotForm(templateType: string) {
+    setSavedSnapshots((prev) => ({ ...prev, [templateType]: structuredClone(getFormData(templateType)) }))
   }
 
   function snapshotAllForms() {
-    const snap: Partial<Record<CommType, Record<string, unknown>>> = {}
-    const types: CommType[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
+    const snap: Record<string, Record<string, unknown>> = {}
+    const types: string[] = ["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"]
     for (const t of types) snap[t] = structuredClone(getFormData(t))
     setSavedSnapshots(snap)
   }
 
-  function handleCancelEdit(type: CommType) {
-    const snap = savedSnapshots[type]
+  function handleCancelEdit(templateType: string) {
+    const snap = savedSnapshots[templateType]
     if (!snap) return
     const r = structuredClone(snap) as unknown
-    switch (type) {
+    switch (templateType) {
       case "birthday": setBirthdayForm(r as typeof birthdayForm); break
       case "anniversary": setAnniversaryForm(r as typeof anniversaryForm); break
       case "bible_study": setBibleStudyForm(r as typeof bibleStudyForm); break
@@ -2579,35 +2536,35 @@ export default function DashboardPage() {
   }
 
   // ---- Save / Delete instance ----
-  async function handleSaveInstance(type: CommType) {
-    setSavingInstance(type)
+  async function handleSaveInstance(eventTypeIdOrTemplateType: string) {
+    setSavingInstance(eventTypeIdOrTemplateType)
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      const weekStart = getWeekStartForSave(type)
-      const templateName = BUILTIN_LABEL[type] || type
-      const baseSubject = getSubject(type)
+      const weekStart = getWeekStartForSave(eventTypeIdOrTemplateType)
+      const templateName = BUILTIN_LABEL[eventTypeIdOrTemplateType] || eventTypeIdOrTemplateType
+      const baseSubject = getSubject(eventTypeIdOrTemplateType)
 
       // DEBUG: Trace subject resolution
       console.log('[SAVE DEBUG]', {
-        type,
-        subjectOverride: subjectOverrides[type],
-        savedTemplate: savedSubjectTemplates[type],
-        dispatchSubject: dispatches[type]?.subject,
+        type: eventTypeIdOrTemplateType,
+        subjectOverride: subjectOverrides[eventTypeIdOrTemplateType],
+        savedTemplate: savedSubjectTemplates[eventTypeIdOrTemplateType],
+        dispatchSubject: dispatches[eventTypeIdOrTemplateType]?.subject,
         baseSubject,
-        prefix: subjectPrefixes[type]
+        prefix: subjectPrefixes[eventTypeIdOrTemplateType]
       })
 
       const payload = {
-        template_type: type,
+        template_type: eventTypeIdOrTemplateType,
         name: templateName,
         subject: baseSubject,  // Store ONLY base subject (no prefix)
-        subject_prefix: subjectPrefixes[type] || null,  // Store prefix separately
-        form_data: getFormData(type),
-        mailing_list_id: commOptions[type].mailingListId || null,
-        smtp_config_id: commOptions[type].smtpConfigId || null,
-        additional_recipients: commOptions[type].additionalRecipients || null,
+        subject_prefix: subjectPrefixes[eventTypeIdOrTemplateType] || null,  // Store prefix separately
+        form_data: getFormData(eventTypeIdOrTemplateType),
+        mailing_list_id: commOptions[eventTypeIdOrTemplateType].mailingListId || null,
+        smtp_config_id: commOptions[eventTypeIdOrTemplateType].smtpConfigId || null,
+        additional_recipients: commOptions[eventTypeIdOrTemplateType].additionalRecipients || null,
         is_active: true,
         week_start: weekStart,
         is_recurring: false,
@@ -2615,8 +2572,8 @@ export default function DashboardPage() {
         created_by: user?.id ?? null,
       }
 
-      const existingId = instanceIds[type]
-      console.log('[SAVE] instanceIds:', instanceIds, 'existingId for', type, '=', existingId)
+      const existingId = instanceIds[eventTypeIdOrTemplateType]
+      console.log('[SAVE] instanceIds:', instanceIds, 'existingId for', eventTypeIdOrTemplateType, '=', existingId)
       if (existingId) {
         const { error, data } = await supabase
           .from("composed_instances")
@@ -2631,8 +2588,8 @@ export default function DashboardPage() {
           // Verify the save actually worked
           console.log('[SAVE SUCCESS] Returned from DB:', data)
           toast.success(`${templateName} draft saved`)
-          snapshotForm(type)
-          logAudit("composed_instance_updated", "composed_instances", existingId, { name: templateName, type, weekStart })
+          snapshotForm(eventTypeIdOrTemplateType)
+          logAudit("composed_instance_updated", "composed_instances", existingId, { name: templateName, type: eventTypeIdOrTemplateType, weekStart })
         }
       } else {
         const { data: inserted, error } = await supabase
@@ -2644,9 +2601,9 @@ export default function DashboardPage() {
           toast.error(`Save failed: ${error.message}`)
         } else {
           toast.success(`${templateName} draft saved`)
-          setInstanceIds((prev) => ({ ...prev, [type]: inserted?.id ?? undefined }))
-          snapshotForm(type)
-          logAudit("composed_instance_created", "composed_instances", inserted?.id, { name: templateName, type, weekStart })
+          if (inserted?.id) setInstanceIds((prev) => ({ ...prev, [eventTypeIdOrTemplateType]: inserted.id }))
+          snapshotForm(eventTypeIdOrTemplateType)
+          logAudit("composed_instance_created", "composed_instances", inserted?.id, { name: templateName, type: eventTypeIdOrTemplateType, weekStart })
         }
       }
     } catch {
@@ -2656,10 +2613,10 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleDeleteInstance(type: CommType) {
-    const id = instanceIds[type]
+  async function handleDeleteInstance(eventTypeIdOrTemplateType: string) {
+    const id = instanceIds[eventTypeIdOrTemplateType]
     if (!id) return
-    const label = BUILTIN_LABEL[type] || type
+    const label = BUILTIN_LABEL[eventTypeIdOrTemplateType] || eventTypeIdOrTemplateType
     if (!confirm(`Delete the saved ${label} draft for this week?`)) return
 
     const supabase = createClient()
@@ -2670,22 +2627,22 @@ export default function DashboardPage() {
       toast.success("Draft deleted")
       setInstanceIds((prev) => {
         const next = { ...prev }
-        delete next[type]
+        delete next[eventTypeIdOrTemplateType]
         return next
       })
-      logAudit("composed_instance_deleted", "composed_instances", id, { name: label, type })
+      logAudit("composed_instance_deleted", "composed_instances", id, { name: label, type: eventTypeIdOrTemplateType })
       fetchAll()
     }
   }
 
-  async function handleRefreshFromTemplate(type: CommType) {
+  async function handleRefreshFromTemplate(templateType: string) {
     // Check if we have signup auto-fill data FIRST
-    const autoFill = signupAutoFills[type]
-    const signupLink = signupLinks[type]
+    const autoFill = signupAutoFills[templateType]
+    const signupLink = signupLinks[templateType]
 
     // If there's signup data, use it
     if (autoFill && autoFill.source === "signup") {
-      switch (type) {
+      switch (templateType) {
         case "bible_study":
           setBibleStudyForm((prev) => ({
             ...prev,
@@ -2710,13 +2667,13 @@ export default function DashboardPage() {
     }
 
     // If no signup data but have signup link, try to fetch it now
-    if (signupLink && (type === "bible_study" || type === "prayer_meeting")) {
-      const currentDate = type === "bible_study" ? bibleStudyForm.date : prayerMeetingForm.date
+    if (signupLink && (templateType === "bible_study" || templateType === "prayer_meeting")) {
+      const currentDate = templateType === "bible_study" ? bibleStudyForm.date : prayerMeetingForm.date
       if (currentDate && !currentDate.toLowerCase().includes("no ")) {
         try {
           const freshAutoFill = await resolveSignupAutoFill(signupLink.formId, signupLink.fieldMap, new Date(currentDate))
           if (freshAutoFill.source === "signup") {
-            switch (type) {
+            switch (templateType) {
               case "bible_study":
                 setBibleStudyForm((prev) => ({
                   ...prev,
@@ -2747,13 +2704,13 @@ export default function DashboardPage() {
     }
 
     // Fall back to template defaults
-    const tmplData = savedTemplateData[type]
+    const tmplData = savedTemplateData[templateType]
     if (!tmplData) {
-      toast.error(`No template defaults found for ${type}`)
+      toast.error(`No template defaults found for ${templateType}`)
       return
     }
     const common = extractCommonFields(tmplData as CommonCardFields)
-    switch (type) {
+    switch (templateType) {
       case "birthday": setBirthdayForm((prev) => ({ ...prev, ...common })); break
       case "anniversary": setAnniversaryForm((prev) => ({ ...prev, ...common })); break
       case "bible_study": {
@@ -2781,27 +2738,27 @@ export default function DashboardPage() {
 
   // ---- Queue / Send ----
   const handleSendNow = useCallback(
-    async (type: CommType) => {
-      const html = getLivePreview(type)
+    async (templateType: string) => {
+      const html = getLivePreview(templateType)
       if (!html) {
         toast.error("No content to send. Please add data first.")
         return
       }
 
       // Track if this is a reminder (resending an already sent email)
-      const currentStatus = getStatus(type)
+      const currentStatus = getStatus(templateType)
       const isReminder = currentStatus === "sent" || currentStatus === "scheduled"
 
       // Get base subject - for reminders, generate fresh (skip old sent subject)
-      const baseSubject = getSubject(type, isReminder)
+      const baseSubject = getSubject(templateType, isReminder)
 
       // Apply ONLY user's explicit prefix (if they set one)
       // Prefix is layered at runtime, never stored in DB
-      const finalSubject = subjectPrefixes[type]?.trim()
-        ? combineSubject(baseSubject, type)
+      const finalSubject = subjectPrefixes[templateType]?.trim()
+        ? combineSubject(baseSubject, templateType)
         : baseSubject
 
-      const opts = commOptions[type]
+      const opts = commOptions[templateType]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
         toast.error("Please select a mailing list or add recipient emails before sending.")
         return
@@ -2811,24 +2768,24 @@ export default function DashboardPage() {
         return
       }
 
-      setSendingType(type)
+      setSendingType(templateType)
       try {
         const supabase = createClient()
         const {
           data: { user },
         } = await supabase.auth.getUser()
 
-        const dispatchWeekStart = getWeekStartForSave(type)
+        const dispatchWeekStart = getWeekStartForSave(templateType)
 
         // Auto-save draft before dispatching so form data persists
         // IMPORTANT: Store ONLY base subject (no prefix) to avoid accumulation
-        const templateName = BUILTIN_LABEL[type] || type
+        const templateName = BUILTIN_LABEL[templateType] || templateType
         const draftPayload = {
-          template_type: type,
+          template_type: templateType,
           name: templateName,
           subject: baseSubject,  // Store base subject WITHOUT prefix
-          subject_prefix: subjectPrefixes[type] || null,  // Store prefix separately
-          form_data: getFormData(type),
+          subject_prefix: subjectPrefixes[templateType] || null,  // Store prefix separately
+          form_data: getFormData(templateType),
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
           additional_recipients: opts.additionalRecipients.trim() || null,
@@ -2838,14 +2795,14 @@ export default function DashboardPage() {
           recur_until: null,
           created_by: user?.id ?? null,
         }
-        const existingDraftId = instanceIds[type]
+        const existingDraftId = instanceIds[templateType]
         if (existingDraftId) {
           await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingDraftId)
         } else {
           const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
-          if (newDraft) setInstanceIds((prev) => ({ ...prev, [type]: newDraft.id }))
+          if (newDraft) setInstanceIds((prev) => ({ ...prev, [templateType]: newDraft.id }))
         }
-        snapshotForm(type)
+        snapshotForm(templateType)
 
         // Resolve recipient count for confirmation dialog
         let recipientCount = 0
@@ -2858,7 +2815,7 @@ export default function DashboardPage() {
         const listName = mailingLists.find((ml) => ml.id === opts.mailingListId)?.name || "Direct recipients"
 
         // Show confirmation dialog instead of sending immediately
-        setSendConfirm({ open: true, type, subject: finalSubject, recipientCount: totalRecipients, listName, isReminder })
+        setSendConfirm({ open: true, eventTypeId: templateType, subject: finalSubject, recipientCount: totalRecipients, listName, isReminder })
         setSendingType(null)
         return
       } catch {
@@ -2871,13 +2828,13 @@ export default function DashboardPage() {
     [commOptions, instanceIds, mailingLists]
   )
 
-  async function handleQueue(type: CommType) {
-    const html = getLivePreview(type)
-    const baseSubject = getSubject(type)
-    const subject = combineSubject(baseSubject, type)
+  async function handleQueue(eventTypeIdOrTemplateType: string) {
+    const html = getLivePreview(eventTypeIdOrTemplateType)
+    const baseSubject = getSubject(eventTypeIdOrTemplateType)
+    const subject = combineSubject(baseSubject, eventTypeIdOrTemplateType)
     if (!html) { toast.error("No content to queue. Please add data first."); return }
 
-    const opts = commOptions[type]
+    const opts = commOptions[eventTypeIdOrTemplateType]
     if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
       toast.error("Please select a mailing list or add recipient emails before queuing.")
       return
@@ -2887,20 +2844,20 @@ export default function DashboardPage() {
       return
     }
 
-    setSendingType(type)
+    setSendingType(eventTypeIdOrTemplateType)
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      const dispatchWeekStart = getWeekStartForSave(type)
+      const dispatchWeekStart = getWeekStartForSave(eventTypeIdOrTemplateType)
 
       // Auto-save draft
-      const templateName = BUILTIN_LABEL[type] || type
+      const templateName = BUILTIN_LABEL[eventTypeIdOrTemplateType] || eventTypeIdOrTemplateType
       const draftPayload = {
-        template_type: type,
+        template_type: eventTypeIdOrTemplateType,
         name: templateName,
         subject: baseSubject,  // Store base subject WITHOUT prefix
-        subject_prefix: subjectPrefixes[type] || null,  // Store prefix separately
-        form_data: getFormData(type),
+        subject_prefix: subjectPrefixes[eventTypeIdOrTemplateType] || null,  // Store prefix separately
+        form_data: getFormData(eventTypeIdOrTemplateType),
         mailing_list_id: opts.mailingListId || null,
         smtp_config_id: opts.smtpConfigId || null,
         additional_recipients: opts.additionalRecipients.trim() || null,
@@ -2910,14 +2867,14 @@ export default function DashboardPage() {
         recur_until: null,
         created_by: user?.id ?? null,
       }
-      const existingDraftId = instanceIds[type]
+      const existingDraftId = instanceIds[eventTypeIdOrTemplateType]
       if (existingDraftId) {
         await supabase.from("composed_instances").update(draftPayload as never).eq("id", existingDraftId)
       } else {
         const { data: newDraft } = await supabase.from("composed_instances").insert(draftPayload as never).select("id").single() as { data: { id: string } | null }
-        if (newDraft) setInstanceIds((prev) => ({ ...prev, [type]: newDraft.id }))
+        if (newDraft) setInstanceIds((prev) => ({ ...prev, [eventTypeIdOrTemplateType]: newDraft.id }))
       }
-      snapshotForm(type)
+      snapshotForm(eventTypeIdOrTemplateType)
 
       // Insert into dispatch_queue as "pending" (for review, not sent)
       const { error } = await supabase
@@ -2927,7 +2884,7 @@ export default function DashboardPage() {
           body_html: html,
           scheduled_at: new Date().toISOString(),
           status: "pending",
-          template_type: type,
+          template_type: eventTypeIdOrTemplateType,
           week_start: dispatchWeekStart,
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
@@ -2939,8 +2896,8 @@ export default function DashboardPage() {
         toast.error(`Failed to queue: ${error.message}`)
       } else {
         toast.success(`"${subject}" queued for review. Approve it in Dispatch.`)
-        setDispatchCounts((prev) => ({ ...prev, [type]: prev[type] + 1 }))
-        await logAudit("dispatch_queued", "dispatch_queue", null, { subject, commType: type })
+        setDispatchCounts((prev) => ({ ...prev, [eventTypeIdOrTemplateType]: (prev[eventTypeIdOrTemplateType] || 0) + 1 }))
+        await logAudit("dispatch_queued", "dispatch_queue", null, { subject, commType: eventTypeIdOrTemplateType })
       }
     } catch {
       toast.error("An unexpected error occurred")
@@ -2950,19 +2907,19 @@ export default function DashboardPage() {
   }
 
   const executeSend = useCallback(async () => {
-    if (!sendConfirm.type) return
-    const type = sendConfirm.type
+    if (!sendConfirm.eventTypeId) return
+    const eventTypeIdOrTemplateType = sendConfirm.eventTypeId
     const subject = sendConfirm.subject
     const isReminder = sendConfirm.isReminder
     setSendConfirm((prev) => ({ ...prev, open: false }))
-    setSendingType(type)
+    setSendingType(eventTypeIdOrTemplateType)
 
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      const opts = commOptions[type]
-      const html = getLivePreview(type)
-      const dispatchWeekStart = getWeekStartForSave(type)
+      const opts = commOptions[eventTypeIdOrTemplateType]
+      const html = getLivePreview(eventTypeIdOrTemplateType)
+      const dispatchWeekStart = getWeekStartForSave(eventTypeIdOrTemplateType)
 
       const { data: inserted, error } = await supabase
           .from("dispatch_queue")
@@ -2971,7 +2928,7 @@ export default function DashboardPage() {
             body_html: html,
             scheduled_at: new Date().toISOString(),
             status: "sending",
-            template_type: type,
+            template_type: eventTypeIdOrTemplateType,
             week_start: dispatchWeekStart,
             mailing_list_id: opts.mailingListId || null,
             smtp_config_id: opts.smtpConfigId || null,
@@ -2998,14 +2955,15 @@ export default function DashboardPage() {
           }
           setDispatches((prev) => ({
             ...prev,
-            [type]: {
+            [eventTypeIdOrTemplateType]: {
               id: inserted?.id ?? "local",
               subject,
               body_html: html,
               status: "pending",
               scheduled_at: new Date().toISOString(),
+              sent_at: null,
               created_at: new Date().toISOString(),
-              template_type: type,
+              template_type: eventTypeIdOrTemplateType,
               week_start: dispatchWeekStart,
               mailing_list_id: opts.mailingListId || null,
               smtp_config_id: opts.smtpConfigId || null,
@@ -3014,14 +2972,14 @@ export default function DashboardPage() {
           }))
           setDispatchCounts((prev) => ({
             ...prev,
-            [type]: prev[type] + 1,
+            [eventTypeIdOrTemplateType]: (prev[eventTypeIdOrTemplateType] || 0) + 1,
           }))
 
           await logAudit(
             isReminder ? "dispatch_reminder_sent" : "dispatch_created",
             "dispatch_queue",
             inserted?.id,
-            { subject, commType: type, isReminder }
+            { subject, commType: eventTypeIdOrTemplateType, isReminder }
           )
         }
       } catch {
@@ -3050,17 +3008,17 @@ export default function DashboardPage() {
     ]
   )
 
-  async function handleTestSend(type: CommType) {
-    const html = getLivePreview(type)
+  async function handleTestSend(eventTypeIdOrTemplateType: string) {
+    const html = getLivePreview(eventTypeIdOrTemplateType)
     if (!html) { toast.error("No content to send."); return }
-    const opts = commOptions[type]
+    const opts = commOptions[eventTypeIdOrTemplateType]
     if (!opts.smtpConfigId) { toast.error("Select a Send From account first."); return }
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     const adminEmail = user?.email
     if (!adminEmail) { toast.error("Could not determine your email."); return }
-    const baseSubject = getSubject(type)
-    const subject = combineSubject(baseSubject, type)
+    const baseSubject = getSubject(eventTypeIdOrTemplateType)
+    const subject = combineSubject(baseSubject, eventTypeIdOrTemplateType)
     try {
       const res = await fetch("/api/dispatch/test", {
         method: "POST",
@@ -3271,8 +3229,8 @@ export default function DashboardPage() {
     setCustomForms((prev) => ({ ...prev, [ctId]: { ...prev[ctId], ...partial } }))
   }
 
-  async function viewSentEmail(type: CommType) {
-    const d = dispatches[type]
+  async function viewSentEmail(eventTypeIdOrTemplateType: string) {
+    const d = dispatches[eventTypeIdOrTemplateType]
     if (!d?.body_html) return
     const supabase = createClient()
     let mailingListName = ""
@@ -3320,13 +3278,13 @@ export default function DashboardPage() {
   }
 
   const handleSchedule = useCallback(
-    async (type: CommType) => {
-      const html = getLivePreview(type)
+    async (eventTypeIdOrTemplateType: string) => {
+      const html = getLivePreview(eventTypeIdOrTemplateType)
       if (!html) {
         toast.error("No content to schedule. Please add data first.")
         return
       }
-      const opts = commOptions[type]
+      const opts = commOptions[eventTypeIdOrTemplateType]
       if (!opts.mailingListId && !opts.additionalRecipients.trim()) {
         toast.error("Please select a mailing list or add recipient emails before scheduling.")
         return
@@ -3337,7 +3295,7 @@ export default function DashboardPage() {
       }
       setScheduleDialog({
         open: true,
-        commType: type,
+        eventTypeId: eventTypeIdOrTemplateType,
         dateTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       })
     },
@@ -3359,16 +3317,16 @@ export default function DashboardPage() {
   )
 
   const confirmSchedule = useCallback(async () => {
-    const type = scheduleDialog.commType
-    if (!type) return
+    const eventTypeIdOrTemplateType = scheduleDialog.eventTypeId
+    if (!eventTypeIdOrTemplateType) return
 
-    const html = getLivePreview(type)
-    const subject = getSubject(type)
+    const html = getLivePreview(eventTypeIdOrTemplateType)
+    const subject = getSubject(eventTypeIdOrTemplateType)
     if (!html) return
 
-    const opts = commOptions[type]
+    const opts = commOptions[eventTypeIdOrTemplateType]
 
-    setSendingType(type)
+    setSendingType(eventTypeIdOrTemplateType)
     setScheduleDialog((prev) => ({ ...prev, open: false }))
 
     try {
@@ -3378,7 +3336,7 @@ export default function DashboardPage() {
         data: { user },
       } = await supabase.auth.getUser()
 
-      const schedWeekStart = getWeekStartForSave(type)
+      const schedWeekStart = getWeekStartForSave(eventTypeIdOrTemplateType)
 
       const { data: inserted, error } = await supabase
         .from("dispatch_queue")
@@ -3387,7 +3345,7 @@ export default function DashboardPage() {
           body_html: html,
           scheduled_at: scheduledAt,
           status: "pending",
-          template_type: type,
+          template_type: eventTypeIdOrTemplateType,
           week_start: schedWeekStart,
           mailing_list_id: opts.mailingListId || null,
           smtp_config_id: opts.smtpConfigId || null,
@@ -3405,14 +3363,15 @@ export default function DashboardPage() {
         )
         setDispatches((prev) => ({
           ...prev,
-          [type]: {
+          [eventTypeIdOrTemplateType]: {
             id: inserted?.id ?? "local",
             subject,
             body_html: html,
             status: "pending",
             scheduled_at: scheduledAt,
+            sent_at: null,
             created_at: new Date().toISOString(),
-            template_type: type,
+            template_type: eventTypeIdOrTemplateType,
             week_start: schedWeekStart,
             mailing_list_id: opts.mailingListId || null,
             smtp_config_id: opts.smtpConfigId || null,
@@ -3421,12 +3380,12 @@ export default function DashboardPage() {
         }))
         setDispatchCounts((prev) => ({
           ...prev,
-          [type]: prev[type] + 1,
+          [eventTypeIdOrTemplateType]: (prev[eventTypeIdOrTemplateType] || 0) + 1,
         }))
 
         await logAudit("dispatch_scheduled", "dispatch_queue", inserted?.id, {
           subject,
-          commType: type,
+          commType: eventTypeIdOrTemplateType,
           scheduledAt,
         })
       }
@@ -3664,27 +3623,29 @@ export default function DashboardPage() {
         <div className="space-y-4">
 
           {(() => {
-            const hasContent: Record<CommType, boolean> = {
+            const hasContent: Record<string, boolean> = {
               birthday: birthdayForm.birthdays.length > 0,
               anniversary: anniversaryForm.anniversaries.length > 0,
               bible_study: bibleStudyForm.date !== "No bible study this week",
+              mountain_house_bible_study: bibleStudyForm.date !== "No bible study this week",
               womens_study: womensStudyForm.date !== "No study this week",
               prayer_meeting: !!prayerMeetingForm.date && prayerMeetingForm.date !== "",
               bulletin: true,
               shoebox_ministry: !!shoeboxMinistryForm.dueDate,
             }
 
-            const cardTitles: Record<CommType, string> = {
+            const cardTitles: Record<string, string> = {
               birthday: "Birthdays",
               anniversary: "Anniversaries",
               bible_study: "Bible Study",
+              mountain_house_bible_study: "Mountain House Bible Study",
               womens_study: "Women's Study",
               prayer_meeting: "Prayer Meeting",
               bulletin: "Weekly Bulletin",
               shoebox_ministry: "Shoebox Ministry",
             }
 
-            const shortSummaries: Record<CommType, string> = {
+            const shortSummaries: Record<string, string> = {
               birthday: birthdayForm.birthdays.length > 0
                 ? `${birthdayForm.birthdays.length} birthday${birthdayForm.birthdays.length > 1 ? "s" : ""}`
                 : "None this week",
@@ -3692,6 +3653,9 @@ export default function DashboardPage() {
                 ? `${anniversaryForm.anniversaries.length} anniversary${anniversaryForm.anniversaries.length > 1 ? "ies" : "y"}`
                 : "None this week",
               bible_study: bibleStudyForm.date !== "No bible study this week"
+                ? `${bibleStudyForm.date} at ${bibleStudyForm.time}`
+                : "No study this week",
+              mountain_house_bible_study: bibleStudyForm.date !== "No bible study this week"
                 ? `${bibleStudyForm.date} at ${bibleStudyForm.time}`
                 : "No study this week",
               womens_study: womensStudyForm.date !== "No study this week"
@@ -3704,20 +3668,22 @@ export default function DashboardPage() {
               shoebox_ministry: shoeboxMinistryForm.dueDate || "No due date set",
             }
 
-            const fullSummaries: Record<CommType, string[]> = {
+            const fullSummaries: Record<string, string[]> = {
               birthday: birthdaySummary,
               anniversary: anniversarySummary,
               bible_study: bibleStudySummary,
+              mountain_house_bible_study: bibleStudySummary,
               womens_study: womensStudySummary,
               prayer_meeting: prayerMeetingSummary,
               bulletin: bulletinSummary,
               shoebox_ministry: shoeboxMinistrySummary,
             }
 
-            const links: Record<CommType, { label: string; url: string }[]> = {
+            const links: Record<string, { label: string; url: string }[]> = {
               birthday: (birthdayForm.resourceLinks ?? []).filter((l) => l.url),
               anniversary: (anniversaryForm.resourceLinks ?? []).filter((l) => l.url),
               bible_study: (bibleStudyForm.resourceLinks ?? []).filter((l) => l.url),
+              mountain_house_bible_study: (bibleStudyForm.resourceLinks ?? []).filter((l) => l.url),
               womens_study: [
                 ...(womensStudyForm.zoomLink ? [{ label: "Join Zoom Meeting", url: womensStudyForm.zoomLink }] : []),
                 ...(womensStudyForm.resourceLinks ?? []).filter((l) => l.url),
@@ -3733,7 +3699,7 @@ export default function DashboardPage() {
               ],
             }
 
-            const editForms: Record<CommType, React.ReactNode> = {
+            const editForms: Record<string, React.ReactNode> = {
               birthday: <BirthdayEditForm data={birthdayForm} onChange={setBirthdayForm} />,
               anniversary: <AnniversaryEditForm data={anniversaryForm} onChange={setAnniversaryForm} />,
               bible_study: <BibleStudyEditForm data={bibleStudyForm} onChange={setBibleStudyForm} />,
@@ -3821,18 +3787,18 @@ export default function DashboardPage() {
             return <>
           {/* ── Mini-card grid ── */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {BUILTIN_TEMPLATES.map(({ type, label, color, icon: DefaultIcon }) => {
-              const TIcon = commTypeIcons[type] ? getIconComponent(commTypeIcons[type]) : DefaultIcon
-              const status = getStatus(type)
-              const count = dispatchCounts[type]
-              const hasData = hasContent[type]
-              const hasDraft = !!instanceIds[type]
-              const isSelected = selectedCard === type
+            {BUILTIN_TEMPLATES.map(({ eventTypeId, templateType, label, color, icon: DefaultIcon }) => {
+              const TIcon = etIdToIcons[eventTypeId] ? getIconComponent(etIdToIcons[eventTypeId]) : DefaultIcon
+              const status = getStatus(eventTypeId)
+              const count = dispatchCounts[eventTypeId]
+              const hasData = hasContent[templateType]
+              const hasDraft = !!instanceIds[eventTypeId]
+              const isSelected = activeCardKey === eventTypeId
 
               return (
                 <button
-                  key={type}
-                  onClick={() => setActiveCardKey(type)}
+                  key={eventTypeId}
+                  onClick={() => setActiveCardKey(eventTypeId)}
                   className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-sm ${
                     isSelected
                       ? "ring-2 ring-offset-1 shadow-sm"
@@ -3853,10 +3819,10 @@ export default function DashboardPage() {
                   {/* Content */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold truncate">{cardTitles[type]}</span>
-                      {(eventCounts[type] ?? 0) > 1 && (
+                      <span className="text-sm font-semibold truncate">{label}</span>
+                      {(eventCounts[templateType] ?? 0) > 1 && (
                         <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          {eventCounts[type]} events
+                          {eventCounts[templateType]} events
                         </span>
                       )}
                       {/* Status badges */}
@@ -3866,18 +3832,18 @@ export default function DashboardPage() {
                             role="link"
                             tabIndex={0}
                             className="shrink-0 cursor-pointer rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                            onClick={(e) => { e.stopPropagation(); window.location.href = `/dispatch?status=sent&type=${type}` }}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); window.location.href = `/dispatch?status=sent&type=${type}` } }}
+                            onClick={(e) => { e.stopPropagation(); window.location.href = `/dispatch?status=sent&type=${templateType}` }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); window.location.href = `/dispatch?status=sent&type=${templateType}` } }}
                           >
                             Sent{count > 1 ? ` ${count}x` : ""}
                           </span>
-                          {dispatches[type]?.body_html && (
+                          {dispatches[eventTypeId]?.body_html && (
                             <span
                               role="link"
                               tabIndex={0}
                               className="shrink-0 cursor-pointer text-[10px] font-medium text-green-600 hover:text-green-800 hover:underline dark:text-green-400"
-                              onClick={(e) => { e.stopPropagation(); viewSentEmail(type) }}
-                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); viewSentEmail(type) } }}
+                              onClick={(e) => { e.stopPropagation(); viewSentEmail(eventTypeId) }}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); viewSentEmail(eventTypeId) } }}
                             >
                               View
                             </span>
@@ -3889,8 +3855,8 @@ export default function DashboardPage() {
                           role="link"
                           tabIndex={0}
                           className="shrink-0 cursor-pointer rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
-                          onClick={(e) => { e.stopPropagation(); window.location.href = `/dispatch?status=pending&type=${type}` }}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); window.location.href = `/dispatch?status=pending&type=${type}` } }}
+                          onClick={(e) => { e.stopPropagation(); window.location.href = `/dispatch?status=pending&type=${templateType}` }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); window.location.href = `/dispatch?status=pending&type=${templateType}` } }}
                         >
                           Queued
                         </span>
@@ -3903,8 +3869,8 @@ export default function DashboardPage() {
                             tabIndex={0}
                             className="ml-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 p-0.5 -mr-0.5 cursor-pointer"
                             title="Clear draft — revert to defaults"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteInstance(type) }}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); handleDeleteInstance(type) } }}
+                            onClick={(e) => { e.stopPropagation(); handleDeleteInstance(eventTypeId) }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); handleDeleteInstance(eventTypeId) } }}
                           >
                             <X className="size-2.5" />
                           </span>
@@ -3912,16 +3878,16 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                      {shortSummaries[type]}
+                      {shortSummaries[templateType]}
                     </p>
                     {(() => {
-                      const d = dispatches[type]
+                      const d = dispatches[eventTypeId]
                       const sentTs = formatRelativeTime(d?.sent_at)
-                      const modTs = formatRelativeTime(instanceUpdatedAt[type])
+                      const modTs = formatRelativeTime(instanceUpdatedAt[eventTypeId])
                       if (sentTs) return <p className="mt-0.5 text-[10px] text-green-600 dark:text-green-400">Sent {sentTs}</p>
                       if (modTs && hasDraft) return <p className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-400">Modified {modTs}</p>
                       if (weekOffset < 0 && !hasDraft && status === "draft" && hasData) return <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">Not dispatched</p>
-                      if (!hasData && (type === "bible_study" || type === "womens_study" || type === "prayer_meeting")) {
+                      if (!hasData && (templateType === "bible_study" || templateType === "womens_study" || templateType === "prayer_meeting" || templateType === "mountain_house_bible_study")) {
                         return <Link href="/calendar" className="mt-0.5 text-[10px] text-primary hover:underline" onClick={(e) => e.stopPropagation()}>Set up schedule</Link>
                       }
                       return null
@@ -4023,18 +3989,19 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Expanded card detail ── */}
-          {BUILTIN_TEMPLATES.find((t) => t.type === selectedCard) && !selectedCustomCard && (() => {
-            const tmpl = BUILTIN_TEMPLATES.find((t) => t.type === selectedCard)
+          {BUILTIN_TEMPLATES.find((t) => t.eventTypeId === activeCardKey) && !selectedCustomCard && (() => {
+            const tmpl = BUILTIN_TEMPLATES.find((t) => t.eventTypeId === activeCardKey)
             if (!tmpl) return null // Template not loaded yet
-            const type = selectedCard
+            const eventTypeId = tmpl.eventTypeId
+            const templateType = tmpl.templateType
 
             // Build status indicators for the full card
-            const summaries = [...fullSummaries[type]]
-            const status = getStatus(type)
-            const count = dispatchCounts[type]
-            const hasDraft = !!instanceIds[type]
+            const summaries = [...fullSummaries[templateType]]
+            const status = getStatus(eventTypeId)
+            const count = dispatchCounts[eventTypeId]
+            const hasDraft = !!instanceIds[eventTypeId]
 
-            const d = dispatches[type]
+            const d = dispatches[eventTypeId]
             const sentTs = d?.sent_at ? format(new Date(d.sent_at), "MMM d 'at' h:mm a") : null
             if (status === "sent" && count > 0) {
               summaries.push(`✅ Email sent${count > 1 ? ` (${count}x)` : ""}${sentTs ? ` — ${sentTs}` : ""}`)
@@ -4042,53 +4009,53 @@ export default function DashboardPage() {
               summaries.push("⏳ Queued for dispatch")
             }
             if (hasDraft) {
-              const modTs = instanceUpdatedAt[type]
+              const modTs = instanceUpdatedAt[eventTypeId]
               const modLabel = modTs ? formatRelativeTime(modTs) : null
               summaries.push(`📌 Draft${modLabel ? ` — modified ${modLabel}` : ""}`)
             }
 
             return (
               <WeeklyCommunicationCard
-                key={type}
-                title={cardTitles[type]}
+                key={eventTypeId}
+                title={tmpl.label}
                 accentColor={tmpl.color}
-                icon={commTypeIcons[type] ? getIconComponent(commTypeIcons[type]) : tmpl.icon}
-                status={getStatus(type)}
+                icon={etIdToIcons[eventTypeId] ? getIconComponent(etIdToIcons[eventTypeId]) : tmpl.icon}
+                status={getStatus(eventTypeId)}
                 summaryLines={summaries}
                 subject={(() => {
-                  const status = getStatus(type)
+                  const status = getStatus(eventTypeId)
                   // For sent/scheduled emails, show the fresh subject (what will be used for reminder)
                   // This ensures the card displays what WILL be sent, not what WAS sent
                   const isReminderContext = status === "sent" || status === "scheduled"
-                  return getSubject(type, isReminderContext)
+                  return getSubject(templateType, isReminderContext)
                 })()}
-                onSubjectChange={(v) => setSubjectOverride(type, v)}
-                subjectPrefix={subjectPrefixes[type] || ""}
-                onSubjectPrefixChange={(v) => setSubjectPrefix(type, v)}
-                scheduledAt={getScheduledAt(type)}
-                previewHtml={getPreview(type)}
-                resourceLinks={links[type]}
-                onQueue={() => handleQueue(type)}
-                onSendNow={() => handleSendNow(type)}
-                onTestSend={() => handleTestSend(type)}
-                onSave={() => handleSaveInstance(type)}
-                onDelete={() => handleDeleteInstance(type)}
-                onCancel={() => handleCancelEdit(type)}
-                onRefresh={() => handleRefreshFromTemplate(type)}
-                saving={savingInstance === type}
-                hasInstance={!!instanceIds[type]}
+                onSubjectChange={(v) => setSubjectOverride(eventTypeId, v)}
+                subjectPrefix={subjectPrefixes[eventTypeId] || ""}
+                onSubjectPrefixChange={(v) => setSubjectPrefix(eventTypeId, v)}
+                scheduledAt={getScheduledAt(eventTypeId)}
+                previewHtml={getPreview(templateType)}
+                resourceLinks={links[templateType]}
+                onQueue={() => handleQueue(eventTypeId)}
+                onSendNow={() => handleSendNow(templateType)}
+                onTestSend={() => handleTestSend(eventTypeId)}
+                onSave={() => handleSaveInstance(eventTypeId)}
+                onDelete={() => handleDeleteInstance(eventTypeId)}
+                onCancel={() => handleCancelEdit(templateType)}
+                onRefresh={() => handleRefreshFromTemplate(templateType)}
+                saving={savingInstance === eventTypeId}
+                hasInstance={!!instanceIds[eventTypeId]}
                 mailingLists={mailingLists}
                 smtpConfigs={smtpConfigs}
-                selectedMailingList={commOptions[type].mailingListId}
-                onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, [type]: { ...prev[type], mailingListId: id } }))}
-                selectedSmtpConfig={commOptions[type].smtpConfigId}
-                onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, [type]: { ...prev[type], smtpConfigId: id } }))}
-                sendCount={dispatchCounts[type]}
-                additionalRecipients={commOptions[type].additionalRecipients}
-                onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, [type]: { ...prev[type], additionalRecipients: v } }))}
-                autoFilledFrom={signupAutoFills[type]?.formTitle ?? null}
+                selectedMailingList={commOptions[eventTypeId]?.mailingListId || ""}
+                onMailingListChange={(id) => setCommOptions((prev) => ({ ...prev, [eventTypeId]: { ...(prev[eventTypeId] || { mailingListId: "", smtpConfigId: "", additionalRecipients: "" }), mailingListId: id } }))}
+                selectedSmtpConfig={commOptions[eventTypeId]?.smtpConfigId || ""}
+                onSmtpConfigChange={(id) => setCommOptions((prev) => ({ ...prev, [eventTypeId]: { ...(prev[eventTypeId] || { mailingListId: "", smtpConfigId: "", additionalRecipients: "" }), smtpConfigId: id } }))}
+                sendCount={dispatchCounts[eventTypeId] || 0}
+                additionalRecipients={commOptions[eventTypeId]?.additionalRecipients || ""}
+                onAdditionalRecipientsChange={(v) => setCommOptions((prev) => ({ ...prev, [eventTypeId]: { ...(prev[eventTypeId] || { mailingListId: "", smtpConfigId: "", additionalRecipients: "" }), additionalRecipients: v } }))}
+                autoFilledFrom={signupAutoFills[eventTypeId]?.formTitle ?? null}
               >
-                {editForms[type]}
+                {editForms[templateType]}
               </WeeklyCommunicationCard>
             )
           })()}

@@ -1,15 +1,13 @@
 import { format, addDays } from "date-fns"
 
-export type CommType =
-  | "birthday"
-  | "anniversary"
-  | "bible_study"
-  | "womens_study"
-  | "prayer_meeting"
-  | "bulletin"
-  | "shoebox_ministry"
+/**
+ * Template type strings - these reference templates in the registry.
+ * NOT a hardcoded union - any string can be a valid template type.
+ * Common built-in types for reference only.
+ */
+export type TemplateType = string
 
-export function inferCommType(name: string): CommType | null {
+export function inferTemplateType(name: string): string | null {
   const n = name.toLowerCase()
   if (n.includes("bible study") && !n.includes("women")) return "bible_study"
   if (n.includes("women") && n.includes("study")) return "womens_study"
@@ -21,32 +19,28 @@ export function inferCommType(name: string): CommType | null {
   return null
 }
 
-export function buildCommTypeMappings(eventTypes: { id: string; name: string; comm_type: string | null }[]): {
-  commTypeToEtId: Record<CommType, string>
-  commTypeToEtName: Record<CommType, string>
-  etIdToCommType: Record<string, CommType>
+export function buildEventTypeMappings(eventTypes: { id: string; name: string; comm_type: string | null }[]): {
+  etIdToTemplateType: Record<string, string>
+  etIdToName: Record<string, string>
 } {
-  const commTypeToEtId: Partial<Record<CommType, string>> = {}
-  const commTypeToEtName: Partial<Record<CommType, string>> = {}
-  const etIdToCommType: Record<string, CommType> = {}
+  const etIdToTemplateType: Record<string, string> = {}
+  const etIdToName: Record<string, string> = {}
 
   for (const et of eventTypes) {
-    const ct = (et.comm_type as CommType) ?? inferCommType(et.name)
-    if (ct) {
-      commTypeToEtId[ct] = et.id
-      commTypeToEtName[ct] = et.name
-      etIdToCommType[et.id] = ct
+    const templateType = et.comm_type ?? inferTemplateType(et.name)
+    if (templateType) {
+      etIdToTemplateType[et.id] = templateType
+      etIdToName[et.id] = et.name
     }
   }
 
   return {
-    commTypeToEtId: commTypeToEtId as Record<CommType, string>,
-    commTypeToEtName: commTypeToEtName as Record<CommType, string>,
-    etIdToCommType,
+    etIdToTemplateType,
+    etIdToName,
   }
 }
 
-export const DISPATCH_MATCHERS: Record<CommType, (subject: string) => boolean> = {
+export const DISPATCH_MATCHERS: Record<string, (subject: string) => boolean> = {
   birthday: (s) => /birthday/i.test(s),
   anniversary: (s) => /anniversary/i.test(s),
   bible_study: (s) => /bible.?study/i.test(s) && !/women/i.test(s),

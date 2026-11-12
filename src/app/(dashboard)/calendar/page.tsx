@@ -44,7 +44,7 @@ import type {
   Address,
   DispatchStatus,
 } from "@/types/database"
-import { inferCommType } from "@/lib/dashboard-types"
+import { inferTemplateType } from "@/lib/dashboard-types"
 import { logAudit } from "@/lib/audit"
 import { sanitizeHtml } from "@/lib/sanitize-html"
 import { batchResolveHostFamilies } from "@/lib/queries/batch-host-families"
@@ -308,7 +308,7 @@ export default function CalendarPage() {
           color: "#9CA3AF",
           status: "cancelled",
           eventTypeName: eventType?.name ?? null,
-          commType: eventType?.comm_type ?? inferCommType(eventType?.name ?? "") ?? null,
+          commType: eventType?.comm_type ?? inferTemplateType(eventType?.name ?? "") ?? null,
           notes: instance.notes,
           eventId: event.id,
           eventTypeId: event.event_type_id,
@@ -336,7 +336,7 @@ export default function CalendarPage() {
         time: formatTime(instance.instance_time ?? event.default_time ?? null) || null,
         status: instance.status,
         eventTypeName: eventType?.name ?? null,
-        commType: eventType?.comm_type ?? inferCommType(eventType?.name ?? "") ?? null,
+        commType: eventType?.comm_type ?? inferTemplateType(eventType?.name ?? "") ?? null,
         infoSections: (eventType as EventType & { info_sections?: unknown })?.info_sections as CalendarEvent["infoSections"] ?? undefined,
         description: event.description,
         notes: instance.notes,
@@ -394,7 +394,7 @@ export default function CalendarPage() {
           time: formatTime(event.default_time) || null,
           status: "confirmed",
           eventTypeName: eventType?.name ?? null,
-          commType: eventType?.comm_type ?? inferCommType(eventType?.name ?? "") ?? null,
+          commType: eventType?.comm_type ?? inferTemplateType(eventType?.name ?? "") ?? null,
           infoSections: (eventType as EventType & { info_sections?: unknown })?.info_sections as CalendarEvent["infoSections"] ?? undefined,
           description: event.description,
           hostFamily: hostFam
@@ -436,7 +436,7 @@ export default function CalendarPage() {
               time: event.default_time ? formatTime(event.default_time) : null,
               status: "confirmed",
               eventTypeName: eventType?.name ?? null,
-              commType: eventType?.comm_type ?? inferCommType(eventType?.name ?? "") ?? null,
+              commType: eventType?.comm_type ?? inferTemplateType(eventType?.name ?? "") ?? null,
               infoSections: (eventType as EventType & { info_sections?: unknown })?.info_sections as CalendarEvent["infoSections"] ?? undefined,
               description: event.description,
               eventId: event.id,

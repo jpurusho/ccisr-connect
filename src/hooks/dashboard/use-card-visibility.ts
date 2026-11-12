@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import type { CommType } from "@/lib/dashboard-types"
+import type { TemplateType } from "@/lib/dashboard-types"
 
-const BUILTIN_TYPES: CommType[] = ["bulletin", "birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting"]
+const BUILTIN_TYPES: TemplateType[] = ["bulletin", "birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting"]
 const ORDER_STORAGE_KEY = "ccisr-dashboard-card-order"
 const HIDDEN_STORAGE_KEY = "ccisr-dashboard-hidden-cards"
 const CUSTOM_HIDDEN_KEY = "ccisr-dashboard-hidden-custom"
@@ -41,9 +41,9 @@ export function useCardVisibility() {
   const [cardOrder, setCardOrder] = useState<CardOrderItem[]>(() => loadCardOrder())
   const [hiddenCustom, setHiddenCustom] = useState<Set<string>>(() => loadHiddenCustom())
 
-  const visibleTemplates = cardOrder.filter((c) => c.visible).map((c) => c.type as CommType)
+  const visibleTemplates = cardOrder.filter((c) => c.visible).map((c) => c.type as TemplateType)
 
-  function toggleTemplate(type: CommType) {
+  function toggleTemplate(type: TemplateType) {
     setCardOrder((prev) => {
       const next = prev.map((c) => c.type === type ? { ...c, visible: !c.visible } : c)
       // Add if not in list yet
