@@ -1842,7 +1842,7 @@ export default function DashboardPage() {
       }
 
       // ---- Generic event cards (non-built-in event types with occurrences this week) ----
-      const builtinCommTypes = new Set<string>(["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"])
+      const builtinTemplateTypes = new Set<string>(["birthday", "anniversary", "bible_study", "womens_study", "prayer_meeting", "bulletin", "shoebox_ministry"])
       // Event types that have a linked custom template already get their own card
       const etIdsWithCustomTemplate = new Set(
         (eventTypesRes.data ?? []).filter((et) => et.default_template_id).map((et) => et.id)
@@ -1851,8 +1851,8 @@ export default function DashboardPage() {
 
       for (const evt of activeEvents) {
         const etTemplateType = mappedEtIdToTemplateType[evt.event_type_id] ?? ""
-        // Skip if this event belongs to a built-in comm type
-        if (builtinCommTypes.has(etTemplateType)) continue
+        // Skip if this event belongs to a built-in template type
+        if (builtinTemplateTypes.has(etTemplateType)) continue
         // Skip if this event type has a custom template (already shown as custom card)
         if (etIdsWithCustomTemplate.has(evt.event_type_id)) continue
         // Skip if there's already a generic card for this event type
