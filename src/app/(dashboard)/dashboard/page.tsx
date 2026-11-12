@@ -4031,8 +4031,14 @@ export default function DashboardPage() {
             })}
           </div>
 
-          {/* ── Settings link ── */}
-          <div className="flex justify-end">
+          {/* ── Settings links ── */}
+          <div className="flex justify-end gap-2">
+            <Link href="/settings/event-types">
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
+                <Settings2 className="size-3.5" />
+                Event Types
+              </Button>
+            </Link>
             <Link href="/settings/templates">
               <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
                 <Settings2 className="size-3.5" />
