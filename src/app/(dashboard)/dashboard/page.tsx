@@ -971,6 +971,19 @@ export default function DashboardPage() {
       const { commTypeToEtName, etIdToCommType } = buildCommTypeMappings(eventTypesRes.data ?? [])
       setCommTypeEtNames(commTypeToEtName)
 
+      // Debug: Check event_types data
+      console.log("=== event_types Query Result ===")
+      console.log("Total event_types rows:", eventTypesRes.data?.length || 0)
+      const commTypeCounts: Record<string, number> = {}
+      eventTypesRes.data?.forEach(et => {
+        if (et.comm_type) {
+          commTypeCounts[et.comm_type] = (commTypeCounts[et.comm_type] || 0) + 1
+        }
+      })
+      Object.entries(commTypeCounts).forEach(([ct, count]) => {
+        if (count > 1) console.error(`❌ DATABASE DUPLICATE: comm_type='${ct}' has ${count} rows`)
+      })
+
       // Build icon overrides from DB
       const iconOverrides: Partial<Record<CommType, string>> = {}
       for (const et of (eventTypesRes.data ?? [])) {
@@ -999,6 +1012,19 @@ export default function DashboardPage() {
 
       // Sort by display order and set loaded templates
       visibleTemplates.sort((a, b) => a.displayOrder - b.displayOrder)
+
+      // Debug: Check for duplicates
+      console.log("=== Dashboard Template Debug ===")
+      console.log("Total templates loaded:", visibleTemplates.length)
+      console.log("Templates:", visibleTemplates.map(t => `${t.type} (${t.label})`))
+      const typeCount: Record<string, number> = {}
+      visibleTemplates.forEach(t => {
+        typeCount[t.type] = (typeCount[t.type] || 0) + 1
+      })
+      Object.entries(typeCount).forEach(([type, count]) => {
+        if (count > 1) console.error(`❌ DUPLICATE: ${type} appears ${count} times`)
+      })
+
       setLoadedTemplates(visibleTemplates)
 
       const etInfoSections: Record<string, { sections: unknown; showInBulletin: boolean }> = {}
