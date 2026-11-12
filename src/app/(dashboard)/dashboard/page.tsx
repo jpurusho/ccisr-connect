@@ -994,9 +994,18 @@ export default function DashboardPage() {
 
       // Build loaded templates list from database + registry
       const visibleTemplates: LoadedTemplate[] = []
+      const seenTypes = new Set<string>()
+
       for (const et of (eventTypesRes.data ?? [])) {
         const ct = etIdToCommType[et.id]
         if (!ct || (et.show_in_dashboard === false)) continue // Skip hidden templates
+
+        // Skip duplicates - keep only the first occurrence of each comm_type
+        if (seenTypes.has(ct)) {
+          console.warn(`⚠️ Skipping duplicate comm_type='${ct}' from event_types id=${et.id}`)
+          continue
+        }
+        seenTypes.add(ct)
 
         const templateConfig = templateRegistry.get(ct)
         if (!templateConfig) continue // Skip if not in registry
@@ -1017,13 +1026,6 @@ export default function DashboardPage() {
       console.log("=== Dashboard Template Debug ===")
       console.log("Total templates loaded:", visibleTemplates.length)
       console.log("Templates:", visibleTemplates.map(t => `${t.type} (${t.label})`))
-      const typeCount: Record<string, number> = {}
-      visibleTemplates.forEach(t => {
-        typeCount[t.type] = (typeCount[t.type] || 0) + 1
-      })
-      Object.entries(typeCount).forEach(([type, count]) => {
-        if (count > 1) console.error(`❌ DUPLICATE: ${type} appears ${count} times`)
-      })
 
       setLoadedTemplates(visibleTemplates)
 
