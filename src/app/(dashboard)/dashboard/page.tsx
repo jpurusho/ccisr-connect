@@ -1265,6 +1265,7 @@ export default function DashboardPage() {
       const bsDate = bsCancelled ? null : bsRawDate
 
       const bsCommon = extractCommonFields(bsDef)
+      console.log("🟡 bsCommon extracted - primaryColor:", bsCommon.primaryColor, "from template bsDef.primaryColor:", bsDef.primaryColor)
       if (bsCommon.resourceLinks.length === 0) {
         const def = bsDef as Record<string, unknown>
         const url = (def.resourceLinkUrl as string) ?? ""
@@ -1332,6 +1333,7 @@ export default function DashboardPage() {
       // NOW load draft if it exists (for style/content, not host data)
       if (hasBsDraft) {
         const fd = composedMapByTemplateType["bible_study"].form_data as Record<string, unknown>
+        console.log("🔴 LOADING DRAFT FROM DB - fd.primaryColor:", fd.primaryColor, "bsCommon.primaryColor:", bsCommon.primaryColor)
         setBibleStudyForm({
           // Spread template defaults first (fallback values)
           ...bsCommon,
