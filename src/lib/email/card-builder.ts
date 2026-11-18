@@ -121,6 +121,17 @@ export function buildStyleContext(settings?: TemplateStyleSettings): StyleContex
   }
 }
 
+/**
+ * When custom primaryColor is provided, remove template gradient to let custom color show.
+ * Template gradients should be defaults, not overrides.
+ */
+function styleWithoutGradientIfCustomColor(style: StyleContext | undefined, hasCustomColor: boolean): StyleContext | undefined {
+  if (hasCustomColor && style?.headerGradientCss) {
+    return { ...style, headerGradientCss: undefined }
+  }
+  return style
+}
+
 export function deriveColorsFromPrimary(hex: string): CardColors {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
@@ -492,6 +503,7 @@ export interface BirthdayCardData extends BaseCardData {
 
 export function buildBirthdayCard(data: BirthdayCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.birthday;
+  const styleForHeader = styleWithoutGradientIfCustomColor(style, !!data.primaryColor);
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const entries = data.birthdays.map((b) => ({ primary: b.name, secondary: b.date }));
@@ -507,7 +519,7 @@ ${msgBlock(data.message, data.messageBgColor, colors, "0", style, data.messageTe
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "🎂",
       colors,
-      style,
+      styleForHeader,
       data.headerTitleColor,
       data.headerSubtitleColor
     ) +
@@ -539,6 +551,7 @@ export interface AnniversaryCardData extends BaseCardData {
 
 export function buildAnniversaryCard(data: AnniversaryCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.anniversary;
+  const styleForHeader = styleWithoutGradientIfCustomColor(style, !!data.primaryColor);
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const entries = data.anniversaries.map((a) => {
@@ -557,7 +570,7 @@ ${msgBlock(data.message, data.messageBgColor, colors, "0", style, data.messageTe
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "💍",
       colors,
-      style,
+      styleForHeader,
       data.headerTitleColor,
       data.headerSubtitleColor
     ) +
@@ -594,6 +607,7 @@ export interface BibleStudyCardData extends BaseCardData {
 
 export function buildBibleStudyCard(data: BibleStudyCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.bible_study;
+  const styleForHeader = styleWithoutGradientIfCustomColor(style, !!data.primaryColor);
 
   const isBreakDate = data.date.toLowerCase().includes("no ") || data.date.toLowerCase().includes("on break");
 
@@ -628,7 +642,7 @@ export function buildBibleStudyCard(data: BibleStudyCardData, style?: StyleConte
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "📖",
       colors,
-      style,
+      styleForHeader,
       data.headerTitleColor,
       data.headerSubtitleColor
     ) +
