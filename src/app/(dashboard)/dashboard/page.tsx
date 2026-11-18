@@ -2344,11 +2344,15 @@ export default function DashboardPage() {
   }, [anniversaryForm, templateStyles])
 
   const bibleStudyPreview = useMemo(() => {
+    console.log("🔵 BIBLE STUDY PREVIEW REGENERATING")
+    console.log("📝 bibleStudyForm.primaryColor:", bibleStudyForm.primaryColor)
     const vars = makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
     const cardTitle = bibleStudyForm.useSubjectAsTitle
       ? getSubject("bible_study")  // Use subject line
       : interp(bibleStudyForm.title, vars)  // Use manual title field
-    return buildBibleStudyCard({
+    const commonData = interpCommon(bibleStudyForm, vars)
+    console.log("📦 interpCommon returned primaryColor:", commonData.primaryColor)
+    const cardData = {
       title: cardTitle,
       date: bibleStudyForm.date,
       time: bibleStudyForm.time,
@@ -2357,8 +2361,12 @@ export default function DashboardPage() {
       address: bibleStudyForm.address || undefined,
       city: bibleStudyForm.city || undefined,
       phone: bibleStudyForm.phone || undefined,
-      ...interpCommon(bibleStudyForm, vars),
-    }, buildStyleContext(templateStyles.bible_study))
+      ...commonData,
+    }
+    console.log("✅ Final cardData.primaryColor:", cardData.primaryColor)
+    const result = buildBibleStudyCard(cardData, buildStyleContext(templateStyles.bible_study))
+    console.log("🎨 Built card, first 200 chars:", result.substring(0, 200))
+    return result
   }, [bibleStudyForm, weekLabel, templateStyles])
 
   const womensStudyPreview = useMemo(() => {
@@ -2497,6 +2505,7 @@ export default function DashboardPage() {
       case "birthday":       return birthdayPreview
       case "anniversary":    return anniversaryPreview
       case "bible_study":    return bibleStudyPreview
+      case "mountain_house_bible_study": return bibleStudyPreview
       case "womens_study":   return womensStudyPreview
       case "prayer_meeting": return prayerMeetingPreview
       case "bulletin":       return bulletinPreview
@@ -2511,6 +2520,7 @@ export default function DashboardPage() {
       case "birthday":       return birthdayPreview
       case "anniversary":    return anniversaryPreview
       case "bible_study":    return bibleStudyPreview
+      case "mountain_house_bible_study": return bibleStudyPreview
       case "womens_study":   return womensStudyPreview
       case "prayer_meeting": return prayerMeetingPreview
       case "bulletin":       return bulletinPreview

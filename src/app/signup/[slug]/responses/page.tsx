@@ -19,6 +19,7 @@ interface ResponseEntry {
   data: Record<string, unknown>
   created_at: string
   member_id?: string | null
+  display_name?: string
 }
 
 interface AuditLogEntry {
@@ -153,7 +154,9 @@ export default function SignupResponsesPage() {
     const rows = sortedResponses.map((response, idx) => {
       const row: string[] = []
       row.push(String(idx + 1))
-      row.push(nameField ? String(response.data[nameField.id] || "Anonymous") : "Anonymous")
+      // Use display_name (formatted family name) if available, otherwise fall back to raw data
+      const displayName = response.display_name || (nameField ? String(response.data[nameField.id] || "Anonymous") : "Anonymous")
+      row.push(displayName)
 
       if (monthField) {
         const month = response.data[monthField.id] as number
@@ -208,7 +211,7 @@ export default function SignupResponsesPage() {
   function getSortValue(response: ResponseEntry): string | number {
     if (sortField === "created_at") return new Date(response.created_at).getTime()
     if (sortField === "name") {
-      return nameField ? String(response.data[nameField.id] || "") : ""
+      return response.display_name || (nameField ? String(response.data[nameField.id] || "") : "")
     }
     if (!form) return ""
     const field = form.fields.find((f) => f.id === sortField)
@@ -540,7 +543,8 @@ export default function SignupResponsesPage() {
                   </tr>
                 ) : (
                   sortedResponses.map((response, idx) => {
-                    const name = nameField ? String(response.data[nameField.id] || "Anonymous") : "Anonymous"
+                    // Use display_name (formatted family name like "Jerome & Sunitha") if available
+                    const name = response.display_name || (nameField ? String(response.data[nameField.id] || "Anonymous") : "Anonymous")
                     const month = monthField ? (response.data[monthField.id] as number) : null
                     const isMemberLinked = !!response.member_id
 

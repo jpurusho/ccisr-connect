@@ -44,6 +44,7 @@ import {
   RotateCcw,
   PauseCircle,
   X,
+  Check,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { CalendarEvent } from "./types"
@@ -185,6 +186,8 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
   const [endDate, setEndDate] = useState("")
   const [message, setMessage] = useState("")
   const [saving, setSaving] = useState(false)
+  const [editingBreakId, setEditingBreakId] = useState<string | null>(null)
+  const [editMessage, setEditMessage] = useState("")
 
   useEffect(() => {
     loadBreaks()
@@ -247,6 +250,36 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
       setBreaks((prev) => prev.filter((b) => b.id !== id))
       onBreakChanged?.()
     }
+  }
+
+  function startEditBreak(brk: BreakRecord) {
+    setEditingBreakId(brk.id)
+    setEditMessage(brk.message || "")
+  }
+
+  function cancelEditBreak() {
+    setEditingBreakId(null)
+    setEditMessage("")
+  }
+
+  async function saveEditBreak(id: string) {
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("event_breaks")
+      .update({ message: editMessage.trim() || null } as never)
+      .eq("id", id)
+
+    if (error) {
+      toast.error(`Failed: ${error.message}`)
+    } else {
+      toast.success("Break message updated")
+      setBreaks((prev) => prev.map((b) => (b.id === id ? { ...b, message: editMessage.trim() || null } : b)))
+      setEditingBreakId(null)
+      setEditMessage("")
+      onBreakChanged?.()
+    }
+    setSaving(false)
   }
 
   const [showPastBreaks, setShowPastBreaks] = useState(false)
@@ -314,6 +347,8 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
           </div>
           {visibleBreaks.map((brk) => {
             const status = getBreakStatus(brk)
+            const isEditing = editingBreakId === brk.id
+
             return (
               <div key={brk.id} className="flex items-start justify-between gap-2">
                 <div className="flex-1 space-y-1">
@@ -321,9 +356,37 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
                     <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[status]}`}>
                       {statusLabels[status]}
                     </Badge>
-                    {brk.message && (
+                    {isEditing ? (
+                      <div className="flex items-center gap-1 flex-1">
+                        <Input
+                          value={editMessage}
+                          onChange={(e) => setEditMessage(e.target.value)}
+                          placeholder="Break message (optional)"
+                          className="h-6 text-xs"
+                          disabled={saving}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => saveEditBreak(brk.id)}
+                          disabled={saving}
+                          title="Save"
+                        >
+                          <Check className="size-3.5 text-green-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={cancelEditBreak}
+                          disabled={saving}
+                          title="Cancel"
+                        >
+                          <X className="size-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
                       <span className="text-xs font-medium text-foreground">
-                        {brk.message}
+                        {brk.message || <span className="italic text-muted-foreground">No message</span>}
                       </span>
                     )}
                   </div>
@@ -337,9 +400,26 @@ function BreakManager({ eventId, eventDate, onBreakChanged }: { eventId: string;
                     </span>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteBreak(brk.id)} title="Remove break">
-                  <X className="size-3.5 text-red-500" />
-                </Button>
+                {!isEditing && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => startEditBreak(brk)}
+                      title="Edit message"
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleDeleteBreak(brk.id)}
+                      title="Remove break"
+                    >
+                      <X className="size-3.5 text-red-500" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )
           })}

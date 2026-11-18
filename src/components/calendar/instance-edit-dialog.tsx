@@ -41,6 +41,7 @@ interface InstanceEditDialogProps {
 interface FamilyOption {
   id: string
   family_name: string
+  member_names?: string
 }
 
 export function InstanceEditDialog({
@@ -57,6 +58,8 @@ export function InstanceEditDialog({
   const [instanceEndTime, setInstanceEndTime] = useState("")
   const [locationOverride, setLocationOverride] = useState("")
   const [notes, setNotes] = useState("")
+  const [instanceSubject, setInstanceSubject] = useState("")
+  const [instanceSubjectPrefix, setInstanceSubjectPrefix] = useState("")
   const [status, setStatus] = useState<"draft" | "confirmed" | "cancelled">("confirmed")
 
   const [families, setFamilies] = useState<FamilyOption[]>([])
@@ -69,6 +72,8 @@ export function InstanceEditDialog({
     setInstanceEndTime("")
     setLocationOverride("")
     setNotes("")
+    setInstanceSubject("")
+    setInstanceSubjectPrefix("")
     setStatus("confirmed")
     setLoading(true)
   }, [])
@@ -80,19 +85,43 @@ export function InstanceEditDialog({
     const supabase = createClient()
 
     async function loadData() {
+      // Fetch families with member names for easier searching
       const { data: famsData } = await supabase
         .from("families")
-        .select("id, family_name")
+        .select(`
+          id,
+          family_name,
+          members!inner(first_name, role_in_family, is_active)
+        `)
         .eq("is_active", true)
         .order("family_name")
-        .returns<FamilyOption[]>()
 
-      setFamilies(famsData ?? [])
+      // Format families with member names
+      const formattedFamilies: FamilyOption[] = (famsData || []).map((fam: any) => {
+        const activeMembers = (fam.members || [])
+          .filter((m: any) => m.is_active && ['husband', 'wife'].includes(m.role_in_family))
+          .map((m: any) => m.first_name)
+          .filter(Boolean)
+
+        const memberNames = activeMembers.length > 0
+          ? activeMembers.join(" & ")
+          : ""
+
+        return {
+          id: fam.id,
+          family_name: fam.family_name,
+          member_names: memberNames,
+        }
+      })
+
+      setFamilies(formattedFamilies)
 
       if (instanceId) {
         type Row = {
           instance_time: string | null
           instance_end_time: string | null
+          instance_subject: string | null
+          instance_subject_prefix: string | null
           host_family_id: string | null
           location_override: string | null
           notes: string | null
@@ -100,7 +129,7 @@ export function InstanceEditDialog({
         }
         const { data } = await supabase
           .from("event_instances")
-          .select("instance_time, instance_end_time, host_family_id, location_override, notes, status")
+          .select("instance_time, instance_end_time, instance_subject, instance_subject_prefix, host_family_id, location_override, notes, status")
           .eq("id", instanceId)
           .returns<Row[]>()
           .single()
@@ -109,6 +138,8 @@ export function InstanceEditDialog({
           setHostFamilyId(data.host_family_id ?? "")
           setInstanceTime(data.instance_time ?? "")
           setInstanceEndTime(data.instance_end_time ?? "")
+          setInstanceSubject(data.instance_subject ?? "")
+          setInstanceSubjectPrefix(data.instance_subject_prefix ?? "")
           setLocationOverride(data.location_override ?? "")
           setNotes(data.notes ?? "")
           setStatus(data.status)
@@ -145,6 +176,8 @@ export function InstanceEditDialog({
       const payload = {
         instance_time: instanceTime || null,
         instance_end_time: instanceEndTime || null,
+        instance_subject: instanceSubject.trim() || null,
+        instance_subject_prefix: instanceSubjectPrefix.trim() || null,
         host_family_id: hostFamilyId && hostFamilyId !== "none" ? hostFamilyId : null,
         location_override: locationOverride.trim() || null,
         notes: notes.trim() || null,
@@ -243,13 +276,23 @@ export function InstanceEditDialog({
                 <Select value={hostFamilyId} onValueChange={(v) => setHostFamilyId(v ?? "")}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="None">
-                      {families.find((f) => f.id === hostFamilyId)?.family_name || "None"}
+                      {(() => {
+                        const selected = families.find((f) => f.id === hostFamilyId)
+                        if (!selected) return "None"
+                        return selected.member_names
+                          ? `${selected.member_names} (${selected.family_name})`
+                          : selected.family_name
+                      })()}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     {families.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>{f.family_name}</SelectItem>
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.member_names
+                          ? `${f.member_names} (${f.family_name})`
+                          : f.family_name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -289,6 +332,29 @@ export function InstanceEditDialog({
                 onChange={(e) => setLocationOverride(e.target.value)}
                 placeholder="Leave blank to use default"
               />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ie-subject-prefix">Subject Prefix</Label>
+                <Input
+                  id="ie-subject-prefix"
+                  value={instanceSubjectPrefix}
+                  onChange={(e) => setInstanceSubjectPrefix(e.target.value)}
+                  placeholder="e.g., REMINDER, FINAL NOTICE"
+                />
+                <p className="text-[11px] text-muted-foreground">Optional prefix for email subject</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ie-subject">Email Subject Override</Label>
+                <Input
+                  id="ie-subject"
+                  value={instanceSubject}
+                  onChange={(e) => setInstanceSubject(e.target.value)}
+                  placeholder="Leave blank to use default"
+                />
+                <p className="text-[11px] text-muted-foreground">Customize subject for this occurrence</p>
+              </div>
             </div>
 
             <div className="space-y-1.5">

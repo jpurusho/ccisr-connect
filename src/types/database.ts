@@ -583,6 +583,8 @@ export type Database = {
           info_sections: Json | null
           instance_date: string
           instance_end_time: string | null
+          instance_subject: string | null
+          instance_subject_prefix: string | null
           instance_time: string | null
           location_override: string | null
           notes: string | null
@@ -598,6 +600,8 @@ export type Database = {
           info_sections?: Json | null
           instance_date: string
           instance_end_time?: string | null
+          instance_subject?: string | null
+          instance_subject_prefix?: string | null
           instance_time?: string | null
           location_override?: string | null
           notes?: string | null
@@ -613,6 +617,8 @@ export type Database = {
           info_sections?: Json | null
           instance_date?: string
           instance_end_time?: string | null
+          instance_subject?: string | null
+          instance_subject_prefix?: string | null
           instance_time?: string | null
           location_override?: string | null
           notes?: string | null
