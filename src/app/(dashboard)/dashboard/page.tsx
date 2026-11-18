@@ -2346,6 +2346,11 @@ export default function DashboardPage() {
   }, [anniversaryForm, templateStyles])
 
   const bibleStudyPreview = useMemo(() => {
+    // Don't generate preview until data is loaded
+    if (loading) {
+      console.log("🔵 BIBLE STUDY PREVIEW SKIPPED - still loading")
+      return null
+    }
     console.log("🔵 BIBLE STUDY PREVIEW REGENERATING")
     console.log("📝 bibleStudyForm.primaryColor:", bibleStudyForm.primaryColor)
     const vars = makeEventVars(weekLabel, bibleStudyForm.date, bibleStudyForm.time, bibleStudyForm.topic || "")
@@ -2369,7 +2374,7 @@ export default function DashboardPage() {
     const result = buildBibleStudyCard(cardData, buildStyleContext(templateStyles.bible_study))
     console.log("🎨 Built card, first 200 chars:", result.substring(0, 200))
     return result
-  }, [bibleStudyForm, weekLabel, templateStyles])
+  }, [bibleStudyForm, weekLabel, templateStyles, loading])
 
   const womensStudyPreview = useMemo(() => {
     const vars = makeEventVars(weekLabel, womensStudyForm.date, womensStudyForm.time, womensStudyForm.topic || "")
