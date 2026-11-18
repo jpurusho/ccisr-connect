@@ -673,6 +673,7 @@ export interface WomensStudyCardData extends BaseCardData {
 
 export function buildWomensStudyCard(data: WomensStudyCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.womens_study;
+  const styleForHeader = styleWithoutGradientIfCustomColor(style, !!data.primaryColor);
 
   const details: { label: string; value: string }[] = [];
   details.push({ label: "When", value: `${data.date} at ${data.time}` });
@@ -695,7 +696,7 @@ export function buildWomensStudyCard(data: WomensStudyCardData, style?: StyleCon
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "🕊️",
       colors,
-      style,
+      styleForHeader,
       data.headerTitleColor,
       data.headerSubtitleColor
     ) +
@@ -726,6 +727,7 @@ export interface PrayerMeetingCardData extends BaseCardData {
 
 export function buildPrayerMeetingCard(data: PrayerMeetingCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.prayer_meeting;
+  const styleForHeader = styleWithoutGradientIfCustomColor(style, !!data.primaryColor);
   const sz = style?.sizes ?? SIZE_SCALES.default;
   const message =
     data.message ||
@@ -752,7 +754,7 @@ export function buildPrayerMeetingCard(data: PrayerMeetingCardData, style?: Styl
       data.headerSubtitle || "Christ Church of India, San Ramon",
       data.headerEmoji || "🙏",
       colors,
-      style,
+      styleForHeader,
       data.headerTitleColor,
       data.headerSubtitleColor
     ) +
@@ -794,6 +796,7 @@ export interface BulletinCardData extends BaseCardData {
 
 export function buildBulletinCard(data: BulletinCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.bulletin;
+  const styleForHeader = styleWithoutGradientIfCustomColor(style, !!data.primaryColor);
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const sectionLabel = (icon: string, title: string, sectionColor: string) =>
@@ -832,8 +835,8 @@ export function buildBulletinCard(data: BulletinCardData, style?: StyleContext):
 
   const bulletinEmoji = data.headerEmoji || "⛪";
   const bulletinTitle = data.headerTitle || "Weekly Bulletin";
-  const bulBgStyle = style?.headerGradientCss
-    ? `background-color:${colors.primary};background:${style.headerGradientCss}`
+  const bulBgStyle = styleForHeader?.headerGradientCss
+    ? `background-color:${colors.primary};background:${styleForHeader.headerGradientCss}`
     : `background:${colors.primary}`;
   const bulletinHeader = `<tr><td style="${bulBgStyle};padding:24px 28px;text-align:center">
 <p style="margin:0;font-size:32px;line-height:1">${bulletinEmoji}</p>
@@ -866,6 +869,7 @@ export interface ShoeboxMinistryCardData extends BaseCardData {
 
 export function buildShoeboxMinistryCard(data: ShoeboxMinistryCardData, style?: StyleContext): string {
   const colors = data.primaryColor ? deriveColorsFromPrimary(data.primaryColor) : EVENT_COLORS.shoebox_ministry;
+  const styleForHeader = styleWithoutGradientIfCustomColor(style, !!data.primaryColor);
   const sz = style?.sizes ?? SIZE_SCALES.default;
   const message =
     data.message ||
@@ -897,7 +901,7 @@ export function buildShoeboxMinistryCard(data: ShoeboxMinistryCardData, style?: 
       data.headerSubtitle || "Shoebox Ministry 2026",
       data.headerEmoji || "🎁",
       colors,
-      style,
+      styleForHeader,
       data.headerTitleColor,
       data.headerSubtitleColor
     ) +
@@ -936,14 +940,15 @@ export function buildCustomCard(data: CustomCardData, style?: StyleContext): str
   const colors = data.primaryColor
     ? deriveColorsFromPrimary(data.primaryColor)
     : EVENT_COLORS[data.colorScheme ?? "bulletin"] || EVENT_COLORS.bulletin;
+  const styleForHeader = styleWithoutGradientIfCustomColor(style, !!data.primaryColor);
   const sz = style?.sizes ?? SIZE_SCALES.default;
 
   const effectiveTitle = data.headerTitle || data.title;
   const effectiveSubtitle = data.headerSubtitle || data.subtitle;
   const effectiveEmoji = data.headerEmoji || data.emoji;
 
-  const customBgStyle = style?.headerGradientCss
-    ? `background-color:${colors.primary};background:${style.headerGradientCss}`
+  const customBgStyle = styleForHeader?.headerGradientCss
+    ? `background-color:${colors.primary};background:${styleForHeader.headerGradientCss}`
     : `background:${colors.primary}`;
   const header = data.bannerImageUrl
     ? `<tr><td style="padding:0;line-height:0"><img src="${data.bannerImageUrl}" alt="${effectiveTitle}" style="width:100%;display:block;border-radius:12px 12px 0 0" /></td></tr>
@@ -951,7 +956,7 @@ export function buildCustomCard(data: CustomCardData, style?: StyleContext): str
 <p style="margin:0;font-size:${sz.header - 2}px;font-weight:700;color:${data.headerTitleColor || "#ffffff"};letter-spacing:-0.3px">${effectiveTitle}</p>
 ${effectiveSubtitle ? `<p style="margin:4px 0 0;font-size:${sz.label}px;color:${data.headerSubtitleColor || "rgba(255,255,255,0.85)"};font-weight:500">${effectiveSubtitle}</p>` : ""}
 </td></tr>`
-    : headerRow(effectiveTitle, effectiveSubtitle || "Christ Church of India, San Ramon", effectiveEmoji || "📋", colors, style, data.headerTitleColor, data.headerSubtitleColor);
+    : headerRow(effectiveTitle, effectiveSubtitle || "Christ Church of India, San Ramon", effectiveEmoji || "📋", colors, styleForHeader, data.headerTitleColor, data.headerSubtitleColor);
 
   const messageHtml = data.message
     ? msgBlock(data.message, data.messageBgColor, colors, "16px 0 0", style, data.messageTextColor)
