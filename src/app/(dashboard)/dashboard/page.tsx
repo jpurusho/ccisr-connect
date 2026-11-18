@@ -2506,19 +2506,23 @@ export default function DashboardPage() {
     const d = dispatches[templateType]
     if (d?.body_html && (d.status === "pending" || d.status === "previewed" || d.status === "approved" || d.status === "sending")) {
       // Only use dispatch HTML for queued/pending items (not yet sent, form isn't editable)
+      console.log("🟠 getPreview using DISPATCH HTML for", templateType, "status:", d.status)
       return d.body_html
     }
+    let result: string | null = null
     switch (templateType) {
-      case "birthday":       return birthdayPreview
-      case "anniversary":    return anniversaryPreview
-      case "bible_study":    return bibleStudyPreview
-      case "mountain_house_bible_study": return bibleStudyPreview
-      case "womens_study":   return womensStudyPreview
-      case "prayer_meeting": return prayerMeetingPreview
-      case "bulletin":       return bulletinPreview
-      case "shoebox_ministry": return shoeboxMinistryPreview
-      default:               return null
+      case "birthday":       result = birthdayPreview; break
+      case "anniversary":    result = anniversaryPreview; break
+      case "bible_study":    result = bibleStudyPreview; break
+      case "mountain_house_bible_study": result = bibleStudyPreview; break
+      case "womens_study":   result = womensStudyPreview; break
+      case "prayer_meeting": result = prayerMeetingPreview; break
+      case "bulletin":       result = bulletinPreview; break
+      case "shoebox_ministry": result = shoeboxMinistryPreview; break
+      default:               result = null
     }
+    console.log("🟢 getPreview returning LIVE preview for", templateType, "first 200:", result?.substring(0, 200))
+    return result
   }
 
   // Get the live-computed preview (ignoring dispatch state) — used when creating new dispatches
