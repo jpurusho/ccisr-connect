@@ -847,7 +847,7 @@ export default function DashboardPage() {
         // Event instances for current week (including cancelled — needed for break/cancel detection)
         supabase
           .from("event_instances")
-          .select("id, event_id, instance_date, instance_time, instance_end_time, location_override, notes, host_family_id, status")
+          .select("id, event_id, instance_date, instance_time, instance_end_time, instance_subject, instance_subject_prefix, location_override, notes, host_family_id, status")
           .gte("instance_date", wkSunISO)
           .lte("instance_date", wkSatISO)
           .returns<{
@@ -856,6 +856,8 @@ export default function DashboardPage() {
             instance_date: string
             instance_time: string | null
             instance_end_time: string | null
+            instance_subject: string | null
+            instance_subject_prefix: string | null
             location_override: string | null
             notes: string | null
             host_family_id: string | null
@@ -1289,56 +1291,78 @@ export default function DashboardPage() {
         }
       }
 
+      // ALWAYS resolve host data from signup/instance/event, regardless of draft
+      // This ensures monthly signup data is used every week, not frozen in draft
+      let bsHostData = { hostName: bsDef.hostNames ?? "TBD", address: bsDef.address ?? "TBD", city: bsDef.city ?? "", phone: bsDef.phone ?? "" }
+
+      // Try signup auto-fill first (most specific — user signed up for this month)
+      const bsSignup = etSignupLinks["bible_study"]
+      let bsAutoFill: AutoFillResult | null = null
+      if (bsSignup && bsDate) {
+        bsAutoFill = await resolveSignupAutoFill(bsSignup.formId, bsSignup.fieldMap, bsDate)
+        if (bsAutoFill.source === "signup") {
+          bsHostData = {
+            hostName: bsAutoFill.hostName ?? "TBD",
+            address: bsAutoFill.address ?? "TBD",
+            city: bsAutoFill.city ?? "",
+            phone: bsAutoFill.phone ?? "",
+          }
+        }
+      }
+
+      // Instance/event host_family_id is authoritative (overrides signup raw name)
+      if (bsInstance?.host_family_id) {
+        bsHostData = getHostFamilyInfo(bsInstance.host_family_id)
+      } else if (bsHostData.hostName === "TBD") {
+        if (bsEvent?.host_family_id) {
+          const expired = bsEvent.host_until ? new Date(bsEvent.host_until + "T23:59:59") < new Date() : false
+          if (!expired) bsHostData = getHostFamilyInfo(bsEvent.host_family_id)
+        }
+      }
+      if (bsInstance?.location_override) bsHostData.address = bsInstance.location_override
+      if (bsInstance?.notes) {
+        const contactMatch = bsInstance.notes.match(/Contact:\s*(.+)/i)
+        if (contactMatch) bsHostData.phone = contactMatch[1].trim()
+      }
+
+      if (bsAutoFill?.source === "signup") {
+        autoFills["bible_study"] = bsAutoFill
+      }
+
+      // NOW load draft if it exists (for style/content, not host data)
       if (hasBsDraft) {
         const fd = composedMapByTemplateType["bible_study"].form_data as Record<string, unknown>
         setBibleStudyForm({
+          // Spread template defaults first (fallback values)
+          ...bsCommon,
+          // Then override with draft-specific values
           title: (fd.title as string) ?? bsDef.title ?? "Bible Study This Friday",
           date: bsOnBreak ? bsBreakMessage : bsDateStr,
           time: bsTimeStr ?? (fd.time as string) ?? bsDef.time ?? "7:30 PM",
           topic: (fd.topic as string) ?? bsDef.topic ?? "Studying the Book of Acts",
-          hostNames: (fd.hostNames as string) ?? bsDef.hostNames ?? "TBD",
-          address: (fd.address as string) ?? bsDef.address ?? "TBD",
-          city: (fd.city as string) ?? bsDef.city ?? "",
-          phone: (fd.phone as string) ?? bsDef.phone ?? "",
-          ...bsCommon,
+          // ✅ KEY FIX: Use FRESH host data, not frozen draft data
+          hostNames: bsOnBreak ? "" : bsHostData.hostName,
+          address: bsOnBreak ? "" : bsHostData.address,
+          city: bsOnBreak ? "" : bsHostData.city,
+          phone: bsOnBreak ? "" : bsHostData.phone,
+          // Override style fields from draft
+          message: (fd.message as string) ?? bsCommon.message,
+          messageBgColor: (fd.messageBgColor as string | undefined) ?? bsCommon.messageBgColor,
+          messageTextColor: (fd.messageTextColor as string | undefined) ?? bsCommon.messageTextColor,
+          primaryColor: (fd.primaryColor as string) ?? bsCommon.primaryColor,
+          footerVerse: (fd.footerVerse as string) ?? bsCommon.footerVerse,
+          footerVerseBgColor: (fd.footerVerseBgColor as string | undefined) ?? bsCommon.footerVerseBgColor,
+          footerVerseTextColor: (fd.footerVerseTextColor as string | undefined) ?? bsCommon.footerVerseTextColor,
+          headerTitle: (fd.headerTitle as string) ?? bsCommon.headerTitle,
+          headerTitleColor: (fd.headerTitleColor as string | undefined) ?? bsCommon.headerTitleColor,
+          headerSubtitle: (fd.headerSubtitle as string) ?? bsCommon.headerSubtitle,
+          headerSubtitleColor: (fd.headerSubtitleColor as string | undefined) ?? bsCommon.headerSubtitleColor,
+          headerEmoji: (fd.headerEmoji as string) ?? bsCommon.headerEmoji,
+          resourceLinks: (fd.resourceLinks as typeof bsCommon.resourceLinks) ?? bsCommon.resourceLinks,
+          customSections: (fd.customSections as typeof bsCommon.customSections) ?? bsCommon.customSections,
         })
       } else {
-        let bsHostData = { hostName: bsDef.hostNames ?? "TBD", address: bsDef.address ?? "TBD", city: bsDef.city ?? "", phone: bsDef.phone ?? "" }
-
-        // Try signup auto-fill first (most specific — user signed up for this month)
-        const bsSignup = etSignupLinks["bible_study"]
-        let bsAutoFill: AutoFillResult | null = null
-        if (bsSignup && bsDate) {
-          bsAutoFill = await resolveSignupAutoFill(bsSignup.formId, bsSignup.fieldMap, bsDate)
-          if (bsAutoFill.source === "signup") {
-            bsHostData = {
-              hostName: bsAutoFill.hostName ?? "TBD",
-              address: bsAutoFill.address ?? "TBD",
-              city: bsAutoFill.city ?? "",
-              phone: bsAutoFill.phone ?? "",
-            }
-          }
-        }
-
-        // Instance/event host_family_id is authoritative (overrides signup raw name)
-        if (bsInstance?.host_family_id) {
-          bsHostData = getHostFamilyInfo(bsInstance.host_family_id)
-        } else if (bsHostData.hostName === "TBD") {
-          if (bsEvent?.host_family_id) {
-            const expired = bsEvent.host_until ? new Date(bsEvent.host_until + "T23:59:59") < new Date() : false
-            if (!expired) bsHostData = getHostFamilyInfo(bsEvent.host_family_id)
-          }
-        }
-        if (bsInstance?.location_override) bsHostData.address = bsInstance.location_override
-        if (bsInstance?.notes) {
-          const contactMatch = bsInstance.notes.match(/Contact:\s*(.+)/i)
-          if (contactMatch) bsHostData.phone = contactMatch[1].trim()
-        }
-
-        if (bsAutoFill?.source === "signup") {
-          autoFills["bible_study"] = bsAutoFill
-        }
-
+        // No draft: use fresh host data + template defaults
         setBibleStudyForm({
           title: bsDef.title ?? "Bible Study This Friday",
           date: bsOnBreak ? bsBreakMessage : bsDateStr,
@@ -2195,9 +2219,27 @@ export default function DashboardPage() {
           }
         }
       }
+      // Check event instances for subject overrides (highest priority for events happening this week)
+      const instanceSubjectOverrides: Record<string, string> = {}
+      const instancePrefixOverrides: Record<string, string> = {}
+
+      for (const inst of weekInstances) {
+        // Find the event type for this instance
+        const evt = activeEvents.find((e: { id: string; event_type_id: string }) => e.id === inst.event_id)
+        if (evt?.event_type_id) {
+          // If instance has a subject override, use it
+          if (inst.instance_subject) {
+            instanceSubjectOverrides[evt.event_type_id] = inst.instance_subject
+          }
+          if (inst.instance_subject_prefix) {
+            instancePrefixOverrides[evt.event_type_id] = inst.instance_subject_prefix
+          }
+        }
+      }
+
       setCommOptions({ ...prefilledOptions, ...customCommOpts })
-      setSubjectOverrides({ ...resolvedSubjects, ...customSubjOvr })
-      setSubjectPrefixes((prev) => ({ ...prev, ...resolvedPrefixes }))
+      setSubjectOverrides({ ...resolvedSubjects, ...instanceSubjectOverrides, ...customSubjOvr })
+      setSubjectPrefixes((prev) => ({ ...prev, ...resolvedPrefixes, ...instancePrefixOverrides }))
 
       // Match dispatches for custom templates
       const customDispInfo: Record<string, { status: string; count: number; lastSentAt: string | null }> = {}
@@ -2440,13 +2482,6 @@ export default function DashboardPage() {
     }
   }
 
-  function setSubjectOverride(key: string, value: string) {
-    setSubjectOverrides((prev) => ({ ...prev, [key]: value }))
-  }
-
-  function setSubjectPrefix(keyOrType: string, value: string) {
-    setSubjectPrefixes((prev) => ({ ...prev, [keyOrType]: value }))
-  }
 
   // ---- Get preview for type ----
   // If dispatched/queued, show the exact HTML that was sent/queued.
@@ -4088,9 +4123,7 @@ export default function DashboardPage() {
                   const isReminderContext = status === "sent" || status === "scheduled"
                   return getSubject(templateType, isReminderContext)
                 })()}
-                onSubjectChange={(v) => setSubjectOverride(eventTypeId, v)}
                 subjectPrefix={subjectPrefixes[eventTypeId] || ""}
-                onSubjectPrefixChange={(v) => setSubjectPrefix(eventTypeId, v)}
                 scheduledAt={getScheduledAt(eventTypeId)}
                 previewHtml={getPreview(templateType)}
                 resourceLinks={links[templateType]}
@@ -4138,9 +4171,7 @@ export default function DashboardPage() {
               status={di.status as CommunicationStatus}
               summaryLines={[form.title || "Custom announcement"]}
               subject={subj}
-              onSubjectChange={(v) => setSubjectOverrides((prev) => ({ ...prev, [ct.id]: v }))}
               subjectPrefix={subjectPrefixes[ct.id] || ""}
-              onSubjectPrefixChange={(v) => setSubjectPrefix(ct.id, v)}
               previewHtml={preview}
               resourceLinks={(form.resourceLinks ?? []).filter((l) => l.url)}
               mailingLists={mailingLists}

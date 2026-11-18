@@ -71,9 +71,7 @@ export interface WeeklyCommunicationCardProps {
   status: CommunicationStatus
   summaryLines: string[]
   subject?: string
-  onSubjectChange?: (value: string) => void
   subjectPrefix?: string
-  onSubjectPrefixChange?: (value: string) => void
   scheduledAt?: Date | null
   previewHtml?: string | null
   resourceLinks?: ResourceLink[]
@@ -180,9 +178,7 @@ export function WeeklyCommunicationCard({
   status,
   summaryLines,
   subject,
-  onSubjectChange,
   subjectPrefix,
-  onSubjectPrefixChange,
   scheduledAt,
   previewHtml,
   onSendNow,
@@ -285,41 +281,18 @@ export function WeeklyCommunicationCard({
           </div>
         </div>
 
-        {/* Subject prefix (optional) */}
-        {subject !== undefined && editing && onSubjectPrefixChange && (
-          <div className="px-4 pl-5 pt-2">
-            <label htmlFor="subject-prefix" className="text-xs font-medium text-muted-foreground mb-1 block">
-              Subject Prefix <span className="text-xs font-normal text-muted-foreground/60">(optional)</span>
-            </label>
-            <input
-              id="subject-prefix"
-              type="text"
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 min-h-[44px] text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-              placeholder="e.g., Reminder, Final Notice"
-              value={subjectPrefix || ""}
-              onChange={(e) => onSubjectPrefixChange(e.target.value)}
-              aria-label="Subject prefix (optional)"
-            />
-          </div>
-        )}
 
-        {/* Subject line */}
+        {/* Subject line (read-only - edit via Calendar) */}
         {subject !== undefined && (
           <div className="px-4 pl-5 pt-2">
-            <label htmlFor="email-subject" className="text-xs font-medium text-muted-foreground mb-1 block">Subject</label>
-            {editing && onSubjectChange ? (
-              <input
-                id="email-subject"
-                type="text"
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 min-h-[44px] text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                value={subject}
-                onChange={(e) => onSubjectChange(e.target.value)}
-                aria-label="Email subject"
-              />
-            ) : (
-              <p className="text-sm font-medium truncate">
-                {subjectPrefix && <span className="text-primary">{subjectPrefix}: </span>}
-                {subject}
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Email Subject</label>
+            <p className="text-sm font-medium">
+              {subjectPrefix && <span className="text-primary">{subjectPrefix}: </span>}
+              {subject}
+            </p>
+            {editing && (
+              <p className="text-xs text-muted-foreground mt-1">
+                To customize the subject, click the date in Calendar → Edit Date
               </p>
             )}
           </div>
@@ -628,6 +601,19 @@ export function WeeklyCommunicationCard({
                 </Button>
               )}
             </div>
+
+            {/* Info banner: What's editable here */}
+            <div className="px-4 pt-3 pl-5">
+              <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3 text-xs">
+                <p className="font-medium text-blue-900 dark:text-blue-300 mb-1">
+                  ✏️ Editing Presentation (This Week Only)
+                </p>
+                <p className="text-blue-700 dark:text-blue-400">
+                  You can customize colors, messages, and styling here. To change operational details (host, time, location, subject), go to Calendar → click the date → Edit Date.
+                </p>
+              </div>
+            </div>
+
             <div className="px-4 py-4 pl-5">
               {children}
             </div>
