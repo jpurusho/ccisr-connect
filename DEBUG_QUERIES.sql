@@ -8,7 +8,7 @@
 -- ────────────────────────────────────────────────────────────────────────────
 SELECT
   e.id,
-  e.name,
+  e.title,
   e.recurrence_rule,
   et.name as event_type_name,
   e.created_at,
@@ -16,10 +16,10 @@ SELECT
 FROM events e
 LEFT JOIN event_types et ON e.event_type_id = et.id
 LEFT JOIN event_breaks eb ON eb.event_id = e.id AND eb.end_date >= CURRENT_DATE
-WHERE e.name ILIKE '%bible%study%'
+WHERE e.title ILIKE '%bible%study%'
    OR et.name ILIKE '%bible%study%'
-GROUP BY e.id, e.name, e.recurrence_rule, et.name, e.created_at
-ORDER BY e.name;
+GROUP BY e.id, e.title, e.recurrence_rule, et.name, e.created_at
+ORDER BY e.title;
 
 -- Expected: Should see 2 rows (San Ramon + Mountain House)
 -- If you see more, you might have duplicate events
@@ -28,7 +28,7 @@ ORDER BY e.name;
 -- QUERY 2: Check all breaks for Bible Study events
 -- ────────────────────────────────────────────────────────────────────────────
 SELECT
-  e.name as event_name,
+  e.title as event_title,
   eb.id as break_id,
   eb.start_date,
   eb.end_date,
@@ -41,7 +41,7 @@ SELECT
   END as status
 FROM event_breaks eb
 JOIN events e ON eb.event_id = e.id
-WHERE e.name ILIKE '%bible%study%'
+WHERE e.title ILIKE '%bible%study%'
 ORDER BY eb.start_date DESC;
 
 -- Expected: Should see your San Ramon break here
@@ -73,7 +73,7 @@ LIMIT 30;
 -- QUERY 4: Check specific event (replace with your event ID)
 -- ────────────────────────────────────────────────────────────────────────────
 -- First, get the event ID for San Ramon Bible Study:
-SELECT id, name FROM events WHERE name ILIKE '%san ramon%bible%';
+SELECT id, title FROM events WHERE title ILIKE '%san ramon%bible%';
 
 -- Then check its breaks (replace <EVENT_ID> with the actual ID):
 -- SELECT * FROM event_breaks WHERE event_id = '<EVENT_ID>';
@@ -115,14 +115,14 @@ ORDER BY created_at DESC;
 -- ────────────────────────────────────────────────────────────────────────────
 SELECT
   CURRENT_TIMESTAMP as checked_at,
-  e.name as event_name,
+  e.title as event_title,
   COUNT(eb.id) FILTER (WHERE eb.end_date >= CURRENT_DATE) as active_breaks,
   COUNT(eb.id) FILTER (WHERE eb.end_date < CURRENT_DATE) as past_breaks,
   MAX(eb.end_date) FILTER (WHERE eb.end_date >= CURRENT_DATE) as latest_break_end
 FROM events e
 LEFT JOIN event_breaks eb ON eb.event_id = e.id
-WHERE e.name ILIKE '%bible%study%'
-GROUP BY e.id, e.name;
+WHERE e.title ILIKE '%bible%study%'
+GROUP BY e.id, e.title;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- DIAGNOSTIC: Check CASCADE DELETE is working
