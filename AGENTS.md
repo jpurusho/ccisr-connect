@@ -4,6 +4,18 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+# Architecture First
+
+**READ THIS FIRST:** See `ARCHITECTURE.md` for system boundaries and clean separation rules.
+
+**Quick Reference:**
+- Calendar = Operational data (schedules, breaks, subjects)
+- Templates = Presentation defaults (colors, styling)
+- Dashboard = Week-specific overrides (this week only)
+- Each system ONLY touches its own database tables
+
+**Critical:** Templates MUST NOT modify `event_breaks` or `event_instances`. This was causing data loss pre-v1.90.3.
+
 # No code duplication
 Shared logic (interpolation, var builders, type helpers, etc.) must live in a common utility file. Never copy the same logic into multiple pages or components — extract it first, then import it everywhere.
 
@@ -57,10 +69,32 @@ Operational data (what happens) lives separately from presentation data (how it 
 - ✅ Only save colors, custom messages, and styling
 
 ### 5. Dispatches (Immutable History)
-- **Table:** `email_dispatches`
+- **Table:** `dispatch_queue`
 - **Purpose:** Historical record of sent emails
 - **Contains:** Snapshot of what was actually sent
 - **Read-only** - never modified after sending
+
+---
+
+## Architecture Boundaries (CRITICAL)
+
+**Post v1.90.3: Clean Separation Achieved**
+
+Each layer has STRICT boundaries and MUST NOT cross them:
+
+| System | Owns | Never Touches |
+|--------|------|---------------|
+| **Calendar** | Operational data | Templates, drafts, styling |
+| **Templates** | Presentation defaults | Breaks, schedules, instances |
+| **Dashboard** | Week-specific overrides | Schedules, templates (read-only) |
+| **Dispatches** | History | Everything (immutable) |
+
+**Why This Matters:**
+
+Before v1.90.3, Templates page was deleting breaks (operational data) when saving template styling.
+This caused the "break disappearing" bug where Calendar breaks were lost on template save.
+
+**Now:** Each system respects boundaries. Templates ONLY touch `email_templates` table.
 
 ## Data Flow (Always Downward)
 
