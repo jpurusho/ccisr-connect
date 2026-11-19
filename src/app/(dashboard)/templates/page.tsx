@@ -326,34 +326,13 @@ export default function TemplatesPage() {
     const formData = getDataForType(typeName) as Record<string, unknown>
 
     const formLocations = formData.locations as { label: string; breaks?: { from: string; to: string; message: string }[] }[] | undefined
-    const breaksToWrite: { location_id: string | null; start_date: string; end_date: string; message: string | null }[] = []
 
-    const templateBreaks = formData.breaks as { from: string; to: string; message: string }[] | undefined
-    if (templateBreaks) {
-      for (const brk of templateBreaks) {
-        if (brk.from && brk.to) {
-          breaksToWrite.push({ location_id: null, start_date: brk.from, end_date: brk.to, message: brk.message || null })
-        }
-      }
-    }
-
-    if (formLocations) {
-      for (const formLoc of formLocations) {
-        if (!formLoc.breaks) continue
-        for (const brk of formLoc.breaks) {
-          if (brk.from && brk.to) {
-            breaksToWrite.push({ location_id: null, start_date: brk.from, end_date: brk.to, message: brk.message || null })
-          }
-        }
-      }
-    }
-
-    await supabase.from("event_breaks").delete().eq("event_id", eventId)
-    if (breaksToWrite.length > 0) {
-      await supabase.from("event_breaks").insert(
-        breaksToWrite.map((b) => ({ event_id: eventId, ...b })) as never
-      )
-    }
+    // REMOVED: Break management from templates
+    // Breaks are now managed ONLY in Calendar page to prevent data loss
+    // Previous code here was deleting ALL breaks for the event, including
+    // those manually added via Calendar, causing the "break disappearing" bug
+    //
+    // If you need to manage breaks, use: Calendar page → Click event → Breaks section
 
     const zoomLink = formData.zoomLink as string | undefined
     if (zoomLink) {

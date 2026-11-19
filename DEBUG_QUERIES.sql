@@ -53,12 +53,12 @@ ORDER BY eb.start_date DESC;
 SELECT
   created_at,
   action,
-  table_name,
+  entity_type,
   entity_id,
   user_id,
   changes
 FROM audit_log
-WHERE table_name IN ('events', 'event_breaks')
+WHERE entity_type IN ('events', 'event_breaks')
   AND action LIKE '%delet%'
   AND created_at > CURRENT_DATE - INTERVAL '7 days'
 ORDER BY created_at DESC
