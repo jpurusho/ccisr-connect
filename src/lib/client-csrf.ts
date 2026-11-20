@@ -10,9 +10,12 @@ export function getCsrfToken(): string | null {
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=')
     if (name === 'csrf-token') {
-      return decodeURIComponent(value)
+      const token = decodeURIComponent(value)
+      console.log('[CSRF] Token found:', token.substring(0, 8) + '...')
+      return token
     }
   }
+  console.warn('[CSRF] Token not found. Available cookies:', cookies.map(c => c.trim().split('=')[0]))
   return null
 }
 
@@ -34,6 +37,7 @@ export function getAuthHeaders(): Record<string, string> {
 
 /**
  * Fetch wrapper that automatically includes CSRF token
+ * Retries once on CSRF failure to handle race conditions on initial page load
  */
 export async function fetchWithCsrf(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers)
@@ -47,8 +51,30 @@ export async function fetchWithCsrf(url: string, options: RequestInit = {}) {
     headers.set('Content-Type', 'application/json')
   }
 
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers,
   })
+
+  // If we get a 403 (CSRF failure) and haven't retried yet, try once more
+  // This handles the race condition where the token wasn't available on first call
+  if (response.status === 403 && !headers.has('x-csrf-retry')) {
+    // Wait a moment for cookie to be committed
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Retry with fresh token
+    const retryHeaders = new Headers(headers)
+    const freshToken = getCsrfToken()
+    if (freshToken) {
+      retryHeaders.set('x-csrf-token', freshToken)
+      retryHeaders.set('x-csrf-retry', 'true') // Prevent infinite retry
+
+      return fetch(url, {
+        ...options,
+        headers: retryHeaders,
+      })
+    }
+  }
+
+  return response
 }
